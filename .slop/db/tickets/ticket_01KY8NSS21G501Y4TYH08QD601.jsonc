@@ -1,0 +1,37 @@
+{
+  "id": "ticket_01KY8NSS21G501Y4TYH08QD601",
+  "name": "E1: polish — --json/--budget everywhere, exit codes, error copy, --tree, help text",
+  "slug": "e1-polish-json-budget-everywhere-exit-codes-error-copy-tree",
+  "spec": {
+    "summary": "E1: polish — --json/--budget everywhere, exit codes, error copy, --tree, help text",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "lane:E"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KY8NSS21G501Y4TYH08QD601",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-23T23:43:31.913Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-23T23:43:31.913Z",
+  "updated_at": "2026-07-23T23:43:31.913Z"
+}

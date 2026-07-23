@@ -1,0 +1,20 @@
+{
+  "id": "event_01KY8NSS2HAQ1Z7D6JMNXKX2AY",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.created",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KY8NSS21G501Y4TYH08QD601"
+  },
+  "payload": {
+    "method": "new",
+    "state": "open",
+    "adhoc": false,
+    "parent": null
+  },
+  "at": "2026-07-23T23:43:31.921Z"
+}

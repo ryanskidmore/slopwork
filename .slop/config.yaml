@@ -1,0 +1,8 @@
+project: slopwork
+user: Ryan Skidmore                    # actor fallback (D17)
+remotes:
+  repo: https://github.com/ryanskidmore/slopwork   # autodetected
+defaults:
+  stale_after: 60m
+  review_stale_after: 24h
+transcripts: local            # local | commit | off

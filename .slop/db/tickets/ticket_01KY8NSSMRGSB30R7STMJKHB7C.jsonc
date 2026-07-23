@@ -1,0 +1,37 @@
+{
+  "id": "ticket_01KY8NSSMRGSB30R7STMJKHB7C",
+  "name": "v0 final verification report: full suite, lint, --help, e2e smoke, merge sim, web routes, status backlog, git log",
+  "slug": "v0-final-verification-report-full-suite-lint-help-e2e-smoke",
+  "spec": {
+    "summary": "v0 final verification report: full suite, lint, --help, e2e smoke, merge sim, web routes, status backlog, git log",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "kind:release"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KY8NSSMRGSB30R7STMJKHB7C",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-23T23:43:32.522Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-23T23:43:32.522Z",
+  "updated_at": "2026-07-23T23:43:32.522Z"
+}
