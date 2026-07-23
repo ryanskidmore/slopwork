@@ -25,6 +25,7 @@ import { join } from "node:path";
 import type { Actor, ActorKind, Config } from "../core/index.js";
 import { configSchema, resolveActorName } from "../core/index.js";
 import type { RepoPaths } from "../repo/paths.js";
+import { detectHarness, sniffHarnessKind } from "../sessions/harness.js";
 import { parseConfigYamlText } from "./config-yaml.js";
 import { SlopError } from "./errors.js";
 
@@ -100,32 +101,49 @@ export async function loadConfig(paths: RepoPaths): Promise<Config> {
  * Cheap, env-only signal for whether this process is running *as* (or
  * under the direct control of) a coding-agent harness, reused here purely
  * to pick an {@link Actor}'s `kind` (`"human"` vs `"agent"`) — NOT a
- * general harness-kind detector. C1/S1 owns the real `HarnessKind`
- * sniffing (`claude-code`/`opencode`/`codex`/`other`, with `--harness`
- * override and session-id capture, see spikes/findings.md §2); this only
- * asks the narrower yes/no question a bare `Actor` needs. Deliberately
- * reuses the exact same three signals/precedence spikes/findings.md §2
- * documents (steps a-c), so a `--as ryan` run from an interactive human
- * shell resolves `kind: "human"`, while the same command run as a tool
- * call inside e.g. Claude Code resolves `kind: "agent"` — without this
- * module having to wait on C1 to land first.
+ * general harness-kind detector.
+ *
+ * **Formalised by C1** (this was a provisional standalone heuristic before
+ * C1 landed real `HarnessKind` sniffing, spikes/findings.md §1-§2): now a
+ * thin wrapper over `src/sessions/harness.ts`'s {@link sniffHarnessKind},
+ * the single canonical sniff C1/C4 both build on, rather than a second,
+ * independently-maintained copy of the same three env checks. Behavior for
+ * every existing caller is unchanged — this is still exactly "is *some*
+ * agent harness driving this process" (kind !== "other"), just no longer
+ * its own implementation of that question.
  */
 export function isAgentHarnessEnv(env: NodeJS.ProcessEnv): boolean {
-  if (env.CLAUDECODE === "1") return true;
-  if (env.OPENCODE === "1") return true;
-  if (env.CODEX_SANDBOX_NETWORK_DISABLED !== undefined || env.CODEX_SANDBOX !== undefined) {
-    return true;
-  }
-  return false;
+  return sniffHarnessKind(env) !== "other";
 }
 
-function actorKind(env: NodeJS.ProcessEnv): ActorKind {
-  return isAgentHarnessEnv(env) ? "agent" : "human";
+/**
+ * `kind` resolution, formalised the same way: run the SAME `HarnessKind`
+ * detection `slop start` uses (`detectHarness`, D17 precedence — `
+ * --harness` override, if the calling command registered one, always
+ * wins over sniffing), and derive `"agent"`/`"human"` from its result
+ * (`"other"` = human at the CLI, since a plain shell invocation with no
+ * detectable harness is the human-driven case). This is the exact
+ * question a bare `Actor.kind` needs — `harnessFlag` only matters for
+ * commands that register `--harness` (today, just `slop start`); every
+ * other caller omits it and falls straight through to sniffing, same as
+ * before.
+ */
+function actorKind(env: NodeJS.ProcessEnv, harnessFlag?: string | null): ActorKind {
+  return detectHarness({ harnessFlag, env }).kind === "other" ? "human" : "agent";
 }
 
 export interface ResolveActorOptions {
   /** `--as <name>` flag value, only present on commands that register it (design.md §4.2 shows it on `slop start`). */
   asFlag?: string | null;
+  /**
+   * `--harness <kind>` flag value, only present on commands that register
+   * one (today, just `slop start`, C1) — feeds `kind` resolution through
+   * the same D17 override the harness itself uses, so `--as ryan --harness
+   * codex` resolves `kind: "agent"` even though `--as` overrides the
+   * *name*. Omit entirely on a command with no `--harness` flag; `kind`
+   * then falls back to plain env sniffing, same as before C1.
+   */
+  harnessFlag?: string | null;
   /** Already-loaded config.yaml, or `null` if none could be loaded (a command that can proceed without one, e.g. before `slop init`). */
   config: Config | null;
   /** Directory to run `git config` in — normally the repo root. */
@@ -156,5 +174,5 @@ export function resolveActor(options: ResolveActorOptions): Actor {
         ".slop/config.yaml, or configure `git config user.name` (design.md D17)",
     );
   }
-  return { name, kind: actorKind(env) };
+  return { name, kind: actorKind(env, options.harnessFlag) };
 }

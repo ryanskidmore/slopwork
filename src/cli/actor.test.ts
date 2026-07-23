@@ -163,4 +163,33 @@ describe("resolveActor (D17: --as > SLOP_ACTOR > config user > git user.name)", 
     const human = resolveActor({ asFlag: "x", config: null, cwd: scratch, env: isolatedGitEnv() });
     expect(human.kind).toBe("human");
   });
+
+  // C1: `kind` is now formalised over the real HarnessKind sniff
+  // (src/sessions/harness.ts), including its `--harness` override for
+  // whichever command registers one (today, just `slop start`).
+  it("an explicit harnessFlag wins over env sniffing for `kind`, same as the harness sniff itself (D17)", () => {
+    const flaggedAgent = resolveActor({
+      asFlag: "x",
+      harnessFlag: "codex",
+      config: null,
+      cwd: scratch,
+      env: isolatedGitEnv(), // no env harness signals at all
+    });
+    expect(flaggedAgent.kind).toBe("agent");
+
+    const flaggedOther = resolveActor({
+      asFlag: "x",
+      harnessFlag: "other",
+      config: null,
+      cwd: scratch,
+      // env DOES have a real harness signal, but --harness other overrides it
+      env: isolatedGitEnv({ CLAUDECODE: "1" }),
+    });
+    expect(flaggedOther.kind).toBe("human");
+  });
+
+  it("without a harnessFlag, `kind` falls back to plain env sniffing (every non-`start` caller)", () => {
+    const human = resolveActor({ asFlag: "x", config: null, cwd: scratch, env: isolatedGitEnv() });
+    expect(human.kind).toBe("human");
+  });
 });
