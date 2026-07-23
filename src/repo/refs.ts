@@ -4,14 +4,24 @@
  *
  * Precedence, in order — and this order is load-bearing, not incidental:
  *   1. **Full prefixed id** (`ticket_<ULID>`) — an exact filename lookup,
- *      no scan needed.
- *   2. **Exact slug** — always wins over a short-prefix interpretation.
- *      This matters because a slug and a ULID prefix live in disjoint
- *      character spaces in practice (slugs are lowercase-hyphenated
- *      words; ULID prefixes are Crockford base32) but nothing *stops* a
- *      short prefix from accidentally reading as a plausible slug
- *      fragment, so the rule needs to be explicit rather than "whichever
- *      matches first": slug wins.
+ *      no scan needed. ULIDs are canonically uppercase (core/ids.ts), so
+ *      this step is intentionally case-sensitive — an exact filename
+ *      match either is or isn't.
+ *   2. **Exact slug, case-insensitively** — always wins over a
+ *      short-prefix interpretation. This matters because a slug and a
+ *      ULID prefix live in disjoint character spaces in practice (slugs
+ *      are lowercase-hyphenated words; ULID prefixes are Crockford
+ *      base32) but nothing *stops* a short prefix from accidentally
+ *      reading as a plausible slug fragment, so the rule needs to be
+ *      explicit rather than "whichever matches first": slug wins.
+ *      Slugs are lowercase by construction (`slugify`, core/slug.ts), so
+ *      the incoming ref is lowercased before this lookup (adversarial
+ *      -review Finding 5: slug matching used to be exact-case only, so
+ *      `Alpha-Ticket` failed to resolve against slug `alpha-ticket` even
+ *      though a mixed-case ULID prefix resolved fine at step 3 below —
+ *      inconsistent, and strictly more surprising than being forgiving
+ *      here too). This is strictly more permissive than before, never
+ *      less: anything that resolved by exact-case slug still does.
  *   3. **Unique short id prefix** (`idMatchesRef`, core/ids.ts) — matches
  *      against the id verbatim or the bare ULID, case-insensitively.
  *      More than one match is a git-style "ambiguous ref" error, not a
@@ -96,9 +106,14 @@ export async function resolveTicketRef(paths: RepoPaths, ref: string): Promise<T
   const { index } = await loadIndex(paths);
 
   // Exact slug always wins over a prefix interpretation (see module doc).
-  const slugMatchId = index.slugs[ref];
+  // Slugs are lowercase by construction, so lowercasing the incoming ref
+  // makes this lookup case-insensitive (adversarial-review Finding 5)
+  // without risking any false match — a slug can never differ from its
+  // lowercased self.
+  const refLower = ref.toLowerCase();
+  const slugMatchId = index.slugs[refLower];
   if (slugMatchId !== undefined) {
-    const slugMatches = index.tickets.filter((t) => t.slug === ref);
+    const slugMatches = index.tickets.filter((t) => t.slug === refLower);
     if (slugMatches.length > 1) {
       // Defensive only: slugs are unique by construction (B1's collision
       // suffix). A hand-edited db that broke that invariant should still

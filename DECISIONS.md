@@ -100,3 +100,90 @@ the exact string shape C4 will write there, only the destination
 directory; this is D5's assumption on the writing side, matching what the
 fixture generator emits, and needs to line up with whatever C4 actually
 writes when that work item lands.
+
+## A3 — adversarial-review fixes: lock fencing, index fault tolerance, content-digest fingerprint, case-insensitive slugs
+
+Four findings from an adversarial review of A3 were fixed without
+regressing its own acceptance criterion ("Kill -9 mid-write leaves no
+corrupt files; ambiguous prefix errors git-style; deleted index
+self-heals"). Two of these settle contracts later work items build on
+directly:
+
+**1. `.slop/db/.lock`'s fencing-token contract (`src/repo/lock.ts`).**
+Staleness-by-timeout alone can't tell a dead holder from a slow-but-alive
+one (contended/I/O-stalled/GC-paused/cgroup-throttled), so a legitimate
+holder that ran long could have its lock silently stolen while still
+writing — two "exclusive" holders at once, no error. Fix: every
+acquisition now records a unique fencing token (a ULID) alongside pid/
+`acquired_at`; `acquireLock`/`withLock` return/hand out a `LockHandle`
+exposing `assertHeld(): Promise<void>`, which re-reads the lock file and
+throws `SlopError(CONFLICT, exit 6)` if the token no longer matches (this
+process was dispossessed), and otherwise renews `acquired_at` (so a
+holder that calls it regularly is never reclaimed merely for running
+past `staleTimeoutMs` — the timeout now means "no progress for N", not
+"started more than N ago"). Release is now a token-based compare-and
+-delete when a token is available (falls back to the old pid-based
+compare for a bare `lockPath` caller with no handle).
+
+**Binding contract for every future multi-file transaction inside
+`withLock`** (B4's done-cascade, a future reparent): call the handle's
+`lock.assertHeld()` between each individual entity write, not just once
+at the top. Skipping it defeats the mechanism — a transaction that never
+checks back in can still be silently dispossessed partway through. No
+real call site exists yet (B4/C3 aren't implemented as of this fix); the
+contract, its doc comment in `lock.ts`, and both a real multi-process test
+(`tests/acceptance/a3-lock-worker.ts` via A3.test.ts) and an in-process
+`withLock` unit test (`lock.test.ts`) are in place for whoever lands the
+first real caller.
+
+**2. Index fault tolerance (`src/repo/db-index.ts`, `src/repo/tickets.ts`,
+`src/cli/commands/reindex.ts`).** A single corrupt ticket file used to
+make `buildIndex` throw, which took `slop reindex` — the documented
+recovery command — down with it, along with every other `loadIndex`
+caller. Fix: `tickets.ts` gains `listTicketsTolerant`, a sibling of the
+(unchanged, still fail-fast) `listTickets` that returns `{tickets,
+problems}` instead of throwing; `buildIndex` uses it and returns
+`problems: TicketReadProblem[]` (id/path/message, same message quality
+`readTicket` itself throws) as part of `DbIndex`. Policy, enforced at
+each layer:
+  - `readTicket`/`listTickets` (direct-by-id / all-or-nothing reads):
+    unchanged, still throw. Correct there — the caller asked for exactly
+    that file, or asked for an all-or-nothing scan.
+  - `buildIndex`/`rebuildIndex`: never throw on a bad ticket file; always
+    return/persist whatever *could* be read, with problems recorded.
+  - `loadIndex` (the function every read path should call): warns on
+    stderr (`db-index.ts`'s `formatIndexProblems`) **every single call**
+    that returns an index with `problems.length > 0` — including a
+    `"fresh"` (non-rebuilt) load serving a persisted problems list from
+    an earlier build. Never silent, never "once and done."
+  - `slop reindex`: reports every problem in one pass with its full
+    actionable error, still rebuilds and saves everything readable, and
+    exits `GENERIC_ERROR` (1) iff any problem remains (0 when clean).
+    `--strict` restores the old fail-fast, all-or-nothing behavior via a
+    `listTickets(paths)` gate call before `rebuildIndex` runs at all.
+No `INDEX_SCHEMA_VERSION` bump for the new `problems` field or the
+fingerprint shape change below: `loadIndex`'s auto-heal already treats
+*any* on-disk shape mismatch (regardless of cause) as `invalid_schema`
+and transparently rebuilds, so a version bump would protect nothing a
+pre-existing mechanism doesn't already cover for free.
+
+**3. Content fingerprint is now a digest, not max-mtime
+(`src/repo/db-index.ts`).** The old `{count, max_mtime_ms}` fingerprint
+missed a real content change whenever the edited file's mtime didn't
+happen to be the directory's max — e.g. `cp -p`/`rsync -t`/a backup
+restore/clock skew between two machines, all realistic given this
+project's explicit multi-agent/multi-machine target. Replaced with
+`{count, digest}`, where `digest` is a sha256 hex digest over every
+entity file's own `(filename, mtimeMs, size)` tuple, sorted by filename —
+still `readdir`+`stat` only, no file content read, same cost class
+(measured 1.7-5.0ms, median ~2.8ms, over 1,000 tickets in this
+environment, vs. the pre-fix implementation's own reported ~1.7ms — see
+the work item's report). Narrows the known same-millisecond blind spot to
+same-millisecond *and* identical byte size.
+
+**4. Slug ref resolution is now case-insensitive
+(`src/repo/refs.ts`).** Slugs are lowercase by construction (`slugify`),
+so `resolveTicketRef` now lowercases the incoming ref before the exact
+-slug lookup — matching `core/ids.ts`'s `idMatchesRef`, which was already
+case-insensitive for short-prefix matching. Documented precedence (slug
+beats prefix) is unchanged; this is strictly more permissive than before.

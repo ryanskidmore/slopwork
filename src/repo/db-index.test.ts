@@ -1,10 +1,17 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixedClock } from "../core/clock.js";
 import { type Ticket, newTicketId, ticketSchema, writeCanonical } from "../core/index.js";
-import { INDEX_SCHEMA_VERSION, buildIndex, computeContentFingerprint, loadIndex, writeIndex } from "./db-index.js";
+import {
+  INDEX_SCHEMA_VERSION,
+  buildIndex,
+  computeContentFingerprint,
+  formatIndexProblems,
+  loadIndex,
+  writeIndex,
+} from "./db-index.js";
 import type { EventContext, MutationEventSpec } from "./events.js";
 import { ensureDbDirs } from "./paths.js";
 import type { RepoPaths } from "./paths.js";
@@ -126,6 +133,52 @@ describe("buildIndex", () => {
     const index = await buildIndex(paths, clock);
     expect(index.tickets[0]?.parent).toBe("jira:PROJ-1");
   });
+
+  it("has an empty problems array in the ordinary (no corruption) case", async () => {
+    const t = makeTicket();
+    await createTicket(paths, t, ctx, createdEvent);
+    const index = await buildIndex(paths, clock);
+    expect(index.problems).toEqual([]);
+  });
+
+  // Adversarial-review Finding 3: a single corrupt ticket file used to
+  // make buildIndex (and therefore `slop reindex`, `ready`, `status`,
+  // ref resolution — everything through loadIndex) throw outright.
+  describe("fault tolerance: a corrupt ticket file never aborts the whole build", () => {
+    it("skips one unreadable ticket file, records it in problems with a high-quality error, and still includes every good ticket", async () => {
+      const good1 = makeTicket();
+      const good2 = makeTicket();
+      await createTicket(paths, good1, ctx, createdEvent);
+      await createTicket(paths, good2, ctx, createdEvent);
+      const badId = newTicketId();
+      const badPath = ticketFilePath(paths, badId);
+      await writeFile(badPath, '{ "id": "not even close to a valid ticket" }');
+
+      const index = await buildIndex(paths, clock);
+
+      expect(index.tickets.map((r) => r.id).sort()).toEqual([good1.id, good2.id].sort());
+      expect(index.problems).toHaveLength(1);
+      expect(index.problems[0]).toMatchObject({ id: badId, path: badPath });
+      // The quality readTicket's own error carries — path + specifics —
+      // must survive into the captured problem, not be flattened away.
+      expect(index.problems[0]?.message).toContain(badPath);
+      expect(index.problems[0]?.message.length).toBeGreaterThan(badPath.length);
+    });
+
+    it("records EVERY bad file in one pass, not just the first", async () => {
+      const good = makeTicket();
+      await createTicket(paths, good, ctx, createdEvent);
+      const bad1 = newTicketId();
+      const bad2 = newTicketId();
+      await writeFile(ticketFilePath(paths, bad1), "{ not even valid jsonc {{{");
+      await writeFile(ticketFilePath(paths, bad2), '{ "id": "still not a valid ticket" }');
+
+      const index = await buildIndex(paths, clock);
+
+      expect(index.tickets.map((r) => r.id)).toEqual([good.id]);
+      expect(index.problems.map((p) => p.id).sort()).toEqual([bad1, bad2].sort());
+    });
+  });
 });
 
 describe("writeIndex / loadIndex — fresh read", () => {
@@ -201,12 +254,90 @@ describe("loadIndex — auto-heal (A3 acceptance: 'deleted index self-heals')", 
     await writeFile(paths.indexFile, "not even close to json {{{");
     await expect(loadIndex(paths, clock)).resolves.toBeDefined();
   });
+
+  // Adversarial-review Finding 3: a corrupt ticket file must never
+  // silently vanish from a build — loadIndex (the function every other
+  // read path calls) warns on stderr, and does so every time it returns
+  // problems, not just once.
+  it("never throws when a ticket file is corrupt either — rebuilds everything readable and records the rest in problems", async () => {
+    const good = makeTicket();
+    await createTicket(paths, good, ctx, createdEvent);
+    await writeFile(ticketFilePath(paths, newTicketId()), "{ not even valid jsonc {{{");
+
+    const result = await loadIndex(paths, clock);
+    expect(result.index.tickets.map((r) => r.id)).toEqual([good.id]);
+    expect(result.index.problems).toHaveLength(1);
+  });
+
+  it("warns on stderr, every time it returns an index with problems — a 'fresh' (non-rebuilt) read is loud too, not just the rebuild", async () => {
+    const good = makeTicket();
+    await createTicket(paths, good, ctx, createdEvent);
+    const badId = newTicketId();
+    const badPath = ticketFilePath(paths, badId);
+    await writeFile(badPath, "{ not even valid jsonc {{{");
+
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const first = await loadIndex(paths, clock);
+      expect(first.rebuilt).toBe(true);
+      expect(stderrSpy).toHaveBeenCalledTimes(1);
+      expect(String(stderrSpy.mock.calls[0]?.[0])).toContain(badPath);
+
+      // A second read, with NOTHING on disk changed: the fingerprint
+      // matches, so this is a "fresh" (non-rebuilt) load — but the
+      // persisted problems list still names the same bad file, so this
+      // must warn AGAIN. Silence here would mean "loud once, then never
+      // again," which is exactly what Finding 3 says not to do.
+      const second = await loadIndex(paths, clock);
+      expect(second.rebuilt).toBe(false);
+      expect(second.reason).toBe("fresh");
+      expect(stderrSpy).toHaveBeenCalledTimes(2);
+      expect(String(stderrSpy.mock.calls[1]?.[0])).toContain(badPath);
+    } finally {
+      stderrSpy.mockRestore();
+    }
+  });
+
+  it("does NOT warn on stderr when there are no problems", async () => {
+    const t = makeTicket();
+    await createTicket(paths, t, ctx, createdEvent);
+
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      await loadIndex(paths, clock);
+      expect(stderrSpy).not.toHaveBeenCalled();
+    } finally {
+      stderrSpy.mockRestore();
+    }
+  });
+});
+
+describe("formatIndexProblems", () => {
+  it("renders a count header plus each problem's path and full message", () => {
+    const text = formatIndexProblems([
+      {
+        id: "ticket_01ARZ3NDEKTSV4RRFFQ69G5FAA" as Ticket["id"],
+        path: "/x/ticket_a.jsonc",
+        message: "/x/ticket_a.jsonc: invalid JSONC\n  line 3, column 1: bad token",
+      },
+      {
+        id: "ticket_01ARZ3NDEKTSV4RRFFQ69G5FAB" as Ticket["id"],
+        path: "/x/ticket_b.jsonc",
+        message: "/x/ticket_b.jsonc: failed schema validation\n  id: expected ticket_<ULID>",
+      },
+    ]);
+    expect(text).toContain("2 ticket file(s)");
+    expect(text).toContain("/x/ticket_a.jsonc");
+    expect(text).toContain("line 3, column 1: bad token");
+    expect(text).toContain("/x/ticket_b.jsonc");
+    expect(text).toContain("id: expected ticket_<ULID>");
+  });
 });
 
 describe("computeContentFingerprint", () => {
-  it("is {count:0, max_mtime_ms:0} for an empty tickets dir", async () => {
+  it("is {count:0, digest:<empty-input sha256>} for an empty tickets dir", async () => {
     const fp = await computeContentFingerprint(paths);
-    expect(fp.tickets).toEqual({ count: 0, max_mtime_ms: 0 });
+    expect(fp.tickets).toEqual({ count: 0, digest: expect.any(String) });
   });
 
   it("counts only real ticket entity files, ignoring temp/other debris", async () => {
@@ -216,8 +347,8 @@ describe("computeContentFingerprint", () => {
     await writeFile(join(paths.ticketsDir, "not-a-ticket.txt"), "x");
 
     const fp = await computeContentFingerprint(paths);
-    expect(fp.tickets).toEqual({ count: 1, max_mtime_ms: expect.any(Number) });
-    expect(fp.tickets?.max_mtime_ms).toBeGreaterThan(0);
+    expect(fp.tickets).toEqual({ count: 1, digest: expect.any(String) });
+    expect(fp.tickets?.digest.length).toBeGreaterThan(0);
   });
 
   it("is readdir+stat only — never reads or parses file content (spot check: garbage content doesn't throw)", async () => {
@@ -225,8 +356,43 @@ describe("computeContentFingerprint", () => {
     await createTicket(paths, t, ctx, createdEvent);
     await writeFile(ticketFilePath(paths, t.id), "{ not even valid jsonc {{{");
     await expect(computeContentFingerprint(paths)).resolves.toEqual({
-      tickets: { count: 1, max_mtime_ms: expect.any(Number) },
+      tickets: { count: 1, digest: expect.any(String) },
     });
+  });
+
+  // Adversarial-review Finding 2: the old count+max-mtime-only fingerprint
+  // could miss a real content change if the edited file's mtime never
+  // advanced past another file's already-recorded max — exactly what
+  // `cp -p`/`rsync -t`/a backup restore/clock skew between machines
+  // produces. The digest must catch this: a file's mtime or size
+  // changing, *in either direction*, always changes the digest.
+  it("changes when a file's mtime is pushed BACKWARDS below another file's mtime — same count, same 'max' either way (Finding 2)", async () => {
+    const older = makeTicket({ name: "Older ticket" });
+    await createTicket(paths, older, ctx, createdEvent);
+    const olderPath = ticketFilePath(paths, older.id);
+    const baseTime = new Date("2026-07-23T10:00:00.000Z");
+    await utimes(olderPath, baseTime, baseTime);
+
+    const newer = makeTicket({ name: "Newer ticket" });
+    await createTicket(paths, newer, ctx, createdEvent);
+    const newerTime = new Date(baseTime.getTime() + 5_000);
+    await utimes(ticketFilePath(paths, newer.id), newerTime, newerTime);
+
+    const before = await computeContentFingerprint(paths);
+
+    // Edit the OLDER ticket's content, then force its mtime backwards —
+    // still less than `newer`'s mtime, so a max-mtime-only fingerprint
+    // would see the directory's max as unchanged and its count as
+    // unchanged, and therefore (wrongly) conclude nothing changed.
+    const raw = await readFile(olderPath, "utf8");
+    await writeFile(olderPath, raw.replace("Older ticket", "Older ticket RENAMED"));
+    const editedTime = new Date(baseTime.getTime() + 1_000); // still < newerTime
+    await utimes(olderPath, editedTime, editedTime);
+
+    const after = await computeContentFingerprint(paths);
+
+    expect(after.tickets?.count).toBe(before.tickets?.count); // count: unchanged
+    expect(after.tickets?.digest).not.toBe(before.tickets?.digest); // digest: caught it anyway
   });
 });
 

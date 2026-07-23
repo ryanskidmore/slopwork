@@ -16,7 +16,9 @@ import { createTicket } from "./tickets.js";
 const ctx: EventContext = { actor: { name: "ryan", kind: "human" }, session: null };
 const createdEvent: MutationEventSpec = { verb: "ticket.created" };
 
-function makeIndexRow(overrides: Partial<IndexTicketRow> & Pick<IndexTicketRow, "id">): IndexTicketRow {
+function makeIndexRow(
+  overrides: Partial<IndexTicketRow> & Pick<IndexTicketRow, "id">,
+): IndexTicketRow {
   return {
     slug: "x",
     name: "X",
@@ -113,6 +115,37 @@ describe("resolveTicketRef — exact slug", () => {
     // a.id's and b.id's bare ULID (since they share that literal
     // prefix) — without the "slug wins" rule this would be ambiguous.
     const resolved = await resolveTicketRef(paths, shared.toLowerCase());
+    expect(resolved.id).toBe(slugTicket.id);
+  });
+
+  // Adversarial-review Finding 5: slug lookup used to be exact-case only
+  // while idMatchesRef's short-prefix matching was already
+  // case-insensitive (core/ids.ts) — an inconsistency that made
+  // "Alpha-Ticket" fail to resolve against slug "alpha-ticket".
+  it("resolves a slug ref case-insensitively", async () => {
+    const t = makeTicket({ slug: "alpha-ticket" });
+    await createTicket(paths, t, ctx, createdEvent);
+    await expect(resolveTicketRef(paths, "Alpha-Ticket")).resolves.toEqual(t);
+    await expect(resolveTicketRef(paths, "ALPHA-TICKET")).resolves.toEqual(t);
+    await expect(resolveTicketRef(paths, "alpha-ticket")).resolves.toEqual(t); // exact case still works
+  });
+
+  it("case-insensitive exact slug still wins over an ambiguous short-prefix interpretation (precedence preserved)", async () => {
+    const shared = "01ARZ3NDEKTSV4RRFFQ69G5FA";
+    const idA = `ticket_${shared}1` as Ticket["id"];
+    const idB = `ticket_${shared}2` as Ticket["id"];
+    const a = makeTicket({ id: idA, root_id: idA, slug: "candidate-a" });
+    const b = makeTicket({ id: idB, root_id: idB, slug: "candidate-b" });
+    const slugTicket = makeTicket({ slug: shared.toLowerCase() });
+    await createTicket(paths, a, ctx, createdEvent);
+    await createTicket(paths, b, ctx, createdEvent);
+    await createTicket(paths, slugTicket, ctx, createdEvent);
+
+    // An UPPERCASE version of the ref: still a case-insensitive slug
+    // match AND still a prefix match against a/b's ids (idMatchesRef is
+    // already case-insensitive) — slug precedence must hold regardless
+    // of which side of the comparison the case-folding happened on.
+    const resolved = await resolveTicketRef(paths, shared.toUpperCase());
     expect(resolved.id).toBe(slugTicket.id);
   });
 });

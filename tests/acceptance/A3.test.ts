@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -137,108 +137,181 @@ describe("A3: Flatfile repo layer", () => {
       clearTimeout(timer);
     }
 
-    it(
-      "repeatedly SIGKILLs a real child process mid-write; every surviving entity file still parses and validates, temp debris is sweepable, and the index rebuilds cleanly afterward",
-      async () => {
-        const calibratedMs = await calibrateRuntimeMs();
-        expect(calibratedMs).toBeGreaterThan(0);
-        // Headroom past the calibrated (max-of-3) uninterrupted runtime,
-        // so the odd real run really can finish naturally within the
-        // kill-delay range despite normal scheduling variance — without
-        // this, "at least one run completed" would flake whenever a real
-        // run happens to be slower than every calibration sample.
-        const boundMs = calibratedMs * 1.6 + 100;
+    it("repeatedly SIGKILLs a real child process mid-write; every surviving entity file still parses and validates, temp debris is sweepable, and the index rebuilds cleanly afterward", async () => {
+      const calibratedMs = await calibrateRuntimeMs();
+      expect(calibratedMs).toBeGreaterThan(0);
+      // Headroom past the calibrated (max-of-3) uninterrupted runtime,
+      // so the odd real run really can finish naturally within the
+      // kill-delay range despite normal scheduling variance — without
+      // this, "at least one run completed" would flake whenever a real
+      // run happens to be slower than every calibration sample.
+      const boundMs = calibratedMs * 1.6 + 100;
 
-        let sawTempFileAfterKill = false;
-        let sawPartialRun = false;
-        let totalCorruptFiles = 0;
-        let totalTicketFilesSeenAcrossRuns = 0;
-        let totalCompleteRuns = 0;
+      let sawTempFileAfterKill = false;
+      let sawPartialRun = false;
+      let totalCorruptFiles = 0;
+      let totalTicketFilesSeenAcrossRuns = 0;
+      let totalCompleteRuns = 0;
 
-        for (let i = 0; i < ITERATIONS; i++) {
-          const scratch = await mkdtemp(join(tmpdir(), `slop-a3-kill-${i}-`));
-          try {
-            // Pre-create the db skeleton, matching realistic usage: a repo
-            // is always `slop init`'d (which lays down .slop/db/{tickets,
-            // sessions,events}/) before anything ever writes to it. The
-            // worker also calls ensureDbDirs itself (idempotent), but
-            // doing it here too means even a kill landing before the
-            // worker gets that far still leaves a well-formed (if empty)
-            // db skeleton to inspect, rather than exercising the
-            // unrelated "no .slop/db at all" case this test isn't about.
-            const paths = await ensureDbDirs(scratch);
-            // Stratified, not purely uniform-random: split [0, boundMs]
-            // into ITERATIONS equal buckets and pick a random point
-            // within iteration i's own bucket. This guarantees the kill
-            // delays genuinely span the *whole* timeline every single
-            // run of this test — including near-zero (kills before the
-            // loop starts) and past typical completion (lets it finish
-            // naturally) — rather than depending on enough independent
-            // random draws happening to cover both ends, which is what
-            // made the purely-random version flaky in practice.
-            const bucketWidth = boundMs / ITERATIONS;
-            const killDelayMs = (i + Math.random()) * bucketWidth;
-            await runAndKillMidway(scratch, killDelayMs);
+      for (let i = 0; i < ITERATIONS; i++) {
+        const scratch = await mkdtemp(join(tmpdir(), `slop-a3-kill-${i}-`));
+        try {
+          // Pre-create the db skeleton, matching realistic usage: a repo
+          // is always `slop init`'d (which lays down .slop/db/{tickets,
+          // sessions,events}/) before anything ever writes to it. The
+          // worker also calls ensureDbDirs itself (idempotent), but
+          // doing it here too means even a kill landing before the
+          // worker gets that far still leaves a well-formed (if empty)
+          // db skeleton to inspect, rather than exercising the
+          // unrelated "no .slop/db at all" case this test isn't about.
+          const paths = await ensureDbDirs(scratch);
+          // Stratified, not purely uniform-random: split [0, boundMs]
+          // into ITERATIONS equal buckets and pick a random point
+          // within iteration i's own bucket. This guarantees the kill
+          // delays genuinely span the *whole* timeline every single
+          // run of this test — including near-zero (kills before the
+          // loop starts) and past typical completion (lets it finish
+          // naturally) — rather than depending on enough independent
+          // random draws happening to cover both ends, which is what
+          // made the purely-random version flaky in practice.
+          const bucketWidth = boundMs / ITERATIONS;
+          const killDelayMs = (i + Math.random()) * bucketWidth;
+          await runAndKillMidway(scratch, killDelayMs);
 
-            const names = await readdir(paths.ticketsDir).catch(() => [] as string[]);
-            const tempNames = names.filter(isTempFileName);
-            const entityNames = names.filter(
-              (n) => n.endsWith(".jsonc") && isTicketId(n.slice(0, -".jsonc".length)),
-            );
-            totalTicketFilesSeenAcrossRuns += entityNames.length;
-            if (entityNames.length >= COUNT_PER_RUN) totalCompleteRuns++;
+          const names = await readdir(paths.ticketsDir).catch(() => [] as string[]);
+          const tempNames = names.filter(isTempFileName);
+          const entityNames = names.filter(
+            (n) => n.endsWith(".jsonc") && isTicketId(n.slice(0, -".jsonc".length)),
+          );
+          totalTicketFilesSeenAcrossRuns += entityNames.length;
+          if (entityNames.length >= COUNT_PER_RUN) totalCompleteRuns++;
 
-            // (1) Every file a reader would treat as an entity parses and
-            // validates — no partial content ever reached a name that
-            // isTicketId/listTicketIds would pick up.
-            for (const name of entityNames) {
-              const raw = await readFile(join(paths.ticketsDir, name), "utf8");
-              const { value, errors } = parseJsonc(raw);
-              const valid = errors.length === 0 && ticketSchema.safeParse(value).success;
-              if (!valid) totalCorruptFiles++;
-            }
-
-            if (tempNames.length > 0) sawTempFileAfterKill = true;
-            if (entityNames.length < COUNT_PER_RUN) sawPartialRun = true;
-
-            // (2) Leftover temp files are ignored by readers (implicit
-            // above: they were excluded from `entityNames`) and swept
-            // cleanly.
-            const expectedSweptPaths = tempNames.map((n) => join(paths.ticketsDir, n)).sort();
-            const swept = (await sweepStaleTempFiles([paths.ticketsDir], { minAgeMs: 0 })).sort();
-            expect(swept).toEqual(expectedSweptPaths);
-            const namesAfterSweep = await readdir(paths.ticketsDir).catch(() => [] as string[]);
-            expect(namesAfterSweep.filter(isTempFileName)).toHaveLength(0);
-
-            // (3) The index rebuilds without error over whatever survived.
-            const { index } = await loadIndex(paths);
-            expect(index.tickets.length).toBe(entityNames.length);
-          } finally {
-            await rm(scratch, { recursive: true, force: true });
+          // (1) Every file a reader would treat as an entity parses and
+          // validates — no partial content ever reached a name that
+          // isTicketId/listTicketIds would pick up.
+          for (const name of entityNames) {
+            const raw = await readFile(join(paths.ticketsDir, name), "utf8");
+            const { value, errors } = parseJsonc(raw);
+            const valid = errors.length === 0 && ticketSchema.safeParse(value).success;
+            if (!valid) totalCorruptFiles++;
           }
+
+          if (tempNames.length > 0) sawTempFileAfterKill = true;
+          if (entityNames.length < COUNT_PER_RUN) sawPartialRun = true;
+
+          // (2) Leftover temp files are ignored by readers (implicit
+          // above: they were excluded from `entityNames`) and swept
+          // cleanly.
+          const expectedSweptPaths = tempNames.map((n) => join(paths.ticketsDir, n)).sort();
+          const swept = (await sweepStaleTempFiles([paths.ticketsDir], { minAgeMs: 0 })).sort();
+          expect(swept).toEqual(expectedSweptPaths);
+          const namesAfterSweep = await readdir(paths.ticketsDir).catch(() => [] as string[]);
+          expect(namesAfterSweep.filter(isTempFileName)).toHaveLength(0);
+
+          // (3) The index rebuilds without error over whatever survived.
+          const { index } = await loadIndex(paths);
+          expect(index.tickets.length).toBe(entityNames.length);
+        } finally {
+          await rm(scratch, { recursive: true, force: true });
         }
+      }
 
-        // The headline safety property: never a single corrupt file,
-        // across every run.
-        expect(totalCorruptFiles).toBe(0);
+      // The headline safety property: never a single corrupt file,
+      // across every run.
+      expect(totalCorruptFiles).toBe(0);
 
-        // Sanity: the run actually did real work (didn't e.g. fail to
-        // spawn every time).
-        expect(totalTicketFilesSeenAcrossRuns).toBeGreaterThan(0);
+      // Sanity: the run actually did real work (didn't e.g. fail to
+      // spawn every time).
+      expect(totalTicketFilesSeenAcrossRuns).toBeGreaterThan(0);
 
-        // The test can't silently degenerate into killing an idle
-        // process and passing vacuously: across ITERATIONS runs, at
-        // least one must show direct evidence of landing inside a write
-        // (a leftover temp file) or an incomplete loop. We also require
-        // at least one run to have completed fully and at least one to
-        // be incomplete, proving the kill delays genuinely spanned the
-        // loop's duration rather than clustering at one extreme.
-        expect(sawTempFileAfterKill || sawPartialRun).toBe(true);
-        expect(totalCompleteRuns).toBeGreaterThan(0);
-        expect(totalCompleteRuns).toBeLessThan(ITERATIONS);
-      },
-      120_000,
-    );
+      // The test can't silently degenerate into killing an idle
+      // process and passing vacuously: across ITERATIONS runs, at
+      // least one must show direct evidence of landing inside a write
+      // (a leftover temp file) or an incomplete loop. We also require
+      // at least one run to have completed fully and at least one to
+      // be incomplete, proving the kill delays genuinely spanned the
+      // loop's duration rather than clustering at one extreme.
+      expect(sawTempFileAfterKill || sawPartialRun).toBe(true);
+      expect(totalCompleteRuns).toBeGreaterThan(0);
+      expect(totalCompleteRuns).toBeLessThan(ITERATIONS);
+    }, 120_000);
+  });
+
+  // A companion to "Kill -9 mid-write leaves no corrupt files": a dead
+  // holder isn't the only way a lock's exclusivity can be violated — a
+  // genuinely-alive-but-slow holder (contended, I/O-stalled, GC-paused,
+  // cgroup-throttled) that runs past staleTimeoutMs looks identical from
+  // the outside, and the original stale-timeout reclaim let a second
+  // process steal the lock and write concurrently with no error at all
+  // (adversarial-review Finding 1). Real processes, real OS-level
+  // concurrency, same reasoning as the kill -9 test above for why a
+  // spawned `bun` child is used instead of simulating this in-process.
+  describe("lock fencing: a dispossessed holder fails loudly instead of writing (adversarial-review Finding 1)", () => {
+    const lockWorkerPath = join(dirname(fileURLToPath(import.meta.url)), "a3-lock-worker.ts");
+
+    function spawnLockWorker(args: string[]): ChildProcess {
+      return spawn("bun", [lockWorkerPath, ...args], { stdio: "ignore" });
+    }
+
+    function waitForExit(child: ChildProcess): Promise<void> {
+      return new Promise((resolve, reject) => {
+        child.once("exit", () => resolve());
+        child.once("error", reject);
+      });
+    }
+
+    it("two real processes contend for the lock with a short stale timeout: the reclaimed holder's assertHeld() throws CONFLICT (exit 6) and never performs its write, while the reclaiming process's write lands cleanly", async () => {
+      const scratch = await mkdtemp(join(tmpdir(), "slop-a3-lock-fencing-"));
+      try {
+        const lockPath = join(scratch, ".lock");
+        const resultPath = join(scratch, "result.log");
+        const counterPath = join(scratch, "counter.txt");
+        await writeFile(resultPath, "");
+        await writeFile(counterPath, "0");
+
+        const staleTimeoutMs = 200;
+        const hangMs = 1_500; // holder "hangs" well past staleTimeoutMs before ever checking back in
+        const stealDelayMs = 500; // contender waits well past staleTimeoutMs before trying, and finishes long before the holder checks back in
+
+        const holder = spawnLockWorker([
+          "holder",
+          lockPath,
+          resultPath,
+          counterPath,
+          String(staleTimeoutMs),
+          String(hangMs),
+        ]);
+        const contender = spawnLockWorker([
+          "contender",
+          lockPath,
+          resultPath,
+          counterPath,
+          String(staleTimeoutMs),
+          String(stealDelayMs),
+        ]);
+
+        await Promise.all([waitForExit(holder), waitForExit(contender)]);
+
+        const resultLines = (await readFile(resultPath, "utf8")).trim().split("\n").filter(Boolean);
+
+        expect(resultLines).toContain("holder:acquired");
+        expect(resultLines).toContain("contender:acquired");
+        expect(resultLines).toContain("contender:wrote");
+        // The headline property: the dispossessed holder's assertHeld()
+        // threw CONFLICT (exit 6) and it therefore never wrote.
+        expect(resultLines).toContain("holder:assertHeld:threw:6");
+        expect(resultLines).not.toContain("holder:wrote");
+        expect(resultLines).not.toContain("holder:assertHeld:ok");
+
+        // Exactly one write landed on the shared counter — the whole
+        // point of fencing is that the dispossessed holder never got to
+        // race the reclaiming process for it.
+        const counter = (await readFile(counterPath, "utf8")).trim();
+        expect(counter).toBe("1");
+      } finally {
+        await rm(scratch, { recursive: true, force: true });
+      }
+    }, 20_000);
   });
 
   describe('"ambiguous prefix errors git-style"', () => {
@@ -354,7 +427,12 @@ describe("A3: Flatfile repo layer", () => {
         await writeFile(
           paths.indexFile,
           `${JSON.stringify(
-            { schema_version: INDEX_SCHEMA_VERSION + 999, built_at: t.created_at, tickets: [], slugs: {} },
+            {
+              schema_version: INDEX_SCHEMA_VERSION + 999,
+              built_at: t.created_at,
+              tickets: [],
+              slugs: {},
+            },
             null,
             2,
           )}\n`,
@@ -477,6 +555,133 @@ describe("A3: Flatfile repo layer", () => {
         expect(second.rebuilt).toBe(false);
         expect(second.reason).toBe("fresh");
         expect(second.index).toEqual(first.index);
+      } finally {
+        await rm(scratch, { recursive: true, force: true });
+      }
+    });
+
+    // Adversarial-review Finding 2: the old fingerprint tracked only file
+    // count + max mtime, so an edit to a ticket whose mtime is NOT the
+    // directory's max — pushed backwards via `utimes`, exactly what `cp
+    // -p`/`rsync -t`/a backup restore/clock skew between two machines all
+    // do — was bit-identical to "nothing changed" and `loadIndex()` would
+    // report `reason: "fresh"` forever. Reproduced here exactly as the
+    // reviewer found it, at the acceptance level (not just the unit-level
+    // fingerprint test in db-index.test.ts).
+    it("an OLDER ticket edited on disk with its mtime forced BACKWARDS (via utimes) — below another ticket's already-recorded mtime — is still detected as stale content on the next read (Finding 2)", async () => {
+      const scratch = await mkdtemp(join(tmpdir(), "slop-a3-index-mtime-backwards-"));
+      try {
+        const paths = await ensureDbDirs(scratch);
+
+        const older = makeTicket({ name: "Older ticket" });
+        await createTicket(paths, older, ctx, createdEvent);
+        const olderPath = ticketFilePath(paths, older.id);
+        const baseTime = new Date("2026-07-23T10:00:00.000Z");
+        await utimes(olderPath, baseTime, baseTime);
+
+        const newer = makeTicket({ name: "Newer ticket" });
+        await createTicket(paths, newer, ctx, createdEvent);
+        const newerTime = new Date(baseTime.getTime() + 60_000);
+        await utimes(ticketFilePath(paths, newer.id), newerTime, newerTime);
+
+        // First read: builds and persists the fingerprint against BOTH
+        // tickets' current (backdated) mtimes.
+        const first = await loadIndex(paths);
+        expect(first.rebuilt).toBe(true);
+        expect(first.index.tickets.find((r) => r.id === older.id)?.name).toBe("Older ticket");
+
+        // Edit the OLDER ticket's content, then force its mtime backwards
+        // — to a value still well below `newer`'s mtime. A max-mtime-only
+        // fingerprint would see the directory's recorded max as
+        // unchanged (still newer's mtime) and the count as unchanged,
+        // and would therefore wrongly report "fresh".
+        const raw = await readFile(olderPath, "utf8");
+        await writeFile(olderPath, raw.replace("Older ticket", "Older ticket EDITED"));
+        const editedTime = new Date(baseTime.getTime() + 5_000); // still << newerTime
+        await utimes(olderPath, editedTime, editedTime);
+
+        const second = await loadIndex(paths);
+        expect(second.rebuilt).toBe(true);
+        expect(second.reason).toBe("stale_content");
+        expect(second.index.tickets.find((r) => r.id === older.id)?.name).toBe(
+          "Older ticket EDITED",
+        );
+      } finally {
+        await rm(scratch, { recursive: true, force: true });
+      }
+    });
+
+    // The "nastiest downstream symptom" named by the reviewer: under the
+    // old fingerprint, a slug rename that happened to land with the
+    // backwards-mtime pattern above would go undetected forever, turning
+    // a ref that SHOULD resolve into a permanent false NOT_FOUND (exit 4).
+    it("a slug RENAMED via a backwards-mtime hand-edit still resolves through resolveTicketRef afterward (Finding 2 downstream symptom)", async () => {
+      const scratch = await mkdtemp(join(tmpdir(), "slop-a3-index-mtime-backwards-slug-rename-"));
+      try {
+        const paths = await ensureDbDirs(scratch);
+
+        const anchor = makeTicket({ name: "Anchor ticket" });
+        await createTicket(paths, anchor, ctx, createdEvent);
+        const baseTime = new Date("2026-07-23T10:00:00.000Z");
+        const anchorTime = new Date(baseTime.getTime() + 60_000);
+        await utimes(ticketFilePath(paths, anchor.id), anchorTime, anchorTime);
+
+        const renamed = makeTicket({ name: "Renamed ticket", slug: "old-slug" });
+        await createTicket(paths, renamed, ctx, createdEvent);
+        await utimes(ticketFilePath(paths, renamed.id), baseTime, baseTime);
+
+        const first = await loadIndex(paths);
+        expect(first.index.slugs["old-slug"]).toBe(renamed.id);
+
+        // Rename the slug directly on disk, then force the file's mtime
+        // backwards below `anchor`'s already-recorded mtime.
+        const renamedPath = ticketFilePath(paths, renamed.id);
+        const raw = await readFile(renamedPath, "utf8");
+        await writeFile(renamedPath, raw.replace('"old-slug"', '"new-slug"'));
+        const editedTime = new Date(baseTime.getTime() + 5_000); // still << anchorTime
+        await utimes(renamedPath, editedTime, editedTime);
+
+        // The ref that should now resolve (the new slug) must actually
+        // resolve — this is the concrete failure mode the reviewer named:
+        // under the old fingerprint this would incorrectly stay NOT_FOUND
+        // (exit 4) forever, because loadIndex would never notice the
+        // rename and rebuild.
+        const resolved = await resolveTicketRef(paths, "new-slug");
+        expect(resolved.id).toBe(renamed.id);
+      } finally {
+        await rm(scratch, { recursive: true, force: true });
+      }
+    });
+
+    // Adversarial-review Finding 3: a single corrupt ticket file used to
+    // make the WHOLE index build throw, so loadIndex — the auto-heal
+    // function this "deleted index self-heals" criterion is about — was
+    // itself unusable when exactly one ticket file was corrupt. The index
+    // must still self-heal for every OTHER ticket even when one is
+    // unreadable.
+    it("self-heals around a single corrupt ticket file: every other ticket is still indexed, and the bad one is reported rather than aborting the whole read (Finding 3)", async () => {
+      const scratch = await mkdtemp(join(tmpdir(), "slop-a3-index-corrupt-ticket-"));
+      try {
+        const paths = await ensureDbDirs(scratch);
+        const good1 = makeTicket();
+        const good2 = makeTicket();
+        await createTicket(paths, good1, ctx, createdEvent);
+        await createTicket(paths, good2, ctx, createdEvent);
+
+        const badId = newTicketId();
+        const badPath = join(paths.ticketsDir, `${badId}.jsonc`);
+        await writeFile(badPath, '{ "id": "not even close to a valid ticket" }');
+
+        const { index, rebuilt } = await loadIndex(paths);
+        expect(rebuilt).toBe(true);
+        expect(index.tickets.map((r) => r.id).sort()).toEqual([good1.id, good2.id].sort());
+        expect(index.problems).toHaveLength(1);
+        expect(index.problems[0]?.path).toBe(badPath);
+
+        // And ordinary ref resolution against the good tickets keeps
+        // working — the corrupt file didn't take the whole read path down.
+        const resolved = await resolveTicketRef(paths, good1.slug);
+        expect(resolved.id).toBe(good1.id);
       } finally {
         await rm(scratch, { recursive: true, force: true });
       }

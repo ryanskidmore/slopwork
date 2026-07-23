@@ -12,6 +12,7 @@ import {
   deleteTicket,
   listTicketIds,
   listTickets,
+  listTicketsTolerant,
   readTicket,
   ticketFilePath,
   updateTicket,
@@ -220,5 +221,50 @@ describe("listTicketIds / listTickets", () => {
     }
     expect(threw).toBeInstanceOf(Error);
     expect((threw as Error).message).toContain(ticketFilePath(paths, badId));
+  });
+});
+
+describe("listTicketsTolerant (adversarial-review Finding 3)", () => {
+  it("returns an empty result against a freshly-initialized (empty) repo", async () => {
+    await expect(listTicketsTolerant(paths)).resolves.toEqual({ tickets: [], problems: [] });
+  });
+
+  it("returns every ticket, with an empty problems list, when nothing is corrupt", async () => {
+    const a = makeTicket();
+    const b = makeTicket();
+    await createTicket(paths, a, ctx, createdEvent);
+    await createTicket(paths, b, ctx, createdEvent);
+    const { tickets, problems } = await listTicketsTolerant(paths);
+    expect(tickets.map((t) => t.id).sort()).toEqual([a.id, b.id].sort());
+    expect(problems).toEqual([]);
+  });
+
+  it("never throws on a corrupt ticket file — returns the good tickets and records the bad one in problems, with the same high-quality error listTickets would have thrown", async () => {
+    const good = makeTicket();
+    await createTicket(paths, good, ctx, createdEvent);
+    const badId = newTicketId();
+    const badPath = ticketFilePath(paths, badId);
+    await writeFile(badPath, '{ "id": "not even close to valid" }');
+
+    const { tickets, problems } = await listTicketsTolerant(paths);
+
+    expect(tickets.map((t) => t.id)).toEqual([good.id]);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatchObject({ id: badId, path: badPath });
+    expect(problems[0]?.message).toContain(badPath);
+  });
+
+  it("records every bad file in one pass, not just the first", async () => {
+    const good = makeTicket();
+    await createTicket(paths, good, ctx, createdEvent);
+    const bad1 = newTicketId();
+    const bad2 = newTicketId();
+    await writeFile(ticketFilePath(paths, bad1), "{ not even valid jsonc {{{");
+    await writeFile(ticketFilePath(paths, bad2), '{ "id": "still not valid" }');
+
+    const { tickets, problems } = await listTicketsTolerant(paths);
+
+    expect(tickets.map((t) => t.id)).toEqual([good.id]);
+    expect(problems.map((p) => p.id).sort()).toEqual([bad1, bad2].sort());
   });
 });

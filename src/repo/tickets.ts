@@ -18,6 +18,7 @@ import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import { type Event, type Ticket, type TicketId, isTicketId, ticketSchema } from "../core/index.js";
 import type { JsoncPatchEntry } from "../core/jsonc.js";
+import type { TicketReadProblem } from "./db-index.js";
 import {
   createEntityFileCanonical,
   deleteEntityFile,
@@ -108,8 +109,54 @@ export async function listTicketIds(paths: RepoPaths): Promise<TicketId[]> {
  * file that fails to parse or validate (see entity-file.ts) — a
  * corrupt entity file is a real problem that should surface loudly to
  * whichever read path triggered this scan, not be silently skipped.
+ * This all-or-nothing behavior is exactly right for a direct-by-id read
+ * (readTicket) and for `slop reindex --strict`, both of which use this
+ * function directly — but it's WRONG for building the derived index
+ * (db-index.ts's `buildIndex`), which uses {@link listTicketsTolerant}
+ * instead precisely so one corrupt file can't take the whole index (and
+ * `slop reindex`'s own non-strict recovery path) down with it
+ * (adversarial-review Finding 3; see db-index.ts's "Fault tolerance").
  */
 export async function listTickets(paths: RepoPaths): Promise<Ticket[]> {
   const ids = await listTicketIds(paths);
   return Promise.all(ids.map((id) => readTicket(paths, id)));
+}
+
+export interface ListTicketsTolerantResult {
+  tickets: Ticket[];
+  problems: TicketReadProblem[];
+}
+
+/**
+ * Like {@link listTickets}, but never throws on a bad file: every ticket
+ * that reads and validates cleanly goes in `tickets` (same relative order
+ * `listTickets` would return — ascending id), and every one that doesn't
+ * goes in `problems` instead, carrying the exact same high-quality error
+ * `readTicket` would have thrown (path, 1-based line:column, parse code /
+ * zod path) — just captured rather than propagated. This is what lets
+ * `buildIndex` (db-index.ts) — and therefore `slop reindex`, the command
+ * that exists specifically to recover from a corrupt db — stay usable
+ * when one ticket file is broken, instead of taking the whole index (and
+ * every read path through it) down with it. See db-index.ts's "Fault
+ * tolerance" for the full policy.
+ */
+export async function listTicketsTolerant(paths: RepoPaths): Promise<ListTicketsTolerantResult> {
+  const ids = await listTicketIds(paths);
+  const settled = await Promise.allSettled(ids.map((id) => readTicket(paths, id)));
+
+  const tickets: Ticket[] = [];
+  const problems: TicketReadProblem[] = [];
+  for (let i = 0; i < settled.length; i++) {
+    const id = ids[i];
+    const outcome = settled[i];
+    if (id === undefined || outcome === undefined) continue; // unreachable: settled/ids are the same length
+    if (outcome.status === "fulfilled") {
+      tickets.push(outcome.value);
+    } else {
+      const message =
+        outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+      problems.push({ id, path: ticketFilePath(paths, id), message });
+    }
+  }
+  return { tickets, problems };
 }
