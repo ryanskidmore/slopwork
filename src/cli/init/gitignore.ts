@@ -1,0 +1,66 @@
+/**
+ * Idempotent `.gitignore` section management for `slop init` (D14:
+ * "index.jsonc gitignored"; D16: "Transcripts: stored locally, gitignored
+ * by default ... committed only if `transcripts: commit`").
+ *
+ * `slop init` never owns the whole `.gitignore` file — only one clearly
+ * marked, managed section within it. Re-running `init` (e.g. after
+ * `transcripts` was hand-edited from `local` to `commit`) replaces just
+ * that section in place, so the gitignore entries always reflect the
+ * current config without ever duplicating lines or touching anything the
+ * repo owner put in the file themselves.
+ */
+import type { TranscriptsMode } from "../../core/index.js";
+
+const SECTION_START = "# --- slopworks (managed by `slop init`) ---";
+const SECTION_END = "# --- end slopworks ---";
+
+/**
+ * D14 (always) + D16 ("gitignored by default ... unless `transcripts:
+ * commit`") — the exact lines `slop init` is responsible for.
+ */
+export function computeGitignoreLines(transcriptsMode: TranscriptsMode): string[] {
+  const lines = [".slop/db/index.jsonc"];
+  if (transcriptsMode !== "commit") {
+    lines.push(".slop/transcripts/");
+  }
+  return lines;
+}
+
+/**
+ * Replace (or insert) the managed slopworks section of a `.gitignore`'s
+ * text with `lines`. Any content outside the markers — including a
+ * missing/empty file — is left exactly as found; an existing managed
+ * section (from a prior `init`) is removed and rewritten in place rather
+ * than appended again, so repeated runs never duplicate entries.
+ */
+export function upsertGitignoreSection(
+  existingText: string,
+  lines: string[],
+): { text: string; changed: boolean } {
+  const before = existingText;
+  const sourceLines = existingText.length > 0 ? existingText.split("\n") : [];
+
+  const startIdx = sourceLines.indexOf(SECTION_START);
+  const endIdx = sourceLines.indexOf(SECTION_END);
+
+  let kept: string[];
+  if (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx) {
+    kept = [...sourceLines.slice(0, startIdx), ...sourceLines.slice(endIdx + 1)];
+  } else {
+    kept = sourceLines;
+  }
+
+  // Trim trailing blank lines from what's kept, so re-running init never
+  // accumulates blank-line padding between unrelated content and the
+  // managed block.
+  while (kept.length > 0 && kept[kept.length - 1]?.trim() === "") {
+    kept.pop();
+  }
+
+  const block = [SECTION_START, ...lines, SECTION_END];
+  const rebuilt = kept.length > 0 ? [...kept, "", ...block] : block;
+
+  const text = `${rebuilt.join("\n")}\n`;
+  return { text, changed: text !== before };
+}
