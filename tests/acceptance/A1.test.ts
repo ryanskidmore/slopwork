@@ -95,10 +95,18 @@ describe("A1: Repo scaffold: TS + Bun build, commander skeleton, vitest, lint/fo
     expect(result.stdout.trim()).toBe(pkg.version);
   });
 
-  it("exits with the reserved NOT_IMPLEMENTED code (3) for a registered-but-unbuilt command", () => {
-    const result = runBinary(["status"]);
-    expect(result.status).toBe(3);
-    expect(result.stderr).toMatch(/not yet implemented/i);
+  // NOT_IMPLEMENTED (3) is scaffolding for commands not yet built (see
+  // notImplemented() in src/cli/errors.ts) — by design every §4.2 command
+  // gets a real implementation during v0, so no acceptance test should
+  // assert that a specific command still exits 3 (it would break the
+  // moment that command's work item lands, as D4 already broke this
+  // test's prior assertion about `status`). The exit-3 path itself is
+  // covered where it belongs: unit tests for src/cli/errors.ts and
+  // src/core/exit-codes.ts, not this acceptance suite.
+
+  it("exits with the reserved USAGE_ERROR code (2) for an unknown command", () => {
+    const result = runBinary(["definitely-not-a-real-command"]);
+    expect(result.status).toBe(2);
   });
 
   it("exits with the reserved USAGE_ERROR code (2) for a missing required argument", () => {
