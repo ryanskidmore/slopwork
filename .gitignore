@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+
+# test / coverage
+coverage/
+*.tsbuildinfo
+
+# logs
+*.log
+npm-debug.log*
+
+# editor / OS noise
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.swp
+
+# env
+.env
+.env.local
+
+# Biome
+.biome-cache/
+
+# NOTE: this repo's OWN .slop/ (if this repo dogfoods itself later) is not
+# ignored here. `slop init` (work item D1) writes .slop/db/index.jsonc and
+# .slop/transcripts/ gitignore entries into the *target* repo it runs in,
+# per D14/D16 — that is a runtime concern of the tool, not this repo's own
+# tooling config.
