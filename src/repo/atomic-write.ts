@@ -147,7 +147,18 @@ export async function sweepStaleTempFiles(
       if (handle === null) continue; // already gone (race with another sweep/reader)
       let ageMs: number;
       try {
-        ageMs = now - (await handle.stat()).mtimeMs;
+        // `stat().mtimeMs` carries sub-millisecond (fractional) precision
+        // on this filesystem, while `now` (captured once via `Date.now()`
+        // above) is truncated to integer milliseconds. For a file written
+        // in the same millisecond as `now` was captured, `mtimeMs` can be
+        // numerically *greater* than `now`, making the naive `now -
+        // mtimeMs` subtraction go slightly negative — which would make
+        // `minAgeMs: 0` ("remove regardless of age") wrongly treat a
+        // brand-new file as too fresh to sweep. Clamp to 0 so age is
+        // never negative (see db-index.ts's module doc, "Content
+        // staleness", for this codebase's other run-in with sub-ms/
+        // coarse mtime precision).
+        ageMs = Math.max(0, now - (await handle.stat()).mtimeMs);
       } finally {
         await handle.close();
       }

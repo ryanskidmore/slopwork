@@ -114,6 +114,24 @@ describe("sweepStaleTempFiles", () => {
     await expect(sweepStaleTempFiles([missing])).resolves.toEqual([]);
   });
 
+  it("removes a just-created .tmp- file with minAgeMs: 0, deterministically (regression: fractional mtimeMs vs. integer Date.now() must never make the computed age go negative)", async () => {
+    // A single fast iteration can pass even against the unfixed code —
+    // whether `Date.now()`'s truncation lands above or below the file's
+    // fractional `mtimeMs` is a coin flip. Repeating in fresh directories,
+    // with no artificial delay, reliably trips the race against the old
+    // (unclamped) age computation.
+    for (let i = 0; i < 20; i++) {
+      const dir = join(scratch, `iter-${i}`);
+      await mkdir(dir);
+      const tempPath = join(dir, `${TEMP_FILE_PREFIX}abc-ticket_x.jsonc`);
+      await writeFile(tempPath, "partial");
+
+      const removed = await sweepStaleTempFiles([dir], { minAgeMs: 0 });
+      expect(removed).toEqual([tempPath]);
+      expect(await readdir(dir)).toEqual([]);
+    }
+  });
+
   it("sweeps across multiple directories in one call", async () => {
     const dirA = join(scratch, "a");
     const dirB = join(scratch, "b");
