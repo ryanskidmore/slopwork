@@ -22,6 +22,16 @@ import {
   sweepStaleTempFiles,
   ticketFilePath,
 } from "../../src/repo/index.js";
+import type { EventContext, MutationEventSpec } from "../../src/repo/index.js";
+
+// A4 changed createTicket/updateTicket/createSession/updateSession to
+// require an EventContext + a MutationEventSpec on every call (repo/
+// events.ts) — these fixtures don't exercise event behavior, so a single
+// fixed pair is reused across every createTicket call in this file. A3's
+// own acceptance criteria (kill -9 safety, ambiguous-ref resolution,
+// index self-heal) are otherwise untouched.
+const ctx: EventContext = { actor: { name: "ryan", kind: "human" }, session: null };
+const createdEvent: MutationEventSpec = { verb: "ticket.created" };
 
 // A3: Flatfile repo layer
 //
@@ -253,9 +263,9 @@ describe("A3: Flatfile repo layer", () => {
         // index already exists would not otherwise be visible without an
         // explicit reindex.
         const slugTicket = makeTicket({ slug: shared.toLowerCase() });
-        await createTicket(paths, a);
-        await createTicket(paths, b);
-        await createTicket(paths, slugTicket);
+        await createTicket(paths, a, ctx, createdEvent);
+        await createTicket(paths, b, ctx, createdEvent);
+        await createTicket(paths, slugTicket, ctx, createdEvent);
 
         // --- ambiguous prefix: exit 5, git-style, names every candidate ---
         let ambiguousErr: unknown;
@@ -294,7 +304,7 @@ describe("A3: Flatfile repo layer", () => {
       try {
         const paths = await ensureDbDirs(scratch);
         const t = makeTicket();
-        await createTicket(paths, t);
+        await createTicket(paths, t, ctx, createdEvent);
 
         // index.jsonc was never written — same state as `rm .slop/db/index.jsonc`
         // or a fresh clone (it's gitignored, D14). This is the FIRST ever
@@ -323,7 +333,7 @@ describe("A3: Flatfile repo layer", () => {
       try {
         const paths = await ensureDbDirs(scratch);
         const t = makeTicket();
-        await createTicket(paths, t);
+        await createTicket(paths, t, ctx, createdEvent);
         await writeFile(paths.indexFile, '{ "schema_version": 1, "tickets": [ { truncated');
 
         const { index, rebuilt, reason } = await loadIndex(paths);
@@ -340,7 +350,7 @@ describe("A3: Flatfile repo layer", () => {
       try {
         const paths = await ensureDbDirs(scratch);
         const t = makeTicket();
-        await createTicket(paths, t);
+        await createTicket(paths, t, ctx, createdEvent);
         await writeFile(
           paths.indexFile,
           `${JSON.stringify(
@@ -372,7 +382,7 @@ describe("A3: Flatfile repo layer", () => {
       try {
         const paths = await ensureDbDirs(scratch);
         const t = makeTicket({ name: "Before the hand-edit" });
-        await createTicket(paths, t);
+        await createTicket(paths, t, ctx, createdEvent);
 
         const first = await loadIndex(paths);
         expect(first.rebuilt).toBe(true); // first-ever read: missing -> builds
@@ -407,7 +417,7 @@ describe("A3: Flatfile repo layer", () => {
       try {
         const paths = await ensureDbDirs(scratch);
         const t1 = makeTicket();
-        await createTicket(paths, t1);
+        await createTicket(paths, t1, ctx, createdEvent);
 
         const first = await loadIndex(paths);
         expect(first.index.tickets.map((r) => r.id)).toEqual([t1.id]);
@@ -433,8 +443,8 @@ describe("A3: Flatfile repo layer", () => {
         const paths = await ensureDbDirs(scratch);
         const t1 = makeTicket();
         const t2 = makeTicket();
-        await createTicket(paths, t1);
-        await createTicket(paths, t2);
+        await createTicket(paths, t1, ctx, createdEvent);
+        await createTicket(paths, t2, ctx, createdEvent);
 
         const first = await loadIndex(paths);
         expect(first.index.tickets.map((r) => r.id).sort()).toEqual([t1.id, t2.id].sort());
@@ -458,7 +468,7 @@ describe("A3: Flatfile repo layer", () => {
       try {
         const paths = await ensureDbDirs(scratch);
         const t = makeTicket();
-        await createTicket(paths, t);
+        await createTicket(paths, t, ctx, createdEvent);
 
         const first = await loadIndex(paths);
         expect(first.rebuilt).toBe(true); // first-ever read: missing -> builds

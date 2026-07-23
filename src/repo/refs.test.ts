@@ -4,10 +4,17 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type Ticket, newTicketId, ticketSchema } from "../core/index.js";
 import type { IndexTicketRow } from "./db-index.js";
+import type { EventContext, MutationEventSpec } from "./events.js";
 import { ambiguousRefMessage, resolveTicketRef } from "./refs.js";
 import { ensureDbDirs } from "./paths.js";
 import type { RepoPaths } from "./paths.js";
 import { createTicket } from "./tickets.js";
+
+// A4: createTicket now requires an EventContext + a MutationEventSpec —
+// these fixtures don't exercise event behavior, so a single fixed pair is
+// reused across every createTicket call below.
+const ctx: EventContext = { actor: { name: "ryan", kind: "human" }, session: null };
+const createdEvent: MutationEventSpec = { verb: "ticket.created" };
 
 function makeIndexRow(overrides: Partial<IndexTicketRow> & Pick<IndexTicketRow, "id">): IndexTicketRow {
   return {
@@ -64,7 +71,7 @@ afterEach(async () => {
 describe("resolveTicketRef — full id (exit criterion: not found -> exit 4)", () => {
   it("resolves by the full ticket_<ULID> id", async () => {
     const t = makeTicket();
-    await createTicket(paths, t);
+    await createTicket(paths, t, ctx, createdEvent);
     await expect(resolveTicketRef(paths, t.id)).resolves.toEqual(t);
   });
 
@@ -74,7 +81,7 @@ describe("resolveTicketRef — full id (exit criterion: not found -> exit 4)", (
 
   it("a ref that matches nothing at all is NOT_FOUND (exit 4)", async () => {
     const t = makeTicket();
-    await createTicket(paths, t);
+    await createTicket(paths, t, ctx, createdEvent);
     await expect(resolveTicketRef(paths, "totally-unknown-ref")).rejects.toMatchObject({
       exitCode: 4,
     });
@@ -84,7 +91,7 @@ describe("resolveTicketRef — full id (exit criterion: not found -> exit 4)", (
 describe("resolveTicketRef — exact slug", () => {
   it("resolves by exact slug", async () => {
     const t = makeTicket({ slug: "add-sso" });
-    await createTicket(paths, t);
+    await createTicket(paths, t, ctx, createdEvent);
     await expect(resolveTicketRef(paths, "add-sso")).resolves.toEqual(t);
   });
 
@@ -98,9 +105,9 @@ describe("resolveTicketRef — exact slug", () => {
     const a = makeTicket({ id: idA, root_id: idA, slug: "candidate-a" });
     const b = makeTicket({ id: idB, root_id: idB, slug: "candidate-b" });
     const slugTicket = makeTicket({ slug: shared.toLowerCase() });
-    await createTicket(paths, a);
-    await createTicket(paths, b);
-    await createTicket(paths, slugTicket);
+    await createTicket(paths, a, ctx, createdEvent);
+    await createTicket(paths, b, ctx, createdEvent);
+    await createTicket(paths, slugTicket, ctx, createdEvent);
 
     // shared.toLowerCase() as a REF also happens to be a prefix of both
     // a.id's and b.id's bare ULID (since they share that literal
@@ -113,7 +120,7 @@ describe("resolveTicketRef — exact slug", () => {
 describe("resolveTicketRef — unique short prefix, ambiguous prefix (git-style)", () => {
   it("resolves a unique short prefix", async () => {
     const t = makeTicket();
-    await createTicket(paths, t);
+    await createTicket(paths, t, ctx, createdEvent);
     const shortRef = t.id.slice("ticket_".length, "ticket_".length + 8);
     await expect(resolveTicketRef(paths, shortRef)).resolves.toEqual(t);
   });
@@ -124,8 +131,8 @@ describe("resolveTicketRef — unique short prefix, ambiguous prefix (git-style)
     const idB = `ticket_${shared}2` as Ticket["id"];
     const a = makeTicket({ id: idA, root_id: idA, name: "Alpha ticket", slug: "alpha-ticket" });
     const b = makeTicket({ id: idB, root_id: idB, name: "Beta ticket", slug: "beta-ticket" });
-    await createTicket(paths, a);
-    await createTicket(paths, b);
+    await createTicket(paths, a, ctx, createdEvent);
+    await createTicket(paths, b, ctx, createdEvent);
 
     let threw: unknown;
     try {
@@ -179,7 +186,7 @@ describe("resolveTicketRef — external refs are not resolvable (D1)", () => {
 describe("resolveTicketRef — auto-heals the index (exercises the A3 self-heal path via an ordinary read)", () => {
   it("resolves correctly even when index.jsonc has never been written", async () => {
     const t = makeTicket();
-    await createTicket(paths, t);
+    await createTicket(paths, t, ctx, createdEvent);
     // paths.indexFile deliberately never created — a fresh clone, or a
     // repo where reindex has never run.
     await expect(resolveTicketRef(paths, t.slug)).resolves.toEqual(t);

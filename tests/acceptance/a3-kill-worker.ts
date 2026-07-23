@@ -16,6 +16,13 @@
  */
 import { newTicketId, ticketSchema } from "../../src/core/index.js";
 import { createTicket, ensureDbDirs, repoPaths } from "../../src/repo/index.js";
+import type { EventContext, MutationEventSpec } from "../../src/repo/index.js";
+
+// A4 changed createTicket to require an EventContext + a MutationEventSpec
+// on every call — fixed here since this worker only cares about ticket
+// -file write safety under SIGKILL, not event behavior.
+const ctx: EventContext = { actor: { name: "kill-test", kind: "agent" }, session: null };
+const createdEvent: MutationEventSpec = { verb: "ticket.created" };
 
 async function main(): Promise<void> {
   const dbRoot = process.argv[2];
@@ -43,7 +50,7 @@ async function main(): Promise<void> {
       created_at: now,
       updated_at: now,
     });
-    await createTicket(paths, ticket);
+    await createTicket(paths, ticket, ctx, createdEvent);
     process.stdout.write(`wrote ${i}\n`);
   }
 

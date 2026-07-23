@@ -3,6 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type Ticket, type TicketId, newTicketId, ticketSchema } from "../core/index.js";
+import type { EventContext, MutationEventSpec } from "./events.js";
+import { listEvents } from "./events.js";
 import { ensureDbDirs } from "./paths.js";
 import type { RepoPaths } from "./paths.js";
 import {
@@ -32,6 +34,14 @@ function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
   });
 }
 
+// A4: createTicket/updateTicket now require an EventContext + a
+// MutationEventSpec on every call (repo/events.ts) — these are the
+// fixture defaults for tests below that aren't specifically exercising
+// event-emission behavior.
+const ctx: EventContext = { actor: { name: "ryan", kind: "human" }, session: null };
+const createdEvent: MutationEventSpec = { verb: "ticket.created" };
+const updatedEvent: MutationEventSpec = { verb: "ticket.updated" };
+
 let scratch: string;
 let paths: RepoPaths;
 
@@ -54,7 +64,7 @@ describe("ticketFilePath", () => {
 describe("createTicket / readTicket", () => {
   it("round-trips a full ticket", async () => {
     const ticket = makeTicket();
-    await createTicket(paths, ticket);
+    await createTicket(paths, ticket, ctx, createdEvent);
     await expect(readTicket(paths, ticket.id)).resolves.toEqual(ticket);
   });
 
@@ -74,12 +84,32 @@ describe("createTicket / readTicket", () => {
     expect(threw).toMatchObject({ exitCode: 1 });
     expect((threw as Error).message).toContain(ticketFilePath(paths, id));
   });
+
+  // A4 (co-located unit-level spot check; the general property across the
+  // whole mutation surface lives in tests/acceptance/A4.test.ts).
+  it("emits exactly one ticket.created event, attributed to the given actor/session/entity", async () => {
+    const ticket = makeTicket();
+    const sessionCtx: EventContext = { actor: { name: "agent-1", kind: "agent" }, session: null };
+    const event = await createTicket(paths, ticket, sessionCtx, {
+      verb: "ticket.created",
+      payload: { method: "new" },
+    });
+
+    const events = await listEvents(paths);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual(event);
+    expect(event.verb).toBe("ticket.created");
+    expect(event.actor).toEqual(sessionCtx.actor);
+    expect(event.session).toBeNull();
+    expect(event.entity).toEqual({ kind: "ticket", id: ticket.id });
+    expect(event.payload).toEqual({ method: "new" });
+  });
 });
 
 describe("updateTicket", () => {
   it("applies a patch and preserves hand-added comments where possible", async () => {
     const ticket = makeTicket({ priority: 2 });
-    await createTicket(paths, ticket);
+    await createTicket(paths, ticket, ctx, createdEvent);
 
     // Simulate a human hand-annotating the file after creation.
     const path = ticketFilePath(paths, ticket.id);
@@ -87,18 +117,61 @@ describe("updateTicket", () => {
     await writeFile(path, `// triaged\n${original}`);
 
     const after = { ...ticket, priority: 0 };
-    await updateTicket(paths, ticket.id, [{ path: ["priority"], value: 0 }], after);
+    await updateTicket(
+      paths,
+      ticket.id,
+      [{ path: ["priority"], value: 0 }],
+      after,
+      ctx,
+      updatedEvent,
+    );
 
     const raw = await readFile(path, "utf8");
     expect(raw).toContain("// triaged");
     await expect(readTicket(paths, ticket.id)).resolves.toEqual(after);
+  });
+
+  it("emits exactly one event (on top of the create's own), with the caller-supplied verb", async () => {
+    const ticket = makeTicket({ priority: 2 });
+    await createTicket(paths, ticket, ctx, createdEvent);
+    const after = { ...ticket, priority: 0 };
+    const sessionCtx: EventContext = { actor: { name: "agent-2", kind: "agent" }, session: null };
+    const event = await updateTicket(
+      paths,
+      ticket.id,
+      [{ path: ["priority"], value: 0 }],
+      after,
+      sessionCtx,
+      { verb: "ticket.updated" },
+    );
+
+    const events = await listEvents(paths);
+    expect(events).toHaveLength(2); // the create's event, then this one
+    expect(events[1]).toEqual(event);
+    expect(event.verb).toBe("ticket.updated");
+    expect(event.entity).toEqual({ kind: "ticket", id: ticket.id });
+  });
+
+  it("throws NOT_FOUND against a nonexistent ticket and emits no event", async () => {
+    const fakeAfter = makeTicket();
+    await expect(
+      updateTicket(
+        paths,
+        newTicketId(),
+        [{ path: ["priority"], value: 0 }],
+        fakeAfter,
+        ctx,
+        updatedEvent,
+      ),
+    ).rejects.toMatchObject({ exitCode: 4 });
+    await expect(listEvents(paths)).resolves.toEqual([]);
   });
 });
 
 describe("deleteTicket", () => {
   it("removes the ticket file", async () => {
     const ticket = makeTicket();
-    await createTicket(paths, ticket);
+    await createTicket(paths, ticket, ctx, createdEvent);
     await deleteTicket(paths, ticket.id);
     await expect(readTicket(paths, ticket.id)).rejects.toMatchObject({ exitCode: 4 });
   });
@@ -109,7 +182,7 @@ describe("listTicketIds / listTickets", () => {
     const ids: TicketId[] = [];
     for (let i = 0; i < 3; i++) {
       const t = makeTicket();
-      await createTicket(paths, t);
+      await createTicket(paths, t, ctx, createdEvent);
       ids.push(t.id);
     }
     await writeFile(join(paths.ticketsDir, ".tmp-abc-ticket_x.jsonc"), "partial");
@@ -127,15 +200,15 @@ describe("listTicketIds / listTickets", () => {
   it("listTickets returns fully validated tickets", async () => {
     const a = makeTicket();
     const b = makeTicket();
-    await createTicket(paths, a);
-    await createTicket(paths, b);
+    await createTicket(paths, a, ctx, createdEvent);
+    await createTicket(paths, b, ctx, createdEvent);
     const all = await listTickets(paths);
     expect(all.map((t) => t.id).sort()).toEqual([a.id, b.id].sort());
   });
 
   it("listTickets throws a clear error naming the file if any ticket is corrupt", async () => {
     const good = makeTicket();
-    await createTicket(paths, good);
+    await createTicket(paths, good, ctx, createdEvent);
     const badId = newTicketId();
     await writeFile(ticketFilePath(paths, badId), '{ "id": "not even close to valid" }');
 

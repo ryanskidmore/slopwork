@@ -5,9 +5,13 @@
  * multi-file transactions, entity CRUD, ref resolution (full id / short
  * prefix / slug), index build + auto-heal, `reindex`.
  *
- * A4 (event writer: emit-on-mutation hook, ULID cursor ordering) builds
- * on `events.ts`'s `createEvent`/`listEvents` primitives, landing its own
- * higher-level "emit on every mutation" wiring separately.
+ * A4 (event writer) lands the emit-on-mutation hook (`events.ts`'s
+ * `EventContext`/`MutationEventSpec`/`withMutationEvent`), which
+ * `tickets.ts`'s `createTicket`/`updateTicket` and `sessions.ts`'s
+ * `createSession`/`updateSession` are built on — every call through those
+ * four functions requires an actor/session context and a verb, and emits
+ * exactly one event. Also lands the ULID cursor query (`events.ts`'s
+ * `queryEvents`) that D3's `slop events --since` builds on.
  */
 export * from "./atomic-write.js";
 export * from "./db-index.js";

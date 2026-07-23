@@ -5,9 +5,16 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { fixedClock } from "../core/clock.js";
 import { type Ticket, newTicketId, ticketSchema, writeCanonical } from "../core/index.js";
 import { INDEX_SCHEMA_VERSION, buildIndex, computeContentFingerprint, loadIndex, writeIndex } from "./db-index.js";
+import type { EventContext, MutationEventSpec } from "./events.js";
 import { ensureDbDirs } from "./paths.js";
 import type { RepoPaths } from "./paths.js";
 import { createTicket, ticketFilePath } from "./tickets.js";
+
+// A4: createTicket now requires an EventContext + a MutationEventSpec —
+// these fixtures don't exercise event behavior, so a single fixed pair is
+// reused across every createTicket call below.
+const ctx: EventContext = { actor: { name: "ryan", kind: "human" }, session: null };
+const createdEvent: MutationEventSpec = { verb: "ticket.created" };
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -54,7 +61,7 @@ describe("buildIndex", () => {
 
   it("summarizes every ticket field the brief requires", async () => {
     const t = makeTicket({ priority: 1, labels: ["area:auth"], active_session: null });
-    await createTicket(paths, t);
+    await createTicket(paths, t, ctx, createdEvent);
     const index = await buildIndex(paths, clock);
     expect(index.tickets).toHaveLength(1);
     const row = index.tickets[0];
@@ -75,14 +82,14 @@ describe("buildIndex", () => {
 
   it("maps slugs to ids", async () => {
     const t = makeTicket();
-    await createTicket(paths, t);
+    await createTicket(paths, t, ctx, createdEvent);
     const index = await buildIndex(paths, clock);
     expect(index.slugs[t.slug]).toBe(t.id);
   });
 
   it("leaves B4/C5 placeholder fields present but null", async () => {
     const t = makeTicket();
-    await createTicket(paths, t);
+    await createTicket(paths, t, ctx, createdEvent);
     const index = await buildIndex(paths, clock);
     const row = index.tickets[0];
     expect(row).toBeDefined();
@@ -97,10 +104,10 @@ describe("buildIndex", () => {
     const blocker = makeTicket({ blocks: [target.id] });
     const relater = makeTicket({ relates_to: [target.id] });
     const discoverer = makeTicket({ discovered_from: [target.id] });
-    await createTicket(paths, target);
-    await createTicket(paths, blocker);
-    await createTicket(paths, relater);
-    await createTicket(paths, discoverer);
+    await createTicket(paths, target, ctx, createdEvent);
+    await createTicket(paths, blocker, ctx, createdEvent);
+    await createTicket(paths, relater, ctx, createdEvent);
+    await createTicket(paths, discoverer, ctx, createdEvent);
 
     const index = await buildIndex(paths, clock);
     const targetRow = index.tickets.find((r) => r.id === target.id);
@@ -115,7 +122,7 @@ describe("buildIndex", () => {
 
   it("does not choke on a ticket whose parent is an external (jira:) ref", async () => {
     const t = makeTicket({ parent: "jira:PROJ-1" });
-    await createTicket(paths, t);
+    await createTicket(paths, t, ctx, createdEvent);
     const index = await buildIndex(paths, clock);
     expect(index.tickets[0]?.parent).toBe("jira:PROJ-1");
   });
@@ -124,7 +131,7 @@ describe("buildIndex", () => {
 describe("writeIndex / loadIndex — fresh read", () => {
   it("loadIndex reads back exactly what writeIndex wrote when nothing has changed", async () => {
     const t = makeTicket();
-    await createTicket(paths, t);
+    await createTicket(paths, t, ctx, createdEvent);
     const built = await buildIndex(paths, clock);
     await writeIndex(paths, built);
 
@@ -138,7 +145,7 @@ describe("writeIndex / loadIndex — fresh read", () => {
 describe("loadIndex — auto-heal (A3 acceptance: 'deleted index self-heals')", () => {
   it("rebuilds transparently when index.jsonc is missing entirely", async () => {
     const t = makeTicket();
-    await createTicket(paths, t);
+    await createTicket(paths, t, ctx, createdEvent);
     // No index.jsonc ever written — simulates both an `rm` and a fresh
     // gitignored clone.
     const result = await loadIndex(paths, clock);
@@ -153,7 +160,7 @@ describe("loadIndex — auto-heal (A3 acceptance: 'deleted index self-heals')", 
 
   it("rebuilds transparently when index.jsonc is corrupt/truncated JSONC", async () => {
     const t = makeTicket();
-    await createTicket(paths, t);
+    await createTicket(paths, t, ctx, createdEvent);
     await writeFile(paths.indexFile, '{ "schema_version": 1, "tickets": [ this is not json');
 
     const result = await loadIndex(paths, clock);
@@ -164,7 +171,7 @@ describe("loadIndex — auto-heal (A3 acceptance: 'deleted index self-heals')", 
 
   it("rebuilds transparently when index.jsonc has a stale schema_version", async () => {
     const t = makeTicket();
-    await createTicket(paths, t);
+    await createTicket(paths, t, ctx, createdEvent);
     await writeFile(
       paths.indexFile,
       `${JSON.stringify({ schema_version: 999, built_at: clock.now().toISOString(), tickets: [], slugs: {} }, null, 2)}\n`,
@@ -178,7 +185,7 @@ describe("loadIndex — auto-heal (A3 acceptance: 'deleted index self-heals')", 
 
   it("rebuilds transparently when index.jsonc parses but fails schema validation", async () => {
     const t = makeTicket();
-    await createTicket(paths, t);
+    await createTicket(paths, t, ctx, createdEvent);
     await writeFile(
       paths.indexFile,
       `${JSON.stringify({ schema_version: INDEX_SCHEMA_VERSION, tickets: "not an array" }, null, 2)}\n`,
@@ -204,7 +211,7 @@ describe("computeContentFingerprint", () => {
 
   it("counts only real ticket entity files, ignoring temp/other debris", async () => {
     const t = makeTicket();
-    await createTicket(paths, t);
+    await createTicket(paths, t, ctx, createdEvent);
     await writeFile(join(paths.ticketsDir, ".tmp-abc-ticket_x.jsonc"), "partial");
     await writeFile(join(paths.ticketsDir, "not-a-ticket.txt"), "x");
 
@@ -215,7 +222,7 @@ describe("computeContentFingerprint", () => {
 
   it("is readdir+stat only — never reads or parses file content (spot check: garbage content doesn't throw)", async () => {
     const t = makeTicket();
-    await createTicket(paths, t);
+    await createTicket(paths, t, ctx, createdEvent);
     await writeFile(ticketFilePath(paths, t.id), "{ not even valid jsonc {{{");
     await expect(computeContentFingerprint(paths)).resolves.toEqual({
       tickets: { count: 1, max_mtime_ms: expect.any(Number) },
@@ -233,7 +240,7 @@ describe("loadIndex — content staleness (coordinator ruling: healing from stal
 
   it("detects a ticket file edited directly on disk (same count, different content/mtime)", async () => {
     const t = makeTicket({ name: "Before" });
-    await createTicket(paths, t);
+    await createTicket(paths, t, ctx, createdEvent);
     const first = await loadIndex(paths, clock);
     expect(first.index.tickets[0]?.name).toBe("Before");
 
@@ -249,7 +256,7 @@ describe("loadIndex — content staleness (coordinator ruling: healing from stal
 
   it("detects a ticket file added directly on disk", async () => {
     const t1 = makeTicket();
-    await createTicket(paths, t1);
+    await createTicket(paths, t1, ctx, createdEvent);
     await loadIndex(paths, clock);
 
     await sleep(20);
@@ -265,8 +272,8 @@ describe("loadIndex — content staleness (coordinator ruling: healing from stal
   it("detects a ticket file deleted directly on disk", async () => {
     const t1 = makeTicket();
     const t2 = makeTicket();
-    await createTicket(paths, t1);
-    await createTicket(paths, t2);
+    await createTicket(paths, t1, ctx, createdEvent);
+    await createTicket(paths, t2, ctx, createdEvent);
     await loadIndex(paths, clock);
 
     await sleep(20);
@@ -280,7 +287,7 @@ describe("loadIndex — content staleness (coordinator ruling: healing from stal
 
   it("does NOT rebuild when nothing changed — the fingerprint match short-circuits", async () => {
     const t = makeTicket();
-    await createTicket(paths, t);
+    await createTicket(paths, t, ctx, createdEvent);
     const first = await loadIndex(paths, clock);
     expect(first.rebuilt).toBe(true);
 
