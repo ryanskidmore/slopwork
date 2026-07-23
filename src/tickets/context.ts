@@ -8,6 +8,7 @@
  * to extend (add plan-progress detail per session, etc.), not rewrite.
  */
 import type { Config, Session, Ticket } from "../core/index.js";
+import { renderSessionPlanSection } from "../sessions/plan-render.js";
 import { jiraBrowseUrl } from "./jira.js";
 
 export interface ContextPackData {
@@ -100,7 +101,14 @@ export function renderContextPack(data: ContextPackData, budgetChars?: number): 
   if (data.sessions.length === 0) {
     lines.push("  none yet");
   } else {
-    for (const s of data.sessions) lines.push(sessionLine(s));
+    for (const s of data.sessions) {
+      lines.push(sessionLine(s));
+      // C2: step status (+ version history, so "plan v2 diffable from v1"
+      // is observable here, not just true of the underlying data) —
+      // `[]` when this session has no plan, so older/unplanned sessions
+      // add no extra lines.
+      lines.push(...renderSessionPlanSection(s));
+    }
   }
 
   let text = lines.join("\n");
