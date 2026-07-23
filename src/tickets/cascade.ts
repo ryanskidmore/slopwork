@@ -44,9 +44,40 @@
  * fresh ticket scan this function needs anyway. It is also self-healing by
  * construction: idempotent. Calling it twice for the same closure (e.g. a
  * caller retrying after an ambiguous failure) computes the exact same
- * "who's newly unblocked" answer both times relative to the ON-DISK state
- * at call time — the SECOND call finds nothing new to do, because the
- * first call's `ticket.ready` events don't change any ticket's state.
+ * "who's newly unblocked" ANSWER both times relative to the ON-DISK state
+ * at call time, because the first call's `ticket.ready` events don't
+ * change any ticket's state. **That alone does not make the EMITTED
+ * `ticket.ready` events idempotent** — a ticket already unblocked (and
+ * already notified) by an earlier call is still, truthfully, a member of
+ * `newlyUnblocked` on every later call, since it's still open with zero
+ * live blockers. See "Emission is deduplicated against the event log"
+ * below for the explicit guard this function adds so a second call writes
+ * no NEW event for it, not just the same candidate answer.
+ *
+ * ## Emission is deduplicated against the event log (exactly-once across retries)
+ *
+ * Since re-invoking {@link cascadeOnClose} for the same `closedTicketId` is
+ * the documented recovery path after a partial cascade (see "Failure
+ * semantics" below), and the candidate computation above is truthful but
+ * NOT itself a record of what was already sent, emitting unconditionally
+ * for every candidate would re-emit an identical `ticket.ready` for every
+ * already-unblocked ticket on every re-invocation — at-least-once with
+ * unbounded duplication, not the exactly-once the rest of this design
+ * implies (adversarial-review finding; a clean audit trail is a §4.7
+ * dogfood requirement). The fix: before writing a `ticket.ready` for
+ * candidate ticket `T`, this function calls `queryEvents(paths, { ticket:
+ * T })` — scoped to `T` alone via that function's own `ticket` filter,
+ * not a hand-rolled scan of the whole log — and skips the write if a
+ * `ticket.ready` event already exists for `T` whose `payload.unblocked_by`
+ * is this `closedTicketId`. This is one `queryEvents` call per candidate
+ * (an event lookup per candidate, not amortized across the whole cascade);
+ * fine at v0's target scale, and deliberately scoped per-ticket via the
+ * existing `ticket` filter rather than fetching and re-scanning the
+ * unfiltered event log once per candidate by hand. The result: a
+ * re-invoked cascade emits only the events that were genuinely missing the
+ * first time — true exactly-once across retries. See
+ * {@link CascadeOnCloseResult}'s `unblocked`/`events` docs for how this
+ * changes what each array reports on a re-invocation.
  *
  * ## Which tickets are even candidates
  *
@@ -100,12 +131,16 @@
  * consequence: a watcher/agent relying SOLELY on `ticket.ready` events
  * (rather than periodically polling `slop ready`) could miss a
  * notification for a ticket that in fact became unblocked. Re-running the
- * SAME cascade is always safe (idempotent, see above), but this function
- * does not self-retry — a caller (C3) that wants at-least-once delivery of
- * `ticket.ready` after a failure should re-invoke {@link cascadeOnClose}
- * for the same `closedTicketId` (a no-new-work call is cheap and correct),
- * NOT re-run the whole `done`/`drop` command, which would try to write the
- * already-closed ticket's state a second time.
+ * SAME cascade is always safe, but this function does not self-retry — a
+ * caller (C3) that wants delivery of `ticket.ready` after a failure should
+ * re-invoke {@link cascadeOnClose} for the same `closedTicketId`, NOT
+ * re-run the whole `done`/`drop` command, which would try to write the
+ * already-closed ticket's state a second time. Thanks to the dedup guard
+ * ("Emission is deduplicated against the event log" above), this
+ * re-invocation is genuinely exactly-once, not merely at-least-once: it
+ * writes only the `ticket.ready` events that are STILL missing, never a
+ * second copy of one that already made it out — so it is always cheap and
+ * safe to call again, including when nothing was actually missing.
  *
  * ## Preconditions (enforced, not just documented)
  *
@@ -127,16 +162,27 @@ import {
   createEvent,
   isLiveBlockerState,
   listTicketsTolerant,
+  queryEvents,
 } from "../repo/index.js";
 import type { EventContext, LockHandle, RepoPaths, TicketReadProblem } from "../repo/index.js";
 
 export interface CascadeOnCloseResult {
-  /** Tickets that flipped open+blocked -> open+unblocked as a direct
-   * result of this closure, ascending id (= creation) order. Every one of
-   * these got exactly one `ticket.ready` event — same order, same length,
-   * as `events`. */
+  /** Every ticket that is, per THIS call's fresh read of disk,
+   * open+blocked_count-zero as a direct result of this closure — the
+   * truthful "who's unblocked" answer, ascending id (= creation) order.
+   * Recompute-from-truth (module doc), so this is the SAME on a
+   * re-invocation regardless of what was already notified — it does NOT
+   * shrink just because some of these were already sent a `ticket.ready`
+   * by an earlier call. See `events` below for what actually got written
+   * THIS call; the two arrays are no longer guaranteed the same length. */
   unblocked: TicketId[];
-  /** The `ticket.ready` events emitted, one per `unblocked` entry, same order. */
+  /** The `ticket.ready` events this call actually WROTE — one per
+   * `unblocked` entry that did not already have a `ticket.ready` event on
+   * disk for this same `closedTicketId` (module doc: "Emission is
+   * deduplicated against the event log"). Same length as `unblocked` on a
+   * fresh closure; on a re-invocation (the documented recovery path for a
+   * partial cascade) this contains only the entries that were genuinely
+   * still missing — possibly `[]` even when `unblocked` is non-empty. */
   events: Event[];
   /** Ticket files skipped while re-reading the db for this cascade (see
    * db-index.ts's "Fault tolerance") — normally `[]`. The cascade still
@@ -167,6 +213,27 @@ function isDefined<T>(value: T | undefined): value is T {
 }
 
 /**
+ * Has `ticketId` already received a `ticket.ready` event crediting
+ * `closedTicketId` for its unblock? Module doc: "Emission is deduplicated
+ * against the event log". Scoped per candidate via `queryEvents`'s own
+ * `ticket` filter — reusing the repo layer's existing filter rather than
+ * hand-rolling a scan — so this asks only about `ticketId`'s own events,
+ * not the whole event log. This IS one `queryEvents` call per candidate
+ * ticket (cheap at v0 scale: see this work item's report for the cost
+ * discussion), not a single lookup amortized across the whole cascade.
+ */
+async function alreadyEmittedReadyFor(
+  paths: RepoPaths,
+  ticketId: TicketId,
+  closedTicketId: TicketId,
+): Promise<boolean> {
+  const priorEvents = await queryEvents(paths, { ticket: ticketId });
+  return priorEvents.some(
+    (event) => event.verb === "ticket.ready" && event.payload.unblocked_by === closedTicketId,
+  );
+}
+
+/**
  * Run the done-cascade for a ticket whose terminal state (`done` or
  * `dropped`) the caller has ALREADY durably written to disk, under the
  * SAME `lock` acquisition passed in here — see this module's doc for the
@@ -175,7 +242,14 @@ function isDefined<T>(value: T | undefined): value is T {
  *
  * For every ticket `closedTicketId.blocks` names that is `open` and whose
  * freshly-recomputed live `blocked_count` is now `0`, emits one
- * `ticket.ready` event (`payload: { unblocked_by: closedTicketId }`).
+ * `ticket.ready` event (`payload: { unblocked_by: closedTicketId }`) —
+ * UNLESS that exact (ticket, closedTicketId) pair already has a
+ * `ticket.ready` event on disk, in which case the write is skipped (module
+ * doc: "Emission is deduplicated against the event log"). This is what
+ * makes re-invoking this function for the same `closedTicketId` — the
+ * documented recovery path after a partial cascade — genuinely
+ * exactly-once rather than at-least-once: a re-run emits only the events
+ * that were still missing, never a duplicate of one already durable.
  * Tickets still blocked by something else (a diamond) are left alone — see
  * module doc, "Which tickets are even candidates".
  */
@@ -215,6 +289,11 @@ export async function cascadeOnClose(
 
   const events: Event[] = [];
   for (const ticket of newlyUnblocked) {
+    // Dedup guard (module doc: "Emission is deduplicated against the event
+    // log") — skip a ticket that already has a `ticket.ready` event for
+    // THIS closure, so a re-invocation (the documented recovery path after
+    // a partial cascade) is exactly-once, not at-least-once.
+    if (await alreadyEmittedReadyFor(paths, ticket.id, closedTicketId)) continue;
     await lock.assertHeld();
     const event = buildTicketReadyEvent(ticket.id, closedTicketId, ctx, clock);
     await createEvent(paths, event);

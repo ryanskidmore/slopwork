@@ -9,6 +9,7 @@ import {
   buildIndex,
   createTicket,
   ensureDbDirs,
+  listEvents,
   readTicket,
   updateTicket,
   withLock,
@@ -207,24 +208,35 @@ describe("cascadeOnClose", () => {
   });
 
   describe("idempotency", () => {
-    it("calling it twice for the same closure emits nothing new the second time", async () => {
+    it("calling it twice for the same closure emits ZERO new ticket.ready events the second time (adversarial-review regression: a re-invocation used to duplicate every already-unblocked ticket's event)", async () => {
       const target = makeTicket({ state: "open" });
       const closer = makeTicket({ state: "open", blocks: [target.id] });
       await createTicket(paths, target, ctx, createdEvent);
       await createTicket(paths, closer, ctx, createdEvent);
 
       await closeTicket(closer.id, "done");
+
       const first = await cascadeOnClose(paths, closer.id, ctx, fakeLock(), clock);
       expect(first.unblocked).toEqual([target.id]);
+      expect(first.events).toHaveLength(1);
+      expect(first.events[0]?.verb).toBe("ticket.ready");
+      expect(first.events[0]?.payload).toEqual({ unblocked_by: closer.id });
 
       const second = await cascadeOnClose(paths, closer.id, ctx, fakeLock(), clock);
-      // `target` is still open with blocked_count 0, so it's a candidate
-      // again — but re-emitting ticket.ready for an already-ready ticket is
-      // harmless (idempotent from the graph's point of view: blocked_count/
-      // ready are recomputed from truth, not from what already fired).
-      // The important invariant is that this NEVER throws and NEVER
-      // fabricates a DIFFERENT answer.
-      expect(second.unblocked).toEqual(first.unblocked);
+      // `target` is still truthfully open with blocked_count 0, so
+      // `unblocked` — recompute-from-truth, unchanged by this fix — still
+      // names it. But it was ALREADY notified by the first call, so the
+      // dedup guard (module doc: "Emission is deduplicated against the
+      // event log") must make the second call write NO event for it.
+      expect(second.unblocked).toEqual([target.id]);
+      expect(second.events).toEqual([]);
+
+      // Cross-check the full event log on disk, not just the return value —
+      // exactly ONE ticket.ready must ever exist for this closure, never two.
+      const allEvents = await listEvents(paths);
+      const readyEvents = allEvents.filter((e) => e.verb === "ticket.ready");
+      expect(readyEvents).toHaveLength(1);
+      expect(readyEvents[0]?.payload).toEqual({ unblocked_by: closer.id });
     });
   });
 
