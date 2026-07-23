@@ -1,0 +1,6 @@
+# .slop/db/*.jsonc files are written with LF line endings by
+# src/core/jsonc.ts's shared FORMATTING_OPTIONS (eol: "\n"). Force LF on
+# checkout too, so a non-Linux clone can't reintroduce CRLF noise and
+# quietly break the diff-minimal-write / git-merge story the flatfile db
+# depends on (spikes/jsonc.md, "Recommended FormattingOptions").
+*.jsonc text eol=lf
