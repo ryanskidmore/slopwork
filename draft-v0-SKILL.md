@@ -1,0 +1,58 @@
+---
+name: slopworks
+description: >
+  Work tracker for agents. Use whenever (a) the repo contains a .slop/ directory,
+  (b) you are asked to work on a ticket, feature, or "the next thing" — including
+  refs like ticket_01J9X7…, a slug like adding-new-auth-provider, or jira:PROJ-123,
+  (c) you are about to start any non-trivial coding task, (d) you discover new work
+  mid-task (bug, todo, follow-up), or (e) you are finishing, blocked, or handing off.
+  Slopworks is the single source of truth for what to do, what's in progress, and
+  what happened — never keep work state in markdown files or your own memory.
+---
+
+# Slopworks
+
+Slopworks (`slop`) tracks work as a dependency graph of tickets. You read it to know what to do, you write to it as you work, and humans audit your trail (sessions, plans, progress, MRs, transcripts). Run `slop instructions` anytime for the project's local copy of these rules.
+
+## When to act, at a glance
+
+| Situation | Do this |
+|---|---|
+| Told "work on X" (id, slug, or jira ref) | `slop show X --context` → if it has open subtickets, pick/start the right one; else `slop start X` |
+| Told "pick up the next thing" | `slop ready --json --budget 3000` → `slop start <top item>` |
+| About to start non-trivial work that has no ticket | `slop new "…"` first (ask the human if unsure it's wanted), then `start` it |
+| Discover a bug/follow-up mid-task | `slop new "…" --discovered-from <current>` — never a TODO comment, never "I'll mention it later" |
+| Blocked by missing work | `slop new` the blocker, `slop update <current> --state open`, link with `--blocks`, tell the human |
+| Need a human decision | Put the question + options in `slop update <ref> --progress "QUESTION: …"`, then stop or continue on the unblocked parts |
+| Code done, MR opened | `slop review <ref> --mr <url>` |
+| MR merged / work verified | `slop done <ref> --note "…"` |
+| Stopping without finishing | `slop stop <ref> --note "<handoff: state, next step, gotchas>"` |
+| Asked "what's the status?" | `slop status`, summarize; don't recite raw output |
+
+## The loop (default for every ticket)
+
+1. `slop start <ref>` — moves the ticket to in_progress, creates your session, and prints the context pack (spec, ancestry, blockers, prior sessions). Read it fully before coding.
+2. `slop plan <ref> "step 1" "step 2" …` — always plan before multi-step work. Revise the plan if the approach changes; don't silently diverge from it.
+3. Work. At each meaningful checkpoint (step done, decision made, surprise found): `slop plan <ref> --check N` and `slop update <ref> --progress "one-line note"`. Checkpoint-level, not keystroke-level.
+4. File everything you discover: `slop new "…" --discovered-from <ref>`.
+5. Open an MR, then `slop review <ref> --mr <url>`. Only `slop done` after merge/verification — done means done.
+
+## Rules
+
+1. **The tracker is the truth.** No TODO comments, no NOTES.md, no work state in prose. If it's work, it's a ticket.
+2. **Never fake state.** Don't `done` unverified work, don't `--check` unfinished steps, don't skip `review` because the change "is small."
+3. **Don't takeover.** If `start` warns that another session is active, stop and tell the human. Use `--takeover` only when explicitly instructed.
+4. **Stopping requires a handoff note.** The next session (probably another amnesiac you) starts from your `--note`. Write what you'd want to read: current state, next step, traps.
+5. **Prefer structured spec fields.** When creating tickets, put acceptance criteria in `acceptance[]` and file/URL pointers in `context[]`, not buried in prose.
+6. **Budget your reads.** Use `--json --budget N` on `ready`/`show`; use `slop context <ref>` to re-load your bearings after compaction instead of re-exploring the repo.
+
+## Reference resolution
+
+Anywhere a `<ref>` is accepted: full id (`ticket_01J9X7M3E8W2`), unique short prefix (`01J9X7`), slug (`adding-new-auth-provider`), and for parents also external refs (`jira:PROJ-123`). Ambiguous prefix → the CLI errors and lists candidates; pick explicitly.
+
+## Edge cases
+
+- **No `.slop/` in the repo:** slopworks isn't set up. Ask the human before running `slop init` — never initialize on your own.
+- **Transcript warnings** on `stop`/`done`: report the warning to the human; never block or retry-loop on it.
+- **Draft tickets** (`state: draft`) are not workable — they're being defined. Don't start them; ask if one looks like it should be yours.
+- **`ready` returns nothing:** check `slop status` for blocked/stale items and report what's gating progress rather than inventing work.
