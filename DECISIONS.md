@@ -187,3 +187,55 @@ so `resolveTicketRef` now lowercases the incoming ref before the exact
 -slug lookup — matching `core/ids.ts`'s `idMatchesRef`, which was already
 case-insensitive for short-prefix matching. Documented precedence (slug
 beats prefix) is unchanged; this is strictly more permissive than before.
+
+## B4 — `ready` ordering's "age" is the ticket's own `id`, not a new `created_at` index column
+
+The acceptance criterion asks for "priority then age," with `created_at`
+named as one option and "a documented tiebreak" explicitly permitted as
+the alternative. `IndexTicketRow` has no `created_at` field. Rather than
+adding one (a new column needing its own secondary tiebreak for two
+tickets created in the same batch/millisecond), `src/tickets/ready.ts`'s
+`compareReadyOrder` sorts on the ticket's own `id` instead: ids are ULIDs
+minted exactly once at creation (`core/ids.ts`'s shared monotonic
+factory) and sort chronologically as plain strings — the same property
+`events.ts`'s cursor ordering already leans on — so ascending-id order
+*is* ascending-creation-order, to the millisecond, and is additionally a
+complete, collision-free tiebreak (ids are globally unique; `created_at`
+alone is not). This keeps `IndexTicketRow`'s reserved `blocked_count`/
+`ready` fill-in (see below) the only shape change this item makes.
+
+## B4 — `blocked_count`/`ready` are recomputed from `Ticket` state at every `buildIndex`, never a stored/decremented counter
+
+`db-index.ts` gains `computeBlockedCounts(tickets)` (live — non-`done`/
+`dropped` — blocker count per ticket) and `computeReady(state, count,
+activeSession)` (design.md §2's predicate, verbatim), both pure and
+exported. `buildIndex` calls them over the full ticket set to fill the
+previously-null `blocked_count`/`ready` columns; B4's done-cascade
+(`src/tickets/cascade.ts`'s `cascadeOnClose`) calls `computeBlockedCounts`
+again over a freshly re-read ticket list after a closure, rather than
+decrementing a counter anywhere — there is nowhere on `Ticket` to store
+one (D5: derived, never asserted), and a bare decrement is provably wrong
+for a diamond (two live blockers; closing one must not flip the target)
+without first computing the same live-count this design computes
+directly. Recomputing is idempotent by construction, which is what makes
+a partial cascade (crash/dispossession after N of M `ticket.ready` events)
+safe to leave as-is rather than needing rollback: the graph's derived
+state is never torn, only the event log's "who got notified" bookkeeping
+can lag, and a re-run of the same cascade repairs it for free. Filling an
+already-nullable field is not a schema reshape, so `INDEX_SCHEMA_VERSION`
+is unchanged — see `db-index.ts`'s module doc for the one narrow gap this
+leaves (a pre-B4 `index.jsonc` already on disk, with untouched ticket
+files, stays `"fresh"` with stale nulls until `slop reindex` or a ticket
+write forces a rebuild; self-heals either way, same class as the existing
+mtime-granularity limitation).
+
+## B4 — `ready --resumable` returns "stopped" work today; C5 widens the same predicate
+
+`src/tickets/ready.ts`'s `filterResumableRows` returns `in_progress`/
+`review` tickets with `active_session === null` — reachable today only via
+direct repo-layer state (or a future crash/hand-edit), since the currently
+-landed `stop` transitions a ticket back to `open`, not to a session
+-less `in_progress`. C5 (staleness) should widen the predicate to also
+match `row.stale === true || row.review_stale === true` (columns already
+reserved on `IndexTicketRow`, `null` until C5) — a one-line change, not a
+redesign; see the module's doc comment for the exact seam.

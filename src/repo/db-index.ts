@@ -103,17 +103,32 @@
  * "Derivations: blocked_count in index, ready query ... done-cascade")
  * and `stale`/`review_stale` (C5: "Staleness: stale_after /
  * review_stale_after computed in index") fields, typed as `<T> | null`.
- * A3 always writes `null` for all four here — populating them is B4's
- * and C5's job respectively — but the fields exist structurally now, so
- * landing that work is filling in a value, not reshaping the index (and
- * therefore doesn't need `INDEX_SCHEMA_VERSION` bumped). The same
- * reasoning applies to the `fingerprint` shape change and the new
- * `problems` field added by this work item's adversarial-review fixes: a
- * pre-fix `index.jsonc` on disk simply fails schema validation against
- * the new shape and falls into the existing `invalid_schema` auto-heal
- * path, transparently rebuilding — the auto-heal mechanism already
- * handles any shape mismatch, so there is nothing a version bump would
- * additionally protect here.
+ * A3 always wrote `null` for all four here. **B4 (this work item) now
+ * fills in `blocked_count`/`ready` for real** — see
+ * {@link computeBlockedCounts}/{@link computeReady} below, called from
+ * `buildIndex` — leaving only `stale`/`review_stale` as C5's remaining
+ * job. Filling in an already-nullable field is not a reshape, so this
+ * doesn't need `INDEX_SCHEMA_VERSION` bumped either — same reasoning as
+ * the `fingerprint` shape change and the `problems` field below: a
+ * pre-fix `index.jsonc` on disk simply fails schema validation against a
+ * genuinely new shape and falls into the existing `invalid_schema`
+ * auto-heal path, transparently rebuilding.
+ *
+ * **Known limitation this leaves (documented, not fixed — same class as
+ * the mtime-granularity limitation below):** a schema bump protects
+ * against a *shape* mismatch, not a *value* one. An `index.jsonc` already
+ * on disk, written by a pre-B4 binary, has `blocked_count`/`ready` fields
+ * that are already `null` — which still satisfies today's nullable
+ * schema. If no ticket file has changed since (so the content fingerprint
+ * still matches), `loadIndex()` will report that file `"fresh"` and serve
+ * those stale nulls rather than the real computed values, until something
+ * changes a ticket file or someone runs `slop reindex` (the same escape
+ * hatch the mtime limitation already relies on). This is a real, narrow
+ * gap for a long-lived local `.slop/db` upgraded across a `slop` binary
+ * version boundary with no ticket writes in between; it does not affect
+ * any fresh build (every test fixture, every fresh clone — index.jsonc is
+ * gitignored, D14, so it never exists pre-populated) and self-heals on
+ * the next `slop reindex` or the next ticket mutation either way.
  */
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
@@ -131,7 +146,7 @@ import {
   ticketIdSchema,
   ticketStateSchema,
 } from "../core/index.js";
-import type { Ticket, TicketId } from "../core/index.js";
+import type { SessionId, Ticket, TicketId, TicketState } from "../core/index.js";
 import { isoTimestampSchema } from "../core/timestamp.js";
 import { slugSchema } from "../core/slug.js";
 import { parseJsonc, writeCanonical } from "../core/jsonc.js";
@@ -222,6 +237,74 @@ export const dbIndexSchema = z.object({
   problems: z.array(ticketReadProblemSchema),
 });
 export type DbIndex = z.infer<typeof dbIndexSchema>;
+
+/**
+ * B4: ticket states that no longer block anything (D5's "blocked" derived
+ * overlay). A blocker that has reached one of these states is CLOSED and
+ * stops counting as a "live" blocker for whatever it names in its own
+ * `blocks` array — this is the exact "live" in "live blocker" throughout
+ * design.md §2 and this work item's brief. Matches `src/tickets/state.ts`'s
+ * own treatment of `done`/`dropped` as terminal (`RAW_STATE_TRANSITIONS`)
+ * and `sessions/context-pack.ts`'s pre-existing ad hoc live-blocker filter
+ * (`t.state !== "done" && t.state !== "dropped"`) — this is now the one
+ * place that rule lives, reused by both `buildIndex` below and B4's
+ * done-cascade (`src/tickets/cascade.ts`), which recomputes
+ * {@link computeBlockedCounts} fresh against a freshly re-read ticket list
+ * rather than trusting any persisted counter (see that module's doc for
+ * why recompute-from-truth, not a mutated counter, is this work item's
+ * chosen design).
+ */
+const CLOSED_TICKET_STATES: ReadonlySet<TicketState> = new Set(["done", "dropped"]);
+
+/** Is a ticket in `state` still capable of blocking something? See {@link CLOSED_TICKET_STATES}. */
+export function isLiveBlockerState(state: TicketState): boolean {
+  return !CLOSED_TICKET_STATES.has(state);
+}
+
+/**
+ * B4: live blocked-by count for every ticket in `tickets` — for each
+ * ticket, how many OTHER tickets currently in a non-`done`/`dropped` state
+ * name it in their own `blocks` array. Pure, synchronous, no I/O. Always
+ * has an entry (possibly `0`) for every id in `tickets`, so a caller may
+ * `.get(id) ?? 0` purely defensively — every real id IS present.
+ *
+ * This is the ONE place `blocked_count` is computed: `buildIndex` calls it
+ * over the full ticket set below, and B4's done-cascade
+ * (`src/tickets/cascade.ts`) calls it again over a freshly re-read ticket
+ * set after a closure, instead of decrementing a number stored anywhere
+ * (D5: `blocked` is a derived overlay, never asserted — there is nowhere
+ * on a `Ticket` to hold a running counter even if this wanted to).
+ */
+export function computeBlockedCounts(tickets: readonly Ticket[]): Map<TicketId, number> {
+  const counts = new Map<TicketId, number>();
+  for (const ticket of tickets) counts.set(ticket.id, 0);
+  for (const blocker of tickets) {
+    if (!isLiveBlockerState(blocker.state)) continue;
+    for (const edge of outgoingEdges(blocker)) {
+      if (edge.kind !== "blocks") continue;
+      if (!isTicketId(edge.to)) continue; // "blocks" edges are always local (edge.ts) — defensive only
+      if (!counts.has(edge.to)) continue; // target absent from this ticket set — shouldn't happen for a consistent db
+      counts.set(edge.to, (counts.get(edge.to) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
+/**
+ * B4: design.md §2's `ready` verdict for a single ticket, verbatim —
+ * `open ∧ no live blockers ∧ no active session`. Pure; the one place this
+ * predicate is implemented, so `buildIndex`'s `ready` column and any other
+ * caller that needs to ask "would this ticket be ready" (e.g. B4's
+ * done-cascade, deciding whether a newly-unblocked ticket deserves a
+ * `ticket.ready` event) always agree.
+ */
+export function computeReady(
+  state: TicketState,
+  liveBlockedCount: number,
+  activeSession: SessionId | null,
+): boolean {
+  return state === "open" && liveBlockedCount === 0 && activeSession === null;
+}
 
 function pushInto<K>(map: Map<K, TicketId[]>, key: K, value: TicketId): void {
   const existing = map.get(key);
@@ -353,9 +436,15 @@ export async function buildIndex(paths: RepoPaths, clock: Clock = systemClock): 
     }
   }
 
+  // B4: computed once over the full ticket set, then read per-row below —
+  // see computeBlockedCounts's doc for why this (not a stored/decremented
+  // counter) is the design.
+  const blockedCounts = computeBlockedCounts(tickets);
+
   const rows: IndexTicketRow[] = tickets
-    .map(
-      (ticket: Ticket): IndexTicketRow => ({
+    .map((ticket: Ticket): IndexTicketRow => {
+      const liveBlockedCount = blockedCounts.get(ticket.id) ?? 0;
+      return {
         id: ticket.id,
         slug: ticket.slug,
         name: ticket.name,
@@ -370,12 +459,12 @@ export async function buildIndex(paths: RepoPaths, clock: Clock = systemClock): 
         blocked_by: blockedBy.get(ticket.id) ?? [],
         related_from: relatedFrom.get(ticket.id) ?? [],
         discovered: discovered.get(ticket.id) ?? [],
-        blocked_count: null,
-        ready: null,
+        blocked_count: liveBlockedCount,
+        ready: computeReady(ticket.state, liveBlockedCount, ticket.active_session),
         stale: null,
         review_stale: null,
-      }),
-    )
+      };
+    })
     .sort((a, b) => a.id.localeCompare(b.id));
 
   const slugs: Record<string, TicketId> = {};

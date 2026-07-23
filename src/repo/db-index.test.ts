@@ -3,12 +3,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixedClock } from "../core/clock.js";
-import { type Ticket, newTicketId, ticketSchema, writeCanonical } from "../core/index.js";
+import { type Ticket, newSessionId, newTicketId, ticketSchema, writeCanonical } from "../core/index.js";
 import {
   INDEX_SCHEMA_VERSION,
   buildIndex,
+  computeBlockedCounts,
   computeContentFingerprint,
+  computeReady,
   formatIndexProblems,
+  isLiveBlockerState,
   loadIndex,
   writeIndex,
 } from "./db-index.js";
@@ -94,16 +97,142 @@ describe("buildIndex", () => {
     expect(index.slugs[t.slug]).toBe(t.id);
   });
 
-  it("leaves B4/C5 placeholder fields present but null", async () => {
+  it("computes blocked_count/ready for real (B4); leaves stale/review_stale null (C5's slot)", async () => {
     const t = makeTicket();
     await createTicket(paths, t, ctx, createdEvent);
     const index = await buildIndex(paths, clock);
     const row = index.tickets[0];
     expect(row).toBeDefined();
-    expect(row?.blocked_count).toBeNull();
-    expect(row?.ready).toBeNull();
+    // A lone open ticket with no blockers and no active session: 0 live
+    // blockers, and per design.md §2 it's therefore ready.
+    expect(row?.blocked_count).toBe(0);
+    expect(row?.ready).toBe(true);
     expect(row?.stale).toBeNull();
     expect(row?.review_stale).toBeNull();
+  });
+
+  describe("B4: blocked_count / ready", () => {
+    it("counts an open blocker as live: blocked_count 1, ready false", async () => {
+      const target = makeTicket();
+      const blocker = makeTicket({ blocks: [target.id] });
+      await createTicket(paths, target, ctx, createdEvent);
+      await createTicket(paths, blocker, ctx, createdEvent);
+
+      const index = await buildIndex(paths, clock);
+      const row = index.tickets.find((r) => r.id === target.id);
+      expect(row?.blocked_count).toBe(1);
+      expect(row?.ready).toBe(false);
+    });
+
+    it("does not count a done blocker: blocked_count 0, ready true", async () => {
+      const target = makeTicket();
+      const blocker = makeTicket({ blocks: [target.id], state: "done" });
+      await createTicket(paths, target, ctx, createdEvent);
+      await createTicket(paths, blocker, ctx, createdEvent);
+
+      const index = await buildIndex(paths, clock);
+      const row = index.tickets.find((r) => r.id === target.id);
+      expect(row?.blocked_count).toBe(0);
+      expect(row?.ready).toBe(true);
+    });
+
+    it("does not count a dropped blocker: blocked_count 0, ready true", async () => {
+      const target = makeTicket();
+      const blocker = makeTicket({ blocks: [target.id], state: "dropped" });
+      await createTicket(paths, target, ctx, createdEvent);
+      await createTicket(paths, blocker, ctx, createdEvent);
+
+      const index = await buildIndex(paths, clock);
+      const row = index.tickets.find((r) => r.id === target.id);
+      expect(row?.blocked_count).toBe(0);
+      expect(row?.ready).toBe(true);
+    });
+
+    it("diamond: two blockers, one done one open — still blocked, blocked_count 1", async () => {
+      const target = makeTicket();
+      const doneBlocker = makeTicket({ blocks: [target.id], state: "done" });
+      const openBlocker = makeTicket({ blocks: [target.id] });
+      await createTicket(paths, target, ctx, createdEvent);
+      await createTicket(paths, doneBlocker, ctx, createdEvent);
+      await createTicket(paths, openBlocker, ctx, createdEvent);
+
+      const index = await buildIndex(paths, clock);
+      const row = index.tickets.find((r) => r.id === target.id);
+      // A naive "any blocker closed -> flip to ready" implementation would
+      // get this wrong; blocked_count must reflect the SURVIVING live
+      // blocker.
+      expect(row?.blocked_count).toBe(1);
+      expect(row?.ready).toBe(false);
+    });
+
+    it("an in_progress ticket with an active session is never ready, even with 0 blockers", async () => {
+      const t = makeTicket({ state: "in_progress", active_session: newSessionId() });
+      await createTicket(paths, t, ctx, createdEvent);
+
+      const index = await buildIndex(paths, clock);
+      const row = index.tickets.find((r) => r.id === t.id);
+      expect(row?.blocked_count).toBe(0);
+      expect(row?.ready).toBe(false);
+    });
+
+    it("drafts/in_progress/review/done/dropped are never ready, regardless of blocked_count", async () => {
+      const nonOpenStates = ["draft", "in_progress", "review", "done", "dropped"] as const;
+      for (const state of nonOpenStates) {
+        const t = makeTicket({
+          state,
+          review:
+            state === "review"
+              ? { requested_at: "2026-07-23T10:00:00.000Z", by: { name: "ryan", kind: "human" } }
+              : undefined,
+        });
+        await createTicket(paths, t, ctx, createdEvent);
+      }
+
+      const index = await buildIndex(paths, clock);
+      expect(index.tickets).toHaveLength(nonOpenStates.length);
+      for (const row of index.tickets) {
+        expect(row.ready, `state=${row.state} should never be ready`).toBe(false);
+      }
+    });
+  });
+
+  describe("computeBlockedCounts / computeReady / isLiveBlockerState (pure)", () => {
+    it("isLiveBlockerState: only done/dropped are non-live", () => {
+      expect(isLiveBlockerState("draft")).toBe(true);
+      expect(isLiveBlockerState("open")).toBe(true);
+      expect(isLiveBlockerState("in_progress")).toBe(true);
+      expect(isLiveBlockerState("review")).toBe(true);
+      expect(isLiveBlockerState("done")).toBe(false);
+      expect(isLiveBlockerState("dropped")).toBe(false);
+    });
+
+    it("computeBlockedCounts: every ticket gets an entry, including one with zero blockers", () => {
+      const a = makeTicket();
+      const b = makeTicket();
+      const counts = computeBlockedCounts([a, b]);
+      expect(counts.get(a.id)).toBe(0);
+      expect(counts.get(b.id)).toBe(0);
+    });
+
+    it("computeBlockedCounts: fan-out — one blocker counted against every ticket it blocks", () => {
+      const x = makeTicket();
+      const y = makeTicket();
+      const blocker = makeTicket({ blocks: [x.id, y.id] });
+      const counts = computeBlockedCounts([x, y, blocker]);
+      expect(counts.get(x.id)).toBe(1);
+      expect(counts.get(y.id)).toBe(1);
+    });
+
+    it("computeReady matches design.md §2 exactly", () => {
+      expect(computeReady("open", 0, null)).toBe(true);
+      expect(computeReady("open", 1, null)).toBe(false);
+      expect(computeReady("open", 0, newSessionId())).toBe(false);
+      expect(computeReady("in_progress", 0, null)).toBe(false);
+      expect(computeReady("draft", 0, null)).toBe(false);
+      expect(computeReady("review", 0, null)).toBe(false);
+      expect(computeReady("done", 0, null)).toBe(false);
+      expect(computeReady("dropped", 0, null)).toBe(false);
+    });
   });
 
   it("derives reverse edges: blocked_by, related_from, discovered from forward fields on OTHER tickets", async () => {
