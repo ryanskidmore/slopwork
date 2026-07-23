@@ -12,7 +12,9 @@ import type { Actor, Ticket, TicketId } from "../core/index.js";
 import { EXIT_CODES, newTicketId, nowIso, ticketSchema } from "../core/index.js";
 import type { RepoPaths } from "../repo/paths.js";
 import { resolveTicketRef } from "../repo/refs.js";
+import { listTickets } from "../repo/tickets.js";
 import { SlopError } from "../cli/errors.js";
+import { validateTicketEdges } from "./edges.js";
 import { ancestryFor, resolveParentRef } from "./parent.js";
 import { pickSlug } from "./slug.js";
 import { defaultSpec, parseSpecInput } from "./spec.js";
@@ -50,7 +52,13 @@ export interface NewTicketResult {
  *   - a USAGE_ERROR `SlopError` if the assembled candidate fails
  *     `ticketSchema` validation (bad priority, empty name, an over-long
  *     label, ...) — every field-level constraint funnels through one
- *     final validation pass rather than being hand-checked piecemeal.
+ *     final validation pass rather than being hand-checked piecemeal;
+ *   - a CONFLICT (exit 6) `SlopError` (B3, `edges.ts`'s `validateTicketEdges`)
+ *     if `--blocks` would exceed the per-ticket per-edge-kind degree cap.
+ *     A cycle is structurally impossible at creation time — a brand-new
+ *     id can't already be named by anything else's edges — but the same
+ *     validation call runs here anyway for one uniform code path shared
+ *     with `edit`'s re-validation, rather than a special-cased subset.
  */
 export async function buildNewTicket(
   paths: RepoPaths,
@@ -69,10 +77,19 @@ export async function buildNewTicket(
     warnings.push(parentResolution.warning);
   }
 
+  // Edges are a set, not a multiset (edges.ts's `assertDegreeCap` rejects
+  // a duplicate target as an error on `edit`'s re-validation path) — so a
+  // repeated `--blocks` naming the same ticket twice is deduped here
+  // rather than surfaced as a creation-time error, which would be a
+  // needlessly hostile reaction to a harmless repeated flag/copy-paste.
   const blocks: TicketId[] = [];
+  const seenBlocks = new Set<TicketId>();
   for (const ref of input.blocksRaw) {
     const target = await resolveTicketRef(paths, ref);
-    blocks.push(target.id);
+    if (!seenBlocks.has(target.id)) {
+      seenBlocks.add(target.id);
+      blocks.push(target.id);
+    }
   }
 
   const discoveredFrom: TicketId[] = [];
@@ -123,6 +140,12 @@ export async function buildNewTicket(
       EXIT_CODES.USAGE_ERROR,
     );
   }
+
+  // B3: degree cap (and, uniformly, the cycle checks — always a no-op
+  // here, see this function's doc) before this ticket is ever handed back
+  // for persisting.
+  const others = await listTickets(paths);
+  validateTicketEdges(parsed.data, others);
 
   return { ticket: parsed.data, warnings };
 }

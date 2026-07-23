@@ -237,4 +237,29 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
       buildNewTicket(paths, baseInput({ blocksRaw: ["no-such-ticket"] }), clock),
     ).rejects.toMatchObject({ exitCode: 4 });
   });
+
+  // B3: buildNewTicket now runs the graph module (edges.ts) before
+  // returning — a cycle is structurally impossible at creation (see B3's
+  // report for why), but the degree cap and --blocks deduplication are
+  // both real, reachable creation-time behaviors.
+  describe("B3: graph validation wired into `new`", () => {
+    it("--blocks repeated for the SAME ticket is deduplicated, not stored twice", async () => {
+      const b1 = makeTicket({ slug: "b1" });
+      await createTicket(paths, b1, ctx, createdEvent);
+      const { ticket } = await buildNewTicket(paths, baseInput({ blocksRaw: ["b1", "b1"] }), clock);
+      expect(ticket.blocks).toEqual([b1.id]);
+    });
+
+    it("rejects --blocks past the per-ticket per-edge-kind cap (exit 6)", async () => {
+      const blockers: Ticket[] = [];
+      for (let i = 0; i < 501; i++) {
+        const t = makeTicket({ slug: `blocker-${i}` });
+        await createTicket(paths, t, ctx, createdEvent);
+        blockers.push(t);
+      }
+      await expect(
+        buildNewTicket(paths, baseInput({ blocksRaw: blockers.map((b) => b.slug) }), clock),
+      ).rejects.toMatchObject({ exitCode: 6 });
+    });
+  });
 });
