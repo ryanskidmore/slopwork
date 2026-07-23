@@ -48,6 +48,19 @@ describe("assertStoppable", () => {
   it("allows a ticket with an active session", () => {
     expect(() => assertStoppable(makeTicket())).not.toThrow();
   });
+
+  it("refuses a review-state ticket (C3): review carries an active session too, but §2 has no review -> open edge", () => {
+    const ticket = makeTicket({
+      state: "review",
+      review: { requested_at: "2026-07-23T09:00:00.000Z", by: { name: "ryan", kind: "human" } },
+    });
+    expect(() => assertStoppable(ticket)).toThrow(/review/i);
+    try {
+      assertStoppable(ticket);
+    } catch (err) {
+      expect((err as { exitCode?: number }).exitCode).toBe(6);
+    }
+  });
 });
 
 describe("buildStoppedSession", () => {

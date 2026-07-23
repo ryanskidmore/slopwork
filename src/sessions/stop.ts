@@ -24,11 +24,32 @@ import { formatZodIssuesForUsage } from "../tickets/validate.js";
  * the single source of truth for "is there anything to stop", deliberately
  * keyed off `active_session` rather than `state === "in_progress"`: the two
  * are kept in lockstep by `start`/`stop` themselves (C1's own scope), so
- * checking the field `stop` itself clears is the more direct assertion. */
+ * checking the field `stop` itself clears is the more direct assertion.
+ *
+ * C3 addendum: a `review`-state ticket ALSO carries a non-null
+ * `active_session` (D15's session model, DECISIONS.md's C3 entry — `slop
+ * review` deliberately never ends the session), which the
+ * `active_session !== null` check alone can't tell apart from a genuine
+ * `in_progress` ticket. §2's diagram draws no `review -> open` edge at
+ * all — `stop` only ever hands an `in_progress` ticket back to `open` —
+ * so this now rejects a `review`-state ticket explicitly, pointing at the
+ * two edges §2 actually allows out of `review` (`slop done`, or `slop
+ * start` for a changes-requested re-entry). Without this, `stop` would
+ * silently perform an illegal `review -> open` transition, bypassing the
+ * state machine `tests/acceptance/C3.test.ts`'s property test checks.
+ */
 export function assertStoppable(ticket: Ticket): void {
   if (ticket.active_session === null) {
     throw new SlopError(
       `ticket "${ticket.name}" (${ticket.slug}) has no active session to stop (state: ${ticket.state})`,
+      EXIT_CODES.CONFLICT,
+    );
+  }
+  if (ticket.state === "review") {
+    throw new SlopError(
+      `ticket "${ticket.name}" (${ticket.slug}) is in review, not in_progress — \`stop\` only hands an ` +
+        'in_progress ticket back to open (design.md §2 has no "review -> open" edge). Either `slop ' +
+        "done` it, or `slop start` it again to re-enter as a changes-requested round (D15).",
       EXIT_CODES.CONFLICT,
     );
   }

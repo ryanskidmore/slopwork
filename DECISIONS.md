@@ -276,6 +276,148 @@ a second `cascadeOnClose` call for the same closure emits zero new
 events, cross-checked against the full on-disk event log, not just the
 function's return value.
 
+## C3 — the session model: `review` captures a transcript but does NOT end the session; only `done`/`stop`/`drop` do
+
+design.md §2 is explicit that `done` "finalizes the session" but is
+deliberately non-committal about `review` ("records the MR and flips
+state"), while §4.3 still lists `review` as a transcript-capture
+checkpoint. The chosen resolution — the "clean model" the work item's own
+brief suggested and this implementation adopted as-is — is: **a session
+stays active (`ended_at: null`) across an entire `in_progress -> review ->
+{done | re-entry}` round-trip; `review` only ever folds a fresh
+`transcript_ref` snapshot into the SAME still-open session; `done`,
+`stop`, and `drop` are the only three edges that ever set
+`ended_at`/`end_summary`.** Concretely: `slop review --mr` reads the
+ticket's active session, calls `captureTranscript` against it (§4.3's
+"capture on every session end... or checkpoint" — a review round is a
+checkpoint even though the session itself isn't ending), and folds only
+`transcript_ref` into a `updateSession` write — `ended_at`/`end_summary`
+are untouched. No dedicated "session updated" verb exists in the closed
+`EVENT_VERBS` set, so this write reuses `review.requested` (the same verb
+the ticket's own `in_progress -> review` transition emits), per
+`src/sessions/transcript.ts`'s module doc, "Exactly how C3 must call
+this" — two `review.requested` events, one per entity (session, ticket),
+both under the same `slop review` invocation.
+
+**Consequence this decision forced, and how it was closed:** since
+`review` leaves `active_session` pointing at a still-*live* session, two
+places elsewhere in the codebase would otherwise have silently done the
+wrong thing once a ticket could actually reach `review` state (unreachable
+before C3, since nothing wrote `state: "review"` until now):
+
+1. **`slop start` on a `review`-state ticket** (D15's changes-requested
+   re-entry) would have hit C1's *own-session-active* conflict check —
+   the same one a genuine `--takeover` needs — and refused without
+   `--takeover`, even though a plain re-`start` is documented, ordinary
+   usage for this edge. Fixed in `src/cli/commands/start.ts`: the
+   conflict gate is now skipped when `current.state === "review"`, and
+   the superseded session is closed via a new local `buildReenteredSession`
+   (accurate "review round ended, re-entered via `slop start`" wording,
+   event verb `session.ended` with `payload: {reason: "review_reentry",
+   re_entry: true}`) instead of `buildSupersededSession`/`session.takeover`
+   — mechanically similar (old session ends, new one begins) but logged
+   as what it actually is, not a takeover. `re_entry: true` also rides
+   the `session.started` event's payload and (already, via C1's
+   pre-existing `buildStartedTicket`) the `ticket.state_changed` event —
+   three places an auditor can find the SAME re-entry, not one.
+2. **`slop stop` on a `review`-state ticket** would have satisfied C1's
+   `assertStoppable` (`active_session !== null` was its only check) and
+   silently performed `review -> open`, an edge that does not exist
+   anywhere in §2's diagram. Fixed with one added guard clause in
+   `src/sessions/stop.ts`'s `assertStoppable`: a `review`-state ticket is
+   now refused (CONFLICT, exit 6), pointing at `slop done`/`slop start`
+   instead. Both fixes are covered directly (`start.test.ts`'s existing
+   D15 re-entry cases plus `stop.test.ts`'s new refusal case) and
+   end-to-end (`tests/acceptance/C3.test.ts`'s state-machine property test
+   and its dedicated re-entry describe block).
+
+`review`/`done`/`drop` never write more than one `updateSession` call
+each, so `active_session`, `ended_at`, `transcript_ref`, and the end
+summary can never disagree with each other or with `ticket.review`: the
+ticket schema's own refine (`review` present iff `state === "review"`)
+plus this session-lifecycle discipline together keep every reachable
+state — `in_progress` (session active, no `review`), `review` (session
+still active, `review` set), `done`/`dropped` (session ended,
+`active_session: null`, `review` cleared) — internally coherent by
+construction, not by convention. `tests/acceptance/C3.test.ts`'s property
+test asserts this directly after every step of every generated operation
+sequence, not just at the end.
+
+## C3 — `done` requires `review` first; there is no direct `in_progress -> done` shortcut
+
+design.md §2's diagram draws `review --done--> done` as the only path
+into `done` — no `in_progress -> done` edge exists in the diagram at all —
+and §5's house rule for agents is explicit: "open an MR and call `review`
+before claiming done." Given the work item's brief explicitly allowed
+either choice provided it's enforced and documented, this implementation
+requires `review` first, matching both the diagram and the house rule
+literally rather than treating them as aspirational. Enforced by
+`src/tickets/state.ts`'s new `checkDoneEntry` (`ok` only when `from ===
+"review"`), which `slop done` (`src/cli/commands/done.ts`) checks before
+doing anything else — `slop done` on an `in_progress` ticket is a
+CONFLICT (exit 6) naming the missing `slop review --mr` step, not a
+silent skip-the-review shortcut. `slop drop`, by contrast, keeps §2's
+"dropped (wontdo) from anywhere" literally: legal from `draft`/`open`/
+`in_progress`/`review` alike (`checkDropEntry`), since dropping was never
+gated on review in the first place.
+
+## C3 — `slop review`/`done`/`drop` get their own single-edge legality checks in `state.ts`, not a same-state shortcut
+
+Extending `src/tickets/state.ts` (per this work item's brief: "extend
+this, do not fork a second table") added `checkReviewEntry`,
+`checkDoneEntry`, `checkDropEntry` — one exported function per edge
+`checkStateTransition`'s own `to === "review"`/`to === "done"` branches
+already excluded (plus a stricter `-> dropped` check) — rather than a
+second `Record<TicketState, TicketState[]>` adjacency table. Together
+with the pre-existing `RAW_STATE_TRANSITIONS`, these three now cover every
+edge in §2's diagram with nothing left implicit. Deliberately WITHOUT
+`checkStateTransition`'s `from === to` same-state shortcut (draft/undraft
+keep that convention — re-running `slop draft` on an already-draft
+ticket is a harmless, B2-established no-op): `slop review`/`done`/`drop`
+are real, side-effecting actions (session finalization, MR recording, the
+done-cascade), not idempotent field setters, so calling any of them a
+second time on a ticket already at the target state is treated as a
+genuine usage mistake (CONFLICT, exit 6) — most concretely, `checkDropEntry`
+is intentionally NOT implemented as `checkStateTransition(from,
+"dropped")`, because that function's same-state shortcut would otherwise
+let a second `slop drop` on an already-dropped ticket through as a silent
+no-op.
+
+## C3 — done/drop call B4's `cascadeOnClose` exactly once, immediately after writing the terminal state, inside the same lock
+
+Both `src/cli/commands/done.ts` and `drop.ts` follow the exact shape
+`cascade.ts`'s own module doc prescribes: resolve the ticket, open one
+`withLock`, write the session-finalize update (if there's a session to
+finalize), `lock.assertHeld()`, write the ticket's terminal state
+(`done`/`dropped`) with its own dedicated verb (`ticket.done`/
+`ticket.dropped`), `lock.assertHeld()` again, THEN call `cascadeOnClose`
+once — never in a loop, never re-invoked speculatively "just in case."
+`drop` treats "no active session" (an `open`/`draft` ticket with nothing
+started) as a legitimate skip of the session-finalize step entirely, not
+an error — §2's "dropped... from anywhere" includes states that never had
+a session to begin with. B4's cascade treats `done`/`dropped` identically
+as "no longer a live blocker" (`isLiveBlockerState`), so both commands'
+single `cascadeOnClose` call is exactly the mechanism §4.7's dogfood bar
+("every completed ticket... a transcript" / clean audit trail) depends
+on. The concurrently-landed cascade-idempotency fix (this file's B4 entry
+above) means a hypothetical future retry-after-partial-failure caller
+could safely re-invoke `cascadeOnClose` a second time without duplicate
+`ticket.ready` events — but neither `done.ts` nor `drop.ts` does this
+today; the acceptance test's e2e/drop cases assert exactly one
+`ticket.ready` event per closure.
+
+## C3 — `--mr` is required-with-warning: `slop review` without it still succeeds
+
+Per design.md §8.1 item 3 / D15, `slop review <ref>` with no `--mr`
+prints a `warning:` line to stderr (naming the exact `--mr <url>` flag to
+re-run with) and still performs the `in_progress -> review` transition,
+leaving `ticket.review.mr` absent (not `null` — an honest "we don't know
+yet," matching `reviewSchema`'s `mr: z.url().optional()`). `--mr <url>`
+suppresses the nag and records the link. Both halves are asserted
+directly in `tests/acceptance/C3.test.ts`'s dedicated clause-2 describe
+block, and exercised incidentally throughout the property test (each
+generated `review` step randomly includes or omits `--mr`).
+
 ## C5 — the index stores a staleness DEADLINE, never a boolean; the boolean is computed live at read time
 
 The plan's C5 row says "computed in index," which read literally means

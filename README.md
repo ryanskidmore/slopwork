@@ -39,6 +39,33 @@ bun run start            # run the CLI from source (bun src/cli/index.ts ...)
 CI (`.github/workflows/ci.yml`) runs on every push and pull request: install → lint → format
 check → typecheck → test → build → smoke-test the compiled binary.
 
+## Lifecycle: `review` → `done` (C3)
+
+Stored ticket states: `draft ⇄ open → in_progress → review → done`, plus `dropped` (wontdo) from
+any non-terminal state (design.md §2). The three closing commands:
+
+- **`slop review <ref> --mr <url>`** — `in_progress → review` only. `--mr` is
+  required-*with-warning* (D15/§8.1 item 3): omit it and the command still succeeds, but nags on
+  stderr; `ticket.review.mr` is left absent, not `null`. The session stays **active** across a
+  review round-trip — `review` only captures a fresh transcript snapshot into it, never sets
+  `ended_at`. See `DECISIONS.md`'s C3 entries for the full session-model writeup.
+- **`slop done <ref> [--note]`** — `review → done` **only**; there is no direct
+  `in_progress → done` shortcut (§2's diagram draws none, and §5's house rule says "open an MR and
+  call review before claiming done"). Finalizes the session (end summary from `--note`, transcript
+  captured per D16, `active_session` cleared) and runs B4's done-cascade exactly once, emitting
+  `ticket.ready` for any dependent this ticket was blocking.
+- **`slop drop <ref> --reason "…"`** — `→ dropped` from any non-terminal state; `--reason` is
+  required. Finalizes the session if one is active (a `dropped` ticket also stops blocking its
+  dependents — same cascade as `done`, called exactly once).
+- **Re-`start` from `review`** — `slop start <ref>` on a `review`-state ticket is D15's
+  changes-requested re-entry: `review → in_progress`, `review` cleared, a fresh session started, no
+  `--takeover` needed, logged as a re-entry (`re_entry: true` on the relevant events).
+
+`src/tickets/state.ts` is the single source of truth for which of these transitions are legal;
+`tests/acceptance/C3.test.ts` includes a `fast-check` property test that drives the compiled
+binary through random operation sequences and checks every result against an independently
+transcribed copy of §2's legal-transition table.
+
 ## Exit codes
 
 Every `slop` command exits with exactly one of the following codes (defined in

@@ -27,6 +27,47 @@
  * table wholesale once `review`/`done` have real dedicated commands, or to
  * keep layering its own richer checks in front of this one. This file's
  * only promise is: never allow more than §2 plainly allows.
+ *
+ * ---------------------------------------------------------------------
+ * C3 addendum: the two excluded edges, checked here too
+ * ---------------------------------------------------------------------
+ *
+ * C3 lands `slop review`/`slop done` — the dedicated commands the two
+ * rejections above point at — and extends this file (rather than forking
+ * a second table) with {@link checkReviewEntry}, {@link checkDoneEntry},
+ * and {@link checkDropEntry}: three small, single-edge legality checks
+ * that, together with {@link RAW_STATE_TRANSITIONS} above, cover every
+ * edge in §2's diagram with nothing left implicit:
+ *
+ *   - `checkReviewEntry`: `in_progress -> review` (D15) — the one edge
+ *     `to === "review"` above always rejects.
+ *   - `checkDoneEntry`: `review -> done` (D15: "`done` closes review
+ *     out"). §2's diagram draws NO direct `in_progress -> done` edge —
+ *     the only path to `done` runs through `review` — matching design.md
+ *     §5's house rule for agents ("open an MR and call `review` before
+ *     claiming done"). This is C3's resolved v0 decision (the work item's
+ *     brief explicitly allows either choice, provided it's enforced here
+ *     and documented — see DECISIONS.md's C3 entry): `slop done` on an
+ *     `in_progress` ticket is a CONFLICT, not a shortcut.
+ *   - `checkDropEntry`: `-> dropped` (§2: "dropped (wontdo) from
+ *     anywhere"). Legal from any non-terminal state — but, UNLIKE
+ *     `checkStateTransition`'s generic same-state shortcut, dropping an
+ *     ALREADY-`dropped` (or `done`) ticket is rejected, not silently
+ *     accepted: `slop drop` is a real terminal action with side effects
+ *     (session finalization, the done-cascade), not an idempotent field
+ *     setter, so `checkStateTransition(current.state, "dropped")` (whose
+ *     `from === to` shortcut would wrongly treat a second `slop drop` on
+ *     an already-dropped ticket as a legal no-op) is deliberately NOT
+ *     reused here.
+ *
+ * None of the three carries a same-state shortcut the way `draft`/
+ * `undraft` (via `checkStateTransition`'s `from === to` rule) do — re
+ * -running `slop review`/`slop done` on a ticket already at that state is
+ * rejected, not a no-op: v0 stores exactly one MR per review round (§8.2
+ * item 4), so there is no supported "update the MR while still in
+ * review" flow, and `done`/`drop` are one-way, side-effecting actions
+ * where "already there" is a genuine usage mistake worth surfacing, not
+ * something to swallow silently.
  */
 import type { TicketState } from "../core/index.js";
 
@@ -90,5 +131,83 @@ export function checkStateTransition(from: TicketState, to: TicketState): StateT
         `from "${from}" via \`update --state\` are: ${allowedList}`,
     };
   }
+  return { ok: true };
+}
+
+/** Shared by all three C3 checks below — see this module's doc, "the two excluded edges, checked here too". */
+function terminalStateCheck(from: TicketState): StateTransitionCheck | null {
+  if (from === "done" || from === "dropped") {
+    return {
+      ok: false,
+      reason: `"${from}" is a terminal state; no further state changes are possible`,
+    };
+  }
+  return null;
+}
+
+/**
+ * `in_progress -> review` (D15) — the sole legal entry into `review`,
+ * matching §2's diagram exactly. `slop review` (C3) checks this directly
+ * instead of routing through `checkStateTransition`, because — unlike
+ * `update --state` — it DOES have what the transition needs (the MR
+ * link, `review.by`/`requested_at`); it is exactly the "dedicated
+ * command" `checkStateTransition`'s own `to === "review"` rejection
+ * above points at. No same-state shortcut: see this module's doc.
+ */
+export function checkReviewEntry(from: TicketState): StateTransitionCheck {
+  if (from === "in_progress") return { ok: true };
+  const terminal = terminalStateCheck(from);
+  if (terminal !== null) return terminal;
+  if (from === "review") {
+    return {
+      ok: false,
+      reason:
+        'ticket is already in "review" (design.md §2 has no review -> review edge; v0 stores one MR ' +
+        "per review round, §8.2 item 4) — run `slop done` to close it out, or `slop start` to re-enter " +
+        "as a changes-requested round (D15)",
+    };
+  }
+  return {
+    ok: false,
+    reason:
+      `illegal transition "${from}" -> "review" (design.md §2); review is reachable only from ` +
+      '"in_progress" — run `slop start` first',
+  };
+}
+
+/**
+ * `review -> done` (D15: "`done` closes review out") — the sole legal
+ * entry into `done`. §2's diagram draws NO direct `in_progress -> done`
+ * edge; this is C3's resolved v0 decision, matching design.md §5's house
+ * rule ("open an MR and call review before claiming done") — see this
+ * module's doc and DECISIONS.md's C3 entry. `slop done` (C3) checks this
+ * directly for the same reason `checkReviewEntry` does: `update --state`
+ * excludes `-> done` because it can't finalize the session/cascade this
+ * transition needs (this module's top doc); the dedicated command both
+ * has that machinery AND is the one place §2's review-gates-done rule can
+ * be enforced. No same-state shortcut: see this module's doc.
+ */
+export function checkDoneEntry(from: TicketState): StateTransitionCheck {
+  if (from === "review") return { ok: true };
+  const terminal = terminalStateCheck(from);
+  if (terminal !== null) return terminal;
+  return {
+    ok: false,
+    reason:
+      `illegal transition "${from}" -> "done" (design.md §2); done is reachable only from "review" — ` +
+      'run `slop review --mr <url>` first (design.md §5: "open an MR and call review before claiming done")',
+  };
+}
+
+/**
+ * `-> dropped` (§2: "dropped (wontdo) from anywhere") — legal from any
+ * non-terminal state, exactly once. Deliberately NOT implemented as
+ * `checkStateTransition(from, "dropped")`: see this module's doc for why
+ * that generic same-state shortcut is wrong for a real, side-effecting
+ * action like `slop drop`.
+ */
+export function checkDropEntry(from: TicketState): StateTransitionCheck {
+  const terminal = terminalStateCheck(from);
+  if (terminal !== null) return terminal;
   return { ok: true };
 }

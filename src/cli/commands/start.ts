@@ -1,6 +1,8 @@
 import type { Command } from "commander";
+import type { Clock } from "../../core/clock.js";
+import { systemClock } from "../../core/clock.js";
 import type { EventVerb, HarnessKind, Session } from "../../core/index.js";
-import { HARNESS_KINDS, harnessKindSchema } from "../../core/index.js";
+import { HARNESS_KINDS, harnessKindSchema, nowIso, sessionSchema } from "../../core/index.js";
 import {
   createSession,
   readSession,
@@ -47,6 +49,32 @@ function parseHarnessFlag(value: string): HarnessKind {
   return parsed.data;
 }
 
+/**
+ * C3's fix to C1's `start`: D15's "changes requested = `slop start` again"
+ * re-entry (`review -> in_progress`) leaves the review round's session
+ * still ACTIVE by design (`slop review` never ends it — DECISIONS.md's C3
+ * entry), so a plain re-`start` finds `current.active_session` pointing
+ * at a live (`ended_at: null`) session, exactly like a genuine takeover
+ * conflict would. Below, `isReviewReentry` (`current.state === "review"`,
+ * the same condition `sessions/start.ts`'s `buildStartedTicket` already
+ * uses for its own `reEntry` flag) short-circuits that gate: no
+ * `--takeover` is required, and the superseded session is closed out via
+ * this function rather than `buildSupersededSession` — same shape (end
+ * now, with a summary), but honest wording: nothing was "taken over",
+ * the same working ticket just continues under a fresh session because
+ * changes were requested. Kept local (not added to `sessions/start.ts`,
+ * C1's file, out of this work item's edit scope) since it's a three-line,
+ * self-contained builder.
+ */
+function buildReenteredSession(previous: Session, clock: Clock = systemClock): Session {
+  const now = nowIso(clock);
+  return sessionSchema.parse({
+    ...previous,
+    ended_at: now,
+    end_summary: "review round ended: changes requested, re-entered via `slop start` (D15)",
+  });
+}
+
 async function runStart(ref: string, opts: StartCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
@@ -88,14 +116,21 @@ async function runStart(ref: string, opts: StartCommandOptions): Promise<void> {
     const current = await readTicket(paths, initialTicket.id);
     assertStartable(current);
 
+    // D15 changes-requested re-entry — see buildReenteredSession's doc
+    // above for why this must NOT go through the ordinary --takeover gate.
+    const isReviewReentry = current.state === "review";
+
     let previousSession: Session | null = null;
     if (current.active_session !== null) {
       const existing = await readSession(paths, current.active_session).catch(() => null);
       if (existing !== null && existing.ended_at === null) {
-        if (!opts.takeover) {
+        if (isReviewReentry) {
+          previousSession = existing;
+        } else if (!opts.takeover) {
           throw activeSessionConflictError(current, existing);
+        } else {
+          previousSession = existing;
         }
-        previousSession = existing;
       }
     }
 
@@ -106,7 +141,14 @@ async function runStart(ref: string, opts: StartCommandOptions): Promise<void> {
       { actor, session: session.id },
       {
         verb: "session.started",
-        payload: { harness: harness.kind, takeover: previousSession !== null },
+        payload: {
+          harness: harness.kind,
+          // `takeover` stays true ONLY for a genuine --takeover seizure —
+          // a review re-entry is ordinary expected usage, not a takeover,
+          // even though it mechanically also supersedes a live session.
+          takeover: previousSession !== null && !isReviewReentry,
+          ...(isReviewReentry ? { re_entry: true } : {}),
+        },
       },
     );
     await lock.assertHeld();
@@ -134,21 +176,39 @@ async function runStart(ref: string, opts: StartCommandOptions): Promise<void> {
 
     if (previousSession !== null) {
       await lock.assertHeld();
-      const endedPrevious = buildSupersededSession(previousSession, actor);
-      await updateSession(
-        paths,
-        previousSession.id,
-        diffSessionPatch(previousSession, endedPrevious),
-        endedPrevious,
-        { actor, session: session.id },
-        {
-          verb: "session.takeover",
-          payload: { previous_actor: previousSession.actor, new_session: session.id },
-        },
-      );
+      if (isReviewReentry) {
+        const endedPrevious = buildReenteredSession(previousSession);
+        await updateSession(
+          paths,
+          previousSession.id,
+          diffSessionPatch(previousSession, endedPrevious),
+          endedPrevious,
+          { actor, session: session.id },
+          {
+            // D15/§2's audit-trail requirement ("logged as re-entry") —
+            // distinct from a genuine `session.takeover` (see
+            // buildReenteredSession's doc for why this is NOT that verb).
+            verb: "session.ended",
+            payload: { reason: "review_reentry", re_entry: true, new_session: session.id },
+          },
+        );
+      } else {
+        const endedPrevious = buildSupersededSession(previousSession, actor);
+        await updateSession(
+          paths,
+          previousSession.id,
+          diffSessionPatch(previousSession, endedPrevious),
+          endedPrevious,
+          { actor, session: session.id },
+          {
+            verb: "session.takeover",
+            payload: { previous_actor: previousSession.actor, new_session: session.id },
+          },
+        );
+      }
     }
 
-    return { session, ticket: startedTicket, previousSession };
+    return { session, ticket: startedTicket, previousSession, isReviewReentry };
   });
 
   for (const w of warnings) printWarning(w);
@@ -160,7 +220,9 @@ async function runStart(ref: string, opts: StartCommandOptions): Promise<void> {
       `  harness: ${harness.kind}${harness.session_id ? `  session_id=${harness.session_id}` : ""}\n` +
       `  git: branch=${git.branch ?? "(none)"} commit=${git.commit_at_start ?? "(none)"}\n` +
       (result.previousSession !== null
-        ? `  took over from ${describeActiveSession(result.previousSession)}\n`
+        ? result.isReviewReentry
+          ? `  re-entered from review (changes requested, D15); closed out ${describeActiveSession(result.previousSession)}\n`
+          : `  took over from ${describeActiveSession(result.previousSession)}\n`
         : ""),
   );
 
