@@ -285,6 +285,17 @@ describe("B1: new / show / edit / update", () => {
       expect(ticket.labels).toEqual(["type:feature", "team:core"]);
     });
 
+    it("--label survives the argv.ts rewrite pass unaffected on `new` too (no +/- semantics at creation; confirmed, not assumed)", async () => {
+      const fixture = await makeFixture();
+      // A value that happens to start with `-` is a legitimate label
+      // string here (design.md's `new` `--label a:b` form has no add
+      // /remove semantics — that's `update`'s job) — the argv rewrite
+      // must still leave it intact rather than mangling it.
+      const { id } = await createTicketViaCli(fixture, "Dash label ticket", ["--label", "-weird"]);
+      const ticket = await readTicketFile(fixture.paths, id);
+      expect(ticket.labels).toEqual(["-weird"]);
+    });
+
     it("--draft (D13: drafts start in draft state)", async () => {
       const fixture = await makeFixture();
       const { id } = await createTicketViaCli(fixture, "Draft ticket", ["--draft"]);
@@ -521,13 +532,91 @@ describe("B1: new / show / edit / update", () => {
       expect(illegal.stderr).toMatch(/illegal transition/);
     });
 
-    it("--label +x -y adds and removes", async () => {
+    // Coordinator smoke-test bug: `--label +x -y` — the EXACT form
+    // design.md §4.2 documents, one `--label` mention followed by two
+    // space-separated, sigil-prefixed tokens — errored with "unknown
+    // option '-y'" before the argv.ts pre-pass fix. All three invocation
+    // shapes an agent (or the D1-generated onboarding docs) might
+    // reasonably type must produce the same result.
+    describe("--label +x -y (all documented invocation shapes)", () => {
+      it("the documented form: one `--label` flag, two space-separated values", async () => {
+        const fixture = await makeFixture();
+        const { id } = await createTicketViaCli(fixture, "Label ticket doc form", [
+          "--label",
+          "keep",
+        ]);
+        const result = runSlop(["update", id, "--label", "+added", "-keep"], fixture.root);
+        expect(result.status, result.stderr).toBe(0);
+        expect((await readTicketFile(fixture.paths, id)).labels).toEqual(["added"]);
+      });
+
+      it("the repeated-flag form: --label +x --label -y", async () => {
+        const fixture = await makeFixture();
+        const { id } = await createTicketViaCli(fixture, "Label ticket repeated form", [
+          "--label",
+          "keep",
+        ]);
+        const result = runSlop(
+          ["update", id, "--label", "+added", "--label", "-keep"],
+          fixture.root,
+        );
+        expect(result.status, result.stderr).toBe(0);
+        expect((await readTicketFile(fixture.paths, id)).labels).toEqual(["added"]);
+      });
+
+      it("the equals form: --label=+x --label=-y", async () => {
+        const fixture = await makeFixture();
+        const { id } = await createTicketViaCli(fixture, "Label ticket equals form", [
+          "--label",
+          "keep",
+        ]);
+        const result = runSlop(["update", id, "--label=+added", "--label=-keep"], fixture.root);
+        expect(result.status, result.stderr).toBe(0);
+        expect((await readTicketFile(fixture.paths, id)).labels).toEqual(["added"]);
+      });
+
+      it("the documented form does not swallow a following real flag (--priority)", async () => {
+        const fixture = await makeFixture();
+        const { id } = await createTicketViaCli(fixture, "Label ticket swallow guard");
+        const result = runSlop(
+          ["update", id, "--label", "+a", "-b", "--priority", "1"],
+          fixture.root,
+        );
+        expect(result.status, result.stderr).toBe(0);
+        const ticket = await readTicketFile(fixture.paths, id);
+        expect(ticket.labels).toEqual(["a"]); // "+a" added, "-b" removed (no-op: never present)
+        expect(ticket.priority).toBe(1); // --priority was NOT swallowed as a label value
+      });
+
+      it("three consecutive documented-form values in one --label mention", async () => {
+        const fixture = await makeFixture();
+        const { id } = await createTicketViaCli(fixture, "Label ticket triple");
+        const result = runSlop(["update", id, "--label", "+a", "+b", "-c"], fixture.root);
+        expect(result.status, result.stderr).toBe(0);
+        expect((await readTicketFile(fixture.paths, id)).labels.sort()).toEqual(["a", "b"]);
+      });
+    });
+
+    // §4.2's other single-value flags already worked with a leading-dash
+    // value even before the argv fix (Commander accepts a `-`-prefixed
+    // token as an option's one immediately-following value without
+    // ambiguity) — asserted here so a future regression is caught, and so
+    // it's on record that these were checked, not assumed, per the
+    // coordinator's ask.
+    it("--progress accepts a value starting with a dash", async () => {
       const fixture = await makeFixture();
-      const { id } = await createTicketViaCli(fixture, "Label ticket", ["--label", "keep"]);
-      const result = runSlop(["update", id, "--label", "+added", "--label", "-keep"], fixture.root);
+      const { id } = await createTicketViaCli(fixture, "Progress dash ticket");
+      const result = runSlop(["update", id, "--progress", "-1 regression"], fixture.root);
       expect(result.status, result.stderr).toBe(0);
-      const ticket = await readTicketFile(fixture.paths, id);
-      expect(ticket.labels).toEqual(["added"]);
+      expect((await readTicketFile(fixture.paths, id)).latest_note).toBe("-1 regression");
+    });
+
+    it("--name accepts a value starting with a dash", async () => {
+      const fixture = await makeFixture();
+      const { id } = await createTicketViaCli(fixture, "Name dash ticket");
+      const result = runSlop(["update", id, "--name", "-foo"], fixture.root);
+      expect(result.status, result.stderr).toBe(0);
+      expect((await readTicketFile(fixture.paths, id)).name).toBe("-foo");
     });
 
     it("--name renames WITHOUT re-slugging (D12: slugs are stable handles)", async () => {

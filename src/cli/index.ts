@@ -15,6 +15,7 @@
 import { Command, CommanderError } from "commander";
 import pkg from "../../package.json" with { type: "json" };
 import { EXIT_CODES } from "../core/exit-codes.js";
+import { rewriteLabelArgv } from "./argv.js";
 import { registerCommands } from "./commands/index.js";
 import { reportError } from "./errors.js";
 
@@ -42,7 +43,11 @@ async function main(): Promise<void> {
   const program = buildProgram();
 
   try {
-    await program.parseAsync(process.argv);
+    // See argv.ts's module doc: fixes the `--label +x -y` form design.md
+    // §4.2 documents, which Commander alone can't parse. Scoped to the
+    // literal `--label` token only — every other command's argv is
+    // returned byte-for-byte unchanged.
+    await program.parseAsync(rewriteLabelArgv(process.argv));
   } catch (err) {
     if (err instanceof CommanderError) {
       // help / --version are success paths; every other Commander-raised
