@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import { sessionSchema } from "../../core/index.js";
 import {
   readSession,
   readTicket,
@@ -9,15 +10,28 @@ import {
   updateTicket,
   withLock,
 } from "../../repo/index.js";
-import { diffSessionPatch } from "../../sessions/patch.js";
+import { diffSessionPatch, SESSION_END_FIELDS } from "../../sessions/patch.js";
 import { assertStoppable, buildStoppedSession, buildStoppedTicket } from "../../sessions/stop.js";
-import { TICKET_FIELDS, diffTicketPatch } from "../../tickets/patch.js";
+import { captureTranscript } from "../../sessions/transcript.js";
+import { diffTicketPatch, TICKET_FIELDS } from "../../tickets/patch.js";
 import { loadConfig, resolveActor } from "../actor.js";
 import { printWarning } from "./shared.js";
 
 interface StopCommandOptions {
   note?: string;
+  transcript?: string;
 }
+
+/**
+ * Every field this command ever patches into an existing session,
+ * `stop`'s own end-of-session fields (`ended_at`/`end_summary`, C1) PLUS
+ * `transcript_ref` (C4) — folded into the SAME `updateSession` write
+ * rather than a second one, since there's no generic "session updated"
+ * verb in `EVENT_VERBS` (see `src/sessions/transcript.ts`'s module doc,
+ * "Exactly how C3 must call this" — `done`/`review`/`drop` should mirror
+ * this exact pattern).
+ */
+const STOP_SESSION_FIELDS = [...SESSION_END_FIELDS, "transcript_ref"] as const;
 
 async function runStop(ref: string, opts: StopCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
@@ -51,13 +65,40 @@ async function runStop(ref: string, opts: StopCommandOptions): Promise<void> {
     const session = await readSession(paths, activeSessionId);
 
     const stoppedSession = buildStoppedSession(session, opts.note);
+
+    // C4: locate + copy the harness transcript for THIS session (never the
+    // ticket/cwd's "most recent" one — see transcript.ts's module doc on
+    // why that would be concurrency-unsound) and fold the result into the
+    // SAME session write as ended_at/end_summary. `captureTranscript`
+    // itself never throws (structural never-block guarantee, design.md
+    // §4.3 / spikes/findings.md §6) — a missing/unfindable transcript
+    // degrades to `transcript_ref: null` + a warning printed below, and
+    // this `stop` still succeeds.
+    const capture = await captureTranscript({
+      session,
+      paths,
+      cwd: root,
+      transcriptsMode: config.transcripts,
+      explicitTranscriptPath: opts.transcript,
+    });
+    const finalSession = sessionSchema.parse({
+      ...stoppedSession,
+      transcript_ref: capture.transcriptRef,
+    });
+
     await updateSession(
       paths,
       session.id,
-      diffSessionPatch(session, stoppedSession),
-      stoppedSession,
+      diffSessionPatch(session, finalSession, STOP_SESSION_FIELDS),
+      finalSession,
       { actor, session: session.id },
-      { verb: "session.stopped", payload: opts.note !== undefined ? { note: opts.note } : {} },
+      {
+        verb: "session.stopped",
+        payload: {
+          ...(opts.note !== undefined ? { note: opts.note } : {}),
+          ...(capture.transcriptRef !== null ? { transcript_ref: capture.transcriptRef } : {}),
+        },
+      },
     );
     await lock.assertHeld();
 
@@ -71,26 +112,39 @@ async function runStop(ref: string, opts: StopCommandOptions): Promise<void> {
       { verb: "ticket.state_changed", payload: { from: current.state, to: stoppedTicket.state } },
     );
 
-    return { session: stoppedSession, ticket: stoppedTicket };
+    return { session: finalSession, ticket: stoppedTicket, transcriptWarning: capture.warning };
   });
+
+  // Printed AFTER the transaction commits, deliberately: a transcript
+  // problem is a warning, never a reason the state change itself could
+  // fail (this is the C4 acceptance criterion's second half, made
+  // structural — see captureTranscript's own doc).
+  if (result.transcriptWarning !== null) printWarning(result.transcriptWarning);
 
   process.stdout.write(
     `stopped ${result.session.id} on ${result.ticket.id} (${result.ticket.slug})\n` +
       `  ${result.ticket.name}\n` +
       `  state: ${result.ticket.state}\n` +
-      `  handoff note: ${result.session.end_summary ?? "(none)"}\n`,
+      `  handoff note: ${result.session.end_summary ?? "(none)"}\n` +
+      `  transcript: ${result.session.transcript_ref ?? "(none)"}\n`,
   );
 }
 
-/** `slop stop` — design.md §2, §4.3, D16; work item C1. */
+/** `slop stop` — design.md §2, §4.3, D16; work items C1 (state transition)
+ * + C4 (transcript capture). */
 export function registerStopCommand(program: Command): void {
   program
     .command("stop")
     .description(
-      "End the current session on <ref> without completing it: hands the ticket back to open " +
-        "and records a handoff note (transcript capture per D16 lands with work item C4).",
+      "End the current session on <ref> without completing it: hands the ticket back to open, " +
+        "records a handoff note, and captures the harness transcript into .slop/transcripts/ " +
+        "(D16) — never blocks if the transcript can't be found.",
     )
     .argument("<ref>", "ticket to stop")
     .option("--note <text>", "handoff note for the next session")
+    .option(
+      "--transcript <path>",
+      "manual transcript path (works for any harness; overrides auto-detection when the file exists)",
+    )
     .action(runStop);
 }
