@@ -28,3 +28,21 @@ export function parseIntegerOption(flag: string): (value: string) => number {
  * 0 (urgent) – 3 (low), default 2. Validation of the range is a later
  * work item's concern (B1); this only turns CLI text into a number. */
 export const parsePriority = parseIntegerOption("--priority");
+
+/** Print a non-fatal `warning: <message>` line to stderr — e.g. B1's
+ * malformed-`jira:`-ref format check (§8.2 item 5: "warn on format
+ * mismatch, don't block"), which must never prevent the command from
+ * succeeding. */
+export function printWarning(message: string): void {
+  process.stderr.write(`warning: ${message}\n`);
+}
+
+/** Read all of stdin as UTF-8 text — `--spec -`'s "read from stdin" (B1,
+ * `new`/`update`). */
+export async function readStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}

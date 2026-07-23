@@ -1,6 +1,49 @@
 import type { Command } from "commander";
-import { notImplemented } from "../errors.js";
-import { collect, parsePriority } from "./shared.js";
+import { repoPaths, requireRepoRoot, resolveTicketRef, updateTicket } from "../../repo/index.js";
+import { buildUpdate } from "../../tickets/update.js";
+import type { UpdateInput } from "../../tickets/update.js";
+import { loadConfig, resolveActor } from "../actor.js";
+import { collect, parsePriority, readStdin } from "./shared.js";
+
+interface UpdateCommandOptions {
+  progress?: string;
+  state?: string;
+  priority?: number;
+  label: string[];
+  name?: string;
+  spec?: string;
+}
+
+async function runUpdate(ref: string, opts: UpdateCommandOptions): Promise<void> {
+  const root = requireRepoRoot(process.cwd());
+  const paths = repoPaths(root);
+  const config = await loadConfig(paths);
+  const actor = resolveActor({ config, cwd: root });
+
+  const current = await resolveTicketRef(paths, ref);
+
+  const specRaw =
+    opts.spec === undefined ? undefined : opts.spec === "-" ? await readStdin() : opts.spec;
+
+  const input: UpdateInput = {
+    progress: opts.progress,
+    state: opts.state,
+    priority: opts.priority,
+    labelOps: opts.label,
+    name: opts.name,
+    specRaw,
+  };
+
+  const { ticket, patch, verb, payload } = buildUpdate(current, input);
+
+  await updateTicket(paths, current.id, patch, ticket, { actor, session: null }, { verb, payload });
+
+  process.stdout.write(
+    `updated ${ticket.id}  (slug: ${ticket.slug})\n` +
+      `  ${ticket.name}\n` +
+      `  state: ${ticket.state}  priority: ${ticket.priority}\n`,
+  );
+}
 
 /** `slop update` — design.md §4.2; work item B1.
  *
@@ -30,5 +73,5 @@ export function registerUpdateCommand(program: Command): void {
     )
     .option("--name <name>", "rename the ticket")
     .option("--spec <json>", 'replace the ticket spec as JSON; pass "-" to read from stdin')
-    .action(() => notImplemented("update", "B1"));
+    .action(runUpdate);
 }
