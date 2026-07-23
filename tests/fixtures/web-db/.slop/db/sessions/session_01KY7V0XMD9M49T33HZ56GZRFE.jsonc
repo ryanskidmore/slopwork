@@ -1,0 +1,40 @@
+{
+  "id": "session_01KY7V0XMD9M49T33HZ56GZRFE",
+  "ticket": "ticket_01KY7V0XM8NSYT4XQB3NT6B2V9",
+  "actor": {
+    "name": "ryan",
+    "kind": "human"
+  },
+  "harness": {
+    "kind": "other",
+    "session_id": null
+  },
+  "git": {
+    "branch": "feature/auth-provider-interface",
+    "commit_at_start": "112200aa"
+  },
+  "started_at": "2026-07-15T12:00:00.000Z",
+  "ended_at": "2026-07-16T12:00:00.000Z",
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Finalize the provider interface shape",
+          "checked": true
+        },
+        {
+          "text": "Write ADR",
+          "checked": true
+        },
+        {
+          "text": "Get sign-off and merge",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-15T12:00:00.000Z"
+    }
+  ],
+  "end_summary": "Finalized the interface directly (no harness) after the agent handoff; merged.",
+  "transcript_ref": null
+}

@@ -1,0 +1,15 @@
+{
+  "id": "event_01KY7V0XMD9M49T33HZ56GZRF2",
+  "actor": {
+    "name": "codex-agent",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.done",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KY7V0XMCBFC5CH2S8FWSQ3WY"
+  },
+  "payload": {},
+  "at": "2026-07-21T16:00:00.000Z"
+}

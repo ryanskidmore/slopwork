@@ -1,0 +1,17 @@
+{
+  "id": "event_01KY7V0XME48FCV1C0A0KMCH09",
+  "actor": {
+    "name": "claude-agent-1",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "review.requested",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KY7V0XME48FCV1C0A0KMCH06"
+  },
+  "payload": {
+    "mr": "https://github.com/ryan/slopworks-fixture/pull/42"
+  },
+  "at": "2026-07-23T11:50:00.000Z"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "event_01KY7V0XMCBFC5CH2S8FWSQ3WW",
+  "actor": {
+    "name": "opencode-agent",
+    "kind": "agent"
+  },
+  "session": "session_01KY7V0XMCBFC5CH2S8FWSQ3WS",
+  "verb": "plan.set",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KY7V0XMCBFC5CH2S8FWSQ3WS"
+  },
+  "payload": {
+    "version": 1,
+    "steps": 4
+  },
+  "at": "2026-07-23T06:01:00.000Z"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "event_01KY7V0XMD9M49T33HZ56GZRFF",
+  "actor": {
+    "name": "ryan",
+    "kind": "human"
+  },
+  "session": "session_01KY7V0XMD9M49T33HZ56GZRFE",
+  "verb": "session.started",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KY7V0XMD9M49T33HZ56GZRFE"
+  },
+  "payload": {
+    "harness": "other",
+    "takeover": true
+  },
+  "at": "2026-07-15T12:00:00.000Z"
+}

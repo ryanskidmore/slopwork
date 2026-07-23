@@ -1,0 +1,9 @@
+project: slopworks-fixture
+user: ryan
+remotes: 
+  repo: https://github.com/ryan/slopworks-fixture
+  jira: https://fixtureorg.atlassian.net
+defaults: 
+  stale_after: 60m
+  review_stale_after: 24h
+transcripts: local

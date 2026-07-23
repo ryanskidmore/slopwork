@@ -1,0 +1,40 @@
+{
+  "id": "ticket_01KY7V0XME48FCV1C0A0KMCH0H",
+  "name": "Investigate memory leak in event writer",
+  "slug": "investigate-memory-leak-in-event-writer",
+  "spec": {
+    "summary": "RSS climbs steadily during a long `slop events --since` watch loop.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 0,
+  "labels": [
+    "bug",
+    "perf"
+  ],
+  "adhoc": true,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY7V0XM8NSYT4XQB3NT6B2VB"
+  ],
+  "root_id": "ticket_01KY7V0XME48FCV1C0A0KMCH0H",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-23T11:30:00.000Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "adhoc",
+    "created_by": {
+      "name": "claude-agent-1",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-23T11:30:00.000Z",
+  "updated_at": "2026-07-23T11:30:00.000Z"
+}

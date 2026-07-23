@@ -1,0 +1,17 @@
+{
+  "id": "event_01KY7V0XME48FCV1C0A0KMCH05",
+  "actor": {
+    "name": "ryan",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.dropped",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KY7V0XME48FCV1C0A0KMCH03"
+  },
+  "payload": {
+    "reason": "Superseded by SlopQL (F6) — real search covers this without an embeddings index."
+  },
+  "at": "2026-07-18T12:00:00.000Z"
+}

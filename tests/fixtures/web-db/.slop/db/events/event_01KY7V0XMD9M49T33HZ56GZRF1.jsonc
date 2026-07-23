@@ -1,0 +1,15 @@
+{
+  "id": "event_01KY7V0XMD9M49T33HZ56GZRF1",
+  "actor": {
+    "name": "ryan",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.created",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KY7V0XMCBFC5CH2S8FWSQ3WY"
+  },
+  "payload": {},
+  "at": "2026-07-21T12:00:00.000Z"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "event_01KY7V0XME48FCV1C0A0KMCH08",
+  "actor": {
+    "name": "claude-agent-1",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.state_changed",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KY7V0XME48FCV1C0A0KMCH06"
+  },
+  "payload": {
+    "from": "open",
+    "to": "in_progress"
+  },
+  "at": "2026-07-23T10:00:00.000Z"
+}

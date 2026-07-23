@@ -1,0 +1,37 @@
+{
+  "id": "ticket_01KY7V0XME48FCV1C0A0KMCH03",
+  "name": "Prototype vector search for ticket search",
+  "slug": "prototype-vector-search-for-ticket-search",
+  "spec": {
+    "summary": "Spike embeddings-based search as an alternative to naive `slop search`.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "dropped",
+  "priority": 3,
+  "labels": [
+    "research"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KY7V0XME48FCV1C0A0KMCH03",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-18T12:00:00.000Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "ryan",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-07-17T12:00:00.000Z",
+  "updated_at": "2026-07-18T12:00:00.000Z"
+}

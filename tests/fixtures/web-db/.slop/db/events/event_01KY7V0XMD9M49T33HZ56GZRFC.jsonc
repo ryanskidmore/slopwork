@@ -1,0 +1,17 @@
+{
+  "id": "event_01KY7V0XMD9M49T33HZ56GZRFC",
+  "actor": {
+    "name": "claude-agent-1",
+    "kind": "agent"
+  },
+  "session": "session_01KY7V0XMD9M49T33HZ56GZRF8",
+  "verb": "session.stopped",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KY7V0XMD9M49T33HZ56GZRF8"
+  },
+  "payload": {
+    "note": "Handing off with a written recommendation; two viable shapes, no strong preference."
+  },
+  "at": "2026-07-14T16:00:00.000Z"
+}

@@ -1,0 +1,44 @@
+{
+  "id": "ticket_01KY7V0XMCBFC5CH2S8FWSQ3WQ",
+  "name": "Write billing migration runbook",
+  "slug": "write-billing-migration-runbook",
+  "spec": {
+    "summary": "Step-by-step runbook for the cutover weekend.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "billing",
+    "docs"
+  ],
+  "adhoc": false,
+  "parent": "ticket_01KY7V0XMCBFC5CH2S8FWSQ3WN",
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KY7V0XMCBFC5CH2S8FWSQ3WN",
+  "path": [
+    "ticket_01KY7V0XMCBFC5CH2S8FWSQ3WN"
+  ],
+  "active_session": null,
+  "last_activity_at": "2026-07-19T12:00:00.000Z",
+  "latest_note": null,
+  "owner": {
+    "name": "ryan",
+    "kind": "human"
+  },
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "ryan",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-07-19T12:00:00.000Z",
+  "updated_at": "2026-07-19T12:00:00.000Z"
+}

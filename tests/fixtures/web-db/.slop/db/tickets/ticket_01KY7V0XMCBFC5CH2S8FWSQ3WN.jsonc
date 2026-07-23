@@ -1,0 +1,41 @@
+{
+  "id": "ticket_01KY7V0XMCBFC5CH2S8FWSQ3WN",
+  "name": "Migrate billing to new provider",
+  "slug": "migrate-billing-to-new-provider",
+  "spec": {
+    "summary": "Move billing off the sunset-ing payment processor before the Q3 shutoff.",
+    "details_md": "Tracked upstream as jira:PROJ-123. This ticket is the local execution tracker.",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "in_progress",
+  "priority": 0,
+  "labels": [
+    "billing"
+  ],
+  "adhoc": false,
+  "parent": "jira:PROJ-123",
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KY7V0XMCBFC5CH2S8FWSQ3WN",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-23T07:00:00.000Z",
+  "latest_note": null,
+  "owner": {
+    "name": "ryan",
+    "kind": "human"
+  },
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "ryan",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-07-19T12:00:00.000Z",
+  "updated_at": "2026-07-23T07:00:00.000Z"
+}

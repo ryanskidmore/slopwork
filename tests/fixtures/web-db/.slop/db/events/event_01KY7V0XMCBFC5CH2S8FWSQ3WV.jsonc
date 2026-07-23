@@ -1,0 +1,18 @@
+{
+  "id": "event_01KY7V0XMCBFC5CH2S8FWSQ3WV",
+  "actor": {
+    "name": "opencode-agent",
+    "kind": "agent"
+  },
+  "session": "session_01KY7V0XMCBFC5CH2S8FWSQ3WS",
+  "verb": "ticket.state_changed",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KY7V0XMCBFC5CH2S8FWSQ3WN"
+  },
+  "payload": {
+    "from": "open",
+    "to": "in_progress"
+  },
+  "at": "2026-07-23T06:00:00.000Z"
+}

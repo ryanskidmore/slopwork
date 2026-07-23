@@ -1,0 +1,17 @@
+{
+  "id": "event_01KY7V0XMCBFC5CH2S8FWSQ3WP",
+  "actor": {
+    "name": "ryan",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.created",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KY7V0XMCBFC5CH2S8FWSQ3WN"
+  },
+  "payload": {
+    "parent": "jira:PROJ-123"
+  },
+  "at": "2026-07-19T12:00:00.000Z"
+}

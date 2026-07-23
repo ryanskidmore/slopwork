@@ -1,0 +1,47 @@
+{
+  "id": "ticket_01KY7V0XM8NSYT4XQB3NT6B2VB",
+  "name": "Implement OAuth provider",
+  "slug": "implement-oauth-provider",
+  "spec": {
+    "summary": "Build the first third-party provider (OAuth 2.0 / OIDC) against the new interface.",
+    "details_md": "Uses `openid-client` under the hood. See design doc linked in context.",
+    "acceptance": [],
+    "context": [
+      "design doc: (link redacted in fixture)"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "in_progress",
+  "priority": 1,
+  "labels": [
+    "auth"
+  ],
+  "adhoc": false,
+  "parent": "ticket_01KY7V0XM33FSMA956ZXB6W7HG",
+  "blocks": [
+    "ticket_01KY7V0XM931TZ2VXMMF6GATMR"
+  ],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KY7V0XM33FSMA956ZXB6W7HG",
+  "path": [
+    "ticket_01KY7V0XM33FSMA956ZXB6W7HG"
+  ],
+  "active_session": null,
+  "last_activity_at": "2026-07-23T11:55:00.000Z",
+  "latest_note": null,
+  "owner": {
+    "name": "ryan",
+    "kind": "human"
+  },
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "ryan",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-07-17T12:00:00.000Z",
+  "updated_at": "2026-07-23T11:55:00.000Z"
+}

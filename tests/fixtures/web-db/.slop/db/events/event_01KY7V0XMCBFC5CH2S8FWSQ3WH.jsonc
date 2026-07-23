@@ -1,0 +1,17 @@
+{
+  "id": "event_01KY7V0XMCBFC5CH2S8FWSQ3WH",
+  "actor": {
+    "name": "claude-agent-1",
+    "kind": "agent"
+  },
+  "session": "session_01KY7V0XMAQ59HN7MA8JS3QPDY",
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KY7V0XM8NSYT4XQB3NT6B2VB"
+  },
+  "payload": {
+    "progress": "openid-client wired up against the built-in provider's interface."
+  },
+  "at": "2026-07-23T10:00:00.000Z"
+}

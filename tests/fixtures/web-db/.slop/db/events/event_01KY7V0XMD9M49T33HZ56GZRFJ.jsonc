@@ -1,0 +1,17 @@
+{
+  "id": "event_01KY7V0XMD9M49T33HZ56GZRFJ",
+  "actor": {
+    "name": "ryan",
+    "kind": "human"
+  },
+  "session": "session_01KY7V0XMD9M49T33HZ56GZRFE",
+  "verb": "session.ended",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KY7V0XMD9M49T33HZ56GZRFE"
+  },
+  "payload": {
+    "reason": "done"
+  },
+  "at": "2026-07-16T12:00:00.000Z"
+}

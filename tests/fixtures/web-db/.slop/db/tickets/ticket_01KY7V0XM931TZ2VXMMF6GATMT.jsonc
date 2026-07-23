@@ -1,0 +1,44 @@
+{
+  "id": "ticket_01KY7V0XM931TZ2VXMMF6GATMT",
+  "name": "Add SSO login docs",
+  "slug": "add-sso-login-docs",
+  "spec": {
+    "summary": "User-facing docs for configuring an SSO provider once one exists.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "draft",
+  "priority": 3,
+  "labels": [
+    "auth",
+    "docs"
+  ],
+  "adhoc": false,
+  "parent": "ticket_01KY7V0XM33FSMA956ZXB6W7HG",
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KY7V0XM33FSMA956ZXB6W7HG",
+  "path": [
+    "ticket_01KY7V0XM33FSMA956ZXB6W7HG"
+  ],
+  "active_session": null,
+  "last_activity_at": "2026-07-21T12:00:00.000Z",
+  "latest_note": null,
+  "owner": {
+    "name": "ryan",
+    "kind": "human"
+  },
+  "provenance": {
+    "method": "draft",
+    "created_by": {
+      "name": "ryan",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-07-21T12:00:00.000Z",
+  "updated_at": "2026-07-21T12:00:00.000Z"
+}

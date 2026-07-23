@@ -1,0 +1,48 @@
+{
+  "id": "ticket_01KY7V0XM33FSMA956ZXB6W7HG",
+  "name": "Add authentication provider",
+  "slug": "add-authentication-provider",
+  "spec": {
+    "summary": "Support pluggable auth providers so self-hosters aren't stuck with the built-in one.",
+    "details_md": "## Why\n\nSeveral self-hosters have asked for OAuth/SSO support. This is the umbrella ticket for that work.\n\n- Keep the built-in provider as the default\n- New providers register through one interface\n",
+    "acceptance": [
+      "At least one OAuth provider works end to end",
+      "Existing auth is unaffected"
+    ],
+    "context": [
+      "https://github.com/ryan/slopworks-fixture/discussions/12"
+    ],
+    "meta": {
+      "estimated_days": 5,
+      "epic": "auth-2026"
+    },
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "auth"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KY7V0XM33FSMA956ZXB6W7HG",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-13T12:00:00.000Z",
+  "latest_note": null,
+  "owner": {
+    "name": "ryan",
+    "kind": "human"
+  },
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "ryan",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-07-13T12:00:00.000Z",
+  "updated_at": "2026-07-13T12:00:00.000Z"
+}

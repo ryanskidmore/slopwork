@@ -1,0 +1,18 @@
+{
+  "id": "event_01KY7V0XMD9M49T33HZ56GZRFB",
+  "actor": {
+    "name": "claude-agent-1",
+    "kind": "agent"
+  },
+  "session": "session_01KY7V0XMD9M49T33HZ56GZRF8",
+  "verb": "plan.set",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KY7V0XMD9M49T33HZ56GZRF8"
+  },
+  "payload": {
+    "version": 1,
+    "steps": 2
+  },
+  "at": "2026-07-14T12:05:00.000Z"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "event_01KY7V0XME48FCV1C0A0KMCH0J",
+  "actor": {
+    "name": "claude-agent-1",
+    "kind": "agent"
+  },
+  "session": "session_01KY7V0XMAQ59HN7MA8JS3QPDY",
+  "verb": "ticket.created",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KY7V0XME48FCV1C0A0KMCH0H"
+  },
+  "payload": {
+    "method": "adhoc",
+    "discovered_from": "ticket_01KY7V0XM8NSYT4XQB3NT6B2VB"
+  },
+  "at": "2026-07-23T11:30:00.000Z"
+}

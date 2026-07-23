@@ -1,0 +1,66 @@
+{
+  "id": "session_01KY7V0XMAQ59HN7MA8JS3QPDY",
+  "ticket": "ticket_01KY7V0XM8NSYT4XQB3NT6B2VB",
+  "actor": {
+    "name": "claude-agent-1",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "c1a55555-0000-4a11-8888-abcdef012345"
+  },
+  "git": {
+    "branch": "feature/oauth-provider",
+    "commit_at_start": "a1b2c3d4"
+  },
+  "started_at": "2026-07-23T09:00:00.000Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Read the provider interface",
+          "checked": true
+        },
+        {
+          "text": "Wire up openid-client",
+          "checked": true
+        },
+        {
+          "text": "Handle token refresh",
+          "checked": false
+        }
+      ],
+      "created_at": "2026-07-23T09:00:00.000Z"
+    },
+    {
+      "version": 2,
+      "steps": [
+        {
+          "text": "Read the provider interface",
+          "checked": true
+        },
+        {
+          "text": "Wire up openid-client",
+          "checked": true
+        },
+        {
+          "text": "Handle token refresh",
+          "checked": true
+        },
+        {
+          "text": "Add config validation for missing client secret",
+          "checked": false
+        },
+        {
+          "text": "Update AGENTS.md with the new provider",
+          "checked": false
+        }
+      ],
+      "created_at": "2026-07-23T11:15:00.000Z"
+    }
+  ],
+  "end_summary": null,
+  "transcript_ref": "transcripts/session_01KY7V0XMAQ59HN7MA8JS3QPDY.jsonl"
+}

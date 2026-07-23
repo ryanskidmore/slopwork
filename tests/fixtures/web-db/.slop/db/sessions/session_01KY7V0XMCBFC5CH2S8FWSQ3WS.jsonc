@@ -1,0 +1,44 @@
+{
+  "id": "session_01KY7V0XMCBFC5CH2S8FWSQ3WS",
+  "ticket": "ticket_01KY7V0XMCBFC5CH2S8FWSQ3WN",
+  "actor": {
+    "name": "opencode-agent",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "opencode",
+    "session_id": null
+  },
+  "git": {
+    "branch": "fix/billing-migration",
+    "commit_at_start": "d4e5f6a7"
+  },
+  "started_at": "2026-07-23T06:00:00.000Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Inventory every call site touching the old billing SDK",
+          "checked": true
+        },
+        {
+          "text": "Add the new provider behind a feature flag",
+          "checked": false
+        },
+        {
+          "text": "Dual-write invoices for one billing cycle",
+          "checked": false
+        },
+        {
+          "text": "Flip the flag and monitor",
+          "checked": false
+        }
+      ],
+      "created_at": "2026-07-23T06:00:00.000Z"
+    }
+  ],
+  "end_summary": null,
+  "transcript_ref": null
+}

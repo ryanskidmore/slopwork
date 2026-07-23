@@ -1,0 +1,41 @@
+{
+  "id": "ticket_01KY7V0XMCBFC5CH2S8FWSQ3WY",
+  "name": "Fix flaky CI on windows runners",
+  "slug": "fix-flaky-ci-on-windows-runners",
+  "spec": {
+    "summary": "windows-latest CI job fails ~1 in 5 runs during the cleanup step.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [
+    "ci",
+    "bug"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KY7V0XMCBFC5CH2S8FWSQ3WY",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-21T16:00:00.000Z",
+  "latest_note": null,
+  "owner": {
+    "name": "ryan",
+    "kind": "human"
+  },
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "ryan",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-07-21T12:00:00.000Z",
+  "updated_at": "2026-07-21T16:00:00.000Z"
+}

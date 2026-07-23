@@ -1,0 +1,17 @@
+{
+  "id": "event_01KY7V0XMD9M49T33HZ56GZRF4",
+  "actor": {
+    "name": "codex-agent",
+    "kind": "agent"
+  },
+  "session": "session_01KY7V0XMD9M49T33HZ56GZRF3",
+  "verb": "session.started",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KY7V0XMD9M49T33HZ56GZRF3"
+  },
+  "payload": {
+    "harness": "codex"
+  },
+  "at": "2026-07-21T12:00:00.000Z"
+}

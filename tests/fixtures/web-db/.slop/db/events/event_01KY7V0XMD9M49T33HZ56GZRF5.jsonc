@@ -1,0 +1,18 @@
+{
+  "id": "event_01KY7V0XMD9M49T33HZ56GZRF5",
+  "actor": {
+    "name": "codex-agent",
+    "kind": "agent"
+  },
+  "session": "session_01KY7V0XMD9M49T33HZ56GZRF3",
+  "verb": "ticket.state_changed",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KY7V0XMCBFC5CH2S8FWSQ3WY"
+  },
+  "payload": {
+    "from": "open",
+    "to": "in_progress"
+  },
+  "at": "2026-07-21T12:00:00.000Z"
+}
