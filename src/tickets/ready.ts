@@ -18,19 +18,26 @@
  *    never a crash) plus `--label`, then sorting ({@link
  *    compareReadyOrder}).
  *  - **`resumable`** — only computed when `--resumable` is passed (design.md
- *    §5: "surface work that can be picked back up"). **What this returns
- *    TODAY, before C5 (staleness) lands**: `in_progress`/`review` tickets
- *    with NO active session — i.e. someone `stop`ped an in-progress ticket,
- *    or a review sat unclaimed, and nobody is currently working it.
- *    **What C5 will ADD, additively**: a ticket whose session is still
- *    technically active but has gone *stale* (no activity past
- *    `stale_after`/`review_stale_after`) is also resumable in spirit (an
- *    agent vanished mid-session). `IndexTicketRow.stale`/`review_stale`
- *    already exist on every row (reserved, `null` until C5 lands — see
- *    db-index.ts), so C5 should widen {@link filterResumableRows}'s
- *    predicate to `activeSession === null || row.stale === true ||
- *    row.review_stale === true` — a one-line change to the predicate
- *    below, not a redesign of this module.
+ *    §5: "surface work that can be picked back up"). Two cases, both
+ *    included:
+ *      1. `in_progress`/`review` tickets with NO active session — someone
+ *         `stop`ped an in-progress ticket, or a review sat unclaimed, and
+ *         nobody is currently working it.
+ *      2. **C5**: a ticket whose session is still technically active but
+ *         has gone *stale* (`now > stale_at`/`review_stale_at` — no
+ *         activity, or no review action, past `stale_after`/
+ *         `review_stale_after`) — an agent vanished mid-session, or a
+ *         review sat unactioned so long the "active" session watching it
+ *         is no longer meaningful. See {@link filterResumableRows}'s `now`
+ *         parameter — the clock-injected read-time check, per
+ *         `tickets/staleness.ts`'s `isStale`/`isReviewStale` (the row's
+ *         `stale_at`/`review_stale_at` are the content-derived deadlines
+ *         `db-index.ts`'s `buildIndex` already computed; this module only
+ *         asks "has that deadline passed, right now").
+ *    The two cases get distinct `ResumableReason`s (`*_no_session` vs.
+ *    `*_stale`) so `resumableReasonText` can say which situation applies —
+ *    "stopped, resumable" reads very differently from "active session
+ *    gone stale."
  *
  * ## Ordering — this work item's acceptance criterion, verbatim: "ready
  * ordering = priority then age"
@@ -40,6 +47,7 @@
  */
 import type { TicketState } from "../core/index.js";
 import type { IndexTicketRow } from "../repo/db-index.js";
+import { isReviewStale, isStale } from "./staleness.js";
 
 export interface ReadyQueryOptions {
   /** Only rows carrying this exact label (design.md §4.2 `--label x`). */
@@ -88,7 +96,12 @@ export function filterReadyRows(
     .sort(compareReadyOrder);
 }
 
-export const RESUMABLE_REASONS = ["in_progress_no_session", "review_no_session"] as const;
+export const RESUMABLE_REASONS = [
+  "in_progress_no_session",
+  "review_no_session",
+  "in_progress_stale",
+  "review_stale",
+] as const;
 export type ResumableReason = (typeof RESUMABLE_REASONS)[number];
 
 export interface ResumableRow {
@@ -96,21 +109,35 @@ export interface ResumableRow {
   reason: ResumableReason;
 }
 
-function resumableReasonFor(state: TicketState): ResumableReason | null {
-  if (state === "in_progress") return "in_progress_no_session";
-  if (state === "review") return "review_no_session";
+function resumableReasonFor(state: TicketState, hasActiveSession: boolean): ResumableReason | null {
+  if (state === "in_progress") return hasActiveSession ? "in_progress_stale" : "in_progress_no_session";
+  if (state === "review") return hasActiveSession ? "review_stale" : "review_no_session";
   return null;
 }
 
-/** See module doc, "resumable" — what this returns today vs. what C5 adds. */
+/**
+ * A row is a resumable CANDIDATE if either: it has no active session at
+ * all (stopped work), or it does have one but has gone stale (C5) — see
+ * module doc, "resumable". `now` is the caller's injected clock's current
+ * time (never a bare `Date.now()`/`new Date()` — see core/clock.ts).
+ */
+function isResumableCandidate(row: IndexTicketRow, now: Date): boolean {
+  if (row.active_session === null) return true;
+  return isStale(row, now) || isReviewStale(row, now);
+}
+
+/** See module doc, "resumable" — the two cases (`*_no_session` /
+ * `*_stale`), and `now`, the clock-injected read-time boundary for the
+ * staleness half (C5's acceptance criterion, "clock-injected tests"). */
 export function filterResumableRows(
   rows: readonly IndexTicketRow[],
+  now: Date,
   options: ReadyQueryOptions = {},
 ): ResumableRow[] {
   const matched: ResumableRow[] = [];
   for (const row of rows) {
-    if (row.active_session !== null) continue; // C5 will OR in a staleness check here — see module doc
-    const reason = resumableReasonFor(row.state);
+    if (!isResumableCandidate(row, now)) continue;
+    const reason = resumableReasonFor(row.state, row.active_session !== null);
     if (reason === null) continue;
     if (!matchesLabel(row, options.label)) continue;
     matched.push({ row, reason });
@@ -124,6 +151,10 @@ export function resumableReasonText(reason: ResumableReason): string {
       return "in_progress with no active session (stopped; resumable)";
     case "review_no_session":
       return "in review with no active session (resumable)";
+    case "in_progress_stale":
+      return "in_progress, active session gone stale (resumable)";
+    case "review_stale":
+      return "in review, active session gone stale — MR awaiting review (resumable)";
   }
 }
 

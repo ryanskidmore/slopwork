@@ -97,7 +97,7 @@ describe("buildIndex", () => {
     expect(index.slugs[t.slug]).toBe(t.id);
   });
 
-  it("computes blocked_count/ready for real (B4); leaves stale/review_stale null (C5's slot)", async () => {
+  it("computes blocked_count/ready for real (B4); an open ticket has neither deadline (C5)", async () => {
     const t = makeTicket();
     await createTicket(paths, t, ctx, createdEvent);
     const index = await buildIndex(paths, clock);
@@ -107,8 +107,90 @@ describe("buildIndex", () => {
     // blockers, and per design.md §2 it's therefore ready.
     expect(row?.blocked_count).toBe(0);
     expect(row?.ready).toBe(true);
-    expect(row?.stale).toBeNull();
-    expect(row?.review_stale).toBeNull();
+    // Neither in_progress nor review — no deadline applies.
+    expect(row?.stale_at).toBeNull();
+    expect(row?.review_stale_at).toBeNull();
+  });
+
+  describe("C5: stale_at / review_stale_at", () => {
+    it("in_progress: stale_at = last_activity_at + config's stale_after (default 60m); review_stale_at null", async () => {
+      const t = makeTicket({ state: "in_progress", last_activity_at: "2026-07-23T10:00:00.000Z" });
+      await createTicket(paths, t, ctx, createdEvent);
+      const index = await buildIndex(paths, clock);
+      const row = index.tickets.find((r) => r.id === t.id);
+      expect(row?.stale_at).toBe("2026-07-23T11:00:00.000Z"); // +60m, the schema default
+      expect(row?.review_stale_at).toBeNull();
+    });
+
+    it("review: review_stale_at = review.requested_at + config's review_stale_after (default 24h); stale_at null", async () => {
+      const t = makeTicket({
+        state: "review",
+        review: { requested_at: "2026-07-22T10:00:00.000Z", by: { name: "ryan", kind: "human" } },
+      });
+      await createTicket(paths, t, ctx, createdEvent);
+      const index = await buildIndex(paths, clock);
+      const row = index.tickets.find((r) => r.id === t.id);
+      expect(row?.review_stale_at).toBe("2026-07-23T10:00:00.000Z"); // +24h, the schema default
+      expect(row?.stale_at).toBeNull();
+    });
+
+    it("review_stale_at anchors on review.requested_at, NOT the ticket's (later) last_activity_at", async () => {
+      const t = makeTicket({
+        state: "review",
+        last_activity_at: "2026-07-23T09:00:00.000Z", // a later, unrelated activity bump
+        review: { requested_at: "2026-07-22T10:00:00.000Z", by: { name: "ryan", kind: "human" } },
+      });
+      await createTicket(paths, t, ctx, createdEvent);
+      const index = await buildIndex(paths, clock);
+      const row = index.tickets.find((r) => r.id === t.id);
+      expect(row?.review_stale_at).toBe("2026-07-23T10:00:00.000Z"); // anchored on requested_at
+    });
+
+    it("reads the REAL configured thresholds from config.yaml, not just the schema defaults", async () => {
+      await writeFile(
+        join(paths.slopDir, "config.yaml"),
+        "project: x\ndefaults:\n  stale_after: 30m\n  review_stale_after: 12h\n",
+        "utf8",
+      );
+      const t = makeTicket({ state: "in_progress", last_activity_at: "2026-07-23T10:00:00.000Z" });
+      await createTicket(paths, t, ctx, createdEvent);
+      const index = await buildIndex(paths, clock);
+      const row = index.tickets.find((r) => r.id === t.id);
+      expect(row?.stale_at).toBe("2026-07-23T10:30:00.000Z"); // +30m, not the 60m default
+    });
+
+    it("open/draft/done/dropped tickets never carry a deadline", async () => {
+      const states = ["draft", "open", "done", "dropped"] as const;
+      for (const state of states) {
+        const t = makeTicket({ state, last_activity_at: "2026-07-23T10:00:00.000Z" });
+        await createTicket(paths, t, ctx, createdEvent);
+      }
+      const index = await buildIndex(paths, clock);
+      for (const row of index.tickets) {
+        expect(row.stale_at, `state=${row.state}`).toBeNull();
+        expect(row.review_stale_at, `state=${row.state}`).toBeNull();
+      }
+    });
+
+    it("PROOF the deadline is a stable, content-derived value: rebuilding at two different 'now's leaves stale_at unchanged", async () => {
+      const t = makeTicket({ state: "in_progress", last_activity_at: "2026-07-23T10:00:00.000Z" });
+      await createTicket(paths, t, ctx, createdEvent);
+
+      const earlyClock = fixedClock(new Date("2026-07-23T10:05:00.000Z")); // before the deadline
+      const lateClock = fixedClock(new Date("2026-07-25T10:05:00.000Z")); // long after the deadline
+
+      const earlyIndex = await buildIndex(paths, earlyClock);
+      const lateIndex = await buildIndex(paths, lateClock);
+
+      const earlyRow = earlyIndex.tickets.find((r) => r.id === t.id);
+      const lateRow = lateIndex.tickets.find((r) => r.id === t.id);
+      // The clock the index was BUILT with never affects the stored
+      // deadline — only ticket content (last_activity_at) and config do.
+      expect(earlyRow?.stale_at).toBe(lateRow?.stale_at);
+      expect(earlyRow?.stale_at).toBe("2026-07-23T11:00:00.000Z");
+      // built_at is the only thing that legitimately differs.
+      expect(earlyIndex.built_at).not.toBe(lateIndex.built_at);
+    });
   });
 
   describe("B4: blocked_count / ready", () => {
@@ -172,6 +254,31 @@ describe("buildIndex", () => {
       const index = await buildIndex(paths, clock);
       const row = index.tickets.find((r) => r.id === t.id);
       expect(row?.blocked_count).toBe(0);
+      expect(row?.ready).toBe(false);
+    });
+
+    // Adversarial-review, mutation-testing finding: an `active_session`
+    // set WHILE `state` is still `open` is the only combination that
+    // isolates design.md §2's "no active session" clause independently of
+    // the "open" clause. A real `slop start` (and the test above, and
+    // every CLI-level "has an active session -> excluded" check) flips
+    // `state` to `in_progress` and sets `active_session` in the SAME
+    // mutation, so the `state !== "open"` exclusion alone already hides
+    // such a ticket from `ready` — a `computeReady` that dropped its
+    // `activeSession === null` check entirely would still pass every one
+    // of those. Constructing `open` + a non-null `active_session` directly
+    // via the repo layer (never reachable through today's `start`/`stop`,
+    // but a legal on-disk state — e.g. mid-transition, or a future
+    // command) is the only way to catch that specific mutation.
+    it("an OPEN ticket with an active session is never ready — isolates the active-session clause independently of state", async () => {
+      const t = makeTicket({ state: "open", active_session: newSessionId() });
+      await createTicket(paths, t, ctx, createdEvent);
+
+      const index = await buildIndex(paths, clock);
+      const row = index.tickets.find((r) => r.id === t.id);
+      expect(row?.state).toBe("open");
+      expect(row?.blocked_count).toBe(0);
+      expect(row?.active_session).not.toBeNull();
       expect(row?.ready).toBe(false);
     });
 
@@ -469,6 +576,26 @@ describe("computeContentFingerprint", () => {
     expect(fp.tickets).toEqual({ count: 0, digest: expect.any(String) });
   });
 
+  // C5: config.yaml joins the fingerprint (stale_at/review_stale_at are
+  // computed from its defaults.*) — see db-index.ts's module doc.
+  describe("C5: config.yaml is part of the fingerprint", () => {
+    it("is {count:0, digest:'absent'} when config.yaml does not exist", async () => {
+      const fp = await computeContentFingerprint(paths);
+      expect(fp.config).toEqual({ count: 0, digest: "absent" });
+    });
+
+    it("becomes {count:1, ...} once config.yaml is created, and changes again on edit", async () => {
+      await writeFile(join(paths.slopDir, "config.yaml"), "project: x\n", "utf8");
+      const afterCreate = await computeContentFingerprint(paths);
+      expect(afterCreate.config?.count).toBe(1);
+
+      await sleep(20);
+      await writeFile(join(paths.slopDir, "config.yaml"), "project: x\ndefaults:\n  stale_after: 5m\n", "utf8");
+      const afterEdit = await computeContentFingerprint(paths);
+      expect(afterEdit.config?.digest).not.toBe(afterCreate.config?.digest);
+    });
+  });
+
   it("counts only real ticket entity files, ignoring temp/other debris", async () => {
     const t = makeTicket();
     await createTicket(paths, t, ctx, createdEvent);
@@ -486,6 +613,7 @@ describe("computeContentFingerprint", () => {
     await writeFile(ticketFilePath(paths, t.id), "{ not even valid jsonc {{{");
     await expect(computeContentFingerprint(paths)).resolves.toEqual({
       tickets: { count: 1, digest: expect.any(String) },
+      config: { count: 0, digest: "absent" },
     });
   });
 
@@ -590,5 +718,25 @@ describe("loadIndex — content staleness (coordinator ruling: healing from stal
     expect(second.rebuilt).toBe(false);
     expect(second.reason).toBe("fresh");
     expect(second.index).toEqual(first.index);
+  });
+
+  // C5: hand-editing config.yaml's defaults.* must invalidate the index —
+  // otherwise a changed stale_after/review_stale_after would silently do
+  // nothing until some unrelated ticket file also happened to change.
+  it("C5: detects a config.yaml hand-edit and recomputes stale_at against the NEW threshold", async () => {
+    await writeFile(join(paths.slopDir, "config.yaml"), "project: x\ndefaults:\n  stale_after: 60m\n", "utf8");
+    const t = makeTicket({ state: "in_progress", last_activity_at: "2026-07-23T10:00:00.000Z" });
+    await createTicket(paths, t, ctx, createdEvent);
+
+    const first = await loadIndex(paths, clock);
+    expect(first.index.tickets[0]?.stale_at).toBe("2026-07-23T11:00:00.000Z");
+
+    await sleep(20);
+    await writeFile(join(paths.slopDir, "config.yaml"), "project: x\ndefaults:\n  stale_after: 5m\n", "utf8");
+
+    const second = await loadIndex(paths, clock);
+    expect(second.rebuilt).toBe(true);
+    expect(second.reason).toBe("stale_content");
+    expect(second.index.tickets[0]?.stale_at).toBe("2026-07-23T10:05:00.000Z");
   });
 });

@@ -17,28 +17,34 @@
  * change to the index's on-disk shape. The CLI layer maps
  * `IndexTicketRow` -> `StatusTicketRow` field-for-field.
  *
- * ## Reading B4/C5's derived fields generically
+ * ## Reading B4's `blocked_count` generically; C5's `stale`/`reviewStale`
  *
- * `blockedCount`/`stale`/`reviewStale` are `<T> | null` — `null` means
- * "not computed yet" (B4/C5 haven't landed), a real value means it has.
- * {@link aggregateDerivedCounts} treats "every row's field is still null"
- * as the whole signal being unknown (`null` in the result — rendered as
- * "—", never `0`, so a human/agent can tell "nothing is blocked" apart
- * from "this repo doesn't know yet"), and otherwise counts normally. This
- * is the mechanism that makes `status` "read generically": nothing here
- * assumes B4/C5 are absent, so the moment a real index row shows up with
- * non-null fields, the counts and the stale section start rendering real
- * data with no code change required here.
+ * `blockedCount` is `number | null` — `null` means "not computed yet" (a
+ * pre-B4 index, never rebuilt since — db-index.ts's documented narrow
+ * gap). {@link aggregateDerivedCounts} treats "every row's `blockedCount`
+ * is still null" as that signal being unknown (`null` in the result —
+ * rendered as "—", never `0`), and otherwise counts normally.
  *
- * **Assumption this module is built against** (documented for C5, which
- * owns actually computing these fields): `stale` applies to `in_progress`
- * rows (checked against `config.defaults.stale_after`) and `reviewStale`
- * applies to `review` rows (checked against
- * `config.defaults.review_stale_after`) — matching the two distinct
- * fields db-index.ts's schema already carries and design.md §2's "stale
- * (in_progress *or review* ...)" overlay, split by state. A row's
- * "other" field (e.g. `reviewStale` on an `in_progress` row) is never
- * read. See DECISIONS.md's D4 entry for the full rationale.
+ * `stale`/`reviewStale`, by contrast, are plain, always-known booleans —
+ * C5 has landed, and there is no longer a "not computed yet" state for
+ * them to represent (see `db-index.ts`'s "C5" doc section: the schema
+ * version bump means a pre-C5 index can never be read as valid in the
+ * first place — it self-heals via `loadIndex`'s auto-heal before any row
+ * reaches this module). `src/cli/commands/status.ts` computes these LIVE,
+ * per row, via `tickets/staleness.ts`'s `isStale`/`isReviewStale` against
+ * an injected clock and the index row's `stale_at`/`review_stale_at`
+ * deadline (see db-index.ts for why the index stores a deadline, not a
+ * boolean), THEN maps the result into `StatusTicketRow` — this module
+ * itself has no clock and does no live/wall-clock computation, staying a
+ * pure function of already-resolved booleans (same "stays pure, plain
+ * data, trivially unit-testable" reasoning as the rest of this module).
+ *
+ * `stale` applies to `in_progress` rows, `reviewStale` to `review` rows —
+ * matching the two distinct fields db-index.ts's schema carries and
+ * design.md §2's "stale (in_progress *or review* ...)" overlay, split by
+ * state. A row's "other" field (e.g. `reviewStale` on an `in_progress`
+ * row) is never read. See DECISIONS.md's D4/C5 entries for the full
+ * rationale.
  */
 import type { TicketState } from "../core/index.js";
 import { TICKET_STATES } from "../core/index.js";
@@ -52,10 +58,10 @@ export interface StatusTicketRow {
   state: TicketState;
   /** B4's derived overlay (index.jsonc's `blocked_count`). `null` until B4 populates it. */
   blockedCount: number | null;
-  /** C5's derived overlay for `in_progress` rows (index.jsonc's `stale`). `null` until C5 populates it. */
-  stale: boolean | null;
-  /** C5's derived overlay for `review` rows (index.jsonc's `review_stale`). `null` until C5 populates it. */
-  reviewStale: boolean | null;
+  /** C5: live-computed (`now > stale_at`) by the CLI layer before this row is built — always known, `in_progress` rows only. */
+  stale: boolean;
+  /** C5: live-computed (`now > review_stale_at`) — always known, `review` rows only. */
+  reviewStale: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -86,18 +92,15 @@ export function aggregateStateCounts(rows: readonly StatusTicketRow[]): StateCou
 export interface DerivedOverlayCounts {
   /** Tickets with a live `blocked_count` > 0. `null` when B4 hasn't populated the index yet (every row's `blockedCount` is still null). */
   blocked: number | null;
-  /** Tickets currently stale (in_progress via `stale`, review via `reviewStale`). `null` when C5 hasn't populated the index yet. */
-  stale: number | null;
+  /** Tickets currently stale (in_progress via `stale`, review via `reviewStale`) — always a real count (C5 has landed; see module doc). */
+  stale: number;
 }
 
 export function aggregateDerivedCounts(rows: readonly StatusTicketRow[]): DerivedOverlayCounts {
   const blockedKnown = rows.some((row) => row.blockedCount !== null);
   const blocked = blockedKnown ? rows.filter((row) => (row.blockedCount ?? 0) > 0).length : null;
 
-  const staleKnown = rows.some((row) => row.stale !== null || row.reviewStale !== null);
-  const stale = staleKnown ? staleTicketRows(rows).length : null;
-
-  return { blocked, stale };
+  return { blocked, stale: staleTicketRows(rows).length };
 }
 
 // ---------------------------------------------------------------------------
@@ -111,13 +114,8 @@ export interface StaleTicketRow {
   state: "in_progress" | "review";
 }
 
-/** in_progress-or-review tickets flagged stale by C5 — see the module
- * doc's "Assumption" for which field applies to which state. Never
- * throws/degrades specially for the pre-C5 case: every row's `stale`/
- * `reviewStale` being `null` just means nothing matches the `=== true`
- * checks below, so this naturally returns `[]` — the caller distinguishes
- * "known empty" from "not computed yet" via {@link aggregateDerivedCounts}'s
- * `stale` field, not via this array. */
+/** in_progress-or-review tickets flagged stale — see the module doc for
+ * which field applies to which state. */
 export function staleTicketRows(rows: readonly StatusTicketRow[]): StaleTicketRow[] {
   const out: StaleTicketRow[] = [];
   for (const row of rows) {
@@ -209,6 +207,11 @@ export interface ReviewTicketRow {
   requestedAt: string;
   by: string;
   ageMs: number;
+  /** C5: live-computed `now > review_stale_at` — marks which awaiting-review
+   * tickets have sat long enough to also count as review-stale, WITHOUT
+   * hiding the MR link the rest of the row already carries (this work
+   * item's acceptance: "stale review ticket surfaces with MR link"). */
+  reviewStale: boolean;
 }
 
 /** Longest-waiting-first — the MR that's been sitting the longest is the

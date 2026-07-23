@@ -1,11 +1,36 @@
 /**
- * `slop ready` — design.md §2, §4.2; work item B4.
+ * `slop ready` — design.md §2, §4.2; work item B4, staleness wiring C5.
  *
  * `ready` = open ∧ no live blockers ∧ no active session. Drafts and review
  * items never appear (design.md §2). The pure selection/ordering this
  * command wraps lives in `src/tickets/ready.ts` — see that module's doc
- * for the exact `--resumable` scope today vs. what C5 adds, and for the
- * `--budget` eliding strategy.
+ * for the exact `--resumable` scope (including C5's widened predicate)
+ * and the `--budget` eliding strategy.
+ *
+ * ## C5: staleness feeds `--resumable`
+ *
+ * `filterResumableRows` (tickets/ready.ts) now ALSO includes an
+ * in_progress/review ticket whose session is still technically active but
+ * has gone stale (`stale_at`/`review_stale_at`, computed content-derived
+ * at index-build time — db-index.ts — compared against `now` at READ time
+ * — tickets/staleness.ts's `isStale`/`isReviewStale`). This command
+ * supplies that `now` via {@link resolveClock}, mirroring `status.ts`'s
+ * `SLOP_STATUS_FAKE_NOW` clock seam (this file's is `SLOP_READY_FAKE_NOW`
+ * — `ready` had no clock override before C5; this introduces one,
+ * following the same pattern) — real usage always uses `systemClock`, and
+ * `tests/acceptance/C5.test.ts` pins it for deterministic assertions.
+ *
+ * ## C5: a stale review ticket surfaces WITH its MR link
+ *
+ * `IndexTicketRow` carries no `review` data (db-index.ts's row is a
+ * summary, not the full ticket — same reasoning `status.ts` documents for
+ * its own per-review-ticket read). So for every RESUMABLE row in `review`
+ * state, this command does one `readTicket` to fetch `review.mr` — bounded
+ * by how many resumable review tickets exist (normally a handful), same
+ * fault-tolerance contract as `status.ts`'s `fetchTicketSafe` (an
+ * unreadable ticket degrades that one row's `mr` to `null` rather than
+ * crashing the command). `ready` (the strict, non-resumable section) never
+ * needs this — review-state tickets never appear there at all.
  *
  * ## `--json` shape
  *
@@ -16,7 +41,7 @@
  *   ],
  *   "resumable_requested": boolean,
  *   "resumable": [
- *     { "id", "slug", "name", "state", "priority", "labels", "why" }, ...
+ *     { "id", "slug", "name", "state", "priority", "labels", "why", "mr"? }, ...
  *   ],
  *   "elided": ["<note>", ...],   // only non-empty when --budget forced elision
  *   "hint": "<string> | null"    // non-null only when both arrays above are empty
@@ -27,10 +52,16 @@
  * script never has to special-case a missing field — it's simply `[]`
  * unless `resumable_requested` is `true`. Every row carries exactly what
  * `slop start` needs next (id, slug, name, priority, labels) plus `why`
- * this ticket is in the list — this work item's brief.
+ * this ticket is in the list — this work item's brief. `mr` (C5) is only
+ * present on `review`-state rows — `string | null`, `null` meaning
+ * "review-state, but no MR link on file yet" (D15: entering review without
+ * `--mr` is allowed, just nagged).
  */
 import type { Command } from "commander";
-import { loadIndex, repoPaths, requireRepoRoot } from "../../repo/index.js";
+import type { Clock, TicketId } from "../../core/index.js";
+import { fixedClock, systemClock } from "../../core/index.js";
+import { loadIndex, readTicket, repoPaths, requireRepoRoot } from "../../repo/index.js";
+import type { RepoPaths } from "../../repo/index.js";
 import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
 import type { ReadyEntry } from "../../tickets/ready.js";
 import {
@@ -56,9 +87,45 @@ interface ReadyJsonRow {
   priority: number;
   labels: string[];
   why: string;
+  /** C5: only present on `review`-state rows — see module doc. */
+  mr?: string | null;
 }
 
-function toJsonRow(entry: ReadyEntry): ReadyJsonRow {
+/** Testing-only clock override — mirrors `status.ts`'s `SLOP_STATUS_FAKE_NOW`
+ * (see this file's module doc, "C5: staleness feeds --resumable"). */
+function resolveClock(): Clock {
+  const raw = process.env.SLOP_READY_FAKE_NOW;
+  if (!raw) return systemClock;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return systemClock;
+  return fixedClock(parsed);
+}
+
+/** One `readTicket` per resumable review-state ticket, to surface its MR
+ * link (C5) — `IndexTicketRow` carries no `review` field. Fault-tolerant:
+ * an unreadable ticket degrades to `mr: null` for that row rather than
+ * crashing the command, same contract as `status.ts`'s `fetchTicketSafe`. */
+async function fetchReviewMrLinks(
+  paths: RepoPaths,
+  ids: readonly TicketId[],
+): Promise<Map<TicketId, string | null>> {
+  const pairs = await Promise.all(
+    ids.map(async (id): Promise<[TicketId, string | null]> => {
+      try {
+        const ticket = await readTicket(paths, id);
+        return [id, ticket.review?.mr ?? null];
+      } catch (err) {
+        process.stderr.write(
+          `warning: could not read ticket ${id} for its MR link: ${err instanceof Error ? err.message : String(err)}\n`,
+        );
+        return [id, null];
+      }
+    }),
+  );
+  return new Map(pairs);
+}
+
+function toJsonRow(entry: ReadyEntry, mrLinks: ReadonlyMap<string, string | null>): ReadyJsonRow {
   const { row } = entry;
   return {
     id: row.id,
@@ -68,6 +135,7 @@ function toJsonRow(entry: ReadyEntry): ReadyJsonRow {
     priority: row.priority,
     labels: row.labels,
     why: entry.why,
+    mr: row.state === "review" ? (mrLinks.get(row.id) ?? null) : undefined,
   };
 }
 
@@ -76,9 +144,10 @@ function renderJson(
   elisions: readonly string[],
   resumableRequested: boolean,
   hint: string | null,
+  mrLinks: ReadonlyMap<string, string | null>,
 ): string {
-  const ready = kept.filter((e) => e.section === "ready").map(toJsonRow);
-  const resumable = kept.filter((e) => e.section === "resumable").map(toJsonRow);
+  const ready = kept.filter((e) => e.section === "ready").map((e) => toJsonRow(e, mrLinks));
+  const resumable = kept.filter((e) => e.section === "resumable").map((e) => toJsonRow(e, mrLinks));
   const body = {
     ready,
     resumable_requested: resumableRequested,
@@ -89,10 +158,11 @@ function renderJson(
   return `${JSON.stringify(body, null, 2)}\n`;
 }
 
-function formatRow(entry: ReadyEntry): string {
+function formatRow(entry: ReadyEntry, mrLinks: ReadonlyMap<string, string | null>): string {
   const { row } = entry;
   const labels = row.labels.length > 0 ? `  labels: ${row.labels.join(",")}` : "";
-  return `  [P${row.priority}] ${row.id}  ${row.slug}  "${row.name}"${labels}  — ${entry.why}`;
+  const mrText = row.state === "review" ? `  mr: ${mrLinks.get(row.id) ?? "(no MR link yet)"}` : "";
+  return `  [P${row.priority}] ${row.id}  ${row.slug}  "${row.name}"${labels}${mrText}  — ${entry.why}`;
 }
 
 function renderText(
@@ -100,6 +170,7 @@ function renderText(
   elisions: readonly string[],
   resumableRequested: boolean,
   hint: string | null,
+  mrLinks: ReadonlyMap<string, string | null>,
 ): string {
   const ready = kept.filter((e) => e.section === "ready");
   const resumable = kept.filter((e) => e.section === "resumable");
@@ -109,11 +180,11 @@ function renderText(
     lines.push(hint);
   } else {
     lines.push(`ready (${ready.length}):`);
-    for (const entry of ready) lines.push(formatRow(entry));
+    for (const entry of ready) lines.push(formatRow(entry, mrLinks));
     if (resumableRequested) {
       lines.push("");
       lines.push(`resumable (${resumable.length}):`);
-      for (const entry of resumable) lines.push(formatRow(entry));
+      for (const entry of resumable) lines.push(formatRow(entry, mrLinks));
     }
   }
 
@@ -137,20 +208,28 @@ function hintFor(entryCount: number, resumableRequested: boolean): string | null
 async function runReady(opts: ReadyCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
-  const { index } = await loadIndex(paths);
+  const clock = resolveClock();
+  const { index } = await loadIndex(paths, clock);
 
   const resumableRequested = opts.resumable === true;
   const ready = filterReadyRows(index.tickets, { label: opts.label });
-  const resumable = resumableRequested ? filterResumableRows(index.tickets, { label: opts.label }) : [];
+  const resumable = resumableRequested
+    ? filterResumableRows(index.tickets, clock.now(), { label: opts.label })
+    : [];
   const entries = buildReadyEntries(ready, resumable);
   const hint = hintFor(entries.length, resumableRequested);
+
+  // C5: MR links for every resumable review-state row (ready's own
+  // section never carries review-state rows — design.md §2).
+  const reviewIds = resumable.filter((r) => r.row.state === "review").map((r) => r.row.id);
+  const mrLinks = await fetchReviewMrLinks(paths, reviewIds);
 
   const rendered = renderReadyWithBudget(
     entries,
     (kept, elisions) =>
       opts.json
-        ? renderJson(kept, elisions, resumableRequested, hint)
-        : renderText(kept, elisions, resumableRequested, hint),
+        ? renderJson(kept, elisions, resumableRequested, hint, mrLinks)
+        : renderText(kept, elisions, resumableRequested, hint, mrLinks),
     opts.budget,
   );
   process.stdout.write(rendered.text);
@@ -161,7 +240,7 @@ export function registerReadyCommand(program: Command): void {
     .command("ready")
     .description("List ready tickets: open, no live blockers, no active session.")
     .option("--label <label>", "filter to tickets carrying this label")
-    .option("--resumable", "also include stopped in_progress/review tickets worth resuming")
+    .option("--resumable", "also include stopped or stale in_progress/review tickets worth resuming")
     .option("--json", "machine-readable output")
     .option(
       "--budget <n>",

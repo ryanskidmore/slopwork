@@ -35,8 +35,8 @@ function makeIndexRow(
     discovered: [],
     blocked_count: null,
     ready: null,
-    stale: null,
-    review_stale: null,
+    stale_at: null,
+    review_stale_at: null,
     ...overrides,
   };
 }

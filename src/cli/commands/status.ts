@@ -21,26 +21,35 @@
  * row rather than crashing the command — see {@link fetchSessionSafe}/
  * {@link fetchTicketSafe}) and run in parallel via `Promise.all`.
  *
- * ## Reading B4/C5's derived index fields generically
+ * ## Reading B4's derived index fields generically; C5's staleness is live
  *
- * `IndexTicketRow.blocked_count`/`stale`/`review_stale` are `<T> | null`
- * until B4/C5 populate them (A3 always writes `null` today). This command
- * never special-cases "those fields don't exist yet" — it maps them
- * straight through to `tickets/status.ts`'s pure aggregation functions,
- * which already treat "every row's field is null" as "not computed" (see
- * that module's doc). The result: the moment B4/C5 land and start writing
- * real values, `status`'s blocked/stale counts and the stale section
- * start showing real data with no change to this file.
+ * `IndexTicketRow.blocked_count` is `number | null` — `null` means a
+ * pre-B4 index that hasn't been rebuilt since (a narrow, self-healing
+ * gap — db-index.ts's doc). This command maps it straight through to
+ * `tickets/status.ts`'s pure aggregation, which treats "every row's field
+ * is null" as "not computed" (see that module's doc).
+ *
+ * `stale`/`review_stale` no longer work that way (C5): `IndexTicketRow`
+ * carries `stale_at`/`review_stale_at` — content-derived DEADLINES, not
+ * booleans (see db-index.ts's "C5" doc section for why a live boolean
+ * can never be safely baked into the index). This command computes the
+ * live boolean itself, per row, via `tickets/staleness.ts`'s
+ * `isStale`/`isReviewStale` against THIS command's own resolved clock
+ * (see "Clock seam" below) — `now > stale_at`, so the exact same on-disk
+ * index row reads as fresh or stale purely depending on when `status` is
+ * run. This is the read-time half of C5's design; `stale_at` itself never
+ * changes just because time passed.
  *
  * ## Clock seam
  *
- * Humanised ages are a function of "now". Real usage always uses
- * {@link systemClock}. `SLOP_STATUS_FAKE_NOW`, mirroring `slop web`'s
- * `SLOP_WEB_FAKE_NOW` (see `src/cli/commands/web.ts`, DECISIONS.md's D5
- * entries), pins the clock instead when set to a parseable date —
- * undocumented as a user-facing flag, read only here, and how
- * `tests/acceptance/D4.test.ts` gets deterministic humanised-age strings
- * out of a real spawned `dist/slop status` process.
+ * Humanised ages, and now (C5) the live stale/review-stale booleans, are
+ * a function of "now". Real usage always uses {@link systemClock}.
+ * `SLOP_STATUS_FAKE_NOW`, mirroring `slop web`'s `SLOP_WEB_FAKE_NOW` (see
+ * `src/cli/commands/web.ts`, DECISIONS.md's D5 entries), pins the clock
+ * instead when set to a parseable date — undocumented as a user-facing
+ * flag, read only here, and how `tests/acceptance/D4.test.ts` and
+ * `tests/acceptance/C5.test.ts` get deterministic output out of a real
+ * spawned `dist/slop status` process.
  *
  * ## `--json` shape
  *
@@ -48,7 +57,7 @@
  * {
  *   "generated_at": "<ISO timestamp>",
  *   "counts": { "draft":0, "open":0, "in_progress":0, "review":0, "done":0, "dropped":0, "total":0 },
- *   "derived": { "blocked": number | null, "stale": number | null },
+ *   "derived": { "blocked": number | null, "stale": number },
  *   "in_progress": [
  *     {
  *       "id", "slug", "name", "priority",
@@ -59,11 +68,10 @@
  *     }, ...
  *   ],   // sorted oldest-session-first; null session = active_session unset or unreadable
  *   "review": [
- *     { "id", "slug", "name", "mr": string | null, "requested_at", "by", "age_ms", "age_human" }, ...
- *   ],   // sorted longest-waiting-first
- *   "stale": [ { "id", "slug", "name", "state": "in_progress" | "review" }, ... ] | null,
- *   // `stale` is null iff `derived.stale` is null (C5 hasn't landed) —
- *   // never an empty array standing in for "unknown".
+ *     { "id", "slug", "name", "mr": string | null, "requested_at", "by", "age_ms", "age_human", "review_stale": boolean }, ...
+ *   ],   // sorted longest-waiting-first; review_stale (C5) marks it WITHOUT hiding the mr link
+ *   "stale": [ { "id", "slug", "name", "state": "in_progress" | "review" }, ... ],
+ *   // always an array now (C5 has landed) — never null.
  *   "problems": [ { "id", "message" }, ... ]   // session/ticket files this run couldn't read; usually []
  * }
  * ```
@@ -83,6 +91,7 @@ import {
   repoPaths,
   requireRepoRoot,
 } from "../../repo/index.js";
+import { isReviewStale, isStale } from "../../tickets/staleness.js";
 import type {
   DerivedOverlayCounts,
   InProgressTicketRow,
@@ -120,15 +129,18 @@ function resolveClock(): Clock {
   return fixedClock(parsed);
 }
 
-function toStatusRow(row: IndexTicketRow): StatusTicketRow {
+/** C5: `stale`/`reviewStale` are computed LIVE here, against `now` — never
+ * read off the index directly (the index only stores the `stale_at`/
+ * `review_stale_at` deadline; see this file's module doc). */
+function toStatusRow(row: IndexTicketRow, now: Date): StatusTicketRow {
   return {
     id: row.id,
     slug: row.slug,
     name: row.name,
     state: row.state,
     blockedCount: row.blocked_count,
-    stale: row.stale,
-    reviewStale: row.review_stale,
+    stale: isStale(row, now),
+    reviewStale: isReviewStale(row, now),
   };
 }
 
@@ -184,10 +196,11 @@ interface StatusData {
 }
 
 async function gatherStatus(paths: RepoPaths, clock: Clock): Promise<StatusData> {
-  const nowMs = clock.now().getTime();
+  const now = clock.now();
+  const nowMs = now.getTime();
   const { index } = await loadIndex(paths, clock);
   const rows = index.tickets;
-  const statusRows = rows.map(toStatusRow);
+  const statusRows = rows.map((row) => toStatusRow(row, now));
 
   const counts = aggregateStateCounts(statusRows);
   const derived = aggregateDerivedCounts(statusRows);
@@ -239,6 +252,13 @@ async function gatherStatus(paths: RepoPaths, clock: Clock): Promise<StatusData>
       requestedAt: ticket.review.requested_at,
       by: ticket.review.by.name,
       ageMs: msSince(ticket.review.requested_at, nowMs),
+      // C5: the index row already carries the content-derived deadline
+      // (review_stale_at, from the SAME review.requested_at) — this is the
+      // read-time boolean, computed against this command's own clock. The
+      // acceptance criterion this satisfies: a stale review ticket
+      // surfaces in this exact section, WITH its `mr` link above, still
+      // shown for every review row regardless of staleness.
+      reviewStale: isReviewStale(row, now),
     });
   }
 
@@ -268,11 +288,7 @@ function renderCountsSection(counts: StateCounts, derived: DerivedOverlayCounts)
       derived.blocked === null ? "—".padStart(5) : String(derived.blocked).padStart(5)
     }${derived.blocked === null ? "  (not yet computed — B4)" : ""}`,
   );
-  lines.push(
-    `  ${"stale".padEnd(LABEL_WIDTH)}  ${
-      derived.stale === null ? "—".padStart(5) : String(derived.stale).padStart(5)
-    }${derived.stale === null ? "  (not yet computed — C5)" : ""}`,
-  );
+  lines.push(`  ${"stale".padEnd(LABEL_WIDTH)}  ${String(derived.stale).padStart(5)}`);
   return lines;
 }
 
@@ -301,21 +317,19 @@ function renderReviewSection(rows: readonly ReviewTicketRow[]): string[] {
   }
   const { shown, omitted } = capRows(rows);
   for (const row of shown) {
+    // C5: reviewStale marks the row WITHOUT hiding its MR link — the mr
+    // field above always renders regardless of staleness (this work
+    // item's acceptance: "stale review ticket surfaces with MR link").
+    const staleTag = row.reviewStale ? "  [STALE]" : "";
     lines.push(
-      `  ${row.slug.padEnd(30)}  ${row.id}  ${row.mr ?? "(no MR link yet)"}  ${row.by}  ${humanizeAge(row.ageMs)}`,
+      `  ${row.slug.padEnd(30)}  ${row.id}  ${row.mr ?? "(no MR link yet)"}  ${row.by}  ${humanizeAge(row.ageMs)}${staleTag}`,
     );
   }
   if (omitted > 0) lines.push(`  … and ${omitted} more`);
   return lines;
 }
 
-function renderStaleSection(
-  rows: readonly StaleTicketRow[],
-  derivedStale: number | null,
-): string[] {
-  if (derivedStale === null) {
-    return ["Stale: — (not yet computed — C5)"];
-  }
+function renderStaleSection(rows: readonly StaleTicketRow[]): string[] {
   const lines: string[] = [`Stale (${rows.length}):`];
   if (rows.length === 0) {
     lines.push("  (none)");
@@ -342,7 +356,7 @@ function printHuman(data: StatusData): void {
   lines.push("");
   lines.push(...renderReviewSection(data.review));
   lines.push("");
-  lines.push(...renderStaleSection(data.stale, data.derived.stale));
+  lines.push(...renderStaleSection(data.stale));
 
   process.stdout.write(`${lines.join("\n")}\n`);
 }
@@ -381,8 +395,9 @@ function printJson(data: StatusData, generatedAtIso: string): void {
       by: row.by,
       age_ms: row.ageMs,
       age_human: humanizeAge(row.ageMs),
+      review_stale: row.reviewStale,
     })),
-    stale: data.derived.stale === null ? null : data.stale,
+    stale: data.stale,
     problems: data.problems,
   };
   process.stdout.write(`${JSON.stringify(body, null, 2)}\n`);

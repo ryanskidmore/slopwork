@@ -32,8 +32,8 @@ function makeRow(overrides: Partial<IndexTicketRow> = {}): IndexTicketRow {
     discovered: [],
     blocked_count: 0,
     ready: true,
-    stale: null,
-    review_stale: null,
+    stale_at: null,
+    review_stale_at: null,
     ...overrides,
   };
 }
@@ -113,36 +113,90 @@ describe("filterReadyRows", () => {
   });
 });
 
+const NOW = new Date("2026-07-23T12:00:00.000Z");
+
 describe("filterResumableRows", () => {
   it("includes in_progress with no active session", () => {
     const row = makeRow({ state: "in_progress", active_session: null, ready: false });
-    const result = filterResumableRows([row]);
+    const result = filterResumableRows([row], NOW);
     expect(result).toHaveLength(1);
     expect(result[0]?.reason).toBe("in_progress_no_session");
   });
 
   it("includes review with no active session", () => {
     const row = makeRow({ state: "review", active_session: null, ready: false });
-    const result = filterResumableRows([row]);
+    const result = filterResumableRows([row], NOW);
     expect(result).toHaveLength(1);
     expect(result[0]?.reason).toBe("review_no_session");
   });
 
-  it("excludes in_progress/review WITH an active session (not yet stopped — C5 will widen this)", () => {
-    const row = makeRow({ state: "in_progress", active_session: newSessionId(), ready: false });
-    expect(filterResumableRows([row])).toEqual([]);
+  it("excludes in_progress/review WITH an active session that is NOT stale", () => {
+    const row = makeRow({
+      state: "in_progress",
+      active_session: newSessionId(),
+      ready: false,
+      stale_at: "2026-07-23T13:00:00.000Z", // in the future relative to NOW — not stale yet
+    });
+    expect(filterResumableRows([row], NOW)).toEqual([]);
+  });
+
+  // C5: a ticket whose session is still technically active but has gone
+  // stale (an agent vanished mid-session) is resumable too — module doc,
+  // "resumable".
+  describe("C5: widened to include a stale ticket that still has an active session", () => {
+    it("includes an in_progress ticket with an active session once stale_at is in the past", () => {
+      const row = makeRow({
+        state: "in_progress",
+        active_session: newSessionId(),
+        ready: false,
+        stale_at: "2026-07-23T11:00:00.000Z", // before NOW — past the deadline
+      });
+      const result = filterResumableRows([row], NOW);
+      expect(result).toHaveLength(1);
+      expect(result[0]?.reason).toBe("in_progress_stale");
+    });
+
+    it("includes a review ticket with an active session once review_stale_at is in the past", () => {
+      const row = makeRow({
+        state: "review",
+        active_session: newSessionId(),
+        ready: false,
+        review_stale_at: "2026-07-23T11:00:00.000Z", // before NOW
+      });
+      const result = filterResumableRows([row], NOW);
+      expect(result).toHaveLength(1);
+      expect(result[0]?.reason).toBe("review_stale");
+    });
+
+    it("does NOT include an in_progress ticket with an active session whose stale_at is still in the future", () => {
+      const row = makeRow({
+        state: "in_progress",
+        active_session: newSessionId(),
+        stale_at: "2026-07-23T12:00:00.001Z", // 1ms after NOW — not yet stale
+      });
+      expect(filterResumableRows([row], NOW)).toEqual([]);
+    });
+
+    it("an active-session ticket with stale_at EXACTLY at now is not yet stale (boundary, now > deadline is strict)", () => {
+      const row = makeRow({
+        state: "in_progress",
+        active_session: newSessionId(),
+        stale_at: NOW.toISOString(),
+      });
+      expect(filterResumableRows([row], NOW)).toEqual([]);
+    });
   });
 
   it("excludes open/draft/done/dropped regardless of active_session", () => {
     const states = ["draft", "open", "done", "dropped"] as const;
     const rows = states.map((state) => makeRow({ state, active_session: null }));
-    expect(filterResumableRows(rows)).toEqual([]);
+    expect(filterResumableRows(rows, NOW)).toEqual([]);
   });
 
   it("applies --label", () => {
     const matches = makeRow({ state: "in_progress", active_session: null, labels: ["x"] });
     const noMatch = makeRow({ state: "in_progress", active_session: null, labels: ["y"] });
-    const result = filterResumableRows([matches, noMatch], { label: "x" });
+    const result = filterResumableRows([matches, noMatch], NOW, { label: "x" });
     expect(result.map((r) => r.row.id)).toEqual([matches.id]);
   });
 
@@ -150,7 +204,7 @@ describe("filterResumableRows", () => {
     const [olderId, newerId] = idsInOrder(2) as [TicketId, TicketId];
     const older = makeRow({ id: olderId, priority: 1, state: "review", active_session: null });
     const newer = makeRow({ id: newerId, priority: 0, state: "in_progress", active_session: null });
-    const result = filterResumableRows([older, newer]);
+    const result = filterResumableRows([older, newer], NOW);
     expect(result.map((r) => r.row.id)).toEqual([newer.id, older.id]);
   });
 });
@@ -159,9 +213,15 @@ describe("resumableReasonText", () => {
   it("gives a distinct, human-readable string per reason", () => {
     expect(resumableReasonText("in_progress_no_session")).toMatch(/in_progress/);
     expect(resumableReasonText("review_no_session")).toMatch(/review/);
-    expect(resumableReasonText("in_progress_no_session")).not.toBe(
+    expect(resumableReasonText("in_progress_stale")).toMatch(/stale/);
+    expect(resumableReasonText("review_stale")).toMatch(/stale/);
+    const texts = new Set([
+      resumableReasonText("in_progress_no_session"),
       resumableReasonText("review_no_session"),
-    );
+      resumableReasonText("in_progress_stale"),
+      resumableReasonText("review_stale"),
+    ]);
+    expect(texts.size).toBe(4); // all distinct
   });
 });
 

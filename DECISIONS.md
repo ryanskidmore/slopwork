@@ -239,3 +239,219 @@ direct repo-layer state (or a future crash/hand-edit), since the currently
 match `row.stale === true || row.review_stale === true` (columns already
 reserved on `IndexTicketRow`, `null` until C5) — a one-line change, not a
 redesign; see the module's doc comment for the exact seam.
+
+## B4 — adversarial-review fix: `cascadeOnClose` re-invocation now deduplicates `ticket.ready` emission against the event log
+
+**Correction to the two B4 entries above:** they describe `blocked_count`/
+`ready`'s recompute-from-truth idempotency and, in doing so, read as if
+that also made the done-cascade's `ticket.ready` *emission* exactly-once
+on a re-invocation ("a re-run of the same cascade repairs it for free").
+That was true of the `blocked_count`/`ready` *answer* recomputed each
+call, but NOT of the events actually written: as originally shipped,
+`cascadeOnClose` re-emitted an identical `ticket.ready` for every
+already-unblocked ticket on every re-invocation, because it had no memory
+of what it had already notified. Since re-invoking `cascadeOnClose` for
+the same `closedTicketId` is this module's own documented recovery path
+after a partial cascade (see its "Failure semantics" doc), this made the
+documented recovery path at-least-once with unbounded duplication, not
+the exactly-once the surrounding text implied — undermining the clean
+audit trail §4.7's dogfood requirement calls for.
+
+**Fix (`src/tickets/cascade.ts`, adversarial review):** before writing a
+`ticket.ready` for candidate ticket `T`, `cascadeOnClose` now calls
+`queryEvents(paths, { ticket: T })` (A4's existing repo-layer query,
+scoped to `T` via its own `ticket` filter rather than a hand-rolled scan)
+and skips the write if a `ticket.ready` event already exists for `T` with
+`payload.unblocked_by` equal to this `closedTicketId`. `unblocked` on
+`CascadeOnCloseResult` is unchanged — still the full, truthful
+recompute-from-truth answer — but `events` now reports only what THIS
+call actually wrote, so the two arrays are no longer guaranteed the same
+length on a re-invocation (see the result type's own doc for the updated
+contract). This costs one extra `queryEvents` call per candidate ticket,
+scoped by ticket rather than an unscoped full-log fetch reprocessed per
+candidate; fine at v0's target scale — see the function's doc comment for
+the full mechanism. Regression coverage:
+`src/tickets/cascade.test.ts`'s "idempotency" describe block now asserts
+a second `cascadeOnClose` call for the same closure emits zero new
+events, cross-checked against the full on-disk event log, not just the
+function's return value.
+
+## C5 — the index stores a staleness DEADLINE, never a boolean; the boolean is computed live at read time
+
+The plan's C5 row says "computed in index," which read literally means
+baking a live `stale: true/false` into `index.jsonc` at build time. **That
+design is wrong**, and this work item does not implement it. Staleness is
+a function of wall-clock time, not ticket content — and `index.jsonc`
+(db-index.ts) only rebuilds on a **content-fingerprint** mismatch (ticket
+files, and now config.yaml, changing), never merely because time passed.
+A ticket that goes stale purely because N hours elapsed with zero edits
+would never trigger a reindex, so a boolean baked in at the last rebuild
+would report `false` forever — exactly the failure mode this work item's
+own acceptance criterion targets ("a stale review ticket surfaces" — a
+ticket whose *content* hasn't changed, only the clock has).
+
+**The fix**, split cleanly across two kinds of function
+(`src/tickets/staleness.ts`, new, pure, fully unit-tested with
+`fixedClock`):
+
+- `computeStaleAt`/`computeReviewStaleAt` compute a **content-derived
+  deadline timestamp** — `last_activity_at + stale_after` for
+  `in_progress`; `review.requested_at + review_stale_after` for `review`;
+  `null` when the state doesn't apply. This deadline IS safe to persist in
+  the index, because — unlike a boolean — it only changes when the
+  ticket's own content changes (an activity bump, a review request, a
+  state transition), which the fingerprint mechanism already tracks by
+  construction. `db-index.ts`'s `buildIndex` calls these once per ticket
+  and stores the result as `IndexTicketRow.stale_at`/`review_stale_at`
+  (replacing A3's reserved `stale`/`review_stale` booleans outright — not
+  filling them in).
+- `isStale`/`isReviewStale` compute the **live boolean** — `now >
+  deadline`, strictly (a ticket exactly AT its deadline is not yet stale;
+  boundary-tested at exactly/just-under/just-over) — against an
+  explicitly injected `now: Date`, never a bare `Date.now()`/`new Date()`
+  (core/clock.ts's rule). This is the read-time half, called by every
+  consumer (`ready --resumable`, `status`) against that command's own
+  resolved clock.
+
+This reconciles "computed in index" (the *deadline* is computed into the
+index, and — critically — is stable/rebuild-safe: rebuilding the SAME
+ticket's index row at two different "now"s yields the identical
+`stale_at`, proven directly in `db-index.test.ts` and
+`tests/acceptance/C5.test.ts`) with correctness (the *boolean* is always
+live, so "time passed, nothing else changed" is handled correctly by
+construction, not by luck).
+
+### `requested_at` vs `last_activity_at` for review staleness
+
+design.md §2 says review staleness "catches MRs rotting unreviewed" — it
+measures how long the MR has sat **awaiting a human**, not how long ago
+the ticket was touched in general. D15's `review.requested_at` marks
+exactly the moment review was asked for, so `computeReviewStaleAt`
+anchors there, not on `last_activity_at`. Concretely: a ticket that's sat
+in review for a week, then gets one unrelated `update --progress` note
+today (bumping `last_activity_at` without addressing the review at all),
+must still read as review-stale — anchoring on `last_activity_at` would
+incorrectly reset the clock on exactly the case this overlay exists to
+catch. `last_activity_at` is used only as a defensive fallback if
+`review.requested_at` is somehow absent on a `review`-state ticket (the
+`Ticket` schema's own `refine` should make this unreachable in practice).
+(`src/web/overlays.ts`'s D5 stale panel independently anchors review
+staleness on `last_activity_at` for both states — a pre-existing,
+documented divergence this work item does not touch; unifying the two
+shared helpers is an E1 polish opportunity.)
+
+### Row-shape change: `INDEX_SCHEMA_VERSION` bumped 1 → 2
+
+Unlike B4's `blocked_count`/`ready` fill-in (an already-nullable field
+staying nullable, no reshape needed), replacing `stale`/`review_stale:
+boolean | null` with `stale_at`/`review_stale_at: IsoTimestamp | null` is
+a genuine field-name-and-type change. A pre-C5 `index.jsonc` on disk fails
+`dbIndexSchema` validation against the new shape outright, so this bumps
+`INDEX_SCHEMA_VERSION` to force it through the existing
+`stale_schema_version`/`invalid_schema` auto-heal path — verified
+directly: `db-index.ts`'s `tryReadValidIndex` checks the literal
+`schema_version` value before/independent of full schema validation, so
+any on-disk index at version 1 (or any other non-matching value) is
+caught and rebuilt transparently, exactly like the pre-existing
+missing/corrupt/stale-content cases.
+
+### Getting real thresholds into `buildIndex` without threading config through every caller
+
+`buildIndex`/`loadIndex` are called from several files this work item
+must not touch (`repo/refs.ts`, `sessions/context-pack.ts`,
+`tickets/slug.ts`, `cli/commands/show.ts`, ...), all with the bare
+`loadIndex(paths)` call — no config parameter. Rather than widen that
+signature (which would force edits to every one of those off-limits call
+sites, or silently serve wrong thresholds to whichever of them doesn't
+pass one), `buildIndex` now loads `.slop/config.yaml`'s `defaults.*`
+itself, internally, via a new `repo/config.ts`
+(`loadConfigDefaultsTolerant`) — **tolerant**: never throws, falls back
+to `core/entities/config.ts`'s own schema defaults (`60m`/`24h`) on any
+failure (missing file, unparseable text, schema mismatch), which is what
+most existing unit-test fixtures need (`ensureDbDirs` alone, no
+`config.yaml` written) and what a repo with a briefly-missing config.yaml
+needs too — `buildIndex` must never be the thing that turns a config
+hiccup into a crash for every downstream `loadIndex` caller (ref
+resolution, `ready`, `status`, ...). This is deliberately NOT
+`cli/actor.ts`'s `loadConfig` (which throws) — same reasoning `repo/config.ts`'s
+own module doc gives. It reuses `cli/config-yaml.ts`'s `parseConfigYamlText`
+(a pure text→object parser) rather than a second implementation, following
+the existing precedent of `repo/paths.ts`/`repo/lock.ts`/`repo/refs.ts`
+importing `cli/errors.ts`'s `SlopError` — a repo-layer file depending on a
+narrow, pure cli-owned helper, not the reverse.
+
+One consequence, accepted: since every caller gets the SAME
+tolerantly-loaded config regardless of which one happens to trigger a
+rebuild, `computeContentFingerprint` (db-index.ts) now ALSO fingerprints
+`config.yaml` itself (a new `"config"` key, shaped like the existing
+per-directory `{count, digest}` pair) — so hand-editing
+`stale_after`/`review_stale_after` invalidates the index exactly like
+editing a ticket file does, rather than silently doing nothing until some
+unrelated ticket write happens to force a rebuild anyway.
+
+### A deliberate, documented layering exception: `repo/db-index.ts` imports `tickets/staleness.ts`
+
+The general rule elsewhere in this codebase is `tickets/*.ts` depends on
+`repo/*.ts` (I/O), never the reverse (e.g. `tickets/cascade.ts` imports
+`repo/index.ts`'s `loadIndex`/`createEvent`; `tickets/ready.ts` imports
+the `IndexTicketRow` type from `repo/db-index.ts`). This work item's own
+brief explicitly asks for `src/tickets/staleness.ts`, grouping the pure
+staleness-deadline formula alongside its sibling pure ticket-domain
+modules (`tickets/ready.ts`, `tickets/status.ts`, `tickets/cascade.ts`)
+rather than in `core/` or duplicated inline in `db-index.ts`. Since
+`staleness.ts` has zero imports back on `repo/` (it is pure — a ticket
+-shaped object plus numbers in, a timestamp or boolean out, no I/O), there
+is no import cycle, only a one-off crossing of the informal layering
+convention — `repo/db-index.ts` imports `computeStaleAt`/
+`computeReviewStaleAt` from `../tickets/staleness.js`, and
+`tickets/ready.ts` imports `isStale`/`isReviewStale` from the same file
+for its `--resumable` widening. Documented here so the next reader
+doesn't mistake it for an accident.
+
+### `ready --resumable` widened; a stale ticket with an active session is included, distinctly
+
+`src/tickets/ready.ts`'s `filterResumableRows` now takes an explicit
+`now: Date` and includes a row if EITHER it has no active session
+(unchanged — the "stopped" case), OR it has one but has gone stale
+(`isStale`/`isReviewStale` against `now`) — an agent that vanished
+mid-session, or a review nobody's actually watching anymore despite an
+"active" session on file. The two cases get distinct `ResumableReason`s
+(`in_progress_no_session`/`review_no_session` vs. `in_progress_stale`/
+`review_stale`) so the rendered "why" text tells them apart — "stopped;
+resumable" reads very differently from "active session gone stale."
+`src/cli/commands/ready.ts` supplies `now` via a new `SLOP_READY_FAKE_NOW`
+clock-override env var (`ready` had no clock seam before C5; this adds
+one, mirroring `status.ts`'s `SLOP_STATUS_FAKE_NOW` / `web.ts`'s
+`SLOP_WEB_FAKE_NOW` exactly).
+
+### The MR-link acceptance: `ready --resumable` and `status` both surface it
+
+`IndexTicketRow` carries no `review` field at all (it's a summary row, not
+the full ticket). For `ready --resumable`, `src/cli/commands/ready.ts`
+does one `readTicket` per resumable **review**-state row (bounded — a
+handful in practice, same fault-tolerant "degrade to null, warn on
+stderr, never crash" contract `status.ts` already established for its own
+per-review-ticket read) to attach `review.mr` to the JSON/text output; `ready`'s
+strict (non-resumable) section never needs this, since review-state
+tickets never appear there. For `status`, `src/tickets/status.ts`'s
+`ReviewTicketRow` gained a `reviewStale: boolean` field, computed by
+`src/cli/commands/status.ts` against the index row's `review_stale_at` —
+rendered as a `[STALE]` tag ALONGSIDE the `mr` field the "awaiting review"
+section already always shows for every row, stale or not (this work
+item's acceptance, verbatim: "stale review ticket surfaces with MR
+link"). `tests/acceptance/C5.test.ts` drives both paths end-to-end against
+a directly-written `review`-state ticket fixture (`review --mr` is C3,
+not yet built) under an injected clock, and asserts a FRESH review ticket
+does NOT surface as stale in either surface.
+
+### Out of scope, left alone: `slop web`'s stale panel
+
+`src/web/overlays.ts` (D5) computes staleness independently, in-memory,
+per HTTP request — already documented there as the "later work item
+should swap in B4's persisted index.jsonc" TODO. This work item does not
+touch `src/web/` per its own ground rules; unifying `slop web`'s
+staleness computation with `tickets/staleness.ts`'s shared helper (so
+there's exactly one `isStale`/`isReviewStale` implementation in the
+codebase, not two that could drift — note web's already differs on the
+`requested_at`-vs-`last_activity_at` question above) is real, valuable
+follow-up work, but it's an E1 polish item, not C5's.

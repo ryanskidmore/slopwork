@@ -147,6 +147,7 @@ interface StatusJsonReview {
   by: string;
   age_ms: number;
   age_human: string;
+  review_stale: boolean;
 }
 
 interface StatusJsonStale {
@@ -167,10 +168,10 @@ interface StatusJsonOutput {
     dropped: number;
     total: number;
   };
-  derived: { blocked: number | null; stale: number | null };
+  derived: { blocked: number | null; stale: number };
   in_progress: StatusJsonInProgress[];
   review: StatusJsonReview[];
-  stale: StatusJsonStale[] | null;
+  stale: StatusJsonStale[];
   problems: { id: string; message: string }[];
 }
 
@@ -525,87 +526,64 @@ describe("D4: status", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Derived blocked/stale overlays: graceful pre-B4/C5 degrade, and
-  // rendering once populated.
+  // Derived blocked/stale overlays: graceful pre-B4 degrade for `blocked`
+  // (still nullable); `stale` (C5) is ALWAYS live-computed — see
+  // tests/acceptance/C5.test.ts for the full clock-injected staleness
+  // acceptance coverage. This describe block keeps only what's still D4's
+  // own concern: rendering, once populated/computed.
   // -------------------------------------------------------------------------
 
   describe("derived blocked/stale overlays", () => {
-    it("degrade gracefully (never crash) when the index's derived fields are still null (pre-B4/C5)", async () => {
+    it("blocked degrades gracefully (never crash) when the index's blocked_count is still null (pre-B4)", async () => {
       const paths = await makeScratchRepo("slop-d4-derived-null-");
-      await writeTicket(
-        paths,
-        makeTicket({ name: "Some in-progress ticket", state: "in_progress" }),
-      );
-      await writeTicket(
-        paths,
-        makeTicket({
-          name: "Some review ticket",
-          state: "review",
-          review: { requested_at: NOW, by: { name: "ryan", kind: "human" } },
-        }),
-      );
+      await writeTicket(paths, makeTicket({ name: "Some open ticket", state: "open" }));
 
-      // Force every derived field back to `null` regardless of how far
-      // B4/C5 have actually landed in this checkout (this work item must
-      // not depend on their landing order — see status.ts's module doc,
-      // "reads generically"). Same fingerprint-preserving hand-mutation
-      // technique as the "once populated" test below.
+      // Force blocked_count back to null regardless of how far B4 has
+      // actually landed in this checkout — same fingerprint-preserving
+      // hand-mutation technique as the "once populated" test below.
       const index: DbIndex = await buildIndex(paths);
       const mutated: DbIndex = {
         ...index,
-        tickets: index.tickets.map((row) => ({
-          ...row,
-          blocked_count: null,
-          ready: null,
-          stale: null,
-          review_stale: null,
-        })),
+        tickets: index.tickets.map((row) => ({ ...row, blocked_count: null, ready: null })),
       };
       await writeIndex(paths, mutated);
 
       const human = status(paths.root);
       expect(human.status, human.stderr).toBe(0);
       expect(human.stdout).toMatch(/blocked\s+—\s+\(not yet computed — B4\)/);
-      expect(human.stdout).toMatch(/stale\s+—\s+\(not yet computed — C5\)/);
-      expect(human.stdout).toContain("Stale: — (not yet computed — C5)");
+      // stale (C5) is always live-computed — no "not yet computed" state.
+      expect(human.stdout).toContain("Stale (0):");
 
       const json = statusJson(paths.root);
-      expect(json.derived).toEqual({ blocked: null, stale: null });
-      expect(json.stale).toBeNull();
+      expect(json.derived.blocked).toBeNull();
+      expect(json.derived.stale).toBe(0);
+      expect(json.stale).toEqual([]);
     });
 
-    it("renders real blocked/stale counts and a stale listing once the index's derived fields are populated", async () => {
+    it("renders real blocked counts (B4) and real, live-computed stale counts/listing (C5) from a real fixture + SLOP_STATUS_FAKE_NOW", async () => {
       const paths = await makeScratchRepo("slop-d4-derived-populated-");
-      const staleInProgress = makeTicket({ name: "Stuck ticket", state: "in_progress" });
-      const freshInProgress = makeTicket({ name: "Fresh ticket", state: "in_progress" });
+      // Stale threshold in this fixture's config.yaml is 60m — see CONFIG_YAML.
+      const staleInProgress = makeTicket({
+        name: "Stuck ticket",
+        state: "in_progress",
+        last_activity_at: "2026-07-23T08:00:00.000Z", // 2h before FAKE_NOW — past the 60m deadline
+      });
+      const freshInProgress = makeTicket({
+        name: "Fresh ticket",
+        state: "in_progress",
+        last_activity_at: "2026-07-23T09:50:00.000Z", // 10m before FAKE_NOW — under the 60m deadline
+      });
       const blockedOpen = makeTicket({ name: "Blocked ticket", state: "open" });
+      const blocker = makeTicket({ name: "Blocker", state: "open", blocks: [blockedOpen.id] });
       await writeTicket(paths, staleInProgress);
       await writeTicket(paths, freshInProgress);
       await writeTicket(paths, blockedOpen);
+      await writeTicket(paths, blocker);
+      await rebuildIndex(paths);
 
-      // Simulate B4/C5 having populated the index — this work item does
-      // NOT implement their computation (out of scope), so this hand
-      // -mutates a real `buildIndex()` result's derived fields directly,
-      // matching this work item's brief ("if you can populate them by
-      // hand-writing index rows"). Crucially, `tickets` are the only
-      // field mutated — the `fingerprint` stays exactly what `buildIndex`
-      // computed from the real on-disk ticket files, so the spawned
-      // `status` process's `loadIndex` freshness check still finds this
-      // index "fresh" and does NOT silently rebuild over the hand-written
-      // values.
-      const index: DbIndex = await buildIndex(paths);
-      const mutated: DbIndex = {
-        ...index,
-        tickets: index.tickets.map((row) => {
-          if (row.id === staleInProgress.id) return { ...row, stale: true };
-          if (row.id === freshInProgress.id) return { ...row, stale: false };
-          if (row.id === blockedOpen.id) return { ...row, blocked_count: 1 };
-          return row;
-        }),
-      };
-      await writeIndex(paths, mutated);
+      const fakeNow = { SLOP_STATUS_FAKE_NOW: "2026-07-23T10:00:00.000Z" };
 
-      const human = status(paths.root);
+      const human = status(paths.root, [], fakeNow);
       expect(human.status, human.stderr).toBe(0);
       expect(human.stdout).toMatch(/blocked\s+1(?!\d)/);
       expect(human.stdout).toMatch(/stale\s+1(?!\d)/);
@@ -615,7 +593,7 @@ describe("D4: status", () => {
         `${freshInProgress.slug}  ${freshInProgress.id}  in_progress`,
       );
 
-      const json = statusJson(paths.root);
+      const json = statusJson(paths.root, fakeNow);
       expect(json.derived).toEqual({ blocked: 1, stale: 1 });
       expect(json.stale).toEqual([
         {
@@ -649,18 +627,14 @@ describe("D4: status", () => {
         dropped: 0,
         total: 1,
       });
-      // Exact null-vs-populated semantics for `derived`/`stale` are pinned
-      // precisely (via fingerprint-preserving hand-mutation, independent
-      // of B4/C5's actual landing order) by the "derived blocked/stale
-      // overlays" tests above — this test only pins the shape/types.
+      // blocked (B4) stays nullable (pinned precisely by the "derived
+      // blocked/stale overlays" tests above); stale (C5) is always a
+      // real number now — never null.
       expect(json.derived.blocked === null || typeof json.derived.blocked === "number").toBe(true);
-      expect(json.derived.stale === null || typeof json.derived.stale === "number").toBe(true);
+      expect(typeof json.derived.stale).toBe("number");
       expect(json.in_progress).toEqual([]);
       expect(json.review).toEqual([]);
-      // `stale` is null exactly when `derived.stale` is null (never an
-      // empty array standing in for "unknown") — see status.ts's module doc.
-      if (json.derived.stale === null) expect(json.stale).toBeNull();
-      else expect(Array.isArray(json.stale)).toBe(true);
+      expect(Array.isArray(json.stale)).toBe(true);
       expect(json.problems).toEqual([]);
     });
   });
@@ -682,10 +656,10 @@ describe("D4: status", () => {
       const paths = await makeScratchRepo("slop-d4-empty-json-");
       const json = statusJson(paths.root);
       expect(json.counts.total).toBe(0);
-      expect(json.derived).toEqual({ blocked: null, stale: null });
+      expect(json.derived).toEqual({ blocked: null, stale: 0 });
       expect(json.in_progress).toEqual([]);
       expect(json.review).toEqual([]);
-      expect(json.stale).toBeNull();
+      expect(json.stale).toEqual([]);
     });
   });
 });

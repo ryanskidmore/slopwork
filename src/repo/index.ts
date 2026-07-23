@@ -14,6 +14,7 @@
  * `queryEvents`) that D3's `slop events --since` builds on.
  */
 export * from "./atomic-write.js";
+export * from "./config.js";
 export * from "./db-index.js";
 export * from "./entity-file.js";
 export * from "./events.js";

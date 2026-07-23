@@ -28,16 +28,24 @@
  * by construction after every routine `git pull` that touched tickets.
  *
  * The fix: every built index embeds a cheap **content fingerprint** —
- * per entity directory the index's content depends on (today: just
- * `tickets/`), a count plus a sha256 digest over every file's own
+ * per entity directory the index's content depends on (today: `tickets/`,
+ * plus — C5 — `config.yaml` itself, single-file rather than a directory
+ * but shaped the same: a `{count, digest}` pair, `count` being `0`/`1` for
+ * absent/present), a count plus a sha256 digest over every file's own
  * `(filename, mtimeMs, size)` tuple, sorted by filename (see
  * {@link computeContentFingerprint}). `loadIndex()` recomputes this
- * fingerprint on every call via `readdir` + `stat` only — no file is
- * parsed or its content read — and rebuilds if it differs from the one
- * recorded in the index, exactly like the missing/unparseable/stale
+ * fingerprint on every call via `readdir`/`stat` only — no file is parsed
+ * or its content read — and rebuilds if it differs from the one recorded
+ * in the index, exactly like the missing/unparseable/stale
  * -schema-version cases (`reason: "stale_content"`). This is cheap: see
  * this work item's report for a measured number on ~1k tickets, kept well
  * inside D4's "< 1s on 1k tickets" budget.
+ *
+ * Fingerprinting `config.yaml` (C5) matters because `stale_at`/
+ * `review_stale_at` (see below) are computed from its `defaults.
+ * stale_after`/`review_stale_after` — without this, hand-editing those
+ * thresholds would silently do nothing until some unrelated ticket file
+ * also changed, since nothing else about the index would look stale.
  *
  * (Supersedes an earlier count+max-mtime-only design — adversarial-review
  * Finding 2: a file whose mtime moves *backwards* below the directory's
@@ -98,19 +106,16 @@
  * etc. has to be derived by scanning every ticket's outgoing edges and
  * inverting), and the fault-tolerance `problems` list above.
  *
- * B4's and C5's room to grow, without a schema-version bump: every
- * {@link IndexTicketRow} already carries `blocked_count`/`ready` (B4:
- * "Derivations: blocked_count in index, ready query ... done-cascade")
- * and `stale`/`review_stale` (C5: "Staleness: stale_after /
- * review_stale_after computed in index") fields, typed as `<T> | null`.
- * A3 always wrote `null` for all four here. **B4 (this work item) now
- * fills in `blocked_count`/`ready` for real** — see
- * {@link computeBlockedCounts}/{@link computeReady} below, called from
- * `buildIndex` — leaving only `stale`/`review_stale` as C5's remaining
- * job. Filling in an already-nullable field is not a reshape, so this
- * doesn't need `INDEX_SCHEMA_VERSION` bumped either — same reasoning as
- * the `fingerprint` shape change and the `problems` field below: a
- * pre-fix `index.jsonc` on disk simply fails schema validation against a
+ * B4's room to grow, without a schema-version bump: every
+ * {@link IndexTicketRow} already carried `blocked_count`/`ready` (B4:
+ * "Derivations: blocked_count in index, ready query ... done-cascade"),
+ * typed as `<T> | null`. A3 always wrote `null` for both. **B4 now fills
+ * these in for real** — see {@link computeBlockedCounts}/
+ * {@link computeReady} below, called from `buildIndex`. Filling in an
+ * already-nullable field is not a reshape, so this doesn't need
+ * `INDEX_SCHEMA_VERSION` bumped either — same reasoning as the
+ * `fingerprint` shape change and the `problems` field below: a pre-fix
+ * `index.jsonc` on disk simply fails schema validation against a
  * genuinely new shape and falls into the existing `invalid_schema`
  * auto-heal path, transparently rebuilding.
  *
@@ -129,6 +134,58 @@
  * any fresh build (every test fixture, every fresh clone — index.jsonc is
  * gitignored, D14, so it never exists pre-populated) and self-heals on
  * the next `slop reindex` or the next ticket mutation either way.
+ *
+ * ## C5: `stale_at`/`review_stale_at` — a deadline, not a boolean
+ *
+ * A3 reserved two boolean fields here (`stale`/`review_stale`, always
+ * `null`). C5 does **not** fill those booleans in — a boolean baked in at
+ * build time would be wrong by construction, since staleness is a
+ * function of wall-clock time and this index only rebuilds on ticket
+ * *content* changes (the fingerprint above), never on the mere passage of
+ * time. A ticket that goes stale purely because N hours elapsed with zero
+ * edits would never trigger a reindex, so a baked `false` would stay
+ * wrong forever — exactly the "stale review ticket surfaces" case C5's
+ * acceptance criterion targets.
+ *
+ * Instead, {@link IndexTicketRow} carries `stale_at`/`review_stale_at`:
+ * **content-derived deadline timestamps** (`last_activity_at +
+ * stale_after` for `in_progress`; `review.requested_at +
+ * review_stale_after` for `review`; `null` when the state doesn't apply —
+ * see `src/tickets/staleness.ts`'s `computeStaleAt`/`computeReviewStaleAt`
+ * for the full formulas and the `requested_at`-vs-`last_activity_at`
+ * rationale). A deadline IS safe to store here, because — unlike a
+ * boolean — it only changes when the ticket's own content changes
+ * (`last_activity_at`/`review` moving, or a state transition), which the
+ * fingerprint already tracks. The live `stale`/`review_stale` BOOLEAN is
+ * computed at READ TIME by callers (`ready --resumable`, `status`) via
+ * `staleness.ts`'s `isStale`/`isReviewStale`, against an explicitly
+ * injected clock — never baked into this file. See DECISIONS.md's C5
+ * entry for the fuller writeup, and `tests/acceptance/C5.test.ts` for the
+ * proof: rebuilding the index at two different "now"s leaves a given
+ * row's `stale_at` unchanged — only the derived boolean, computed
+ * separately by the caller, differs.
+ *
+ * This IS a row-shape change (`stale`/`review_stale: boolean | null` →
+ * `stale_at`/`review_stale_at: IsoTimestamp | null`) — unlike B4's
+ * fill-in-a-nullable-field change above, a pre-C5 `index.jsonc` fails
+ * schema validation against the new field names/types outright, so this
+ * bumps {@link INDEX_SCHEMA_VERSION} (1 → 2) to force every such index
+ * through the existing `invalid_schema`/`stale_schema_version` auto-heal
+ * path rather than silently misreading old boolean fields as the new
+ * timestamp ones.
+ *
+ * Thresholds come from `.slop/config.yaml`'s `defaults.stale_after`/
+ * `review_stale_after` (design.md §3), read tolerantly via
+ * `repo/config.ts`'s `loadConfigDefaultsTolerant` (never throws — falls
+ * back to the schema's own defaults, `60m`/`24h`, so a repo with no
+ * config.yaml, e.g. most unit-test fixtures, still builds a valid index).
+ * `computeContentFingerprint` also fingerprints `config.yaml` itself (see
+ * below), so editing `stale_after`/`review_stale_after` by hand is
+ * treated the same as editing a ticket file: it invalidates the index and
+ * triggers a rebuild on the next `loadIndex()` call, keeping every row's
+ * `stale_at`/`review_stale_at` computed against the CURRENT configured
+ * thresholds, not whatever was configured the last time some ticket file
+ * happened to change.
  */
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
@@ -150,12 +207,33 @@ import type { SessionId, Ticket, TicketId, TicketState } from "../core/index.js"
 import { isoTimestampSchema } from "../core/timestamp.js";
 import { slugSchema } from "../core/slug.js";
 import { parseJsonc, writeCanonical } from "../core/jsonc.js";
+import { parseDurationMs } from "../core/duration.js";
+// C5: pure staleness-deadline formulas — see this module's "C5:
+// stale_at/review_stale_at" doc section above for why importing from
+// tickets/ (normally the reverse dependency direction — tickets/*.ts
+// depends on repo/, not the other way around) is a deliberate, safe
+// exception here: staleness.ts is pure/I-O-free (no import back on
+// repo/), so there is no cycle, only a one-off crossing chosen so the
+// formula lives alongside its sibling pure ticket-domain modules
+// (tickets/ready.ts, tickets/status.ts, tickets/cascade.ts) rather than
+// being duplicated or relocated into core/. See DECISIONS.md's C5 entry.
+import { computeReviewStaleAt, computeStaleAt } from "../tickets/staleness.js";
 import { atomicWriteFile } from "./atomic-write.js";
+import { loadConfigDefaultsTolerant } from "./config.js";
 import { isEnoent, readDirSafe } from "./fs-utils.js";
 import type { RepoPaths } from "./paths.js";
 import { listTicketsTolerant } from "./tickets.js";
 
-export const INDEX_SCHEMA_VERSION = 1;
+/**
+ * C5 bumped this 1 → 2: `stale`/`review_stale` (`boolean | null`) were
+ * replaced by `stale_at`/`review_stale_at` (`IsoTimestamp | null`) — a
+ * genuine row-shape change, not an already-nullable-field fill-in (see
+ * this module's "C5" doc section above). Any `index.jsonc` written by a
+ * pre-C5 binary fails `dbIndexSchema` validation against the new field
+ * names/types and falls into the existing `stale_schema_version`/
+ * `invalid_schema` auto-heal path, exactly like any other schema bump.
+ */
+export const INDEX_SCHEMA_VERSION = 2;
 
 export const indexTicketRowSchema = z.object({
   id: ticketIdSchema,
@@ -187,18 +265,24 @@ export const indexTicketRowSchema = z.object({
   blocked_count: z.number().int().nullable(),
   ready: z.boolean().nullable(),
 
-  // --- C5 slots in here: `stale_after`/`review_stale_after` computed
-  // against `last_activity_at` (clock-injected per C5's own acceptance
-  // criterion). A3 always writes `null`. ---
-  stale: z.boolean().nullable(),
-  review_stale: z.boolean().nullable(),
+  // --- C5: content-derived staleness DEADLINES, not booleans — see this
+  // module's "C5: stale_at/review_stale_at" doc section above for why. A
+  // ticket's own state + last_activity_at (in_progress) or
+  // review.requested_at (review) plus config.yaml's stale_after/
+  // review_stale_after; `null` when the state doesn't apply. Read-time
+  // callers compute the live boolean via tickets/staleness.ts's
+  // isStale/isReviewStale against an injected clock — never here. ---
+  stale_at: isoTimestampSchema.nullable(),
+  review_stale_at: isoTimestampSchema.nullable(),
 });
 export type IndexTicketRow = z.infer<typeof indexTicketRowSchema>;
 
-/** One entity directory's cheap staleness signature — see the module
- * doc's "Content staleness". `digest` is a sha256 hex digest over every
- * entity file's own `(filename, mtimeMs, size)` tuple, sorted by
- * filename, computed from `readdir` + `stat` alone (never file content).
+/** One entity directory's (or, since C5, single tracked file's — see
+ * `computeContentFingerprint`'s `config.yaml` entry) cheap staleness
+ * signature — see the module doc's "Content staleness". `digest` is a
+ * sha256 hex digest over every entity file's own `(filename, mtimeMs,
+ * size)` tuple (or, for a single file, just its own `(mtimeMs, size)`),
+ * computed from `readdir`/`stat` alone (never file content).
  */
 export const dirFingerprintSchema = z.object({
   count: z.number().int().min(0),
@@ -361,13 +445,43 @@ async function fingerprintTicketsDir(dir: string): Promise<DirFingerprint> {
 }
 
 /**
- * Cheap staleness signal for `loadIndex()`'s auto-heal — `readdir` +
- * `stat` only, no file content read or parsed. See the module doc's
- * "Content staleness" section for the full rationale and the known
- * mtime-granularity limitation.
+ * C5: `config.yaml`'s own `(mtimeMs, size)` fingerprint — the single-file
+ * analogue of {@link fingerprintTicketsDir}, shaped the same
+ * (`DirFingerprint`) so it fits `ContentFingerprint`'s existing
+ * `Record<string, DirFingerprint>` shape with no schema change. `count` is
+ * `0`/`1` for absent/present, so a config.yaml being created or deleted
+ * also changes the fingerprint, not just an edit to an existing one.
+ */
+async function fingerprintConfigFile(configPath: string): Promise<DirFingerprint> {
+  try {
+    const st = await stat(configPath);
+    const hash = createHash("sha256");
+    hash.update(String(st.mtimeMs));
+    hash.update(" ");
+    hash.update(String(st.size));
+    return { count: 1, digest: hash.digest("hex") };
+  } catch (err) {
+    if (isEnoent(err)) return { count: 0, digest: "absent" };
+    throw err;
+  }
+}
+
+/**
+ * Cheap staleness signal for `loadIndex()`'s auto-heal — `readdir`/`stat`
+ * only, no file content read or parsed. See the module doc's "Content
+ * staleness" section for the full rationale and the known
+ * mtime-granularity limitation. C5: also fingerprints `config.yaml`
+ * itself (key `"config"`) — `stale_at`/`review_stale_at` are computed
+ * from its `defaults.*` thresholds, so a hand-edit to config.yaml must
+ * invalidate the index exactly like a ticket-file edit does.
  */
 export async function computeContentFingerprint(paths: RepoPaths): Promise<ContentFingerprint> {
-  return { tickets: await fingerprintTicketsDir(paths.ticketsDir) };
+  const configPath = join(paths.slopDir, "config.yaml");
+  const [tickets, config] = await Promise.all([
+    fingerprintTicketsDir(paths.ticketsDir),
+    fingerprintConfigFile(configPath),
+  ]);
+  return { tickets, config };
 }
 
 function fingerprintsEqual(a: ContentFingerprint, b: ContentFingerprint): boolean {
@@ -419,10 +533,22 @@ function warnAboutIndexProblems(problems: TicketReadProblem[]): void {
  * an extra rebuild). The reverse ordering could let a fingerprint
  * overshoot what `rows` actually reflects, which would let a genuinely
  * stale index pass as fresh — the one outcome this mechanism exists to
- * prevent. */
+ * prevent. The ticket read and the (separate, C5) config-defaults read
+ * below happen afterward, and may run concurrently with each other —
+ * same "undershoot is safe" reasoning covers any race between the two:
+ * worst case, the fingerprint reflects a config.yaml a moment older than
+ * the thresholds just used, and the very next `loadIndex()` call's own
+ * fresh fingerprint catches the difference and rebuilds again. */
 export async function buildIndex(paths: RepoPaths, clock: Clock = systemClock): Promise<DbIndex> {
   const fingerprint = await computeContentFingerprint(paths);
-  const { tickets, problems } = await listTicketsTolerant(paths);
+  const [{ tickets, problems }, configDefaults] = await Promise.all([
+    listTicketsTolerant(paths),
+    // C5: tolerant — never throws, falls back to schema defaults (60m/24h)
+    // when config.yaml is missing/unparseable (see repo/config.ts).
+    loadConfigDefaultsTolerant(paths),
+  ]);
+  const staleAfterMs = parseDurationMs(configDefaults.stale_after);
+  const reviewStaleAfterMs = parseDurationMs(configDefaults.review_stale_after);
 
   const blockedBy = new Map<TicketId, TicketId[]>();
   const relatedFrom = new Map<TicketId, TicketId[]>();
@@ -461,8 +587,13 @@ export async function buildIndex(paths: RepoPaths, clock: Clock = systemClock): 
         discovered: discovered.get(ticket.id) ?? [],
         blocked_count: liveBlockedCount,
         ready: computeReady(ticket.state, liveBlockedCount, ticket.active_session),
-        stale: null,
-        review_stale: null,
+        // C5: content-derived deadlines, not booleans — see this module's
+        // "C5" doc section. Pure functions of the ticket's own state +
+        // last_activity_at/review.requested_at + the configured
+        // thresholds; the live boolean is computed at read time by
+        // callers (ready --resumable, status), never here.
+        stale_at: computeStaleAt(ticket, staleAfterMs),
+        review_stale_at: computeReviewStaleAt(ticket, reviewStaleAfterMs),
       };
     })
     .sort((a, b) => a.id.localeCompare(b.id));

@@ -18,8 +18,8 @@ function row(
     slug: overrides.id,
     name: overrides.id,
     blockedCount: null,
-    stale: null,
-    reviewStale: null,
+    stale: false,
+    reviewStale: false,
     ...overrides,
   };
 }
@@ -56,10 +56,10 @@ describe("aggregateStateCounts", () => {
   });
 });
 
-describe("aggregateDerivedCounts — reads B4/C5's fields generically", () => {
-  it("blocked/stale are both null when every row's fields are still null (pre-B4/C5)", () => {
+describe("aggregateDerivedCounts", () => {
+  it("blocked is null when every row's blockedCount is still null (pre-B4 index)", () => {
     const rows = [row({ id: "a", state: "in_progress" }), row({ id: "b", state: "review" })];
-    expect(aggregateDerivedCounts(rows)).toEqual({ blocked: null, stale: null });
+    expect(aggregateDerivedCounts(rows)).toEqual({ blocked: null, stale: 0 });
   });
 
   it("blocked becomes a real count once ANY row's blockedCount is non-null (B4 has populated the index)", () => {
@@ -75,7 +75,7 @@ describe("aggregateDerivedCounts — reads B4/C5's fields generically", () => {
     expect(aggregateDerivedCounts(rows).blocked).toBe(0);
   });
 
-  it("stale counts in_progress rows via `stale` and review rows via `reviewStale`, once C5 has populated either field", () => {
+  it("stale (C5) is ALWAYS a real count — never null, counts in_progress rows via `stale` and review rows via `reviewStale`", () => {
     const rows = [
       row({ id: "a", state: "in_progress", stale: true }),
       row({ id: "b", state: "in_progress", stale: false }),
@@ -83,6 +83,11 @@ describe("aggregateDerivedCounts — reads B4/C5's fields generically", () => {
       row({ id: "d", state: "done" }), // never counted regardless of state
     ];
     expect(aggregateDerivedCounts(rows).stale).toBe(2);
+  });
+
+  it("stale is a real 0 (not null) when nothing is stale", () => {
+    const rows = [row({ id: "a", state: "in_progress", stale: false })];
+    expect(aggregateDerivedCounts(rows).stale).toBe(0);
   });
 });
 
@@ -101,7 +106,7 @@ describe("staleTicketRows", () => {
     expect(staleTicketRows(rows).map((r) => r.id)).toEqual(["a", "c"]);
   });
 
-  it("returns [] (not null/throw) when every field is still null — the pre-C5 degrade", () => {
+  it("returns [] (not throw) when nothing is stale", () => {
     const rows = [row({ id: "a", state: "in_progress" }), row({ id: "b", state: "review" })];
     expect(staleTicketRows(rows)).toEqual([]);
   });
@@ -223,8 +228,8 @@ describe("sortInProgressRows — oldest session first", () => {
 describe("sortReviewRows — longest-waiting first", () => {
   it("sorts descending by age", () => {
     const rows = [
-      { id: "a", slug: "a", name: "a", mr: null, requestedAt: "t", by: "x", ageMs: 1000 },
-      { id: "b", slug: "b", name: "b", mr: null, requestedAt: "t", by: "x", ageMs: 9000 },
+      { id: "a", slug: "a", name: "a", mr: null, requestedAt: "t", by: "x", ageMs: 1000, reviewStale: false },
+      { id: "b", slug: "b", name: "b", mr: null, requestedAt: "t", by: "x", ageMs: 9000, reviewStale: false },
     ];
     expect(sortReviewRows(rows).map((r) => r.id)).toEqual(["b", "a"]);
   });
