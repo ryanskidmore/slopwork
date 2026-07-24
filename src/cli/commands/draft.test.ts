@@ -253,6 +253,39 @@ describe("runDraft (in-process)", () => {
     expect(ticket.state).toBe("draft");
   });
 
+  // closing-loop-commands-lack-json (nice-to-have)
+  it("--json returns a stable shape, with already_draft reflecting the no-op case", async () => {
+    const root = await makeTempRepo("slop-draft-inproc-json-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "JSON draft ticket");
+
+    const out1 = captureOutput();
+    try {
+      await withCwd(root, () => runDraft(id, { json: true }));
+      const body = JSON.parse(out1.stdout()) as {
+        id: TicketId;
+        state: string;
+        already_draft: boolean;
+        handle: string;
+      };
+      expect(body.id).toBe(id);
+      expect(body.state).toBe("draft");
+      expect(body.already_draft).toBe(false);
+      expect(body.handle).toMatch(/^t-/);
+    } finally {
+      out1.restore();
+    }
+
+    const out2 = captureOutput();
+    try {
+      await withCwd(root, () => runDraft(id, { json: true }));
+      const body2 = JSON.parse(out2.stdout()) as { already_draft: boolean };
+      expect(body2.already_draft).toBe(true);
+    } finally {
+      out2.restore();
+    }
+  });
+
   it("an already-draft ticket is an idempotent no-op, with a distinct message and no bumped updated_at", async () => {
     const root = await makeTempRepo("slop-draft-inproc-idempotent-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });

@@ -2,7 +2,14 @@ import type { Command } from "commander";
 import type { Clock } from "../../core/clock.js";
 import { systemClock } from "../../core/clock.js";
 import type { Actor, Session, Ticket } from "../../core/index.js";
-import { EXIT_CODES, mrUrlSchema, nowIso, sessionSchema, ticketSchema } from "../../core/index.js";
+import {
+  EXIT_CODES,
+  mrUrlSchema,
+  nowIso,
+  sessionSchema,
+  shortTicketCode,
+  ticketSchema,
+} from "../../core/index.js";
 import {
   readSession,
   readTicket,
@@ -28,6 +35,7 @@ import { printWarning } from "./shared.js";
 interface ReviewCommandOptions {
   mr?: string;
   transcript?: string;
+  json?: boolean;
 }
 
 /**
@@ -255,10 +263,42 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
   // unchanged, so its own headline says so instead of implying a
   // transition that didn't happen. `initialTicket` (read before the lock,
   // above) still reflects the PRE-write state here.
-  const headline =
-    initialTicket.state === "review"
-      ? `${result.ticket.id} (${result.ticket.slug}) MR link updated (already in review)`
-      : `${result.ticket.id} (${result.ticket.slug}) moved to review`;
+  const alreadyInReview = initialTicket.state === "review";
+
+  if (opts.json) {
+    // closing-loop-commands-lack-json: field names mirror `show --json`'s
+    // ticket sub-shape (`review: {mr, requested_at, by}`, `null` when
+    // absent — same "absent optional field -> null" convention `new
+    // --json`'s own `parent` uses) rather than flattening `mr`/
+    // `requested_at` the way the human-readable text above does.
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          id: result.ticket.id,
+          slug: result.ticket.slug,
+          handle: shortTicketCode(result.ticket.id),
+          name: result.ticket.name,
+          state: result.ticket.state,
+          review: result.ticket.review
+            ? {
+                mr: result.ticket.review.mr ?? null,
+                requested_at: result.ticket.review.requested_at,
+                by: result.ticket.review.by,
+              }
+            : null,
+          transcript: result.session.transcript_ref,
+          already_in_review: alreadyInReview,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    return;
+  }
+
+  const headline = alreadyInReview
+    ? `${result.ticket.id} (${result.ticket.slug}) MR link updated (already in review)`
+    : `${result.ticket.id} (${result.ticket.slug}) moved to review`;
 
   process.stdout.write(
     `${headline}\n` +
@@ -292,5 +332,6 @@ export function registerReviewCommand(program: Command): void {
       "--transcript <path>",
       "manual transcript path (works for any harness; overrides auto-detection when the file exists)",
     )
+    .option("--json", "machine-readable result (id, slug, handle, name, state, review, transcript)")
     .action(runReview);
 }

@@ -539,6 +539,52 @@ describe("runUpdate (in-process)", () => {
     expect((await readTicket(paths, id)).priority).toBe(0);
   });
 
+  // closing-loop-commands-lack-json
+  it("--json returns a stable shape (id/slug/handle/name/state/priority) on the full read-modify-write path", async () => {
+    const root = await makeTempRepo("slop-update-inproc-json-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "JSON update ticket");
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runUpdate(id, baseOpts({ priority: 0, json: true })));
+      const body = JSON.parse(out.stdout()) as {
+        id: TicketId;
+        slug: string;
+        handle: string;
+        name: string;
+        state: string;
+        priority: number;
+      };
+      expect(body.id).toBe(id);
+      expect(body.priority).toBe(0);
+      expect(body.handle).toMatch(/^t-/);
+    } finally {
+      out.restore();
+    }
+  });
+
+  // closing-loop-commands-lack-json: the lock-free PURE --progress path
+  // (ticket_01KY9RWFM80BKNE2CDX85QMKGS) is a separate early return in
+  // runUpdate — must also honor --json, not just the locked path above.
+  it("--json also works on the lock-free pure --progress path", async () => {
+    const root = await makeTempRepo("slop-update-inproc-json-progress-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "JSON progress ticket");
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () =>
+        runUpdate(id, baseOpts({ progress: "headway via json", json: true })),
+      );
+      const body = JSON.parse(out.stdout()) as { id: TicketId; state: string };
+      expect(body.id).toBe(id);
+      expect(body.state).toBe("open");
+    } finally {
+      out.restore();
+    }
+  });
+
   it("--label +x adds a label; a later --label -x removes it", async () => {
     const root = await makeTempRepo("slop-update-inproc-label-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });

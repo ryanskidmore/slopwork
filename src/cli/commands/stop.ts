@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { END_SUMMARY_MAX_LENGTH, sessionSchema } from "../../core/index.js";
+import { END_SUMMARY_MAX_LENGTH, sessionSchema, shortTicketCode } from "../../core/index.js";
 import {
   readSession,
   readTicket,
@@ -23,6 +23,7 @@ import { assertMaxLength, printWarning, sessionOwnershipWarning } from "./shared
 interface StopCommandOptions {
   note?: string;
   transcript?: string;
+  json?: boolean;
 }
 
 /**
@@ -175,6 +176,30 @@ export async function runStop(ref: string, opts: StopCommandOptions): Promise<vo
   if (result.transcriptWarning !== null) printWarning(result.transcriptWarning);
   if (result.ownershipWarning !== null) printWarning(result.ownershipWarning);
 
+  if (opts.json) {
+    // closing-loop-commands-lack-json: field names mirror `start --json`'s
+    // own `session`/`ticket` split (id/slug/name/state on the ticket;
+    // session gets its own `id`), plus `note`/`transcript` naming the two
+    // pieces of data this command's own text output already surfaces.
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          id: result.ticket.id,
+          slug: result.ticket.slug,
+          handle: shortTicketCode(result.ticket.id),
+          name: result.ticket.name,
+          state: result.ticket.state,
+          session_id: result.session.id,
+          note: result.session.end_summary,
+          transcript: result.session.transcript_ref,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    return;
+  }
+
   process.stdout.write(
     `stopped ${result.session.id} on ${result.ticket.id} (${result.ticket.slug})\n` +
       `  ${result.ticket.name}\n` +
@@ -199,6 +224,10 @@ export function registerStopCommand(program: Command): void {
     .option(
       "--transcript <path>",
       "manual transcript path (works for any harness; overrides auto-detection when the file exists)",
+    )
+    .option(
+      "--json",
+      "machine-readable result (id, slug, handle, name, state, session_id, note, transcript)",
     )
     .action(runStop);
 }

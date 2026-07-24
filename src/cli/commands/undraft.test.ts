@@ -236,6 +236,39 @@ describe("runUndraft (in-process)", () => {
     expect((await readTicket(paths, id)).state).toBe("open");
   });
 
+  // closing-loop-commands-lack-json (nice-to-have)
+  it("--json returns a stable shape, with already_open reflecting the no-op case", async () => {
+    const root = await makeTempRepo("slop-undraft-inproc-json-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "JSON undraft ticket", { draft: true });
+
+    const out1 = captureOutput();
+    try {
+      await withCwd(root, () => runUndraft(id, { json: true }));
+      const body = JSON.parse(out1.stdout()) as {
+        id: TicketId;
+        state: string;
+        already_open: boolean;
+        handle: string;
+      };
+      expect(body.id).toBe(id);
+      expect(body.state).toBe("open");
+      expect(body.already_open).toBe(false);
+      expect(body.handle).toMatch(/^t-/);
+    } finally {
+      out1.restore();
+    }
+
+    const out2 = captureOutput();
+    try {
+      await withCwd(root, () => runUndraft(id, { json: true }));
+      const body2 = JSON.parse(out2.stdout()) as { already_open: boolean };
+      expect(body2.already_open).toBe(true);
+    } finally {
+      out2.restore();
+    }
+  });
+
   it("an already-open ticket is an idempotent no-op", async () => {
     const root = await makeTempRepo("slop-undraft-inproc-idempotent-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });

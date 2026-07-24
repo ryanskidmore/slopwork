@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { fixedClock, systemClock } from "../../core/index.js";
+import { fixedClock, shortTicketCode, systemClock } from "../../core/index.js";
 import type { Ticket } from "../../core/index.js";
 import {
   appendEvent,
@@ -29,6 +29,7 @@ interface UpdateCommandOptions {
   acceptance: string[];
   context: string[];
   relatesTo: string[];
+  json?: boolean;
 }
 
 /**
@@ -57,7 +58,36 @@ function pureProgressNote(opts: UpdateCommandOptions): string | undefined {
   return opts.progress;
 }
 
-function printUpdated(ticket: Pick<Ticket, "id" | "slug" | "name" | "state" | "priority">): void {
+/**
+ * closing-loop-commands-lack-json: `--json` result — a small, stable
+ * shape naming exactly the fields the human-readable output already
+ * prints, with `handle` added for parity with `new --json`'s own result
+ * (E1) — every mutator that reads a ticket back should surface the same
+ * short, typeable handle, not just the commands that create one. Field
+ * names deliberately match `new`'s JSON keys (`id`/`slug`/`handle`/`name`/
+ * `state`/`priority`) rather than inventing a parallel vocabulary.
+ */
+function printUpdated(
+  ticket: Pick<Ticket, "id" | "slug" | "name" | "state" | "priority">,
+  json: boolean | undefined,
+): void {
+  if (json) {
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          id: ticket.id,
+          slug: ticket.slug,
+          handle: shortTicketCode(ticket.id),
+          name: ticket.name,
+          state: ticket.state,
+          priority: ticket.priority,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    return;
+  }
   process.stdout.write(
     `updated ${ticket.id}  (slug: ${ticket.slug})\n` +
       `  ${ticket.name}\n` +
@@ -111,7 +141,7 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
       );
     }
 
-    printUpdated(initialTicket);
+    printUpdated(initialTicket, opts.json);
     return;
   }
 
@@ -207,7 +237,7 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
     return ticket;
   });
 
-  printUpdated(ticket);
+  printUpdated(ticket, opts.json);
 }
 
 /** `slop update` — design.md §4.2; work item B1.
@@ -271,5 +301,6 @@ export function registerUpdateCommand(program: Command): void {
       collect,
       [] as string[],
     )
+    .option("--json", "machine-readable result (id, slug, handle, name, state, priority)")
     .action(runUpdate);
 }

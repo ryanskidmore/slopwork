@@ -252,6 +252,41 @@ describe("runStop (in-process)", () => {
     expect(ticket.active_session).toBeNull();
   });
 
+  // closing-loop-commands-lack-json
+  it("--json returns a stable, machine-readable shape and keeps stdout clean JSON", async () => {
+    const root = await makeTempRepo("slop-stop-inproc-json-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "JSON stop ticket");
+    const startOut = captureOutput();
+    try {
+      await withCwd(root, () => runStart(id, {}));
+    } finally {
+      startOut.restore();
+    }
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runStop(id, { note: "handoff via json", json: true }));
+      const body = JSON.parse(out.stdout()) as {
+        id: TicketId;
+        slug: string;
+        handle: string;
+        name: string;
+        state: string;
+        session_id: string;
+        note: string;
+        transcript: string | null;
+      };
+      expect(body.id).toBe(id);
+      expect(body.state).toBe("open");
+      expect(body.note).toBe("handoff via json");
+      expect(body.session_id).toMatch(/^session_/);
+      expect(body.handle).toMatch(/^t-/);
+    } finally {
+      out.restore();
+    }
+  });
+
   it("ticket_01KYAPN9NXY6RPSV6WGR42CJHJ: warns on stderr (but still succeeds) when the acting actor differs from who started the session", async () => {
     const root = await makeTempRepo("slop-stop-inproc-ownership-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });

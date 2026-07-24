@@ -153,6 +153,38 @@ describe("runReview (in-process)", () => {
     expect(ticket.review?.mr).toBe("https://example.com/org/repo/pull/1");
   });
 
+  // closing-loop-commands-lack-json
+  it("--json returns a stable, machine-readable shape and keeps stdout clean JSON", async () => {
+    const root = await makeTempRepo("slop-review-inproc-json-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "JSON review ticket");
+    await startTicket(root, id);
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () =>
+        runReview(id, { mr: "https://example.com/org/repo/pull/5", json: true }),
+      );
+      const body = JSON.parse(out.stdout()) as {
+        id: TicketId;
+        slug: string;
+        handle: string;
+        name: string;
+        state: string;
+        review: { mr: string | null; requested_at: string; by: unknown } | null;
+        transcript: string | null;
+        already_in_review: boolean;
+      };
+      expect(body.id).toBe(id);
+      expect(body.state).toBe("review");
+      expect(body.review?.mr).toBe("https://example.com/org/repo/pull/5");
+      expect(body.already_in_review).toBe(false);
+      expect(body.handle).toMatch(/^t-/);
+    } finally {
+      out.restore();
+    }
+  });
+
   it("nags on stderr (but still succeeds) when --mr is omitted", async () => {
     const root = await makeTempRepo("slop-review-inproc-nomr-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });

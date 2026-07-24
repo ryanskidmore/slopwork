@@ -8,6 +8,7 @@ import {
   nowIso,
   RESOLUTION_MAX_LENGTH,
   sessionSchema,
+  shortTicketCode,
   ticketSchema,
 } from "../../core/index.js";
 import {
@@ -39,6 +40,7 @@ interface DoneCommandOptions {
   note?: string;
   transcript?: string;
   outcome?: string;
+  json?: boolean;
 }
 
 /**
@@ -269,6 +271,40 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
     process.stderr.write(`${formatIndexProblems(result.cascade.problems)}\n`);
   }
 
+  if (opts.json) {
+    // closing-loop-commands-lack-json: `unblocked` is the field this
+    // ticket's own brief calls out by name ("done's unblocked-cascade list
+    // is prose only") — a `TicketId[]`, matching `cascade.ts`'s own
+    // `CascadeOnCloseResult.unblocked` field name/shape exactly, not a
+    // joined string. `problems` mirrors `status --json`'s own
+    // `{id, message}` shape (db-index.ts's `TicketReadProblem` minus
+    // `path`, which is an internal file-layout detail status/done's
+    // agent-facing JSON has never surfaced). `resolution_set` (not
+    // `resolution`) deliberately avoids a field that would sometimes hold
+    // a string and sometimes a boolean depending on `--outcome` — the
+    // full resolution text is `show --json`'s job.
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          id: result.ticket.id,
+          slug: result.ticket.slug,
+          handle: shortTicketCode(result.ticket.id),
+          name: result.ticket.name,
+          state: result.ticket.state,
+          note: result.session.end_summary,
+          resolution_set: result.ticket.resolution !== undefined,
+          transcript: result.session.transcript_ref,
+          unblocked: result.cascade.unblocked,
+          problems: result.cascade.problems.map((p) => ({ id: p.id, message: p.message })),
+          skipped_review: result.skippedReview,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    return;
+  }
+
   process.stdout.write(
     `done ${result.ticket.id} (${result.ticket.slug})\n` +
       `  ${result.ticket.name}\n` +
@@ -309,6 +345,11 @@ export function registerDoneCommand(program: Command): void {
     .option(
       "--transcript <path>",
       "manual transcript path (works for any harness; overrides auto-detection when the file exists)",
+    )
+    .option(
+      "--json",
+      "machine-readable result (id, slug, handle, name, state, note, resolution_set, " +
+        "transcript, unblocked, problems, skipped_review)",
     )
     .action(runDone);
 }
