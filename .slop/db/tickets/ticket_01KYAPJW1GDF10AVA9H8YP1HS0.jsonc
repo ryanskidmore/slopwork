@@ -1,0 +1,45 @@
+{
+  "id": "ticket_01KYAPJW1GDF10AVA9H8YP1HS0",
+  "name": "review: no-MR nag advises re-running review, which the state machine rejects; no way to attach an MR while in review",
+  "slug": "review-no-mr-nag-advises",
+  "spec": {
+    "summary": "review: no-MR nag advises re-running review, which the state machine rejects; no way to attach an MR while in review",
+    "details_md": "review.ts:114-121 nag says re-run slop review once the MR exists, but checkReviewEntry rejects review->review (exit 6). update has no --mr flag, so the only routes to attach a late MR are a spurious start re-entry or a hand-edit. Fix: allow updating the MR link on a review-state ticket (e.g. slop review --mr on same state updates the link, or update --mr).",
+    "acceptance": [
+      "a review-state ticket can get/replace its MR link non-interactively",
+      "nag text matches what the CLI actually allows"
+    ],
+    "context": [
+      "src/cli/commands/review.ts:114",
+      "src/tickets/state.ts:291"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "area:cli"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPJW1GDF10AVA9H8YP1HS0",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:35:43.026Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:35:43.026Z",
+  "updated_at": "2026-07-24T18:35:43.026Z"
+}

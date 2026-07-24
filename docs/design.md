@@ -1,5 +1,10 @@
 # Slopwork — Spec
 
+> **Historical document.** This is the internal design spec v0 was built from, preserved as
+> written. The maintained, user-facing documentation lives in this directory — start with
+> [`README.md`](README.md). Where this spec and the shipped tool disagree,
+> [`DECISIONS.md`](DECISIONS.md) records what actually shipped and why.
+
 **v0.6 · July 17, 2026 · slopwork.dev · free OSS**
 
 > **Next action:** build v0 (§4). First milestone: `slop init && slop new "Test feature" && slop ready` against the flatfile db. ~1 day. Full v0: ~2.5 weeks. **v0 exit bar: a full dogfood week (§4.7) with zero fallbacks to markdown TODOs.**

@@ -67,7 +67,7 @@ describe("gitUserName", () => {
   });
 });
 
-describe("isAgentHarnessEnv (kind heuristic; reuses spikes/findings.md §2's signals)", () => {
+describe("isAgentHarnessEnv (kind heuristic; reuses docs/spikes/findings.md §2's signals)", () => {
   it("detects Claude Code", () => {
     expect(isAgentHarnessEnv({ CLAUDECODE: "1" })).toBe(true);
   });

@@ -1,0 +1,44 @@
+{
+  "id": "ticket_01KYAPHGJ9Y6DCN9EGHRX2KRA0",
+  "name": "spec parsing: malformed or unknown-key --spec JSON silently becomes details_md prose",
+  "slug": "spec-parsing-malformed-or-unknown",
+  "spec": {
+    "summary": "spec parsing: malformed or unknown-key --spec JSON silently becomes details_md prose",
+    "details_md": "parseSpecInput (src/tickets/spec.ts:61-83) falls back to details_md for anything that is not a clean known-keys JSON object. A typo key (e.g. description) or truncated JSON silently stores the whole JSON string as prose — this review's own first ticket hit it. Fix: when raw parses as a JSON object (or starts with {) but fails the known-keys/schema gate, error or at least warn loudly instead of silently degrading.",
+    "acceptance": [
+      "JSON-looking spec that fails the schema errors (USAGE_ERROR) or warns on stderr",
+      "bare-markdown specs still land in details_md"
+    ],
+    "context": [
+      "src/tickets/spec.ts:61"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "area:cli"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPHGJ9Y6DCN9EGHRX2KRA0",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:34:58.508Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:34:58.508Z",
+  "updated_at": "2026-07-24T18:34:58.508Z"
+}

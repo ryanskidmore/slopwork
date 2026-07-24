@@ -8,7 +8,7 @@ import {
 } from "./jsonc.js";
 
 // Fixture modeled on the S3 spike's own 7-comment hand-authored ticket
-// fixture (spikes/jsonc.md, "Load-bearing empirical findings"): file
+// fixture (docs/spikes/jsonc.md, "Load-bearing empirical findings"): file
 // header, a block comment above a key, an inline `/* */`, a comment on an
 // empty-array line, a comment attached to an array element, a comment
 // above a nested object, and a trailing inline `//` on an array element.
@@ -137,7 +137,7 @@ describe("writeCanonical", () => {
   });
 });
 
-describe("writeUpdate — comment survival (scoped exactly per spikes/jsonc.md)", () => {
+describe("writeUpdate — comment survival (scoped exactly per docs/spikes/jsonc.md)", () => {
   it("survives editing an existing scalar, nested deep inside the document", () => {
     const after = baseline();
     after.spec.summary = "updated summary";
@@ -226,7 +226,7 @@ describe("writeUpdate — comment survival (scoped exactly per spikes/jsonc.md)"
   });
 });
 
-describe("writeUpdate — comments expected to be lost (scoped exactly per spikes/jsonc.md)", () => {
+describe("writeUpdate — comments expected to be lost (scoped exactly per docs/spikes/jsonc.md)", () => {
   it("loses a comment that was attached above a deleted key (destroyed with it)", () => {
     const after = baseline();
     delete after.spec.meta;
@@ -272,7 +272,7 @@ describe("writeUpdate — round-trip correctness holds unconditionally", () => {
 });
 
 describe("writeUpdate — jsonc-parser@3.3.1 inline-array-delete-last-element regression", () => {
-  // spikes/jsonc.md: modify() on an inline `["a","b","c"]` array, removing
+  // docs/spikes/jsonc.md: modify() on an inline `["a","b","c"]` array, removing
   // the last element, corrupts the document in the installed stable
   // version (3.3.1) — `applyEdits` produces malformed JSON that silently
   // reparses into wrong data. This is the exact scenario writeUpdate's

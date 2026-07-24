@@ -364,7 +364,7 @@ addEvent({ kind: "ticket", id: billingRunbook.id }, "ticket.created", RYAN, null
 // Session S2: migrate-billing — opencode, single-version plan, STALE
 // (last activity 5h ago > stale_after 60m), no transcript captured
 // (S2/D16: an expected, non-fatal case — opencode's session id and
-// transcript locator are both null-by-default per spikes/findings.md §1.2/§3.2).
+// transcript locator are both null-by-default per docs/spikes/findings.md §1.2/§3.2).
 const s2Id = newSessionId();
 const s2: Session = sessionSchema.parse({
   id: s2Id,
@@ -842,7 +842,7 @@ const config: Config = configSchema.parse({
 });
 
 // ---------------------------------------------------------------------------
-// Transcripts (spikes/findings.md §4 record/block shapes)
+// Transcripts (docs/spikes/findings.md §4 record/block shapes)
 // ---------------------------------------------------------------------------
 
 interface RawRecord {

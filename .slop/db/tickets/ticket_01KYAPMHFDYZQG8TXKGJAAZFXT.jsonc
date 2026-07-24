@@ -1,0 +1,45 @@
+{
+  "id": "ticket_01KYAPMHFDYZQG8TXKGJAAZFXT",
+  "name": "handle t-<code> missing from ready/search JSON and stale status rows; onboarding omits it from ref list",
+  "slug": "handle-t-code-missing-from",
+  "spec": {
+    "summary": "handle t-<code> missing from ready/search JSON and stale status rows; onboarding omits it from ref list",
+    "details_md": "new/show/status(in_progress,review) expose handle but ready --json, search --json and status stale rows do not — agents cannot use the short ref where picking work happens. Onboarding (content.ts:126) also omits the handle from the ref-resolution list and uses an invalid example full id (ticket_01J9X7M3E8W2 is not 26 chars).",
+    "acceptance": [
+      "handle present in all ticket-row JSON shapes",
+      "onboarding ref list includes t-<code> and a valid example id"
+    ],
+    "context": [
+      "src/cli/commands/ready.ts:128",
+      "src/cli/onboarding/content.ts:126"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 3,
+  "labels": [
+    "area:cli"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPMHFDYZQG8TXKGJAAZFXT",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:36:37.743Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:36:37.743Z",
+  "updated_at": "2026-07-24T18:36:37.743Z"
+}

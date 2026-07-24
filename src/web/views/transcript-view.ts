@@ -1,6 +1,6 @@
 /**
  * §4.4 item 4: the transcript viewer. Renders a session's `.jsonl`
- * conversation readably (spikes/findings.md §4): user/assistant turns as
+ * conversation readably (docs/spikes/findings.md §4): user/assistant turns as
  * distinct blocks, `text` as markdown prose, `thinking` de-emphasised and
  * collapsible, `tool_use` collapsed behind its name, `tool_result`
  * collapsed with an expand affordance, non-conversational record types

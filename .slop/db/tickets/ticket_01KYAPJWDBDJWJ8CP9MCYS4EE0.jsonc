@@ -1,0 +1,44 @@
+{
+  "id": "ticket_01KYAPJWDBDJWJ8CP9MCYS4EE0",
+  "name": "closing loop commands lack --json (update/draft/undraft/review/stop/done/drop)",
+  "slug": "closing-loop-commands-lack-json",
+  "spec": {
+    "summary": "closing loop commands lack --json (update/draft/undraft/review/stop/done/drop)",
+    "details_md": "new/split/start return machine-readable results but the commands that END a session do not — done's unblocked-cascade list is prose only. Agents must scrape human text exactly where reliable branching matters most.",
+    "acceptance": [
+      "--json on update/review/stop/done/drop (draft/undraft nice-to-have) with stable shapes matching new/show field names"
+    ],
+    "context": [
+      "src/cli/commands/done.ts:245",
+      "src/cli/commands/review.ts:231"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "area:cli"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPJWDBDJWJ8CP9MCYS4EE0",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:35:43.405Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:35:43.405Z",
+  "updated_at": "2026-07-24T18:35:43.405Z"
+}

@@ -1,0 +1,45 @@
+{
+  "id": "ticket_01KYAPJWK1AC66QP7RDCJPHX7J",
+  "name": "exit code 4 is overloaded: not-a-slopwork-repo vs ref-not-found are indistinguishable",
+  "slug": "exit-code-4-is-overloaded",
+  "spec": {
+    "summary": "exit code 4 is overloaded: not-a-slopwork-repo vs ref-not-found are indistinguishable",
+    "details_md": "requireRepoRoot throws NOT_FOUND(4) for a missing .slop/ (src/repo/paths.ts:82) while docs define 4 strictly as ref-did-not-resolve. Also slop web breaks the convention the other way: its own findSlopRoot walk throws GENERIC_ERROR(1) (src/cli/commands/web.ts:74). Pick one semantic, use requireRepoRoot in web, document it.",
+    "acceptance": [
+      "web uses the shared repo-root discovery + same exit code",
+      "docs/README exit-code table matches behavior for the not-a-repo case"
+    ],
+    "context": [
+      "src/repo/paths.ts:82",
+      "src/cli/commands/web.ts:32"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "area:cli"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPJWK1AC66QP7RDCJPHX7J",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:35:43.587Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:35:43.587Z",
+  "updated_at": "2026-07-24T18:35:43.587Z"
+}

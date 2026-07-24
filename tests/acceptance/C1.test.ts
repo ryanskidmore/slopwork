@@ -101,7 +101,7 @@ function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
 }
 
 /** Every harness-identity env var any of the three real harnesses set
- * (spikes/findings.md §1) — stripped by default so this suite's own
+ * (docs/spikes/findings.md §1) — stripped by default so this suite's own
  * ambient environment (which may itself be a real Claude Code session,
  * per findings.md §1.1's own reproduced dump) never leaks into a test
  * asserting on detection. Mirrors tests/acceptance/D1.test.ts's `runSlop`. */

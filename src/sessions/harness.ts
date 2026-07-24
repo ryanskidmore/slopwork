@@ -1,11 +1,11 @@
 /**
- * Harness detection (S1, `spikes/findings.md` §1-§2; D9/D17; design.md
+ * Harness detection (S1, `docs/spikes/findings.md` §1-§2; D9/D17; design.md
  * §4.3) — work item C1.
  *
  * This is THE canonical place a harness kind + its own session id get
  * sniffed from the environment. `slop start` (src/cli/commands/start.ts)
  * captures the result ONCE into the Session entity at session-start time —
- * see `spikes/findings.md` §5's "Known-unsound case": never re-derive
+ * see `docs/spikes/findings.md` §5's "Known-unsound case": never re-derive
  * "which session is mine" later via a newest-mtime heuristic, since two
  * concurrent agents in one repo is a first-class scenario here, and that
  * heuristic answers "which session touched this project most recently",
@@ -15,7 +15,7 @@
  * `src/cli/actor.ts`'s D17 actor `kind` (human/agent) resolution is also
  * built directly on {@link sniffHarnessKind} (see that module).
  *
- * Precedence (`spikes/findings.md` §2), reproduced:
+ * Precedence (`docs/spikes/findings.md` §2), reproduced:
  *   1. `--harness <kind>` flag, if passed — ALWAYS wins, no exceptions,
  *      no "but the env disagrees" override (D17).
  *   2. Otherwise, sniff in this fixed order, first match wins, never throw:

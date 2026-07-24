@@ -1,0 +1,46 @@
+{
+  "id": "ticket_01KYAPN9G0K6AX3408QWRKHMHD",
+  "name": "housekeeping: gitignore .lock.stale-* sentinels; launcher double-spawn; takeover transcript gap; unbounded notes; events defaults",
+  "slug": "housekeeping-gitignore-lock-stale",
+  "spec": {
+    "summary": "housekeeping: gitignore .lock.stale-* sentinels; launcher double-spawn; takeover transcript gap; unbounded notes; events defaults",
+    "details_md": "Grab-bag of small confirmed items: (1) .gitignore covers .lock and .tmp-* but not the .lock.stale-<token> sentinels the stale-breaker can leave (lock.ts:281). (2) bin/slop.mjs spawns bun --version before every real run — measurable startup tax; try the real spawn and map ENOENT instead. (3) takeover/review re-entry end sessions without transcript capture while docs/configuration.md:110 claims capture on every end — fix docs or add best-effort capture. (4) --note/--outcome/--reason unbounded (done --outcome - reads all stdin) — consider caps. (5) slop events with no flags returns the whole log and next_cursor:null when everything is elided though has_more:true — give events a default limit and always emit a usable cursor.",
+    "acceptance": [
+      "each sub-item fixed or explicitly wontfixed"
+    ],
+    "context": [
+      "src/repo/lock.ts:281",
+      "bin/slop.mjs",
+      "docs/configuration.md:110",
+      "src/cli/commands/events.ts"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 3,
+  "labels": [
+    "area:polish"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPN9G0K6AX3408QWRKHMHD",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:37:02.339Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:37:02.339Z",
+  "updated_at": "2026-07-24T18:37:02.339Z"
+}

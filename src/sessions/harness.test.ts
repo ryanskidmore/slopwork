@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { detectHarness, sniffHarnessKind } from "./harness.js";
 
-describe("sniffHarnessKind (spikes/findings.md §2 precedence)", () => {
+describe("sniffHarnessKind (docs/spikes/findings.md §2 precedence)", () => {
   it("detects claude-code via CLAUDECODE=1", () => {
     expect(sniffHarnessKind({ CLAUDECODE: "1" })).toBe("claude-code");
   });

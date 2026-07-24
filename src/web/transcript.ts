@@ -1,7 +1,7 @@
 /**
  * Claude Code transcript JSONL parsing, classification, and pagination
  * (design.md §4.4 item 4 / D16). Record and block shapes are exactly what
- * spikes/findings.md §4 documents — read that section before changing
+ * docs/spikes/findings.md §4 documents — read that section before changing
  * anything here.
  *
  * Performance strategy (D5 architecture requirement — "must stay
@@ -31,7 +31,7 @@ export const CONVERSATIONAL_TYPES = new Set(["user", "assistant"]);
 export const SYSTEM_TYPE = "system";
 
 /**
- * Explicitly documented (spikes/findings.md §4) as "safe for a transcript
+ * Explicitly documented (docs/spikes/findings.md §4) as "safe for a transcript
  * viewer to skip/hide by default" and never described as worth surfacing
  * — always hidden, regardless of the `all` toggle.
  */

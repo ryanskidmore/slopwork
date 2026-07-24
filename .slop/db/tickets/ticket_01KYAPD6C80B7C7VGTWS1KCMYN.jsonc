@@ -1,0 +1,38 @@
+{
+  "id": "ticket_01KYAPD6C80B7C7VGTWS1KCMYN",
+  "name": "Tidy repo for public presentation: move+reframe design.md, DECISIONS.md, v0-implementation-plan.md into docs/",
+  "slug": "tidy-repo-for-public-presentation",
+  "spec": {
+    "summary": "Tidy repo for public presentation: move+reframe design.md, DECISIONS.md, v0-implementation-plan.md into docs/",
+    "details_md": "{\"description\":\"Root-level internal docs (design.md, DECISIONS.md, v0-implementation-plan.md, spikes/) should be reframed as internal/history docs under docs/ so the repo presents cleanly to newcomers. Update all references (README, docs index, code comments, tests).\",\"acceptance\":[\"Root directory contains only user-facing files (README, LICENSE, RELEASE, configs)\",\"design.md/DECISIONS.md/v0-implementation-plan.md relocated under docs/ with reframing prefaces\",\"All repo references to old paths updated; tests/lint/typecheck pass\"],\"context\":[\"README.md\",\"docs/README.md\"]}",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 1,
+  "labels": [],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYAPD6C80B7C7VGTWS1KCMYN",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T19:00:28.632Z",
+  "latest_note": "Human approved. Internal docs moved to docs/ with prefaces, references updated, full verification suite green.",
+  "owner": {
+    "name": "ryan",
+    "kind": "human"
+  },
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:32:37.031Z",
+  "updated_at": "2026-07-24T19:00:28.632Z"
+}

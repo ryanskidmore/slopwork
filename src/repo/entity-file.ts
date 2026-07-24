@@ -4,7 +4,7 @@
  * (existing file, comment-preserving via `writeUpdate`), delete, and
  * listing ids present in a directory.
  *
- * Every read validates with the caller's zod schema — per spikes/jsonc.md,
+ * Every read validates with the caller's zod schema — per docs/spikes/jsonc.md,
  * `parseJsonc` never throws and silently accepts duplicate keys, so a
  * clean parse is not sufficient evidence the file is good data (A3
  * scope item 3). A file that fails either step produces a clear,

@@ -1,0 +1,45 @@
+{
+  "id": "ticket_01KYAPJVVNSESE8TM6523NRAKK",
+  "name": "edit: vi fallback hangs agents on non-TTY; no non-interactive path for parent/blocks/owner repair",
+  "slug": "edit-vi-fallback-hangs-agents",
+  "spec": {
+    "summary": "edit: vi fallback hangs agents on non-TTY; no non-interactive path for parent/blocks/owner repair",
+    "details_md": "pickEditorCommand (src/cli/commands/edit.ts:37-41) falls back to vi and spawns with stdio inherit and no isInteractive() guard (edit.ts:107) — reproduced: unset EDITOR/VISUAL on non-TTY blocks forever. Worse, edit is the ONLY way to change parent/blocks/discovered_from/owner post-creation (docs/cli-reference.md:196), so the one command agents are steered to for edge repair is the one that hangs them.",
+    "acceptance": [
+      "non-TTY + no EDITOR fails fast (exit 2) with guidance",
+      "a non-interactive alternative exists (edit --stdin or update --parent/--blocks/--owner)"
+    ],
+    "context": [
+      "src/cli/commands/edit.ts:37",
+      "src/cli/init/prompt.ts:25"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "area:cli"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPJVVNSESE8TM6523NRAKK",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:35:42.840Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:35:42.840Z",
+  "updated_at": "2026-07-24T18:35:42.840Z"
+}

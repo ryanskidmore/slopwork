@@ -1,0 +1,43 @@
+{
+  "id": "ticket_01KYAPKSP6QQMGZ6Q6YDPE8NAV",
+  "name": "web: second slop web on an occupied port silently double-binds on Linux (SO_REUSEPORT)",
+  "slug": "web-second-slop-web-on",
+  "spec": {
+    "summary": "web: second slop web on an occupied port silently double-binds on Linux (SO_REUSEPORT)",
+    "details_md": "Reproduced live: second instance on the same port printed serving and requests round-robin between instances; the EADDRINUSE handler (server.ts:128) never fires on Linux because Bun sets SO_REUSEPORT. Pass reusePort:false explicitly or probe the port first.",
+    "acceptance": [
+      "second instance on an occupied port errors with the friendly port-in-use message on Linux"
+    ],
+    "context": [
+      "src/web/server.ts:128"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "area:web"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPKSP6QQMGZ6Q6YDPE8NAV",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:36:13.384Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:36:13.384Z",
+  "updated_at": "2026-07-24T18:36:13.384Z"
+}

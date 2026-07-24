@@ -71,7 +71,7 @@ describe("readEntityFile", () => {
   });
 
   it("catches the case parseJsonc alone would miss: a clean-parsing duplicate-key file that validates to the wrong shape", async () => {
-    // spikes/jsonc.md: duplicate keys are silently accepted by parseJsonc
+    // docs/spikes/jsonc.md: duplicate keys are silently accepted by parseJsonc
     // (last one wins), so a hand-corrupted duplicate key can only be
     // caught by validating, never by parse errors alone.
     const path = join(scratch, "dup-key.jsonc");

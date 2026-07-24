@@ -28,7 +28,7 @@ import {
 // deliberately adversarial generators (tests/acceptance/a2-arbitraries.ts:
 // multi-line markdown with quotes/backslashes/tabs/code fences, unicode
 // names, empty arrays, absent optional fields) — then asserts comment
-// survival exactly as scoped by spikes/jsonc.md, using real entity
+// survival exactly as scoped by docs/spikes/jsonc.md, using real entity
 // -shaped documents rather than generic JSON. (Edge, the fifth §4.1
 // object, has no independent on-disk shape of its own to round-trip —
 // see DECISIONS.md and src/core/entities/edge.ts.)
@@ -128,7 +128,7 @@ describe("A2: Core types + serialization", () => {
     });
   });
 
-  describe("comment survival on a real ticket document, scoped exactly per spikes/jsonc.md", () => {
+  describe("comment survival on a real ticket document, scoped exactly per docs/spikes/jsonc.md", () => {
     // A hand-annotated JSONC ticket file: start from a real, fully-defaulted
     // Ticket (so every field a person could plausibly hand-edit is
     // present), then splice in 4 comments at meaningful spots — a file
@@ -240,7 +240,7 @@ describe("A2: Core types + serialization", () => {
     // inline single-line array (exactly what an $EDITOR session commonly
     // produces), then `slop update --label -y` (or similar) removes the
     // last label. Without the safety net this reproduces the documented
-    // jsonc-parser@3.3.1 data-corruption bug (spikes/jsonc.md).
+    // jsonc-parser@3.3.1 data-corruption bug (docs/spikes/jsonc.md).
     it("does not corrupt the file: writeUpdate falls back to canonical and the result is correct", () => {
       const id = newTicketId();
       const before = ticketSchema.parse({

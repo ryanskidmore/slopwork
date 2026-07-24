@@ -1,0 +1,17 @@
+{
+  "id": "event_01KYANWAHYFG06ZZ70C23WSYVH",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  },
+  "payload": {
+    "progress": "Core repo/tickets read: lock+atomic+index+cascade+state all solid. Moving to hands-on CLI edge-case testing."
+  },
+  "at": "2026-07-24T18:23:24.222Z"
+}

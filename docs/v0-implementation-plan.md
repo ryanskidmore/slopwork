@@ -1,5 +1,10 @@
 # Slopwork v0 — Implementation Plan
 
+> **Historical document.** The implementation plan v0 was actually built from, preserved as
+> written. Its work-item ids (A1…E4) are load-bearing: each `tests/acceptance/<ID>.test.ts` file
+> is named after one and quotes its acceptance criterion verbatim. The companion spec is
+> [`design.md`](design.md); the maintained user docs start at [`README.md`](README.md).
+
 **July 17, 2026 · companion to Spec v0.6 · target: ~2.5 weeks with you + 2 agents**
 
 > **Next action:** run the three spikes (S1–S3, §2) — ~half a day total, they de-risk everything downstream. Then A1.

@@ -1,0 +1,45 @@
+{
+  "id": "ticket_01KYAPMH3580PYJ6C06NEQXT3Q",
+  "name": "raw ZodErrors escape as exit-1 JSON dumps (new with empty name, plan with empty step)",
+  "slug": "raw-zoderrors-escape-as-exit",
+  "spec": {
+    "summary": "raw ZodErrors escape as exit-1 JSON dumps (new with empty name, plan with empty step)",
+    "details_md": "slop new \"\" dumps a raw zod issues array naming internal field summary and exits 1; slop plan <ref> \"\" same class (plan.ts:89 uses .parse). Both are usage mistakes: should be USAGE_ERROR(2) with a clean human message naming the user-facing argument.",
+    "acceptance": [
+      "empty/whitespace name and plan step produce clean exit-2 errors",
+      "no raw zod JSON reaches stderr for user input mistakes"
+    ],
+    "context": [
+      "src/tickets/spec.ts:82",
+      "src/sessions/plan.ts:89"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "area:cli"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPMH3580PYJ6C06NEQXT3Q",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:36:37.351Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:36:37.351Z",
+  "updated_at": "2026-07-24T18:36:37.351Z"
+}

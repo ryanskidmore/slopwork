@@ -104,7 +104,7 @@ export async function loadConfig(paths: RepoPaths): Promise<Config> {
  * general harness-kind detector.
  *
  * **Formalised by C1** (this was a provisional standalone heuristic before
- * C1 landed real `HarnessKind` sniffing, spikes/findings.md §1-§2): now a
+ * C1 landed real `HarnessKind` sniffing, docs/spikes/findings.md §1-§2): now a
  * thin wrapper over `src/sessions/harness.ts`'s {@link sniffHarnessKind},
  * the single canonical sniff C1/C4 both build on, rather than a second,
  * independently-maintained copy of the same three env checks. Behavior for

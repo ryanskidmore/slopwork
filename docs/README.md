@@ -14,9 +14,8 @@ across parallel agent branches, plus a read-only local web explorer
 This is the **user + operator documentation** — how to install it, how the
 model works, every command and flag, the workflow agents follow, the web UI,
 configuration, and the concurrency story. For the original design rationale
-and the decisions behind it, see [`design.md`](../design.md) and
-[`DECISIONS.md`](../DECISIONS.md) in the repo root; this doc set distills
-those into what you need to actually use the tool.
+and the decisions behind it, see the history section below; this doc set
+distills those into what you need to actually use the tool.
 
 ## Who this is for
 
@@ -38,6 +37,19 @@ those into what you need to actually use the tool.
 | [Web UI](web-ui.md) | What `slop web` shows — list, tree, ticket detail, transcripts, review/stale panels |
 | [Configuration](configuration.md) | `.slop/config.yaml`, actor/harness identity resolution, environment variables |
 | [Concurrency & merging](concurrency-and-merging.md) | Why `.slop/db/` merges cleanly, the multi-file lock, and lock-free progress updates |
+
+## History & internals
+
+How v0 came to be, preserved as written — read these for the *why* behind a
+design choice, the docs above for how to use the tool:
+
+| Doc | Covers |
+|---|---|
+| [Design spec](design.md) | The internal spec v0 was built from (v0.6): decisions D1–D17, the state model, the flatfile db, the feature menu |
+| [Engineering decisions](DECISIONS.md) | Append-only decision log written during the build; cited from code comments by work-item id |
+| [v0 implementation plan](v0-implementation-plan.md) | The plan v0 was built from; its work-item ids (A1…E4) name the acceptance tests |
+| [Spike findings](spikes/findings.md) | Day-0 research: harness env vars and transcript locations per harness |
+| [JSONC spike](spikes/jsonc.md) | The serialization spike behind the comment-preserving JSONC write path |
 
 ## The one-paragraph version
 

@@ -1,0 +1,40 @@
+{
+  "id": "session_01KYAPPBZVJP508M6A9SKEP9QV",
+  "ticket": "ticket_01KYAPD6C80B7C7VGTWS1KCMYN",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "main",
+    "commit_at_start": "96e356fb16c7f4f54dc7779233f0ee91b82df81f"
+  },
+  "started_at": "2026-07-24T18:37:37.659Z",
+  "ended_at": "2026-07-24T19:00:28.612Z",
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "git mv design/DECISIONS/v0-plan/spikes into docs/ with reframing prefaces",
+          "checked": true
+        },
+        {
+          "text": "Update README, docs/README index, and path-qualified citations (spikes/)",
+          "checked": true
+        },
+        {
+          "text": "Verify: tests, lint, typecheck, format check",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T18:37:37.885Z"
+    }
+  ],
+  "end_summary": "Human approved. Internal docs moved to docs/ with prefaces, references updated, full verification suite green.",
+  "transcript_ref": "transcripts/session_01KYAPPBZVJP508M6A9SKEP9QV.jsonl"
+}

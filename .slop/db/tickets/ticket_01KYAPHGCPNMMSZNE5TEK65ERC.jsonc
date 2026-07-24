@@ -1,0 +1,43 @@
+{
+  "id": "ticket_01KYAPHGCPNMMSZNE5TEK65ERC",
+  "name": "transcript: claude-code newest-mtime fallback lacks the started_at/ambiguity guard codex got",
+  "slug": "transcript-claude-code-newest-mtime",
+  "spec": {
+    "summary": "transcript: claude-code newest-mtime fallback lacks the started_at/ambiguity guard codex got",
+    "details_md": "locateClaudeCode (src/sessions/transcript.ts:415-419) falls back to newestJsonlIn(projectDir) when harness session_id is null, with no started_at filter and no multi-candidate refusal — two concurrent agents in one repo can capture each other's transcript. Apply the same Fix-3 guards codex received.",
+    "acceptance": [
+      "fallback refuses ambiguous/predating candidates like locateCodex"
+    ],
+    "context": [
+      "src/sessions/transcript.ts:415"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "area:sessions"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPHGCPNMMSZNE5TEK65ERC",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:34:58.328Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:34:58.328Z",
+  "updated_at": "2026-07-24T18:34:58.328Z"
+}

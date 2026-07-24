@@ -1,0 +1,43 @@
+{
+  "id": "ticket_01KYAPHG0TRPBRWF7BGC0HS1VX",
+  "name": "web: corrupt or missing config.yaml 500s every page",
+  "slug": "web-corrupt-or-missing-config",
+  "spec": {
+    "summary": "web: corrupt or missing config.yaml 500s every page",
+    "details_md": "getConfig (src/web/fixture-data-source.ts:192-202) throws on YAML/schema error or ENOENT and every view calls it, so one bad merge of config.yaml takes the whole web UI down with an opaque 500. DB file listing is already fault-tolerant; config should degrade the same way (fall back to defaults + warning banner).",
+    "acceptance": [
+      "web UI renders with defaults + visible warning when config.yaml is missing/corrupt"
+    ],
+    "context": [
+      "src/web/fixture-data-source.ts:192"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "area:web"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPHG0TRPBRWF7BGC0HS1VX",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:34:57.948Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:34:57.948Z",
+  "updated_at": "2026-07-24T18:34:57.948Z"
+}

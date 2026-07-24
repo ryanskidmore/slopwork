@@ -1,0 +1,45 @@
+{
+  "id": "ticket_01KYAPN8X68TEEA4NHXZ1PZD52",
+  "name": "web: HEAD returns 404 despite Allow: GET, HEAD; config 500 page + stale panel polish",
+  "slug": "web-head-returns-404-despite",
+  "spec": {
+    "summary": "web: HEAD returns 404 despite Allow: GET, HEAD; config 500 page + stale panel polish",
+    "details_md": "(1) Routes register GET only; Bun does not auto-map HEAD, so HEAD /tickets is 404 while the 405 fallback and docs advertise HEAD — health checks report the UI dead (server.ts:96). (2) Stale panel sorts and labels review tickets by last_activity_at instead of review.requested_at (stale.ts:37,45) — under-reports how long an MR has waited.",
+    "acceptance": [
+      "HEAD works or is dropped from Allow+docs",
+      "stale panel uses requested_at for review rows"
+    ],
+    "context": [
+      "src/web/server.ts:96",
+      "src/web/views/stale.ts:37"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 3,
+  "labels": [
+    "area:web"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPN8X68TEEA4NHXZ1PZD52",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:37:01.737Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:37:01.737Z",
+  "updated_at": "2026-07-24T18:37:01.737Z"
+}

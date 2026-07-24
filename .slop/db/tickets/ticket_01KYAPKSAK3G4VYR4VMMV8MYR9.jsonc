@@ -1,0 +1,44 @@
+{
+  "id": "ticket_01KYAPKSAK3G4VYR4VMMV8MYR9",
+  "name": "web: transcript pager Newer/Older labels are inverted (and out-of-range offset renders nonsense)",
+  "slug": "web-transcript-pager-newer-older",
+  "spec": {
+    "summary": "web: transcript pager Newer/Older labels are inverted (and out-of-range offset renders nonsense)",
+    "details_md": "transcript-view.ts:154-159: records render oldest-first, offset+limit moves toward NEWER records, but the forward link is labeled Older and backward Newer — navigation is backwards on the core transcript feature. Also ?offset past the end renders records 100001-100000 with Newer still enabled.",
+    "acceptance": [
+      "pager labels match actual chronology",
+      "out-of-range offset clamps"
+    ],
+    "context": [
+      "src/web/views/transcript-view.ts:154"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "area:web"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPKSAK3G4VYR4VMMV8MYR9",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:36:13.014Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:36:13.014Z",
+  "updated_at": "2026-07-24T18:36:13.014Z"
+}

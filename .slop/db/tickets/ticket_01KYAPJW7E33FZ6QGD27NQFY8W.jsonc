@@ -1,0 +1,45 @@
+{
+  "id": "ticket_01KYAPJW7E33FZ6QGD27NQFY8W",
+  "name": "new/update: structured spec fields need first-class flags (--acceptance/--context/--summary/--details)",
+  "slug": "new-update-structured-spec-fields",
+  "spec": {
+    "summary": "new/update: structured spec fields need first-class flags (--acceptance/--context/--summary/--details)",
+    "details_md": "Only --spec <json> exists; onboarding house rules mandate structured acceptance[]/context[], so every agent hand-serializes JSON in shell (quoting hazards + the silent details_md fallback). collect() machinery for repeatable flags already exists (shared.ts:11).",
+    "acceptance": [
+      "slop new/update accept repeatable --acceptance and --context plus --summary/--details",
+      "onboarding/docs updated to prefer the flags"
+    ],
+    "context": [
+      "src/cli/commands/new.ts:124",
+      "src/cli/commands/shared.ts:11"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "area:cli"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPJW7E33FZ6QGD27NQFY8W",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:35:43.219Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:35:43.219Z",
+  "updated_at": "2026-07-24T18:35:43.219Z"
+}

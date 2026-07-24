@@ -1,0 +1,46 @@
+{
+  "id": "ticket_01KYAPMH96595NEJNKPSZH6XT5",
+  "name": "budget flags: units and validation are inconsistent across commands",
+  "slug": "budget-flags-units-and-validation",
+  "spec": {
+    "summary": "budget flags: units and validation are inconsistent across commands",
+    "details_md": "show --context --budget N means N*4 chars while context --budget N means N chars; context rejects negatives (exit 2) but ready/status/search/events accept them and return everything-elided (agents may misread empty ready as nothing ready). Also show --context appends a ~33-char note after slicing so tiny budgets overshoot.",
+    "acceptance": [
+      "one documented unit everywhere",
+      "negative budgets rejected consistently"
+    ],
+    "context": [
+      "src/tickets/context.ts:31",
+      "src/sessions/context-budget.ts:64",
+      "src/cli/commands/shared.ts:45"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 3,
+  "labels": [
+    "area:cli"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPMH96595NEJNKPSZH6XT5",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:36:37.544Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:36:37.544Z",
+  "updated_at": "2026-07-24T18:36:37.544Z"
+}

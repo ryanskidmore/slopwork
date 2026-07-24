@@ -1,5 +1,10 @@
 # Slopwork — Engineering Decisions
 
+> **Engineering decision log.** Append-only record of decisions made while building v0, preserved
+> as written. Code comments throughout `src/` cite entries here by work-item id (e.g.
+> "DECISIONS.md's C3 entry"). For how the shipped tool behaves, see the user docs in this
+> directory, starting with [`README.md`](README.md).
+
 Short-form log of implementation decisions made while executing
 `v0-implementation-plan.md` that aren't already captured by one of
 `design.md`'s D-numbered decisions, or that sharpen one of them for

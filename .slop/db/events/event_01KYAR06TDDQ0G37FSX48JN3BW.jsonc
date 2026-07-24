@@ -1,0 +1,19 @@
+{
+  "id": "event_01KYAR06TDDQ0G37FSX48JN3BW",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": "session_01KYAPPBZVJP508M6A9SKEP9QV",
+  "verb": "session.ended",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KYAPPBZVJP508M6A9SKEP9QV"
+  },
+  "payload": {
+    "reason": "done",
+    "note": "Human approved. Internal docs moved to docs/ with prefaces, references updated, full verification suite green.",
+    "transcript_ref": "transcripts/session_01KYAPPBZVJP508M6A9SKEP9QV.jsonl"
+  },
+  "at": "2026-07-24T19:00:28.621Z"
+}

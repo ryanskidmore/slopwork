@@ -1,7 +1,7 @@
 /**
  * Claude Code setup detection for `slop init` (work item D1: install
  * `.claude/skills/slopwork/SKILL.md` "when a Claude Code setup is
- * detected"). Detection signals per spikes/findings.md §1.1 (S1, verified
+ * detected"). Detection signals per docs/spikes/findings.md §1.1 (S1, verified
  * directly against a live Claude Code session on this machine, and
  * cross-checked against Anthropic's own docs): `CLAUDECODE=1` is the
  * documented, positive-ID environment variable Claude Code sets for every

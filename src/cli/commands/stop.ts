@@ -91,7 +91,7 @@ export async function runStop(ref: string, opts: StopCommandOptions): Promise<vo
     // why that would be concurrency-unsound) and fold the result into the
     // SAME session write as ended_at/end_summary. `captureTranscript`
     // itself never throws (structural never-block guarantee, design.md
-    // §4.3 / spikes/findings.md §6) — a missing/unfindable transcript
+    // §4.3 / docs/spikes/findings.md §6) — a missing/unfindable transcript
     // degrades to `transcript_ref: null` + a warning printed below, and
     // this `stop` still succeeds. Reuses `speculativeCapture` (captured
     // OUTSIDE this lock, above) when it's still keyed to this exact

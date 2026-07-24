@@ -1,0 +1,43 @@
+{
+  "id": "ticket_01KYAPN9978T914TSPK5JR5XZC",
+  "name": "edges: self relates-to is accepted (ticket can relate to itself)",
+  "slug": "edges-self-relates-to-is",
+  "spec": {
+    "summary": "edges: self relates-to is accepted (ticket can relate to itself)",
+    "details_md": "Reproduced: slop update X --relates-to +X succeeds. Self-blocks is rejected by the cycle check but relates-to (symmetric, uncycled) has no self-edge rule (edges.ts:315 treats self as existing). Reject self-edges for all kinds.",
+    "acceptance": [
+      "self relates-to rejected with a clear error"
+    ],
+    "context": [
+      "src/tickets/edges.ts:315"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 3,
+  "labels": [
+    "area:core"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPN9978T914TSPK5JR5XZC",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:37:02.121Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:37:02.121Z",
+  "updated_at": "2026-07-24T18:37:02.121Z"
+}

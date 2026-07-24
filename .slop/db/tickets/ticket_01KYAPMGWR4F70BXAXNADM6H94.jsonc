@@ -1,0 +1,45 @@
+{
+  "id": "ticket_01KYAPMGWR4F70BXAXNADM6H94",
+  "name": "label grammar inconsistent: new --label accepts sigil junk that update's ± syntax then mismatches",
+  "slug": "label-grammar-inconsistent-new-label",
+  "spec": {
+    "summary": "label grammar inconsistent: new --label accepts sigil junk that update's ± syntax then mismatches",
+    "details_md": "update --label requires ±label but new --label takes raw text: slop new x --label +bug stores literal +bug (exit 0, no warning); a later update --label -bug removes the wrong thing. new should reject/warn on leading + or -.",
+    "acceptance": [
+      "new --label +x errors or warns",
+      "shared label validation between new and update"
+    ],
+    "context": [
+      "src/cli/commands/new.ts:139",
+      "src/tickets/update.ts:73"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "area:cli"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPMGWR4F70BXAXNADM6H94",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:36:37.146Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:36:37.146Z",
+  "updated_at": "2026-07-24T18:36:37.146Z"
+}

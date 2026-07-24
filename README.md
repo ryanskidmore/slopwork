@@ -5,14 +5,15 @@ into a dependency graph of tickets; coding agents pick tickets up, plan their ap
 through a session, and leave an auditable trail — progress notes, plan checkpoints, an MR, and a
 transcript — ending in `done`. v0 is a local CLI backed by a flatfile JSONC database
 (`.slop/db/`) designed to be git-mergeable across parallel agent streams, plus a read-only local
-web explorer (`slop web`). See `design.md` for the full spec and `v0-implementation-plan.md` for
-how it was built.
+web explorer (`slop web`). See [`docs/design.md`](docs/design.md) for the full spec and
+[`docs/v0-implementation-plan.md`](docs/v0-implementation-plan.md) for how it was built.
 
 This repo is itself the implementation, and v0 ships complete: all 22 commands are implemented
 and covered by acceptance tests — setup (`init`, `instructions`, `reindex`), ticket shaping
 (`new`, `split`, `draft`, `undraft`, `edit`, `update`), the agent loop (`ready`, `start`,
 `context`, `plan`, `review`, `stop`, `done`, `drop`), and inspection (`status`, `show`, `search`,
-`events`, `web`). See `v0-implementation-plan.md` §3 for the work-item breakdown behind each one.
+`events`, `web`). See [`docs/v0-implementation-plan.md`](docs/v0-implementation-plan.md) §3 for
+the work-item breakdown behind each one.
 
 ## Installation
 
@@ -56,8 +57,9 @@ against the shipped CLI:
 - [`docs/concurrency-and-merging.md`](docs/concurrency-and-merging.md) — the git-merge story, the
   db lock, and lock-free progress updates
 
-`design.md` and `DECISIONS.md` remain the internal spec and decision log this doc set distills
-from — read those for the *why* behind a design choice, `docs/` for how to actually use the tool.
+The same directory's [History & internals](docs/README.md#history--internals) section holds the
+original spec, decision log, and implementation plan this doc set distills from — read those for
+the *why* behind a design choice, the docs above for how to actually use the tool.
 
 ## Development
 
@@ -142,7 +144,7 @@ and `--version`).
 
 - **Unit tests live beside the code as `*.test.ts`** (e.g. `src/core/exit-codes.test.ts`).
 - **Acceptance tests live in `tests/acceptance/<ITEM-ID>.test.ts`** — one file per
-  `v0-implementation-plan.md` §3 work item (e.g. `A1.test.ts`, `A3.test.ts`, `B4.test.ts`). Each
+  `docs/v0-implementation-plan.md` §3 work item (e.g. `A1.test.ts`, `A3.test.ts`, `B4.test.ts`). Each
   file's top-level `describe` is named `<ITEM-ID>: <item title>`, and a comment quotes that item's
   acceptance criterion verbatim from the plan. This convention is load-bearing — project
   verification greps for exactly one acceptance file per work item — so every new work item must

@@ -7,7 +7,7 @@
  *
  * Two halves:
  *
- *   - {@link locateTranscript} — spikes/findings.md §5's locator function
+ *   - {@link locateTranscript} — docs/spikes/findings.md §5's locator function
  *     spec, implemented close to verbatim: given a harness + cwd (+ an
  *     optional explicit `--transcript` path), returns an absolute path to
  *     a transcript file readable right now, or `null`. Synchronous,
@@ -510,7 +510,7 @@ function locateCodex(
 // ---------------------------------------------------------------------------
 
 /**
- * spikes/findings.md §5's locator, implemented. Returns an absolute path
+ * docs/spikes/findings.md §5's locator, implemented. Returns an absolute path
  * to a transcript readable NOW, or `null` if nothing could be found.
  * MUST NOT throw under any condition — every branch below is backed by
  * the defensive helpers above.

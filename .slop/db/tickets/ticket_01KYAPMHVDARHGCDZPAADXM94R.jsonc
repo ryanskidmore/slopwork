@@ -1,0 +1,45 @@
+{
+  "id": "ticket_01KYAPMHVDARHGCDZPAADXM94R",
+  "name": "docs: exit 3 documented as live but unreachable; --owner help claims unenforced D1 requirement",
+  "slug": "docs-exit-3-documented-as",
+  "spec": {
+    "summary": "docs: exit 3 documented as live but unreachable; --owner help claims unenforced D1 requirement",
+    "details_md": "No throw site for NOT_IMPLEMENTED(3) exists — mark it reserved in README/cli-reference. new --owner help says roots require a human owner (D1) but nothing enforces it (F4 is future work) — drop the claim from help text.",
+    "acceptance": [
+      "README/cli-reference mark 3 reserved",
+      "--owner help matches behavior"
+    ],
+    "context": [
+      "src/core/exit-codes.ts:25",
+      "src/cli/commands/new.ts:142"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 3,
+  "labels": [
+    "area:docs"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPMHVDARHGCDZPAADXM94R",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:36:38.127Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:36:38.127Z",
+  "updated_at": "2026-07-24T18:36:38.127Z"
+}

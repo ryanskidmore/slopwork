@@ -1,0 +1,44 @@
+{
+  "id": "ticket_01KYAPMHNGJQH29YK7ZDFVVAJC",
+  "name": "nags print before validation (review/stop) asserting state changes that never happen",
+  "slug": "nags-print-before-validation-review",
+  "spec": {
+    "summary": "nags print before validation (review/stop) asserting state changes that never happen",
+    "details_md": "slop review no-such-ticket prints the entering-review-without-MR warning then error: not found (exit 4); stop nags about missing --note before assertStoppable rejects. Move nags after validation/commit (done.ts already does this correctly).",
+    "acceptance": [
+      "no nag is printed when the command then fails"
+    ],
+    "context": [
+      "src/cli/commands/review.ts:114",
+      "src/cli/commands/stop.ts:50"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 3,
+  "labels": [
+    "area:cli"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPMHNGJQH29YK7ZDFVVAJC",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:36:37.938Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:36:37.938Z",
+  "updated_at": "2026-07-24T18:36:37.938Z"
+}

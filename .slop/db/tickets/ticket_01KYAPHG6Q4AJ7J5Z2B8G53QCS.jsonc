@@ -1,0 +1,44 @@
+{
+  "id": "ticket_01KYAPHG6Q4AJ7J5Z2B8G53QCS",
+  "name": "transcript: codex locator attaches a previous session rollout when zero candidates postdate started_at",
+  "slug": "transcript-codex-locator-attaches-a",
+  "spec": {
+    "summary": "transcript: codex locator attaches a previous session rollout when zero candidates postdate started_at",
+    "details_md": "locateCodex (src/sessions/transcript.ts:472-506) tracks best-by-mtime across all cwd-matching rollouts; the Fix-3 refusal only fires when >1 candidate is newer than started_at. When ZERO are newer, every candidate predates the session, yet the newest is still attached — silently wrong audit data. Should return null + warning.",
+    "acceptance": [
+      "zero-newer case returns null with a warning",
+      "unit test covering it"
+    ],
+    "context": [
+      "src/sessions/transcript.ts:472"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "area:sessions"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPHG6Q4AJ7J5Z2B8G53QCS",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:34:58.137Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:34:58.137Z",
+  "updated_at": "2026-07-24T18:34:58.137Z"
+}

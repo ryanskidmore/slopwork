@@ -1,0 +1,45 @@
+{
+  "id": "ticket_01KYAPKS46GG5F5Y5R214XVB7W",
+  "name": "duration: huge stale_after overflows Date and crashes every index build",
+  "slug": "duration-huge-stale-after-overflows",
+  "spec": {
+    "summary": "duration: huge stale_after overflows Date and crashes every index build",
+    "details_md": "parseDurationMs has no magnitude bound; stale_after: 99999999999d passes config schema, then computeStalenessDeadlines toISOString throws RangeError inside buildIndex, breaking status/ready/reindex repo-wide. Users plausibly set huge values to disable staleness. Clamp or treat overflow as no-deadline.",
+    "acceptance": [
+      "absurd durations clamp to null deadline (staleness disabled) with a warning",
+      "regression test"
+    ],
+    "context": [
+      "src/core/duration.ts:25",
+      "src/tickets/staleness.ts:88"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "area:core"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPKS46GG5F5Y5R214XVB7W",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:36:12.808Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:36:12.808Z",
+  "updated_at": "2026-07-24T18:36:12.808Z"
+}

@@ -3,7 +3,7 @@
  *
  * D10: ticket specs carry `details_md` — "markdown inside" — and the
  * transcript viewer renders `text`/`thinking` blocks as prose
- * (spikes/findings.md §4). Both need markdown rendering, and the build
+ * (docs/spikes/findings.md §4). Both need markdown rendering, and the build
  * must stay fully offline with no CDN assets (D5 architecture
  * requirements).
  *

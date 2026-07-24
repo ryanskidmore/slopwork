@@ -1,5 +1,5 @@
 /**
- * JSONC read/write, per the S3 spike (spikes/jsonc.md). Read the spike
+ * JSONC read/write, per the S3 spike (docs/spikes/jsonc.md). Read the spike
  * before touching this file — it is not advisory, it is the spec for this
  * module, including a documented data-corruption bug in
  * `jsonc-parser@3.3.1` that `writeUpdate`'s safety net exists to catch.
@@ -18,7 +18,7 @@ import type { JSONPath } from "jsonc-parser";
 /**
  * The one shared `FormattingOptions` object every writer in this codebase
  * must use. Idempotency across repeated `modify()` cycles was only
- * verified (spikes/jsonc.md, "Formatting stability") when every writer
+ * verified (docs/spikes/jsonc.md, "Formatting stability") when every writer
  * uses these exact options consistently — importing this constant instead
  * of constructing a fresh options object anywhere is load-bearing, not
  * style.
@@ -45,7 +45,7 @@ export interface ParseJsoncResult<T> {
  * best-effort value; the only signal of trouble is `errors`. Callers MUST
  * check `errors` themselves; an empty-but-wrong-shaped `value` is
  * possible (e.g. duplicate keys silently keep the last occurrence — see
- * spikes/jsonc.md "Known limitations" item 3).
+ * docs/spikes/jsonc.md "Known limitations" item 3).
  */
 export function parseJsonc<T = unknown>(text: string): ParseJsoncResult<T> {
   const errors: jsonc.ParseError[] = [];
@@ -150,7 +150,7 @@ function deletesLastArrayElement(root: jsonc.Node | undefined, entry: JsoncPatch
  * is supposed to produce — used purely as a validation oracle, never
  * trusted blindly.
  *
- * Safety net (spikes/jsonc.md "Recommended API" — this is the point of
+ * Safety net (docs/spikes/jsonc.md "Recommended API" — this is the point of
  * the function, not an afterthought):
  *   1. If any single patch entry deletes the LAST element of an array
  *      (checked against the pre-patch document), skip `modify()`
@@ -169,10 +169,10 @@ function deletesLastArrayElement(root: jsonc.Node | undefined, entry: JsoncPatch
  *      structural mismatch — falls back to `writeCanonical(expectedAfter)`.
  *
  * Because of this, `parseJsonc(writeUpdate(...)).value` deep-equals
- * `expectedAfter` unconditionally, by construction — see spikes/jsonc.md,
+ * `expectedAfter` unconditionally, by construction — see docs/spikes/jsonc.md,
  * "What the round-trip property test can honestly assert". Comment
  * survival does not: it is best-effort, and lost outright for whichever
- * single write trips the step-3 fallback (spikes/jsonc.md documents
+ * single write trips the step-3 fallback (docs/spikes/jsonc.md documents
  * exactly which cases are lossy: deleting a key/element with an attached
  * comment, and any write that fails validation).
  */
