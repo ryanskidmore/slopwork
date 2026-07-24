@@ -175,3 +175,119 @@ describe("done — Fix 2 (ticket_01KY9NVM1YRM1F7NX1QS5JJAW1): a recapture that f
     expect(ticketAfterDone.state).toBe("done");
   });
 });
+
+// ---------------------------------------------------------------------------
+// ticket_01KY9RWFDR9QEWQ5B1ZACQJ338: review made optional — `done` now
+// accepts `in_progress -> done` directly (D15 revised), nagging on stderr
+// for non-`adhoc` tickets that skip review, silently for `adhoc` ones, and
+// never for the unchanged `review -> done` path. Same real-spawned-process
+// style as the fixture above (`runSlop` against SOURCE, from a fresh
+// `slop init` repo) rather than unit-testing `checkDoneEntry` in isolation
+// again — that's already covered by state.test.ts; this exercises the CLI
+// layer's nag decision plus the finalize/cascade machinery end to end.
+// ---------------------------------------------------------------------------
+
+function createTicket(
+  root: string,
+  name: string,
+  extraArgs: string[] = [],
+): { id: TicketId; slug: string } {
+  const result = runSlop(["new", name, ...extraArgs], root);
+  expect(result.status, result.stderr).toBe(0);
+  const m = CREATED_LINE.exec(result.stdout);
+  if (!m?.[1] || !m[2]) {
+    throw new Error(
+      `could not parse "created <id> (slug: <slug>)" out of stdout:\n${result.stdout}`,
+    );
+  }
+  return { id: m[1] as TicketId, slug: m[2] };
+}
+
+describe("done — review made optional (ticket_01KY9RWFDR9QEWQ5B1ZACQJ338)", () => {
+  it("adhoc ticket: start then done directly completes silently — no nag on stderr", async () => {
+    const { root, paths } = await makeFixtureRepo();
+    const { id, slug } = createTicket(root, "Adhoc direct-done ticket", ["--adhoc"]);
+
+    const started = runSlop(["start", slug], root);
+    expect(started.status, started.stderr).toBe(0);
+    const ticketAfterStart = await readTicket(paths, id);
+    expect(ticketAfterStart.adhoc).toBe(true);
+    const sessionId = ticketAfterStart.active_session;
+    if (sessionId === null) throw new Error("expected an active session after start");
+
+    const done = runSlop(["done", slug, "--note", "adhoc, shipped directly"], root);
+    expect(done.status, done.stderr).toBe(0);
+    expect(done.stderr).not.toMatch(/review\/MR/i);
+
+    const ticketAfterDone = await readTicket(paths, id);
+    expect(ticketAfterDone.state).toBe("done");
+    expect(ticketAfterDone.active_session).toBeNull();
+
+    const sessionAfterDone = await readSession(paths, sessionId);
+    expect(sessionAfterDone.ended_at).not.toBeNull();
+    expect(sessionAfterDone.end_summary).toBe("adhoc, shipped directly");
+  });
+
+  it(
+    "non-adhoc ticket: start then done directly completes WITH a nag on stderr; ticket ends done, " +
+      "session finalizes, and the done-cascade still unblocks a dependent",
+    async () => {
+      const { root, paths } = await makeFixtureRepo();
+      const dependent = createTicket(root, "Dependent on a direct-done ticket");
+      const { id, slug } = createTicket(root, "Non-adhoc direct-done ticket", [
+        "--blocks",
+        dependent.slug,
+      ]);
+
+      const started = runSlop(["start", slug], root);
+      expect(started.status, started.stderr).toBe(0);
+      const ticketAfterStart = await readTicket(paths, id);
+      expect(ticketAfterStart.adhoc).toBe(false);
+      const sessionId = ticketAfterStart.active_session;
+      if (sessionId === null) throw new Error("expected an active session after start");
+
+      const done = runSlop(["done", slug, "--note", "shipped without going through review"], root);
+      expect(done.status, done.stderr).toBe(0);
+      expect(done.stderr).toMatch(/done without a review\/MR/i);
+      expect(done.stderr).toMatch(/slop review --mr/);
+
+      const ticketAfterDone = await readTicket(paths, id);
+      expect(ticketAfterDone.state).toBe("done");
+      expect(ticketAfterDone.active_session).toBeNull();
+
+      const sessionAfterDone = await readSession(paths, sessionId);
+      expect(sessionAfterDone.ended_at).not.toBeNull();
+      expect(sessionAfterDone.end_summary).toBe("shipped without going through review");
+
+      // B4's done-cascade still fires on the direct in_progress -> done path.
+      expect(done.stdout).toContain(dependent.id);
+      const dependentAfter = await readTicket(paths, dependent.id);
+      expect(dependentAfter.state).toBe("open");
+      const readyAfter = runSlop(["ready", "--json"], root);
+      expect(readyAfter.status, readyAfter.stderr).toBe(0);
+      expect(JSON.parse(readyAfter.stdout).ready.map((r: { id: string }) => r.id)).toContain(
+        dependent.id,
+      );
+    },
+  );
+
+  it("review -> done (unchanged path): completes with no nag, regardless of the review-skipping wording", async () => {
+    const { root, paths } = await makeFixtureRepo();
+    const { id, slug } = createTicket(root, "Review-then-done ticket");
+
+    const started = runSlop(["start", slug], root);
+    expect(started.status, started.stderr).toBe(0);
+
+    const reviewed = runSlop(["review", slug, "--mr", "https://example.com/org/repo/pull/7"], root);
+    expect(reviewed.status, reviewed.stderr).toBe(0);
+    const ticketAfterReview = await readTicket(paths, id);
+    expect(ticketAfterReview.state).toBe("review");
+
+    const done = runSlop(["done", slug, "--note", "shipped via review"], root);
+    expect(done.status, done.stderr).toBe(0);
+    expect(done.stderr).not.toMatch(/review\/MR/i);
+
+    const ticketAfterDone = await readTicket(paths, id);
+    expect(ticketAfterDone.state).toBe("done");
+  });
+});

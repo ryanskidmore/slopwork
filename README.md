@@ -72,19 +72,22 @@ check → typecheck → test → build → smoke-test the compiled binary.
 
 ## Lifecycle: `review` → `done` (C3)
 
-Stored ticket states: `draft ⇄ open → in_progress → review → done`, plus `dropped` (wontdo) from
-any non-terminal state (design.md §2). The three closing commands:
+Stored ticket states: `draft ⇄ open → in_progress → review → done`, plus a direct
+`in_progress → done` edge (review is an **optional** checkpoint, not a required one) and `dropped`
+(wontdo) from any non-terminal state (design.md §2). The three closing commands:
 
 - **`slop review <ref> --mr <url>`** — `in_progress → review` only. `--mr` is
   required-*with-warning* (D15/§8.1 item 3): omit it and the command still succeeds, but nags on
   stderr; `ticket.review.mr` is left absent, not `null`. The session stays **active** across a
   review round-trip — `review` only captures a fresh transcript snapshot into it, never sets
   `ended_at`. See `DECISIONS.md`'s C3 entries for the full session-model writeup.
-- **`slop done <ref> [--note]`** — `review → done` **only**; there is no direct
-  `in_progress → done` shortcut (§2's diagram draws none, and §5's house rule says "open an MR and
-  call review before claiming done"). Finalizes the session (end summary from `--note`, transcript
-  captured per D16, `active_session` cleared) and runs B4's done-cascade exactly once, emitting
-  `ticket.ready` for any dependent this ticket was blocking.
+- **`slop done <ref> [--note]`** — `review → done` **or** directly `in_progress → done`; review is
+  optional, not required. Completing a non-`adhoc` ticket directly from `in_progress` (i.e. it
+  never went through `review`) still succeeds, but nags on stderr suggesting `slop review --mr
+  <url>` next time; `adhoc` tickets (D13) and the `review → done` path never nag. Either way,
+  `done` finalizes the session (end summary from `--note`, transcript captured per D16,
+  `active_session` cleared) and runs B4's done-cascade exactly once, emitting `ticket.ready` for
+  any dependent this ticket was blocking.
 - **`slop drop <ref> --reason "…"`** — `→ dropped` from any non-terminal state; `--reason` is
   required. Finalizes the session if one is active (a `dropped` ticket also stops blocking its
   dependents — same cascade as `done`, called exactly once).

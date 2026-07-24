@@ -111,10 +111,14 @@ function newTicket(
 // ---------------------------------------------------------------------------
 
 /**
- * Independent oracle: §2's state diagram, plus this work item's two
- * documented resolved-ambiguity decisions (DECISIONS.md's C3 entry) —
- * `done` requires `review` first (no direct `in_progress -> done` edge in
- * §2's diagram), and `stop`/`review`/`done`/`drop` don't get a same-state
+ * Independent oracle: §2's state diagram, plus this work item's documented
+ * resolved-ambiguity decisions (DECISIONS.md's C3 entry) — `done` is
+ * reachable from EITHER `review` OR directly from `in_progress` (review is
+ * OPTIONAL, not required; §2's diagram draws both edges into `done`; a
+ * non-`adhoc` ticket completing directly from `in_progress` gets a soft
+ * nag on stderr but the transition still succeeds — see
+ * ticket_01KY9RWFDR9QEWQ5B1ZACQJ338 / `src/tickets/state.ts`'s "review made
+ * optional"), and `stop`/`review`/`done`/`drop` don't get a same-state
  * shortcut the way `draft`/`undraft` do (re-running a side-effecting
  * action on a ticket already at its target state is a usage mistake, not
  * an idempotent no-op). Hand-written FRESH here — deliberately NOT
@@ -186,10 +190,12 @@ const ORACLE: Record<Exclude<Op, "update">, Partial<Record<TicketState, TicketSt
   start: { open: "in_progress", review: "in_progress" },
   stop: { in_progress: "open" },
   review: { in_progress: "review" },
-  // C3's resolved decision: done is reachable ONLY via review (§2's
-  // diagram draws no in_progress -> done edge; design.md §5's house rule
-  // "open an MR and call review before claiming done").
-  done: { review: "done" },
+  // C3's revised decision: review is OPTIONAL — done is reachable via
+  // review OR directly from in_progress (§2's diagram draws both edges
+  // into done). A non-adhoc ticket completing directly from in_progress
+  // gets a soft nag on stderr (checked by dedicated tests below, not this
+  // property test), but the transition itself is legal either way.
+  done: { review: "done", in_progress: "done" },
   // "dropped (wontdo) from anywhere" (§2) — anywhere non-terminal.
   drop: {
     draft: "dropped",
@@ -537,14 +543,40 @@ describe("C3: Lifecycle", () => {
       },
     );
 
-    it("done directly from in_progress (skipping review) is rejected, exit 6", async () => {
-      const { root } = await makeFixtureRepo();
-      const ticket = newTicket(root, "Skip-review ticket");
-      expect(runSlop(["start", ticket.slug], root).status).toBe(0);
-      const result = runSlop(["done", ticket.slug], root);
-      expect(result.status).toBe(6);
-      expect(result.stderr).toMatch(/reachable only from "review"/);
-    });
+    it(
+      "done directly from in_progress (skipping review) succeeds (review is optional, " +
+        "ticket_01KY9RWFDR9QEWQ5B1ZACQJ338) and a non-adhoc ticket nags on stderr",
+      async () => {
+        const { root, paths } = await makeFixtureRepo();
+        const ticket = newTicket(root, "Skip-review ticket");
+        expect(runSlop(["start", ticket.slug], root).status).toBe(0);
+        const result = runSlop(["done", ticket.slug], root);
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stderr).toMatch(/warning:.*done without a review\/MR/i);
+
+        const doneTicket = await readTicket(paths, ticket.id);
+        expect(doneTicket.state).toBe("done");
+        expect(doneTicket.review).toBeUndefined();
+        expect(doneTicket.active_session).toBeNull();
+      },
+    );
+
+    it(
+      "done directly from in_progress on an --adhoc ticket succeeds with NO nag (D13 exempts adhoc " +
+        "tickets from the usual planning ceremony)",
+      async () => {
+        const { root, paths } = await makeFixtureRepo();
+        const ticket = newTicket(root, "Adhoc skip-review ticket", ["--adhoc"]);
+        expect(runSlop(["start", ticket.slug], root).status).toBe(0);
+        const result = runSlop(["done", ticket.slug], root);
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stderr).not.toMatch(/done without a review\/MR/i);
+
+        const doneTicket = await readTicket(paths, ticket.id);
+        expect(doneTicket.state).toBe("done");
+        expect(doneTicket.active_session).toBeNull();
+      },
+    );
   });
 
   // ---------------------------------------------------------------------------

@@ -227,9 +227,13 @@ describe("E1: Polish", () => {
       const root = await makeCliFixture("e1-conflict");
       const ticket = newTicketCli(root, "conflict matrix ticket");
 
-      // done requires review first (C3: no in_progress -> done shortcut).
-      expect(runSlop(["start", ticket.slug], root).status).toBe(0);
+      // done is illegal before the ticket has ever entered in_progress —
+      // still a conflict even though review is now optional (C3:
+      // `checkDoneEntry` accepts "review" or "in_progress", never "open"
+      // directly — run `slop start` first).
       expect(runSlop(["done", ticket.slug], root).status).toBe(6);
+
+      expect(runSlop(["start", ticket.slug], root).status).toBe(0);
 
       // draft/undraft only apply to their one specific edge — an
       // in_progress ticket is illegal for both.

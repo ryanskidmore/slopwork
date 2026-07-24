@@ -46,11 +46,13 @@ const DONE_SESSION_FIELDS = [
 
 /**
  * Build (never persist) the ticket as `done` should leave it: `review ->
- * done` (D15/`checkDoneEntry` — the CLI layer below enforces legality
- * before this is ever called), `review` cleared (the schema requires it
- * absent outside `state === "review"`), `active_session` cleared, and
- * `latest_note` updated from `--note` when given (same convention
- * `stop`'s `buildStoppedTicket` uses for its handoff note).
+ * done` OR `in_progress -> done` (D15, revised — review is optional;
+ * `checkDoneEntry` decides legality, the nag decision lives in `runDone`
+ * below, both before this is ever called), `review` cleared (already
+ * absent on the `in_progress` path; the schema requires it absent outside
+ * `state === "review"`), `active_session` cleared, and `latest_note`
+ * updated from `--note` when given (same convention `stop`'s
+ * `buildStoppedTicket` uses for its handoff note).
  */
 export function buildDoneTicket(
   current: Ticket,
@@ -104,25 +106,41 @@ async function runDone(ref: string, opts: DoneCommandOptions): Promise<void> {
   const result = await withLock(paths.lockFile, async (lock) => {
     const current = await readTicket(paths, initialTicket.id);
 
-    // D15/§2/§5: done is only reachable from review — see
-    // DECISIONS.md's C3 entry for why this work item chose to require
-    // review rather than allow a direct in_progress -> done shortcut.
+    // D15/§2, revised (ticket_01KY9RWFDR9QEWQ5B1ZACQJ338): review is now
+    // OPTIONAL — legal from `review` OR directly from `in_progress`. See
+    // state.ts's module doc ("review made optional") for the full
+    // rationale; DECISIONS.md's older C3 entry documents the prior,
+    // review-required decision this ticket supersedes.
     const check = checkDoneEntry(current.state);
     if (!check.ok) {
       throw new SlopError(check.reason ?? "illegal state transition", EXIT_CODES.CONFLICT);
     }
 
+    // The nag (§8.1 item 3's required-with-warning philosophy, applied one
+    // level up from `review --mr`'s own optional-MR nag): completing
+    // directly from `in_progress` — i.e. this ticket never went through
+    // `review` — is legal per `checkDoneEntry` above, but a non-`adhoc`
+    // ticket still gets a soft warning, printed on stderr AFTER the
+    // transaction commits (below), same convention as the transcript-miss
+    // warning. `adhoc` tickets (D13: exempt from the usual planning
+    // ceremony) never nag, and neither does the unchanged `review -> done`
+    // path.
+    const skippedReview = current.state === "in_progress" && current.adhoc !== true;
+
     const activeSessionId = current.active_session;
     if (activeSessionId === null) {
-      // Unreachable in practice: a `review`-state ticket always still
-      // carries its active session (DECISIONS.md's C3 entry — `slop
-      // review` never clears `active_session`, only `slop
-      // done`/`drop`/`stop` do, and `stop` refuses a review-state
-      // ticket). Kept only for TypeScript narrowing / defense against a
-      // hand-edited or otherwise inconsistent db.
+      // Unreachable in practice for either legal entry state: a
+      // `review`-state ticket always still carries its active session
+      // (DECISIONS.md's C3 entry — `slop review` never clears
+      // `active_session`, only `slop done`/`drop`/`stop` do, and `stop`
+      // refuses a review-state ticket), and an `in_progress`-state ticket
+      // always carries one too (C1's invariant — `start` sets it, only
+      // `stop`/`done`/`drop` clear it, none of which can have run while
+      // still `in_progress`). Kept only for TypeScript narrowing / defense
+      // against a hand-edited or otherwise inconsistent db.
       throw new SlopError(
-        `ticket "${current.name}" (${current.slug}) is in review but has no active session — the db ` +
-          "appears inconsistent (a review-state ticket should always carry one)",
+        `ticket "${current.name}" (${current.slug}) is "${current.state}" but has no active session — ` +
+          `the db appears inconsistent (a "${current.state}"-state ticket should always carry one)`,
         EXIT_CODES.GENERIC_ERROR,
       );
     }
@@ -188,12 +206,20 @@ async function runDone(ref: string, opts: DoneCommandOptions): Promise<void> {
       ticket: doneTicket,
       transcriptWarning: capture.warning,
       cascade,
+      skippedReview,
     };
   });
 
-  // Printed AFTER the transaction commits — a transcript miss or a
-  // corrupt-elsewhere-in-the-db problem is a warning, never a reason
-  // `done` itself could fail (same convention as `stop.ts`).
+  // Printed AFTER the transaction commits — a transcript miss, a skipped
+  // review, or a corrupt-elsewhere-in-the-db problem is a warning, never a
+  // reason `done` itself could fail (same convention as `stop.ts`).
+  if (result.skippedReview) {
+    printWarning(
+      `${result.ticket.id} (${result.ticket.slug}) done without a review/MR — if this had a code ` +
+        "change, open an MR and run `slop review --mr <url>` first next time (D15: review is " +
+        "optional, not required)",
+    );
+  }
   if (result.transcriptWarning !== null) printWarning(result.transcriptWarning);
   if (result.cascade.problems.length > 0) {
     process.stderr.write(`${formatIndexProblems(result.cascade.problems)}\n`);
@@ -213,15 +239,20 @@ async function runDone(ref: string, opts: DoneCommandOptions): Promise<void> {
 
 /** `slop done` — design.md §2, §4.3, D15, D16; work item C3.
  *
- * `review -> done` only (see `buildDoneTicket`'s doc / DECISIONS.md's C3
- * entry): finalizes the active session (end summary from `--note`,
- * transcript captured per C4), then runs B4's done-cascade exactly once.
+ * `review -> done` OR `in_progress -> done` (see `buildDoneTicket`'s doc —
+ * D15 revised, review is optional; ticket_01KY9RWFDR9QEWQ5B1ZACQJ338):
+ * finalizes the active session (end summary from `--note`, transcript
+ * captured per C4), then runs B4's done-cascade exactly once. Completing a
+ * non-`adhoc` ticket directly from `in_progress` (skipping review) nags on
+ * stderr but still succeeds; `adhoc` tickets and the `review -> done` path
+ * never nag.
  */
 export function registerDoneCommand(program: Command): void {
   program
     .command("done")
     .description(
-      "Complete <ref> (review -> done only): finalize the session (end summary + transcript per " +
+      "Complete <ref> (from review, or directly from in_progress — review is optional, but non-" +
+        "adhoc tickets nag on stderr if they skip it): finalize the session (end summary + transcript per " +
         "D16), cascade unblocks (B4), and mark done.",
     )
     .argument("<ref>", "ticket to complete")

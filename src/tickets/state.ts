@@ -3,11 +3,13 @@
  * the seam B1's brief asks for: "the full state machine is C3's; implement
  * what §2 plainly allows and leave a clear seam."
  *
- * §2's diagram:
+ * §2's diagram (review made OPTIONAL — ticket_01KY9RWFDR9QEWQ5B1ZACQJ338,
+ * see "review made optional" below):
  *
  *   draft ⇄ open ──start──▶ in_progress ──review --mr──▶ review ──done──▶ done
- *                ▲              │  ▲                       │
- *                └────stop──────┘  └──────start (changes requested)──────┘
+ *                ▲              │  ▲                       │              ▲
+ *                └────stop──────┘  └──────start (changes requested)──────┘│
+ *                                   └──────────done (review optional)──────┘
  *
  * plus `dropped` (wontdo) from anywhere.
  *
@@ -95,14 +97,31 @@
  *
  *   - `checkReviewEntry`: `in_progress -> review` (D15) — the one edge
  *     `to === "review"` above always rejects.
- *   - `checkDoneEntry`: `review -> done` (D15: "`done` closes review
- *     out"). §2's diagram draws NO direct `in_progress -> done` edge —
- *     the only path to `done` runs through `review` — matching design.md
- *     §5's house rule for agents ("open an MR and call `review` before
- *     claiming done"). This is C3's resolved v0 decision (the work item's
- *     brief explicitly allows either choice, provided it's enforced here
- *     and documented — see DECISIONS.md's C3 entry): `slop done` on an
- *     `in_progress` ticket is a CONFLICT, not a shortcut.
+ *   - `checkDoneEntry`: `review -> done` OR `in_progress -> done` (D15,
+ *     revised below) — see "review made optional" for the current rule.
+ *
+ * ---------------------------------------------------------------------
+ * Review made optional (ticket_01KY9RWFDR9QEWQ5B1ZACQJ338): `checkDoneEntry`
+ * now also allows `in_progress -> done` directly
+ * ---------------------------------------------------------------------
+ *
+ * C3's original v0 decision (kept in the history above, and still
+ * DECISIONS.md's stale record until that file's own owner updates it) made
+ * `review -> done` the ONLY legal entry into `done`, rejecting a direct
+ * `in_progress -> done` as a CONFLICT. This work item revisits that
+ * decision: §2's diagram now draws a direct `in_progress -> done` edge
+ * alongside `review -> done`, and `checkDoneEntry` accepts either. Legality
+ * here is unconditional on `adhoc` — this file only ever answers "is the
+ * edge legal," never "should it warn." Discipline is preserved one layer up
+ * instead, by a NAG rather than a block: `slop done` (`done.ts`) prints a
+ * soft warning on stderr when it completes a non-`adhoc` ticket directly
+ * from `in_progress` (i.e. the ticket never went through `review`), but
+ * still lets the transition through — the identical required-with-warning
+ * philosophy `review --mr` already uses for its own optional `--mr` link
+ * (§8.1 item 3). `adhoc` tickets complete directly with no nag at all: D13
+ * already exempts them from the usual planning ceremony, and review is part
+ * of that ceremony. `review -> done` is unaffected — never nagged, exactly
+ * as before.
  *   - `checkDropEntry`: `-> dropped` (§2: "dropped (wontdo) from
  *     anywhere"). Legal from any non-terminal state — but, UNLIKE
  *     `checkStateTransition`'s generic same-state shortcut, dropping an
@@ -291,26 +310,28 @@ export function checkReviewEntry(from: TicketState): StateTransitionCheck {
 }
 
 /**
- * `review -> done` (D15: "`done` closes review out") — the sole legal
- * entry into `done`. §2's diagram draws NO direct `in_progress -> done`
- * edge; this is C3's resolved v0 decision, matching design.md §5's house
- * rule ("open an MR and call review before claiming done") — see this
- * module's doc and DECISIONS.md's C3 entry. `slop done` (C3) checks this
- * directly for the same reason `checkReviewEntry` does: `update --state`
- * excludes `-> done` because it can't finalize the session/cascade this
- * transition needs (this module's top doc); the dedicated command both
- * has that machinery AND is the one place §2's review-gates-done rule can
- * be enforced. No same-state shortcut: see this module's doc.
+ * `review -> done` OR `in_progress -> done` — review is now OPTIONAL (D15,
+ * revised — see this module's doc, "review made optional"): §2's diagram
+ * draws both edges into `done`. This function only answers legality;
+ * whether the direct `in_progress -> done` path deserves a nag (non-`adhoc`
+ * tickets that skipped review) is decided one layer up, in `done.ts`, not
+ * here — same division of labour `checkReviewEntry`/`review --mr`'s
+ * optional-`--mr` nag already uses. `slop done` (C3) still calls this
+ * directly rather than `checkStateTransition`, for the same reason as
+ * before: `update --state` excludes `-> done` because it can't finalize
+ * the session/cascade this transition needs (this module's top doc); the
+ * dedicated command has that machinery. No same-state shortcut: see this
+ * module's doc.
  */
 export function checkDoneEntry(from: TicketState): StateTransitionCheck {
-  if (from === "review") return { ok: true };
+  if (from === "review" || from === "in_progress") return { ok: true };
   const terminal = terminalStateCheck(from);
   if (terminal !== null) return terminal;
   return {
     ok: false,
     reason:
-      `illegal transition "${from}" -> "done" (design.md §2); done is reachable only from "review" — ` +
-      'run `slop review --mr <url>` first (design.md §5: "open an MR and call review before claiming done")',
+      `illegal transition "${from}" -> "done" (design.md §2); done is reachable from "review" or ` +
+      '"in_progress" — run `slop start <ref>` first (work item C1)',
   };
 }
 

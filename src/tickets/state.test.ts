@@ -145,26 +145,35 @@ describe("checkReviewEntry (C3: in_progress -> review, D15)", () => {
   });
 });
 
-describe("checkDoneEntry (C3: review -> done, D15)", () => {
-  it("legal only from review — NOT directly from in_progress (design.md §2's diagram has no such edge)", () => {
+describe("checkDoneEntry (C3: review -> done OR in_progress -> done, D15 revised — review is optional)", () => {
+  it("legal from review AND directly from in_progress (design.md §2's diagram now draws both edges)", () => {
     expect(checkDoneEntry("review")).toEqual({ ok: true });
-    expect(checkDoneEntry("in_progress").ok).toBe(false);
+    expect(checkDoneEntry("in_progress")).toEqual({ ok: true });
   });
 
-  it("rejects every other state", () => {
-    for (const s of ["draft", "open", "in_progress", "done", "dropped"] as const) {
+  it("rejects draft/open/dropped/done", () => {
+    for (const s of ["draft", "open", "dropped", "done"] as const) {
       expect(checkDoneEntry(s).ok, s).toBe(false);
     }
   });
 
-  it("in_progress -> done names the review-first rule, not a generic message", () => {
-    expect(checkDoneEntry("in_progress").reason).toMatch(/reachable only from "review"/);
+  it("draft/open -> done names the illegal-transition rule, pointing at `slop start`", () => {
+    for (const s of ["draft", "open"] as const) {
+      const result = checkDoneEntry(s);
+      expect(result.ok, s).toBe(false);
+      expect(result.reason, s).toMatch(/slop start/);
+    }
   });
 
   it("terminal states name themselves as terminal", () => {
     expect(checkDoneEntry("done").reason).toMatch(/terminal state/);
     expect(checkDoneEntry("dropped").reason).toMatch(/terminal state/);
   });
+
+  // `checkDoneEntry` only decides legality — whether the direct
+  // in_progress -> done path nags is a `done.ts`/CLI-layer concern (adhoc
+  // vs. non-adhoc), never this file's, so there is deliberately no
+  // adhoc-aware test here; see done.test.ts for that.
 });
 
 describe("checkDropEntry (C3: -> dropped, §2 'from anywhere')", () => {

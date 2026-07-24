@@ -343,7 +343,14 @@ construction, not by convention. `tests/acceptance/C3.test.ts`'s property
 test asserts this directly after every step of every generated operation
 sequence, not just at the end.
 
-## C3 — `done` requires `review` first; there is no direct `in_progress -> done` shortcut
+## C3 — `done` requires `review` first; there is no direct `in_progress -> done` shortcut (SUPERSEDED — see "review made optional" below)
+
+**Superseded by ticket_01KY9RWFDR9QEWQ5B1ZACQJ338** (this file's own
+newest entry, at the bottom): `checkDoneEntry` now also accepts a direct
+`in_progress -> done` edge, with a non-`adhoc`-only nag replacing the
+hard CONFLICT this entry originally documented. Kept below verbatim as
+the historical record of the original v0 call and its reasoning; do not
+treat it as the current behavior.
 
 design.md §2's diagram draws `review --done--> done` as the only path
 into `done` — no `in_progress -> done` edge exists in the diagram at all —
@@ -835,3 +842,35 @@ open defect). `tests/acceptance/e2-merge-sim.ts`'s module doc and
 `formatReport()` output were reworded to match (`KNOWN ISSUE` /
 `real defect` → `KNOWN BEHAVIOR` / documented, accepted). The ticket
 schema and `updated_at` bumping are untouched by this fix.
+
+## C3 — review made optional: `done` now also accepts a direct `in_progress -> done` edge, with a non-`adhoc` nag replacing the old CONFLICT (ticket_01KY9RWFDR9QEWQ5B1ZACQJ338)
+
+**Supersedes this file's earlier "`done` requires `review` first" entry
+above.** design.md §2's diagram was revised to draw a direct
+`in_progress -> done` edge alongside `review -> done`, making review an
+optional checkpoint rather than a mandatory gate. `checkDoneEntry`
+(`src/tickets/state.ts`) now returns `ok: true` for `from === "review"`
+OR `from === "in_progress"` — legality is unconditional on `adhoc`; this
+function only ever answers "is the edge legal," never "should it warn."
+
+Discipline is preserved one layer up instead, in `slop done`
+(`src/cli/commands/done.ts`), by a NAG rather than a block — the same
+required-with-warning philosophy this file's own `--mr` entry above
+already documents for `review --mr`. When `runDone` completes a ticket
+whose `current.state === "in_progress" && current.adhoc !== true` (i.e.
+it never went through `review`), it prints, on stderr, AFTER the
+transaction commits (same convention as the transcript-miss warning):
+
+```
+warning: <id> (<slug>) done without a review/MR — if this had a code
+change, open an MR and run `slop review --mr <url>` first next time
+(D15: review is optional, not required)
+```
+
+`adhoc` tickets get no nag at all (D13 already exempts them from the
+usual planning ceremony, and review is part of that ceremony), and
+`review -> done` is unaffected — never nagged, exactly as before. Exit
+code is 0 either way; the transition, session finalization, and B4
+cascade all proceed identically regardless of which of the two legal
+entry states triggered them. `slop drop`'s "dropped (wontdo) from
+anywhere" behavior is untouched by this change.

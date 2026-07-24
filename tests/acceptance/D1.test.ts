@@ -802,8 +802,10 @@ describe("D1: init + agent onboarding", () => {
     }, 30_000);
 
     it(
-      'house rule the skill teaches ("Only `slop done` after merge/verification — done means done"): ' +
-        "`done` on a ticket that was never sent through `review` is refused, not silently allowed",
+      'house rule the skill teaches ("Only `slop done` after merge/verification — done means done") ' +
+        "is now enforced as a soft nag, not a hard block (review is optional, " +
+        "ticket_01KY9RWFDR9QEWQ5B1ZACQJ338): `done` on a ticket that was never sent through " +
+        "`review` still succeeds, but warns on stderr rather than silently saying nothing",
       async () => {
         const dir = await makeScratchRepo("slop-d1-loop-house-rule-");
         const init = runSlop(["init", "--yes"], dir, { CLAUDECODE: "1" });
@@ -814,17 +816,17 @@ describe("D1: init + agent onboarding", () => {
         expect(runLoopStep(["start", ticket.slug], dir).status).toBe(0);
 
         const doneResult = runLoopStep(["done", ticket.slug], dir);
-        expect(doneResult.status).toBe(6); // CONFLICT (core/exit-codes.ts)
-        expect(doneResult.stderr).toMatch(/reachable only from "review"/);
+        expect(doneResult.status, doneResult.stderr).toBe(0);
+        expect(doneResult.stderr).toMatch(/warning:.*done without a review\/MR/i);
         expect(doneResult.stderr).toMatch(/slop review/);
 
-        // Refused, not merely warned about: state is untouched.
-        const stillInProgress = await readTicket(paths, ticket.id as TicketId);
-        expect(stillInProgress.state).toBe("in_progress");
+        // Allowed, not refused: the ticket completes.
+        const nowDone = await readTicket(paths, ticket.id as TicketId);
+        expect(nowDone.state).toBe("done");
 
-        // The event log agrees: no ticket.done was ever written for it.
+        // The event log agrees: ticket.done WAS written for it.
         const events = await queryEvents(paths, { ticket: ticket.id as TicketId });
-        expect(events.some((e) => e.verb === "ticket.done")).toBe(false);
+        expect(events.some((e) => e.verb === "ticket.done")).toBe(true);
       },
     );
   });

@@ -30,7 +30,7 @@
 | D12 | **Slugs are first-class handles** everywhere ids work | |
 | D13 | **`draft` + `adhoc` creation affordances**; drafts never `ready` | |
 | D14 | **index.jsonc gitignored** (pure derivative, auto-healed) | |
-| D15 | **`review` is a stored state carrying an MR link.** `slop review <ref> --mr <url>` moves in_progress → review; `done` closes review out; changes-requested = `slop start` again (logged as re-entry) | New per review |
+| D15 | **`review` is a stored, OPTIONAL state carrying an MR link.** `slop review <ref> --mr <url>` moves in_progress → review; `done` closes review out — or completes directly from in_progress, skipping review entirely, nagging on stderr for non-`adhoc` tickets that skip it (`adhoc` never nags); changes-requested = `slop start` again (logged as re-entry) | Revised: review made optional, mirroring `--mr`'s own required-with-warning treatment |
 | D16 | **Transcripts: stored locally, gitignored by default.** Session end (stop/done/review) attaches the harness transcript to `.slop/transcripts/`; committed only if `transcripts: commit` in config. Session *summaries* are always in the committed db | New per review. Default rationale: transcripts are huge and can contain secrets — see §8.1 |
 | D17 | **Actor identity resolution order:** `--as` flag → `SLOP_ACTOR` env → `user:` in config.yaml → `git config user.name`. Harness detection: env sniffing (Claude Code / opencode / Codex set identifiable vars) → `--harness` flag override | New — was ambiguous |
 
@@ -38,19 +38,20 @@
 
 ## 2. State model
 
-Stored: `draft → open → in_progress → review → done`, plus `dropped` (wontdo) from anywhere.
+Stored: `draft → open → in_progress → (review) → done`, plus `dropped` (wontdo) from anywhere. `review` is a **checkpoint, not a mandatory step** (D15, revised): `done` closes it out when used, but is equally legal directly from `in_progress` — review is optional, not required.
 
 ```
 draft ⇄ open ──start──▶ in_progress ──review --mr──▶ review ──done──▶ done
-              ▲              │  ▲                       │
-              └────stop──────┘  └──────start (changes requested)──────┘
+              ▲              │  ▲                       │              ▲
+              └────stop──────┘  └──────start (changes requested)──────┘│
+                                 └──────────done (review optional)──────┘
 ```
 
 Derived overlays (D5): `blocked` (live blockers) · `stale` (in_progress *or review*, no activity past threshold — review staleness catches MRs rotting unreviewed).
 
 `ready` = query: `open ∧ no live blockers ∧ no active session`. Drafts and review items never appear.
 
-**Working a ticket:** `start` creates a session (harness kind + harness session id + branch/commit captured), sets `in_progress`, prints the context pack. `plan` registers/revises the session's step checklist. `update --progress` logs + bumps activity. `review --mr <url>` records the MR and flips state — the ticket now points at exactly the thing a human needs to look at. `done` completes (cascades unblocks) and finalizes the session: end summary written to the db, transcript captured per D16. `stop` hands off (transcript also captured — a dead session's transcript is often the most valuable one). Takeover of an active ticket: warn + `--takeover`, logged.
+**Working a ticket:** `start` creates a session (harness kind + harness session id + branch/commit captured), sets `in_progress`, prints the context pack. `plan` registers/revises the session's step checklist. `update --progress` logs + bumps activity. `review --mr <url>` records the MR and flips state — the ticket now points at exactly the thing a human needs to look at. `done` completes (cascades unblocks) and finalizes the session: end summary written to the db, transcript captured per D16 — legal from `review` *or* directly from `in_progress` (review is optional, D15 revised); completing a non-`adhoc` ticket that never went through review prints a soft nag on stderr but still succeeds, mirroring `review --mr`'s own required-with-warning treatment of the MR link (§8.1 item 3); `adhoc` tickets (D13) complete directly with no nag at all. `stop` hands off (transcript also captured — a dead session's transcript is often the most valuable one). Takeover of an active ticket: warn + `--takeover`, logged.
 
 ---
 
@@ -173,7 +174,7 @@ A full week of building Slopwork with Slopwork where all of these hold:
 
 Target: **"Go work on adding-new-auth-provider"** / **"pick up the next ready ticket under PROJ-123."**
 
-1. `slop init` writes `.slop/AGENTS.md` (+ `CLAUDE.md` link offer): the loop is *ready → start → plan → update --progress → review --mr → done*, house rules ("file discovered work with `--discovered-from`; no TODOs in prose; open an MR and call `review` before claiming done").
+1. `slop init` writes `.slop/AGENTS.md` (+ `CLAUDE.md` link offer): the loop is *ready → start → plan → update --progress → review --mr → done*, house rules ("file discovered work with `--discovered-from`; no TODOs in prose; open an MR and call `review` before claiming done — optional, but skipping it on a non-`adhoc` ticket nags on stderr").
 2. `slop start` = one command to full context; `slop context` re-prints it mid-session after compaction.
 3. Slugs keep humans out of ULID-land; `--parent` accepts slugs and `jira:` refs.
 4. Parallel streams: per-agent sessions, `ready` excludes active work, explicit logged takeovers.
@@ -217,7 +218,7 @@ Target: **"Go work on adding-new-auth-provider"** / **"pick up the next ready ti
 
 1. **Transcript policy (D16):** local + gitignored by default (size, secrets); `transcripts: commit` opt-in; summaries always committed; capture on *every* session end, not just `done` — abandoned sessions' transcripts are the most valuable ones.
 2. **Actor + harness identity (D17):** explicit resolution orders; no more "how does the CLI know who's acting."
-3. **Review transitions (D15):** `review --mr` required-with-warning (can enter review without an MR link, but it nags); changes-requested = re-`start` (logged); no separate `changes_requested` state.
+3. **Review transitions (D15):** `review --mr` required-with-warning (can enter review without an MR link, but it nags); changes-requested = re-`start` (logged); no separate `changes_requested` state. **Review itself is optional** (revised): `done` accepts `in_progress → done` directly, applying the identical required-with-warning philosophy one level up — a non-`adhoc` ticket that skips review entirely still nags on stderr, `adhoc` tickets don't, and `review → done` stays exactly as before.
 4. **Priority scale:** 0 (urgent) – 3 (low), default 2.
 5. **Timestamps:** ISO-8601 UTC everywhere. Short-prefix collisions: git-style "ambiguous ref" error.
 
