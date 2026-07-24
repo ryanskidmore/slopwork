@@ -137,7 +137,7 @@ import {
   sortReviewRows,
   staleTicketRows,
 } from "../../tickets/status.js";
-import { parseIntegerOption } from "./shared.js";
+import { parseBudgetOption } from "./shared.js";
 
 interface StatusCommandOptions {
   json?: boolean;
@@ -532,7 +532,7 @@ export function registerStatusCommand(program: Command): void {
       "--budget <n>",
       `cap output size to N ${CONTEXT_PACK_BUDGET_UNIT} (elides stale rows, then review rows, then ` +
         "in_progress rows, least-important-first; counts/derived are always kept in full)",
-      parseIntegerOption("--budget"),
+      parseBudgetOption,
     )
     .action(runStatus);
 }

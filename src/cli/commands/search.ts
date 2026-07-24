@@ -82,7 +82,7 @@ import {
   searchTerms,
 } from "../../tickets/search.js";
 import { SlopError } from "../errors.js";
-import { parseIntegerOption } from "./shared.js";
+import { parseBudgetOption, parseIntegerOption } from "./shared.js";
 
 interface SearchCommandOptions {
   json?: boolean;
@@ -302,7 +302,7 @@ export function registerSearchCommand(program: Command): void {
     .option(
       "--budget <n>",
       `cap output size to N ${CONTEXT_PACK_BUDGET_UNIT} (elides lowest-ranked results first)`,
-      parseIntegerOption("--budget"),
+      parseBudgetOption,
     )
     .action(runSearch);
 }

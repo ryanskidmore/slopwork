@@ -1,5 +1,4 @@
 import type { Command } from "commander";
-import { EXIT_CODES } from "../../core/index.js";
 import { repoPaths, requireRepoRoot, resolveTicketRef } from "../../repo/index.js";
 import {
   CONTEXT_PACK_BUDGET_UNIT,
@@ -8,37 +7,30 @@ import {
 } from "../../sessions/context-budget.js";
 import { buildContextPackData } from "../../sessions/context-pack.js";
 import { loadConfig } from "../actor.js";
-import { SlopError } from "../errors.js";
+import { parseBudgetOption } from "./shared.js";
 
 interface ContextCommandOptions {
   budget?: number;
   json?: boolean;
 }
 
-/** `--budget N` here counts in characters (see context-budget.ts's doc for
- * why this deliberately differs from `show --context --budget`'s rough
- * token estimate) — validated as a non-negative integer, same "usage
- * mistake, reject eagerly" treatment `start.ts`'s `--harness` gets. Throws
- * a {@link SlopError} (USAGE_ERROR, exit 2) — E1's exit-code audit fix
- * (see `shared.ts`'s `parseIntegerOption` doc for why a bare `Error` here
- * would silently exit 1 instead).
+/**
+ * `--budget N` here counts in characters, same as every other
+ * budget-taking command (`ready`/`search`/`status`/`events`/`show
+ * --context` — see core/budget.ts's `BUDGET_UNIT`, the single unit every
+ * one of them documents and enforces).
  *
- * **Input-validation fix:** `Number.parseInt` silently truncates
- * leading-numeric garbage — `--budget 100abc` used to parse as `100`
- * instead of being rejected. The value's full trimmed text must now match
- * `/^-?\d+$/` (a complete integer, nothing trailing) before it's accepted
- * at all; the existing non-negative bound is unchanged. */
-export function parseBudgetFlag(value: string): number {
-  const trimmed = value.trim();
-  const parsed = Number.parseInt(trimmed, 10);
-  if (!/^-?\d+$/.test(trimmed) || !Number.isInteger(parsed) || parsed < 0) {
-    throw new SlopError(
-      `--budget must be a non-negative integer (${CONTEXT_PACK_BUDGET_UNIT}), got "${value}"`,
-      EXIT_CODES.USAGE_ERROR,
-    );
-  }
-  return parsed;
-}
+ * budget-flags-units-and-validation: this used to be its own local copy of
+ * the negative-rejecting validation (`context` was the ONLY `--budget`
+ * command that rejected negatives; every other command's `--budget` used
+ * the generic, negative-accepting `parseIntegerOption`, silently degrading
+ * to "elide everything" instead). Kept as a thin alias — rather than a
+ * bare re-export — of the now-shared `shared.ts#parseBudgetOption` every
+ * command uses, purely so this file's own `.option(...)` call site and
+ * `context.test.ts`'s existing `parseBudgetFlag` import both keep working
+ * unchanged.
+ */
+export const parseBudgetFlag = parseBudgetOption;
 
 export async function runContext(ref: string, opts: ContextCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());

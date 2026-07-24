@@ -147,6 +147,33 @@ describe("E1: Polish", () => {
       expect(runSlop(["search", "   "], root).status).toBe(2); // no non-whitespace search text
     });
 
+    // budget-flags-units-and-validation: a negative `--budget` used to be
+    // accepted by every command EXCEPT `context` (which had its own,
+    // separate negative-rejecting parser) — `ready`/`search`/`status`/
+    // `events`/`show` instead silently degraded to "elide everything" and
+    // exited 0 with an empty (but validly-shaped) result, which an agent
+    // could easily misread as "genuinely nothing is ready/found" rather
+    // than "I mistyped --budget". Every `--budget`-taking command now
+    // shares ONE parser (shared.ts's `parseBudgetOption`) that rejects a
+    // negative value the same way `context` always did.
+    it("USAGE_ERROR (2): a negative --budget is rejected the same way on every budget-taking command", async () => {
+      const root = await makeCliFixture("e1-budget-negative");
+      const ticket = newTicketCli(root, "negative budget matrix ticket");
+
+      expect(runSlop(["ready", "--budget", "-1"], root).status).toBe(2);
+      expect(runSlop(["search", "budget", "--budget", "-1"], root).status).toBe(2);
+      expect(runSlop(["status", "--budget", "-1"], root).status).toBe(2);
+      expect(runSlop(["events", "--budget", "-1"], root).status).toBe(2);
+      expect(runSlop(["show", ticket.slug, "--context", "--budget", "-1"], root).status).toBe(2);
+      expect(runSlop(["context", ticket.slug, "--budget", "-1"], root).status).toBe(2);
+
+      // Every rejection names the flag, same as the positive (--budget
+      // notanumber) case already asserted above — not a bare, unattributed
+      // error.
+      const result = runSlop(["ready", "--budget", "-1"], root);
+      expect(result.stderr).toContain("--budget");
+    });
+
     it("NOT_FOUND (4): an unresolvable <ref>, across several commands, and a missing .slop directory", async () => {
       const root = await makeCliFixture("e1-not-found");
       newTicketCli(root, "not-found matrix ticket");

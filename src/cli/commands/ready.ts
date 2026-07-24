@@ -73,7 +73,7 @@ import {
   filterResumableRows,
   renderReadyWithBudget,
 } from "../../tickets/ready.js";
-import { parseIntegerOption } from "./shared.js";
+import { parseBudgetOption } from "./shared.js";
 
 interface ReadyCommandOptions {
   label?: string;
@@ -255,7 +255,7 @@ export function registerReadyCommand(program: Command): void {
     .option(
       "--budget <n>",
       `cap output size to N ${CONTEXT_PACK_BUDGET_UNIT} (elides lowest-priority/least-relevant tickets first)`,
-      parseIntegerOption("--budget"),
+      parseBudgetOption,
     )
     .action(runReady);
 }

@@ -11,6 +11,7 @@ import { SlopError } from "../errors.js";
 import {
   assertMaxLength,
   collect,
+  parseBudgetOption,
   parseIntegerOption,
   parsePriority,
   printWarning,
@@ -93,6 +94,52 @@ describe('parsePriority (parseIntegerOption("--priority"))', () => {
 
   it("rejects '1.9' rather than silently truncating to priority 1", () => {
     expect(() => parsePriority("1.9")).toThrow(SlopError);
+  });
+});
+
+// budget-flags-units-and-validation: the ONE `--budget <n>` parser shared
+// by every budget-taking command (`ready`, `search`, `status`, `events`,
+// `context`, `show --context`) — see this function's own doc comment in
+// shared.ts for why. Before this ticket, only `context` (via its own local
+// copy, now an alias of this function) rejected a negative `--budget`;
+// every other command used the generic `parseIntegerOption`, which
+// accepts negatives and hands them straight to the elision helpers,
+// silently degrading to "elide everything" on a successful (exit 0) run.
+describe("parseBudgetOption", () => {
+  it("accepts a plain non-negative integer", () => {
+    expect(parseBudgetOption("100")).toBe(100);
+  });
+
+  it("accepts zero", () => {
+    expect(parseBudgetOption("0")).toBe(0);
+  });
+
+  it("accepts an integer with surrounding whitespace", () => {
+    expect(parseBudgetOption(" 250 ")).toBe(250);
+  });
+
+  it("rejects a negative integer (USAGE_ERROR, exit 2)", () => {
+    expect(() => parseBudgetOption("-5")).toThrow(SlopError);
+    try {
+      parseBudgetOption("-5");
+      throw new Error("expected parseBudgetOption to throw");
+    } catch (err) {
+      expect((err as SlopError).exitCode).toBe(EXIT_CODES.USAGE_ERROR);
+      expect((err as SlopError).message).toContain("--budget");
+      expect((err as SlopError).message).toContain("non-negative");
+    }
+  });
+
+  it("rejects trailing garbage instead of truncating it (--budget 100abc)", () => {
+    expect(() => parseBudgetOption("100abc")).toThrow(SlopError);
+  });
+
+  it("rejects a decimal instead of truncating it", () => {
+    expect(() => parseBudgetOption("1.9")).toThrow(SlopError);
+  });
+
+  it("rejects a value that is entirely non-numeric", () => {
+    expect(() => parseBudgetOption("notanumber")).toThrow(SlopError);
   });
 });
 

@@ -11,7 +11,10 @@ order — lowest-priority tickets, stale rows before review rows before
 in-progress rows, oldest sessions before long spec prose, etc. — is
 documented per-command below and in each command's own `--help`). With
 `--json`, hitting the budget never produces truncated/invalid JSON — it
-degrades to a smaller, still-valid envelope instead.
+degrades to a smaller, still-valid envelope instead. `--budget` counts in
+characters on every command it appears on — `ready`, `search`, `status`,
+`events`, `context`, and `show --context` — and rejects a negative value
+as a usage error (exit `2`) rather than silently eliding everything.
 
 ## Ref resolution
 

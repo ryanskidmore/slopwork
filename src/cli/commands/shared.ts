@@ -3,6 +3,7 @@
  * directory. Kept deliberately tiny — A1 only registers commands, it
  * does not implement them.
  */
+import { BUDGET_UNIT } from "../../core/budget.js";
 import { EXIT_CODES } from "../../core/exit-codes.js";
 import type { Actor, Session } from "../../core/index.js";
 import { SlopError } from "../errors.js";
@@ -57,6 +58,39 @@ export function parseIntegerOption(flag: string): (value: string) => number {
  * 0 (urgent) – 3 (low), default 2. Validation of the range is a later
  * work item's concern (B1); this only turns CLI text into a number. */
 export const parsePriority = parseIntegerOption("--priority");
+
+/**
+ * Parse a `--budget <n>` value — the ONE shared parser for every
+ * budget-taking command (`ready`, `search`, `status`, `events`, `context`,
+ * `show --context`): a non-negative integer count of {@link BUDGET_UNIT}
+ * (characters, core/budget.ts). Rejects negatives as a USAGE_ERROR (exit
+ * 2), same eager "usage mistake, reject before any I/O" treatment every
+ * other option parser in this module gets.
+ *
+ * budget-flags-units-and-validation: before this, `context` (alone) had
+ * its own negative-rejecting parser while `ready`/`search`/`status`/
+ * `events`/`show` all used the generic {@link parseIntegerOption}, which
+ * happily accepts a negative `--budget` and hands it straight to
+ * core/budget.ts's elision helpers — which then elide EVERY entry (a
+ * negative budget can never fit even the empty envelope) and return a
+ * successful, valid-looking `{"ready": [], ...}` on exit 0. An agent
+ * skimming that output has no way to tell "genuinely nothing is ready"
+ * apart from "I mistyped --budget -1" — a silent footgun a same-shaped
+ * USAGE_ERROR up front avoids entirely. Every command below now shares
+ * this one implementation instead of six independent copies of the same
+ * validation (or, as here, five copies missing it).
+ */
+export function parseBudgetOption(value: string): number {
+  const trimmed = value.trim();
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!/^-?\d+$/.test(trimmed) || !Number.isInteger(parsed) || parsed < 0) {
+    throw new SlopError(
+      `--budget must be a non-negative integer (${BUDGET_UNIT}), got "${value}"`,
+      EXIT_CODES.USAGE_ERROR,
+    );
+  }
+  return parsed;
+}
 
 /**
  * Reject a free-form CLI text option once it exceeds `max` characters —

@@ -3,19 +3,22 @@
  * budget"; design.md §4.2 `slop context <ref>`, §5.2 "one command to full
  * context").
  *
- * **Unit: characters, not tokens.** `src/tickets/context.ts` (B1)'s own
- * `--budget` (wired into `slop show --context --budget`) treats `N` as a
- * *rough* token estimate (`budgetCharsFromTokens`, ~4 chars/token, no real
- * tokeniser) — an honestly-documented approximation, not a bug, but this
- * work item's brief is explicit: "if you claim tokens, you need a real
- * tokeniser — don't fake it." `slop context --budget N` (this module)
- * therefore treats `N` as a literal character count instead — exact,
- * verifiable, no estimate to be wrong about. **This is a real,
- * user-visible inconsistency between two `--budget` flags in the same CLI
- * today** (`show --context --budget 100` means "~400 chars"; `context
- * --budget 100` means "exactly 100 chars") — flagged here and in C1's
- * report for E1 ("generalise `--budget` across commands") to reconcile,
- * not silently glossed over.
+ * **Unit: characters, exactly** — `core/budget.ts`'s `BUDGET_UNIT`
+ * (re-exported here as {@link CONTEXT_PACK_BUDGET_UNIT} for call-site
+ * continuity), the ONE unit every `--budget`-taking command in this CLI
+ * documents and enforces: `ready`, `search`, `status`, `events`, `context`,
+ * and `show --context`. (History: `slop show --context --budget` used to
+ * treat `N` as a *rough* token estimate via `tickets/context.ts`'s own
+ * `budgetCharsFromTokens`, ~4 chars/token — a real, user-visible
+ * inconsistency with this module's exact character count.
+ * budget-flags-units-and-validation reconciled `show --context` onto this
+ * module's `renderContextPackWithBudget` and removed the now-dead
+ * token-estimate helper entirely, rather than leave two units alive.)
+ * Every command's parser also now shares one implementation —
+ * `src/cli/commands/shared.ts`'s `parseBudgetOption` — so a negative
+ * `--budget` is rejected (`USAGE_ERROR`, exit 2) the same way everywhere,
+ * instead of silently degrading to "elide everything" on some commands and
+ * erroring on others.
  *
  * **Elision order** (least-important content dropped first, per the C1
  * brief: "degrade by truncating the least important sections first ...
@@ -32,24 +35,26 @@
  *   3. Last resort: a raw slice of our OWN already-elided text (core pack
  *      fields + our own elision notes, details_md already blanked) down to
  *      exactly `budgetChars`. Deliberately NOT `tickets/context.ts`'s own
- *      post-hoc `renderContextPack(data, budgetChars)`: that function's
- *      fixed-length truncation note (~32 chars) can't itself shrink below
- *      its own length, so for a `budgetChars` smaller than that it would
- *      silently return text LONGER than requested — see the code comment
- *      at this step for the full reasoning. A plain string slice has no
- *      such floor, so {@link renderContextPackWithBudget} always genuinely
- *      respects the budget, for every `budgetChars >= 0`, even one too
- *      small to fit any coherent structure at all.
+ *      post-hoc `renderContextPack(data, budgetChars)` (a simpler,
+ *      fixed-length-truncation-note primitive this module is built on top
+ *      of, not a duplicate of): a raw slice has no minimum floor, so
+ *      {@link renderContextPackWithBudget} always genuinely respects the
+ *      budget, for every `budgetChars >= 0`, even one too small to fit any
+ *      coherent structure at all.
  *
  * Every step that actually elided something appends a trailing "## Elided
  * for --budget" section naming what happened, so the reader always knows
  * content was dropped rather than silently getting a truncated-looking
  * pack with no explanation.
  *
- * **Reusable beyond C1**: E1 ("generalise `--budget` across commands")
- * should import {@link renderContextPackWithBudget} directly rather than
- * re-deriving this elision order per command — the only per-command work
- * left is building a `ContextPackData` (see `context-pack.ts`, also C1)
+ * **Reused across every read command**: E1 generalised `--budget` beyond
+ * `context`/`show --context` — `ready`/`search`/`status`/`events` instead
+ * build on `core/budget.ts`'s list-shaped `renderEntriesWithBudget` (this
+ * module's prose-eliding sibling, same "drop least-important content
+ * first, say what was elided" philosophy), while `context`/`show
+ * --context` keep using {@link renderContextPackWithBudget} directly — the
+ * only per-command work is building a `ContextPackData` (see
+ * `context-pack.ts`, also C1)
  * and passing it here.
  */
 import type { Session, Ticket } from "../core/index.js";

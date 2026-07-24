@@ -1,0 +1,48 @@
+{
+  "id": "session_01KYAYAVDJ8WY1M68HB4JS94VJ",
+  "ticket": "ticket_01KYAPMH96595NEJNKPSZH6XT5",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "worktree-agent-a2f73771765d13db7",
+    "commit_at_start": "cb8a3a8c61a139eaae35a6f091ffc26a6d9c9cd4"
+  },
+  "started_at": "2026-07-24T20:51:08.850Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "confirm units already reconciled to chars everywhere (show --context uses renderContextPackWithBudget, not the old token estimate) - fix stale docs claiming otherwise",
+          "checked": true
+        },
+        {
+          "text": "add shared parseBudgetOption (shared.ts) rejecting negative budgets; wire into ready/search/status/events/show/context (context's own parser aliased to it)",
+          "checked": true
+        },
+        {
+          "text": "remove dead budgetCharsFromTokens/CHARS_PER_TOKEN_ESTIMATE + their test",
+          "checked": true
+        },
+        {
+          "text": "fix renderContextPack tiny-budget truncation-note overshoot bug",
+          "checked": true
+        },
+        {
+          "text": "add regression tests (shared.test.ts unit tests, E1.test.ts acceptance test for negative --budget across all commands, context.test.ts overshoot test); update cli-reference.md",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T21:02:04.592Z"
+    }
+  ],
+  "end_summary": null,
+  "transcript_ref": "transcripts/session_01KYAYAVDJ8WY1M68HB4JS94VJ.jsonl"
+}
