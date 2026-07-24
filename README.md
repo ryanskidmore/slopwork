@@ -42,6 +42,23 @@ slop web                 # read-only explorer at http://localhost:4553
 Run `slop instructions` for the full agent loop and house rules, or `slop <command> --help` for
 any command's options.
 
+## Documentation
+
+The [`docs/`](docs/README.md) directory has the full user + operator documentation, verified
+against the shipped CLI:
+
+- [`docs/getting-started.md`](docs/getting-started.md) — install, `slop init`, a full walkthrough
+- [`docs/concepts.md`](docs/concepts.md) — the data model, state machine, and derived overlays
+- [`docs/cli-reference.md`](docs/cli-reference.md) — every command, every flag, exit codes
+- [`docs/agent-workflow.md`](docs/agent-workflow.md) — the loop agents follow and the house rules
+- [`docs/web-ui.md`](docs/web-ui.md) — what `slop web` shows
+- [`docs/configuration.md`](docs/configuration.md) — `config.yaml`, actor/harness identity, env vars
+- [`docs/concurrency-and-merging.md`](docs/concurrency-and-merging.md) — the git-merge story, the
+  db lock, and lock-free progress updates
+
+`design.md` and `DECISIONS.md` remain the internal spec and decision log this doc set distills
+from — read those for the *why* behind a design choice, `docs/` for how to actually use the tool.
+
 ## Development
 
 Requires [Bun](https://bun.sh) ≥ 1.3. Developed and tested on Linux and macOS; Windows is

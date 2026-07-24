@@ -1,0 +1,409 @@
+# CLI reference
+
+Every `slop` command below was verified against `./dist/slop <command>
+--help` and the command's implementation in `src/cli/commands/`. Commands
+are grouped exactly as `slop --help` groups them.
+
+A note on two flags that show up on most read commands: `--json` switches
+to machine-readable output, and `--budget <n>` caps output to roughly `n`
+characters, eliding the least-important entries first (the exact elision
+order — lowest-priority tickets, stale rows before review rows before
+in-progress rows, oldest sessions before long spec prose, etc. — is
+documented per-command below and in each command's own `--help`). With
+`--json`, hitting the budget never produces truncated/invalid JSON — it
+degrades to a smaller, still-valid envelope instead.
+
+## Ref resolution
+
+Anywhere a `<ref>` is accepted, it resolves in this order:
+
+1. **Full id** — `ticket_<ULID>`, exact match, case-sensitive.
+2. **Exact slug** — case-insensitive, always wins over a short-prefix
+   interpretation. Slugs may carry a single `type/` prefix
+   (`fix/ui-not-showing`) for branch-name alignment.
+3. **Short `t-<code>` handle** — a stable 5-character handle derived from
+   the ticket's own id (printed by `slop new`/`slop show`), e.g. `t-m1k6w`.
+4. **Unique short id prefix** — any unambiguous prefix of the id or its
+   bare ULID (`01KYA7`).
+
+A prefix or `t-<code>` that matches more than one ticket is a **git-style
+ambiguous-ref error** (exit `5`) listing every candidate, never a
+pick-the-first-one. `jira:PROJ-123`-style external refs are only valid as
+`--parent` values — passing one where a local ticket ref is expected is a
+usage error (exit `2`).
+
+## Exit codes
+
+Every command exits with exactly one of these (`src/core/exit-codes.ts`),
+so a driving agent can branch on `$?` instead of scraping output:
+
+| Code | Name | Meaning |
+|---|---|---|
+| 0 | `SUCCESS` | Command completed successfully. |
+| 1 | `GENERIC_ERROR` | Unexpected runtime error (I/O failure, bug, etc). |
+| 2 | `USAGE_ERROR` | Bad invocation — missing/invalid arguments or flags. |
+| 3 | `NOT_IMPLEMENTED` | Command is registered but its body isn't built yet. |
+| 4 | `NOT_FOUND` | A `<ref>` did not resolve to any entity. |
+| 5 | `AMBIGUOUS_REF` | A short-prefix or slug `<ref>` matched more than one entity. |
+| 6 | `CONFLICT` | Illegal state transition or other conflicting operation. |
+
+---
+
+## Setup & maintenance
+
+### `init`
+
+Initialize `.slop/` in this repo. See
+[Getting started → Initialize a repo](getting-started.md#initialize-a-repo)
+for the full write-up of what it creates.
+
+```sh
+slop init --yes
+slop init --project myproj --jira "" --yes
+```
+
+| Flag | Meaning |
+|---|---|
+| `--jira <url>` | set `remotes.jira` non-interactively (pass `""` for explicitly blank) |
+| `--project <name>` | override the autodetected project name |
+| `--user <name>` | override the autodetected user (D17 config rung) |
+| `--yes` | accept all detected defaults; never prompt |
+| `--link-claude-md` | non-interactively add a slopwork pointer to an existing `CLAUDE.md` |
+
+Safe to re-run: never touches `config.yaml` or `db/` on an already
+-initialized repo, only regenerates `AGENTS.md`/the skill file/the
+gitignore section.
+
+### `instructions`
+
+Prints this project's onboarding rules — the loop and house rules,
+interpolated with this repo's `config.yaml` (project name, Jira URL). No
+flags. See [Agent workflow](agent-workflow.md) for the content.
+
+```sh
+slop instructions
+```
+
+### `reindex`
+
+Rebuilds the derived, gitignored `.slop/db/index.jsonc` from the tickets,
+sessions, and events on disk. You rarely need this by hand — every read
+path auto-heals a missing/stale index — but it's the manual escape hatch
+after a bulk hand-edit, or to force-surface every unreadable ticket file
+in one pass.
+
+```sh
+slop reindex
+slop reindex --strict   # fail on the first unreadable file instead of skipping it
+```
+
+`--strict` restores pre-fault-tolerance, all-or-nothing behavior. Without
+it, `reindex` skips unreadable ticket files, still rebuilds everything it
+could read, reports every problem, and exits `1` if any remain.
+
+---
+
+## Creating & shaping
+
+### `new`
+
+```sh
+slop new "Adding new auth provider"
+slop new "Fix login redirect" --parent jira:PROJ-123 --priority 1
+slop new "Add OAuth callback tests" --discovered-from add-oauth-provider
+slop new "Spike: passkeys" --draft
+slop new --spec - "Detailed ticket" < spec.json
+```
+
+| Flag | Meaning |
+|---|---|
+| `--spec <json>` | ticket spec as JSON; `-` reads from stdin |
+| `--parent <ref>` | parent ticket ref, slug, or external ref (`jira:PROJ-123`) |
+| `--blocks <ref>` | this ticket blocks `<ref>` (repeatable) |
+| `--discovered-from <ref>` | the ticket this work was discovered while doing |
+| `--label <key:value>` | repeatable |
+| `--draft` | create in draft state (never appears in `ready`) |
+| `--adhoc` | mark as created outside normal planning (exempts `done` from the review-skip nag) |
+| `--owner <actor>` | owning actor, stored as a human actor |
+| `--priority <0-3>` | 0 urgent .. 3 low, default 2 |
+| `--slug <slug>` | explicit branch-style handle, optionally `type/`-prefixed; auto-generated from the name when omitted |
+| `--json` | machine-readable result |
+
+Without `--spec`, the spec defaults to `{summary: <name>}`. There is
+**no `--relates-to` flag** — see
+[Concepts → Edge](concepts.md#edge) for what edges are and aren't
+CLI-settable today.
+
+### `split`
+
+```sh
+slop split auth-overhaul "Add OAuth provider" "Add MFA"
+```
+
+Creates one new sub-ticket per name given, each parented under `<ref>` and
+carrying a `discovered-from` edge back to it, state always `open`
+regardless of the target's own state. `--json` for a machine-readable
+result naming the target plus every new child's id/slug.
+
+### `draft` / `undraft`
+
+```sh
+slop draft <ref>      # -> draft (never ready, never startable)
+slop undraft <ref>    # -> open
+```
+
+### `edit`
+
+```sh
+slop edit <ref>
+```
+
+Opens `<ref>`'s ticket JSONC file in `$VISUAL`/`$EDITOR` for direct
+hand-editing.
+
+### `update`
+
+The general mutator — every dedicated verb command above is sugar over
+this for the one edge it can perform (`draft ⇄ open`); everything else
+(state transitions with side effects) needs its own command, see
+[Concepts → state machine](concepts.md#state-machine).
+
+```sh
+slop update <ref> --progress "one-line status note"
+slop update <ref> --priority 0 --label +urgent --label -stale
+slop update <ref> --name "Better ticket name"
+slop update <ref> --spec - < new-spec.json
+slop update <ref> --state open      # only draft <-> open is legal here
+```
+
+| Flag | Meaning |
+|---|---|
+| `--progress <note>` | append a progress note, bump activity |
+| `--state <state>` | `draft\|open\|in_progress\|review\|done\|dropped` — only `draft ⇄ open` succeeds; every other target explains which dedicated command to use instead |
+| `--priority <0-3>` | |
+| `--label <±label>` | `+label` to add, `-label` to remove (repeatable) |
+| `--name <name>` | rename |
+| `--spec <json>` | replace the spec; `-` reads from stdin |
+
+A **pure `--progress`-only call** (nothing else on the command line) is
+lock-free — see
+[Concurrency & merging](concurrency-and-merging.md#lock-free-progress-updates).
+
+---
+
+## The agent loop
+
+### `ready`
+
+```sh
+slop ready
+slop ready --label area:auth
+slop ready --resumable
+slop ready --json --budget 3000
+```
+
+Lists tickets that are `open`, have no live blockers, and no active
+session — ordered by priority then age (oldest first). Drafts and
+in-review tickets never appear.
+
+| Flag | Meaning |
+|---|---|
+| `--label <label>` | filter to tickets carrying this label |
+| `--resumable` | also list stopped or gone-stale in_progress/review tickets worth resuming |
+| `--json` | machine-readable |
+| `--budget <n>` | cap output size, eliding lowest-priority/least-relevant tickets first |
+
+### `start`
+
+```sh
+slop start <ref>
+slop start <ref> --as ryan --harness codex
+slop start <ref> --takeover
+slop start <ref> --json
+```
+
+Creates a session (harness + git capture), moves the ticket to
+`in_progress`, and prints the context pack.
+
+| Flag | Meaning |
+|---|---|
+| `--as <name>` | override actor identity for this session |
+| `--harness <kind>` | `claude-code\|opencode\|codex\|other` — overrides auto-detection |
+| `--takeover` | take over a ticket with another active session (logged as a takeover event) |
+| `--json` | small stable result (session/ticket ids, git info) — **omits** the context pack; follow with `slop context <ref> --json` |
+
+Starting a ticket that's currently `review` (changes-requested re-entry)
+never needs `--takeover` — it's logged as `re_entry: true`, not a takeover.
+Starting a ticket someone else has actively `in_progress` **does** need
+`--takeover`; without it the command refuses with a `CONFLICT` (exit `6`).
+
+### `context`
+
+```sh
+slop context <ref>
+slop context <ref> --json --budget 4000
+```
+
+Reprints `<ref>`'s context pack (spec, ancestry, blockers, prior sessions)
+mid-session, without changing state — useful after context compaction.
+
+| Flag | Meaning |
+|---|---|
+| `--budget <n>` | cap output; elides oldest sessions, then long `spec.details_md`, before ever hard-truncating |
+| `--json` | structured pack; degrades to a minimal-but-valid envelope under a tight budget rather than corrupting the JSON |
+
+### `plan`
+
+```sh
+slop plan <ref> "step 1" "step 2" "step 3"   # sets/revises the plan (new version)
+slop plan <ref> --check 2
+slop plan <ref> --uncheck 2
+```
+
+Step text and `--check`/`--uncheck` are mutually exclusive; `--check` and
+`--uncheck` are mutually exclusive with each other. Supplying step text
+always creates a **new plan version** (diffable from the last); checking or
+unchecking a step number (1-based) mutates the *current* version in place
+— it does not version-bump.
+
+### `review`
+
+```sh
+slop review <ref> --mr https://github.com/org/repo/pull/42
+slop review <ref>                       # legal, but nags on stderr
+```
+
+Moves `in_progress → review`. `--mr` is recommended, not required (D15):
+omitting it still moves the ticket, but nags on stderr and leaves
+`review.mr` absent. `--transcript <path>` overrides transcript
+auto-detection for this call.
+
+### `stop`
+
+```sh
+slop stop <ref> --note "state: X done, next: Y, gotcha: Z"
+```
+
+Ends the current session without completing the ticket: hands it back to
+`open`, records the handoff note, captures the harness transcript. Never
+blocks if the transcript can't be found — warns instead. `--transcript
+<path>` is a manual override.
+
+### `done`
+
+```sh
+slop done <ref> --note "merged and verified"
+slop done <ref> --note "…" --outcome "Long-form writeup of what changed and why."
+slop done <ref> --outcome - < outcome.md
+```
+
+Completes `<ref>` — legal from `review` **or** directly from
+`in_progress` (review is optional). Finalizes the session (end summary +
+transcript), then runs the done-cascade exactly once, reporting any
+ticket this one was blocking that just became unblocked.
+
+| Flag | Meaning |
+|---|---|
+| `--note <text>` | completion note (also becomes the session's end summary and the ticket's `latest_note`) |
+| `--outcome <text>` | long-form resolution writeup stored on the ticket; `-` reads stdin |
+| `--transcript <path>` | manual transcript path override |
+
+Completing a non-`adhoc` ticket directly from `in_progress` (never went
+through `review`) still succeeds but nags on stderr; `adhoc` tickets and
+the `review → done` path never nag.
+
+### `drop`
+
+```sh
+slop drop <ref> --reason "superseded by ticket_01…"
+```
+
+Marks `<ref>` `dropped` (wontdo) from any non-terminal state. `--reason`
+is **required**. Finalizes an active session if one exists, and runs the
+same done-cascade `done` does — a dropped ticket also stops blocking its
+dependents. `--transcript <path>` only matters if there's an active
+session to finalize.
+
+---
+
+## Inspecting
+
+### `status`
+
+```sh
+slop status
+slop status --json --budget 2000
+```
+
+Project pulse: counts by state, in-progress tickets with sessions, stale
+items, and tickets awaiting review with their MR links.
+
+| Flag | Meaning |
+|---|---|
+| `--json` | machine-readable |
+| `--budget <n>` | elides stale rows, then review rows, then in-progress rows, least-important-first; the counts/derived totals are always kept in full |
+
+### `show`
+
+```sh
+slop show <ref>
+slop show <ref> --context
+slop show <ref> --tree
+slop show <ref> --json
+```
+
+A ticket's full details: spec, state, edges, sessions, and history.
+
+| Flag | Meaning |
+|---|---|
+| `--context` | include the full context pack |
+| `--tree` | render the ticket's ancestry/descendant tree |
+| `--budget <n>` | caps `--context` output only — a single ticket/tree view is never elided |
+| `--json` | machine-readable (ticket, plus `--tree`/`--context` data when given) |
+
+### `search`
+
+```sh
+slop search "oauth callback"
+slop search "reset token" --json --limit 10
+```
+
+A naive, case-insensitive scan over ticket names, specs, and progress-note
+history — every space-separated word must match somewhere. This is **not**
+a query language (no field filters) — that's the parked SlopQL feature.
+
+| Flag | Meaning |
+|---|---|
+| `--json` | machine-readable |
+| `--limit <n>` | cap result count |
+| `--budget <n>` | elides lowest-ranked results first |
+
+### `events`
+
+```sh
+slop events
+slop events --ticket <ref>
+slop events --since event_01KY… --json
+```
+
+Lists immutable events in cursor order — ascending by event id, which
+sorts chronologically (oldest first).
+
+| Flag | Meaning |
+|---|---|
+| `--since <event_id>` | exclusive cursor: only events after this id |
+| `--ticket <ref>` | scope to one ticket (id, slug, or short prefix) |
+| `--limit <n>` | cap result count |
+| `--json` | events plus a `next_cursor` for paging |
+| `--budget <n>` | elides the newest trailing events first, adjusting `next_cursor`/`has_more` to match what's actually returned |
+
+### `web`
+
+```sh
+slop web
+slop web --port 0     # pick a free port
+```
+
+Serves the read-only local explorer. See [Web UI](web-ui.md) for what's
+in it. Default port **4553**; `--port 0` picks a free port. Binds to
+`127.0.0.1` only — it is never reachable off-machine.
