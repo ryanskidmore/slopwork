@@ -1,0 +1,18 @@
+{
+  "id": "event_01KYB1DRQM2R6EK8HDWVYW9P2Z",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": "session_01KYB1DRQDM5JPH288YE664ZYA",
+  "verb": "session.started",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KYB1DRQDM5JPH288YE664ZYA"
+  },
+  "payload": {
+    "harness": "claude-code",
+    "takeover": false
+  },
+  "at": "2026-07-24T21:45:10.132Z"
+}

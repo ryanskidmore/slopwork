@@ -1,0 +1,52 @@
+{
+  "id": "session_01KYB1DRQDM5JPH288YE664ZYA",
+  "ticket": "ticket_01KYAY563XSEE9C0AEZ7MH23HG",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "worktree-agent-a2eee53c16d94144c",
+    "commit_at_start": "52ae2415395d6f57600071020b3ac301875ddcbf"
+  },
+  "started_at": "2026-07-24T21:45:10.125Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Scaffold frontend toolchain: React+TS, Tailwind v4, shadcn/ui components (via CLI where possible), self-hosted mono+sans fonts, dual tsconfig, build wiring into bun run build",
+          "checked": true
+        },
+        {
+          "text": "Design + implement read-only JSON API in src/web (routes, DTOs reusing overlays/markdown/html safety helpers), keep the 5 wave-1 hardening fixes",
+          "checked": true
+        },
+        {
+          "text": "Build the React SPA: app shell (topbar/nav/theme toggle/command palette), ticket list+filters, tree view, ticket detail with audit-spine timeline, transcript viewer, review panel, stale panel",
+          "checked": true
+        },
+        {
+          "text": "Wire SPA build into bun run build for a single self-contained binary; delete old server-rendered view files/tests; update .oxfmtrc.json exclusions",
+          "checked": true
+        },
+        {
+          "text": "Rewrite/port tests: unit tests for new pure logic, acceptance tests against the JSON API + SPA shell (preserving host-allowlist/config-fault-tolerance/HEAD/reusePort/jira-url coverage), add a build-artifact smoke test",
+          "checked": true
+        },
+        {
+          "text": "Update docs/web-ui.md and README dev-loop docs; run full gate (build/test/lint/typecheck/format:check) and fix to green; file discovered follow-ups; slop review",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T21:45:20.605Z"
+    }
+  ],
+  "end_summary": null,
+  "transcript_ref": "transcripts/session_01KYB1DRQDM5JPH288YE664ZYA.jsonl"
+}

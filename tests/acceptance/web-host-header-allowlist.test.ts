@@ -146,7 +146,18 @@ describe("web: Host-header allowlist blocks DNS rebinding", () => {
 
   it("normal browsing (real requests, no Host tampering) is unaffected", async () => {
     if (!server) throw new Error("server not started");
-    for (const path of ["/tickets", "/tree", "/review", "/stale", "/assets/style.css"]) {
+    for (const path of [
+      "/tickets",
+      "/tree",
+      "/review",
+      "/stale",
+      "/assets/app.css",
+      "/assets/app.js",
+      "/api/tickets",
+      "/api/tree",
+      "/api/review",
+      "/api/stale",
+    ]) {
       const res = await getWithHost(server.port, path, `127.0.0.1:${server.port}`);
       expect(res.statusCode, path).not.toBe(403);
     }

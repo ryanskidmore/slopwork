@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    /* Browser SPA typecheck config — deliberately separate from the repo
+     * root tsconfig.json, which targets `lib: ["ESNext"]` + `types: ["bun"]`
+     * for the Bun-only server/CLI code and has no DOM lib at all. This SPA
+     * runs in a browser, not under Bun, so it needs the opposite: DOM libs,
+     * react-jsx transform, no Bun ambient types. `bun run typecheck:web`
+     * (package.json) runs this config; the root `typecheck` script covers
+     * everything else under src/ and tests/ as before.
+     */
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleDetection": "force",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "types": [],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  },
+  "include": ["**/*.ts", "**/*.tsx", "../api/types.ts"]
+}

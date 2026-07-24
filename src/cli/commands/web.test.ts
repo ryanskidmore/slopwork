@@ -318,48 +318,60 @@ afterAll(async () => {
 
 describe("web-one-malformed-db-file-500s-every-page-and-leaks-filesyst", () => {
   describe("a corrupt ticket file no longer breaks the listing views", () => {
-    // /tickets and /tree render every ticket regardless of state, so the
-    // two good tickets (freshly created, neither in "review" nor stale)
-    // are asserted present there. /review and /stale are STATE-filtered
-    // views — none of this fixture's tickets are in "review" state or old
-    // enough to be stale, so both legitimately render an empty table; the
-    // real assertion for them is simply "200, not 500" (proven separately
-    // below), not that they list tickets which were never going to be in
-    // an empty-by-construction filtered view in the first place.
-    it.each(["/tickets", "/tree"] as const)(
-      "%s still 200s and lists the good tickets, excluding only the corrupt one",
-      async (path) => {
-        const res = await get(path);
-        expect(res.status).toBe(200);
-        const body = await res.text();
-        expect(body).toContain(goodTicket.name);
-        expect(body).toContain(sessionTicket.name);
-        // The corrupt ticket itself is simply absent, not rendered garbled.
-        expect(body).not.toContain(badTicket.name);
-      },
-    );
+    // /api/tickets and /api/tree render every ticket regardless of state, so
+    // the two good tickets (freshly created, neither in "review" nor stale)
+    // are asserted present there. /api/review and /api/stale are
+    // STATE-filtered — none of this fixture's tickets are in "review" state
+    // or old enough to be stale, so both legitimately return an empty list;
+    // the real assertion for them is simply "200, not 500" (proven
+    // separately below), not that they list tickets which were never going
+    // to be in an empty-by-construction filtered view in the first place.
+    it("/api/tickets still 200s and lists the good tickets, excluding only the corrupt one", async () => {
+      const res = await get("/api/tickets");
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { tickets: Array<{ name: string }> };
+      const names = body.tickets.map((t) => t.name);
+      expect(names).toContain(goodTicket.name);
+      expect(names).toContain(sessionTicket.name);
+      // The corrupt ticket itself is simply absent, not rendered garbled.
+      expect(names).not.toContain(badTicket.name);
+    });
 
-    it.each(["/review", "/stale"] as const)("%s still 200s (never a 500)", async (path) => {
+    it("/api/tree still 200s and lists the good tickets, excluding only the corrupt one", async () => {
+      const res = await get("/api/tree");
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { roots: Array<{ ticket: { name: string } }> };
+      const names = body.roots.map((r) => r.ticket.name);
+      expect(names).toContain(goodTicket.name);
+      expect(names).toContain(sessionTicket.name);
+      expect(names).not.toContain(badTicket.name);
+    });
+
+    it.each(["/api/review", "/api/stale"] as const)("%s still 200s (never a 500)", async (path) => {
       const res = await get(path);
       expect(res.status).toBe(200);
-      const body = await res.text();
+      const body = (await res.json()) as {
+        tickets?: Array<{ name: string }>;
+        rows?: Array<{ ticket: { name: string } }>;
+      };
+      const names = (body.tickets ?? body.rows?.map((r) => r.ticket) ?? []).map((t) => t.name);
       // Never the corrupt ticket, whatever the view's own state filter did.
-      expect(body).not.toContain(badTicket.name);
+      expect(names).not.toContain(badTicket.name);
     });
   });
 
   describe("an unrelated ticket's own detail page is unaffected", () => {
     it("200s and renders the real, unrelated, well-formed ticket", async () => {
-      const res = await get(`/tickets/${goodTicket.id}`);
+      const res = await get(`/api/tickets/${goodTicket.id}`);
       expect(res.status).toBe(200);
-      const body = await res.text();
-      expect(body).toContain(goodTicket.name);
+      const body = (await res.json()) as { ticket: { name: string } };
+      expect(body.ticket.name).toBe(goodTicket.name);
     });
   });
 
   describe("the corrupted ticket's own detail page degrades to 404, not 500", () => {
     it("404s rather than crashing (it's excluded from the tolerant listing findTicketByRef scans)", async () => {
-      const res = await get(`/tickets/${badTicket.id}`);
+      const res = await get(`/api/tickets/${badTicket.id}`);
       expect(res.status).toBe(404);
     });
   });
@@ -367,14 +379,14 @@ describe("web-one-malformed-db-file-500s-every-page-and-leaks-filesyst", () => {
   describe("a genuinely unexpected 500 (corrupt session file, strict by-id read) leaks nothing", () => {
     it("still 500s — this fix does not paper over real errors", async () => {
       const res = await get(
-        `/tickets/${sessionTicket.id}/sessions/${corruptedSessionId}/transcript`,
+        `/api/tickets/${sessionTicket.id}/sessions/${corruptedSessionId}/transcript`,
       );
       expect(res.status).toBe(500);
     });
 
     it("the 500 body contains no server filesystem path", async () => {
       const res = await get(
-        `/tickets/${sessionTicket.id}/sessions/${corruptedSessionId}/transcript`,
+        `/api/tickets/${sessionTicket.id}/sessions/${corruptedSessionId}/transcript`,
       );
       const body = await res.text();
       expect(body).not.toContain(root);
@@ -384,7 +396,7 @@ describe("web-one-malformed-db-file-500s-every-page-and-leaks-filesyst", () => {
 
     it("the 500 body is NOT Bun's verbose dev error page (no stack trace/source excerpt)", async () => {
       const res = await get(
-        `/tickets/${sessionTicket.id}/sessions/${corruptedSessionId}/transcript`,
+        `/api/tickets/${sessionTicket.id}/sessions/${corruptedSessionId}/transcript`,
       );
       const body = await res.text();
       // "__bunfallback" is Bun's own dev-mode error-overlay marker (see the
@@ -400,13 +412,13 @@ describe("web-one-malformed-db-file-500s-every-page-and-leaks-filesyst", () => {
   });
 
   describe("still strictly read-only", () => {
-    it("POST /tickets returns 405, never a mutation", async () => {
-      const res = await get("/tickets", { method: "POST" });
+    it("POST /api/tickets returns 405, never a mutation", async () => {
+      const res = await get("/api/tickets", { method: "POST" });
       expect(res.status).toBe(405);
     });
 
-    it("POST to a ticket detail route returns 405", async () => {
-      const res = await get(`/tickets/${goodTicket.id}`, { method: "POST" });
+    it("POST to a ticket detail API route returns 405", async () => {
+      const res = await get(`/api/tickets/${goodTicket.id}`, { method: "POST" });
       expect(res.status).toBe(405);
     });
   });
@@ -438,7 +450,7 @@ describe("SLOP_WEB_DEBUG opts back into the verbose dev error page", () => {
     if (!debugServer) throw new Error("debug server not started");
     const res = await fetch(
       new URL(
-        `/tickets/${sessionTicket.id}/sessions/${corruptedSessionId}/transcript`,
+        `/api/tickets/${sessionTicket.id}/sessions/${corruptedSessionId}/transcript`,
         debugServer.baseUrl,
       ),
     );

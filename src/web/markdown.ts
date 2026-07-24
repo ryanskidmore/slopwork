@@ -25,10 +25,10 @@
  * against `Bun.markdown.html` directly — see this module's test file).
  * `sanitizeMarkdownHtml` below post-processes the generated markup and
  * neutralises any `href`/`src` whose scheme isn't on the same allowlist
- * `safeUrl` (src/web/html.ts) enforces for the MR link, so the two guards
- * can never drift apart.
+ * `safeUrl` (src/web/url-safety.ts) enforces for the MR/jira links, so the
+ * two guards can never drift apart.
  */
-import { safeUrl } from "./html.js";
+import { safeUrl } from "./url-safety.js";
 
 const SAFE_OPTIONS: Bun.markdown.Options = {
   noHtmlBlocks: true,

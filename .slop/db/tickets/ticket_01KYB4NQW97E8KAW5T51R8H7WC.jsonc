@@ -1,0 +1,44 @@
+{
+  "id": "ticket_01KYB4NQW97E8KAW5T51R8H7WC",
+  "name": "Add a lightweight visual/screenshot smoke test for slop web",
+  "slug": "add-a-lightweight-visual-screenshot",
+  "spec": {
+    "summary": "The web UI test suite (D5.test.ts, web-real-repo.test.ts, etc.) is entirely black-box HTTP/JSON assertions by design (Bun-only globals aren't available inside vitest workers) - it structurally cannot catch real rendering bugs: CSS/layout defects, broken HTML attribute quoting, or a Tailwind utility that silently produces zero visual output.",
+    "details_md": "During rewrite-slop-web-as-a (React+Tailwind+shadcn SPA rewrite), the full green gate (build/test/lint/typecheck/format:check, 1913 passing tests) did NOT catch two real, user-visible bugs, both only found by actually rendering the app in a headless browser and looking. 1) The inline SVG favicon's own attributes used double quotes while embedded inside a double-quoted href attribute in the shell HTML, corrupting HTML parsing. Valid TypeScript, valid-looking template string; no automated check flagged it. 2) The audit-spine timeline's connecting rail (a Tailwind before-pseudo-element) rendered completely invisible: Tailwind only generates a pseudo-element's box when it also has an explicit content utility applied; every other before-prefixed utility on the same element is silently inert without it. Computed styles were all individually correct (position, color, dimensions); the element just never existed in the render tree. No test, unit, typecheck, or black-box HTTP, can see this from JSON/HTML source text alone. Both were only caught by a manual playwright install-chromium plus screenshot pass during this ticket's own QA, not by CI. That tooling worked in this sandboxed environment without root/sudo.",
+    "acceptance": [
+      "A repeatable script or test that spawns slop web, takes at least one real screenshot (or does an equivalent headless-browser DOM/computed-style assertion) of the ticket list and ticket-detail/audit-spine pages, and fails if a page throws a console error, a known signature element has zero rendered size, or obvious HTML-parsing corruption is present",
+      "Documented in README's Web UI development section as part of the dev/verification loop",
+      "Wired into CI if the runtime cost is acceptable, or clearly documented as a manual pre-merge step if not"
+    ],
+    "context": [
+      "src/web/frontend/, tests/acceptance/D5.test.ts header comment (explains why every other web test is black-box HTTP-only)",
+      "docs/DECISIONS.md Web v2 entry (rewrite-slop-web-as-a), the paragraph on the two bugs found only by rendering"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYAY563XSEE9C0AEZ7MH23HG"
+  ],
+  "root_id": "ticket_01KYB4NQW97E8KAW5T51R8H7WC",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T22:41:57.133Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T22:41:57.133Z",
+  "updated_at": "2026-07-24T22:41:57.133Z"
+}
