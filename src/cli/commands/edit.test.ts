@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
+import { EXIT_CODES } from "../../core/exit-codes.js";
 import type { TicketId } from "../../core/index.js";
 import { readTicket, repoPaths, ticketFilePath } from "../../repo/index.js";
 import { pickEditorCommand, runEdit } from "./edit.js";
@@ -299,6 +300,55 @@ describe("runEdit (in-process)", () => {
     const out = captureOutput();
     try {
       await expect(withCwd(root, () => runEdit(id))).rejects.toThrow(/no editor configured/);
+    } finally {
+      out.restore();
+    }
+  });
+
+  // edit-vi-fallback-hangs-agents: the regression this ticket closes.
+  // Before the fix, this exact shape ($VISUAL/$EDITOR both unset, no TTY —
+  // vitest workers never have one, same as any harness-driven pipe) fell
+  // through to `spawnSync("vi", ..., {stdio: "inherit"})` and blocked
+  // FOREVER, hanging this very test (and the whole suite) rather than
+  // failing. That it completes at all — let alone quickly, with the
+  // documented USAGE_ERROR/exit-2 shape and a non-interactive-alternative
+  // pointer — IS the regression proof.
+  it("no $VISUAL/$EDITOR and non-TTY: fails fast (USAGE_ERROR, exit 2) instead of hanging, naming the non-interactive alternative", async () => {
+    const root = await makeTempRepo("slop-edit-inproc-nontty-fallback-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Non-TTY fallback ticket");
+    delete process.env.VISUAL;
+    delete process.env.EDITOR;
+
+    const before = await readFile(ticketFilePath(repoPaths(root), id), "utf8");
+
+    const out = captureOutput();
+    try {
+      await expect(withCwd(root, () => runEdit(id))).rejects.toMatchObject({
+        exitCode: EXIT_CODES.USAGE_ERROR,
+        message: expect.stringMatching(/not a TTY/i),
+      });
+    } finally {
+      out.restore();
+    }
+    // Never touched the file: this is a pure pre-flight refusal, no editor
+    // process was ever spawned.
+    const after = await readFile(ticketFilePath(repoPaths(root), id), "utf8");
+    expect(after).toBe(before);
+  });
+
+  it("no $VISUAL/$EDITOR and non-TTY: the error names update --parent/--blocks/--owner/--relates-to as the non-interactive alternative", async () => {
+    const root = await makeTempRepo("slop-edit-inproc-nontty-alt-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Non-TTY alternative-pointer ticket");
+    delete process.env.VISUAL;
+    delete process.env.EDITOR;
+
+    const out = captureOutput();
+    try {
+      await expect(withCwd(root, () => runEdit(id))).rejects.toThrow(
+        /update <ref> --parent.*--blocks.*--owner.*--relates-to/s,
+      );
     } finally {
       out.restore();
     }

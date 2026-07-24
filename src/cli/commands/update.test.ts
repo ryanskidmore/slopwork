@@ -470,6 +470,236 @@ describe("update --relates-to <±ref>: add/remove a relates-to edge (ticket_01KY
   });
 });
 
+describe("update --blocks/--owner/--parent: the non-interactive edge/owner repair path (edit-vi-fallback-hangs-agents)", () => {
+  it("--help lists --blocks, --owner, and --parent", () => {
+    const result = spawnSync("bun", [cliEntry, "update", "--help"], { encoding: "utf8" });
+    expect(result.stdout).toContain("--blocks");
+    expect(result.stdout).toContain("--owner");
+    expect(result.stdout).toContain("--parent");
+  });
+
+  it("--blocks +ref adds a blocking edge, visible via `show --json`", async () => {
+    const { dir } = await makeCliRepo();
+    const main = newTicketCli(dir, "ryan", "Main ticket");
+    const target = newTicketCli(dir, "ryan", "Blocked target");
+
+    const result = mustRunSlopSource(
+      ["update", main.id, "--blocks", `+${target.slug}`],
+      dir,
+      "ryan",
+    );
+    expect(result.status, result.stderr).toBe(0);
+
+    const paths = repoPaths(dir);
+    const after = await readTicket(paths, main.id);
+    expect(after.blocks).toEqual([target.id]);
+  });
+
+  it("-ref removes a previously-added blocks edge", async () => {
+    const { dir } = await makeCliRepo();
+    const main = newTicketCli(dir, "ryan", "Main ticket");
+    const target = newTicketCli(dir, "ryan", "Blocked target");
+    mustRunSlopSource(["update", main.id, "--blocks", `+${target.slug}`], dir, "ryan");
+
+    const result = mustRunSlopSource(
+      ["update", main.id, "--blocks", `-${target.slug}`],
+      dir,
+      "ryan",
+    );
+    expect(result.status, result.stderr).toBe(0);
+
+    const paths = repoPaths(dir);
+    const after = await readTicket(paths, main.id);
+    expect(after.blocks).toEqual([]);
+  });
+
+  it("rejects a self-blocks edge (exit 6, CONFLICT), leaving the ticket untouched", async () => {
+    const { dir } = await makeCliRepo();
+    const main = newTicketCli(dir, "ryan", "Main ticket");
+    const paths = repoPaths(dir);
+    const before = await readTicket(paths, main.id);
+
+    const result = runSlopSource(["update", main.id, "--blocks", `+${main.slug}`], dir, "ryan");
+    expect(result.status).toBe(6);
+    expect(result.stderr).toMatch(/blocks/);
+
+    const after = await readTicket(paths, main.id);
+    expect(after).toEqual(before);
+  });
+
+  // Unlike --relates-to (symmetric, non-cycle-checked), --blocks IS
+  // cycle-checked (edges.ts's module doc) — this is the one behavioral
+  // difference between the two that update.ts's shared `applyIdSetOps`
+  // engine does NOT paper over: validateTicketEdges's assertNoBlocksCycle
+  // still runs whenever `patch` touches `blocks`.
+  it("rejects a two-ticket blocking CYCLE (exit 6, CONFLICT) — proves --blocks is cycle-checked, unlike --relates-to", async () => {
+    const { dir } = await makeCliRepo();
+    const a = newTicketCli(dir, "ryan", "Ticket A");
+    const b = newTicketCli(dir, "ryan", "Ticket B");
+    mustRunSlopSource(["update", a.id, "--blocks", `+${b.slug}`], dir, "ryan");
+
+    const paths = repoPaths(dir);
+    const bBefore = await readTicket(paths, b.id);
+
+    // B now blocking A would close the cycle A -> B -> A.
+    const result = runSlopSource(["update", b.id, "--blocks", `+${a.slug}`], dir, "ryan");
+    expect(result.status).toBe(6);
+    expect(result.stderr).toMatch(/cycle/i);
+
+    const bAfter = await readTicket(paths, b.id);
+    expect(bAfter).toEqual(bBefore);
+  });
+
+  it("rejects a nonexistent --blocks ref (exit 4, NOT_FOUND), leaving the ticket untouched", async () => {
+    const { dir } = await makeCliRepo();
+    const main = newTicketCli(dir, "ryan", "Main ticket");
+    const paths = repoPaths(dir);
+    const before = await readTicket(paths, main.id);
+
+    const result = runSlopSource(["update", main.id, "--blocks", "+no-such-ticket"], dir, "ryan");
+    expect(result.status).toBe(4);
+
+    const after = await readTicket(paths, main.id);
+    expect(after).toEqual(before);
+  });
+
+  it("--owner <name> sets the owning actor", async () => {
+    const { dir } = await makeCliRepo();
+    const main = newTicketCli(dir, "ryan", "Main ticket");
+
+    const result = mustRunSlopSource(["update", main.id, "--owner", "priya"], dir, "ryan");
+    expect(result.status, result.stderr).toBe(0);
+
+    const paths = repoPaths(dir);
+    const after = await readTicket(paths, main.id);
+    expect(after.owner).toEqual({ name: "priya", kind: "human" });
+  });
+
+  it("--owner can be replaced by a later call", async () => {
+    const { dir } = await makeCliRepo();
+    const main = newTicketCli(dir, "ryan", "Main ticket");
+    mustRunSlopSource(["update", main.id, "--owner", "priya"], dir, "ryan");
+
+    const result = mustRunSlopSource(["update", main.id, "--owner", "sam"], dir, "ryan");
+    expect(result.status, result.stderr).toBe(0);
+
+    const paths = repoPaths(dir);
+    const after = await readTicket(paths, main.id);
+    expect(after.owner).toEqual({ name: "sam", kind: "human" });
+  });
+
+  it("rejects a blank --owner (exit 2, USAGE_ERROR), leaving the ticket untouched", async () => {
+    const { dir } = await makeCliRepo();
+    const main = newTicketCli(dir, "ryan", "Main ticket");
+    const paths = repoPaths(dir);
+    const before = await readTicket(paths, main.id);
+
+    const result = runSlopSource(["update", main.id, "--owner", "   "], dir, "ryan");
+    expect(result.status).toBe(2);
+
+    const after = await readTicket(paths, main.id);
+    expect(after).toEqual(before);
+  });
+
+  it("--parent <ref> reparents a root ticket under another, recomputing root_id/path", async () => {
+    const { dir } = await makeCliRepo();
+    const oldRoot = newTicketCli(dir, "ryan", "Old root");
+    const newParent = newTicketCli(dir, "ryan", "New parent");
+
+    const result = mustRunSlopSource(
+      ["update", oldRoot.id, "--parent", newParent.slug],
+      dir,
+      "ryan",
+    );
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).not.toMatch(/reparented — root_id\/path recomputed for \d+ descendant/);
+
+    const paths = repoPaths(dir);
+    const after = await readTicket(paths, oldRoot.id);
+    expect(after.parent).toBe(newParent.id);
+    expect(after.root_id).toBe(newParent.id);
+    expect(after.path).toEqual([newParent.id]);
+  });
+
+  it("--parent <ref> cascades root_id/path to every existing descendant, and says so on stdout", async () => {
+    const { dir } = await makeCliRepo();
+    const oldParent = newTicketCli(dir, "ryan", "Old parent");
+    const newParent = newTicketCli(dir, "ryan", "New parent");
+    mustRunSlopSource(["new", "Child ticket", "--parent", oldParent.id], dir, "ryan");
+    const childResult = runSlopSource(["search", "Child ticket", "--json"], dir, "ryan");
+    const childId = (JSON.parse(childResult.stdout) as { results: { id: TicketId }[] }).results[0]
+      ?.id;
+    if (!childId)
+      throw new Error(`could not find "Child ticket" via search:\n${childResult.stdout}`);
+    mustRunSlopSource(["new", "Grandchild ticket", "--parent", childId], dir, "ryan");
+
+    const paths = repoPaths(dir);
+    const childBefore = await readTicket(paths, childId);
+    expect(childBefore.parent).toBe(oldParent.id);
+    expect(childBefore.root_id).toBe(oldParent.id);
+
+    // Reparent the CHILD (which itself has a child, "Grandchild ticket")
+    // under newParent — the grandchild is the existing descendant whose
+    // own root_id/path must move along with it.
+    const result = mustRunSlopSource(["update", childId, "--parent", newParent.slug], dir, "ryan");
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toMatch(/reparented — root_id\/path recomputed for 1 descendant/);
+
+    const childAfter = await readTicket(paths, childId);
+    expect(childAfter.parent).toBe(newParent.id);
+    expect(childAfter.root_id).toBe(newParent.id);
+    expect(childAfter.path).toEqual([newParent.id]);
+
+    const grandchildResult = runSlopSource(["search", "Grandchild ticket", "--json"], dir, "ryan");
+    const grandchild = (JSON.parse(grandchildResult.stdout) as { results: { id: TicketId }[] })
+      .results[0];
+    if (!grandchild) throw new Error("could not find Grandchild ticket via search");
+    const grandchildAfter = await readTicket(paths, grandchild.id);
+    expect(grandchildAfter.root_id).toBe(newParent.id);
+    expect(grandchildAfter.path).toEqual([newParent.id, childId]);
+  });
+
+  it("rejects a self-parent (exit 6, CONFLICT), leaving the ticket untouched", async () => {
+    const { dir } = await makeCliRepo();
+    const main = newTicketCli(dir, "ryan", "Main ticket");
+    const paths = repoPaths(dir);
+    const before = await readTicket(paths, main.id);
+
+    const result = runSlopSource(["update", main.id, "--parent", main.slug], dir, "ryan");
+    expect(result.status).toBe(6);
+
+    const after = await readTicket(paths, main.id);
+    expect(after).toEqual(before);
+  });
+
+  it("rejects a nonexistent --parent ref (exit 4, NOT_FOUND), leaving the ticket untouched", async () => {
+    const { dir } = await makeCliRepo();
+    const main = newTicketCli(dir, "ryan", "Main ticket");
+    const paths = repoPaths(dir);
+    const before = await readTicket(paths, main.id);
+
+    const result = runSlopSource(["update", main.id, "--parent", "no-such-ticket"], dir, "ryan");
+    expect(result.status).toBe(4);
+
+    const after = await readTicket(paths, main.id);
+    expect(after).toEqual(before);
+  });
+
+  it("an external (jira:) --parent is accepted, terminating the local tree", async () => {
+    const { dir } = await makeCliRepo();
+    const main = newTicketCli(dir, "ryan", "Main ticket");
+
+    const result = mustRunSlopSource(["update", main.id, "--parent", "jira:PROJ-123"], dir, "ryan");
+    expect(result.status, result.stderr).toBe(0);
+
+    const paths = repoPaths(dir);
+    const after = await readTicket(paths, main.id);
+    expect(after.parent).toBe("jira:PROJ-123");
+    expect(after.root_id).toBe(main.id);
+    expect(after.path).toEqual([]);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // In-process coverage of `runUpdate` (real v8 coverage, no subprocess).
 // ---------------------------------------------------------------------------
@@ -478,6 +708,7 @@ function baseOpts(overrides: Partial<Parameters<typeof runUpdate>[1]> = {}) {
   return {
     label: [] as string[],
     relatesTo: [] as string[],
+    blocks: [] as string[],
     acceptance: [] as string[],
     context: [] as string[],
     ...overrides,
@@ -537,6 +768,52 @@ describe("runUpdate (in-process)", () => {
     }
     const paths = repoPaths(root);
     expect((await readTicket(paths, id)).priority).toBe(0);
+  });
+
+  // closing-loop-commands-lack-json
+  it("--json returns a stable shape (id/slug/handle/name/state/priority) on the full read-modify-write path", async () => {
+    const root = await makeTempRepo("slop-update-inproc-json-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "JSON update ticket");
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runUpdate(id, baseOpts({ priority: 0, json: true })));
+      const body = JSON.parse(out.stdout()) as {
+        id: TicketId;
+        slug: string;
+        handle: string;
+        name: string;
+        state: string;
+        priority: number;
+      };
+      expect(body.id).toBe(id);
+      expect(body.priority).toBe(0);
+      expect(body.handle).toMatch(/^t-/);
+    } finally {
+      out.restore();
+    }
+  });
+
+  // closing-loop-commands-lack-json: the lock-free PURE --progress path
+  // (ticket_01KY9RWFM80BKNE2CDX85QMKGS) is a separate early return in
+  // runUpdate — must also honor --json, not just the locked path above.
+  it("--json also works on the lock-free pure --progress path", async () => {
+    const root = await makeTempRepo("slop-update-inproc-json-progress-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "JSON progress ticket");
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () =>
+        runUpdate(id, baseOpts({ progress: "headway via json", json: true })),
+      );
+      const body = JSON.parse(out.stdout()) as { id: TicketId; state: string };
+      expect(body.id).toBe(id);
+      expect(body.state).toBe("open");
+    } finally {
+      out.restore();
+    }
   });
 
   it("--label +x adds a label; a later --label -x removes it", async () => {

@@ -1,17 +1,20 @@
 /**
  * `slop update` (B1) — the general mutator. Pure over an already-loaded
  * {@link Ticket}: given the current ticket and the parsed `--progress
- * /--state/--priority/--label/--name/--spec/--relates-to` flags, produces
- * the resulting ticket, the JSONC patch to persist it
- * (`src/tickets/patch.ts`), and the event verb/payload to emit.
+ * /--state/--priority/--label/--name/--spec/--relates-to/--blocks/--owner
+ * /--parent` flags, produces the resulting ticket, the JSONC patch to
+ * persist it (`src/tickets/patch.ts`), and the event verb/payload to emit.
  * `src/cli/commands/update.ts` owns resolving `<ref>` (including every
- * `--relates-to <±ref>` target, via `resolveTicketRef` — this module never
- * touches the repo, so it only ever sees already-resolved `TicketId`s),
- * reading stdin for `--spec -`, calling `updateTicket`, running the edges
- * -module re-validation `--relates-to` needs (`edges.ts`'s
- * `validateTicketEdges` — this module intentionally does NOT call it,
- * since that requires every OTHER ticket in the db, i.e. I/O), and
- * printing the result.
+ * `--relates-to`/`--blocks <±ref>` target and `--parent <ref>`, via
+ * `resolveTicketRef`/`resolveParentRef` — this module never touches the
+ * repo, so it only ever sees already-resolved `TicketId`s/{@link
+ * ParentResolution}s), reading stdin for `--spec -`, calling
+ * `updateTicket`, running the edges-module re-validation `--relates-to`/
+ * `--blocks`/`--parent` need (`edges.ts`'s `validateTicketEdges` — this
+ * module intentionally does NOT call it, since that requires every OTHER
+ * ticket in the db, i.e. I/O) plus, for `--parent`, the `root_id`/`path`
+ * recompute + descendant cascade (`parent.ts`'s `recomputeAncestry`, same
+ * reason), and printing the result.
  */
 import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
@@ -20,6 +23,7 @@ import { EXIT_CODES, nowIso, ticketSchema, ticketStateSchema } from "../core/ind
 import type { JsoncPatchEntry } from "../core/jsonc.js";
 import { SlopError } from "../cli/errors.js";
 import { assertLabelHasNoLeadingSigil } from "./labels.js";
+import type { ParentResolution } from "./parent.js";
 import { diffTicketPatch } from "./patch.js";
 import { checkStateTransition } from "./state.js";
 import { applySpecFieldOverrides, hasSpecFieldOverrides, parseSpecInput } from "./spec.js";
@@ -28,12 +32,19 @@ import { formatZodIssuesForUsage } from "./validate.js";
 
 /** Ticket fields `update` may ever touch — deliberately narrower than
  * `patch.ts`'s full `TICKET_FIELDS` (`edit`'s concern): `update` never
- * rewrites `id`/`slug`/`root_id`/`path`/`parent`/`blocks`/`discovered_from`/
- * `owner`/`provenance`/etc. `relates_to` is the one edge field it CAN
- * touch (`--relates-to <±ref>`, ticket_01KYA3Z9FNZ2FDMDRWNKR9EV7J) —
- * `relates-to` is the symmetric, non-cycle-checked edge (edges.ts's module
- * doc), so exposing add/remove for it here doesn't reopen any of the
- * ancestry/deadlock hazards `parent`/`blocks` carry. */
+ * rewrites `id`/`slug`/`root_id`/`path`/`discovered_from`/`provenance`/etc.
+ * `relates_to`/`blocks`/`owner`/`parent` are the edge/ownership fields it
+ * CAN touch — `--relates-to <±ref>` (ticket_01KYA3Z9FNZ2FDMDRWNKR9EV7J),
+ * `--blocks <±ref>`/`--owner <name>`/`--parent <ref>`
+ * (edit-vi-fallback-hangs-agents: a non-interactive alternative to `slop
+ * edit` for exactly this post-creation edge/owner repair, since `edit`'s
+ * `$EDITOR` fallback hangs agents on a non-TTY — see edit.ts's own fix).
+ * `root_id`/`path` are deliberately NOT in this list: unlike `relates_to`/
+ * `blocks`/`owner`, they're never diffed against `UPDATE_TOUCHABLE_FIELDS`
+ * directly — `src/cli/commands/update.ts` recomputes and patches them
+ * itself, via `recomputeAncestry`, only when `patch` here actually touches
+ * `parent` (this module has no `others`/I/O to recompute them with; see
+ * this module's top doc). */
 const UPDATE_TOUCHABLE_FIELDS = [
   "name",
   "spec",
@@ -42,6 +53,9 @@ const UPDATE_TOUCHABLE_FIELDS = [
   "priority",
   "labels",
   "relates_to",
+  "blocks",
+  "owner",
+  "parent",
   "latest_note",
   "last_activity_at",
   "updated_at",
@@ -52,6 +66,13 @@ const UPDATE_TOUCHABLE_FIELDS = [
  * "did anything REAL change" set a same-state (or otherwise fully
  * redundant) `update` call is judged against, below. Timestamps are never
  * part of this: they're an effect of a real change, not evidence of one.
+ * `parent` IS included, even though `contentNext.parent` (below) is only
+ * the raw resolved value, not yet reconciled against `root_id`/`path`
+ * (that reconciliation is `src/cli/commands/update.ts`'s job, via
+ * `recomputeAncestry`, once it sees `parent` in the returned `patch`) —
+ * "did `parent`'s own field value change" is still a perfectly complete
+ * answer on its own, independent of whatever `root_id`/`path` end up
+ * being once reconciled.
  */
 const UPDATE_CONTENT_FIELDS = [
   "name",
@@ -61,6 +82,9 @@ const UPDATE_CONTENT_FIELDS = [
   "priority",
   "labels",
   "relates_to",
+  "blocks",
+  "owner",
+  "parent",
   "latest_note",
 ] as const satisfies readonly (keyof Ticket)[];
 
@@ -139,12 +163,65 @@ export function parseRelatesToOpText(raw: string): RelatesToOpText {
   return { op: sigil, ref };
 }
 
-/** Apply already-resolved `--relates-to` ops to `current.relates_to` — the
- * `TicketId` analogue of {@link applyLabelOps}: `relates_to` is a SET, not
- * a multiset (edges.ts's `assertDegreeCap` rejects a duplicate target as
- * an error, same as `--blocks` on `new`), so `+` on an already-present
- * target and `-` on an absent one are both no-ops, never an error. */
-function applyRelatesToOps(current: readonly TicketId[], ops: readonly RelatesToOp[]): TicketId[] {
+/**
+ * `--blocks <±ref>` — the `edit-vi-fallback-hangs-agents` extension of the
+ * exact same pattern `--relates-to` established: `blocks`/`relates-to` are
+ * both `TicketId[]` set fields on {@link Ticket}, so their unresolved-text
+ * ({@link BlocksOpText}) and resolved ({@link BlocksOp}) shapes, and
+ * {@link parseBlocksOpText}'s parsing, are byte-for-byte the same logic as
+ * {@link RelatesToOpText}/{@link RelatesToOp}/{@link parseRelatesToOpText}
+ * — kept as separate named types/functions (rather than one shared generic
+ * exposed publicly) so each flag's own error messages name itself
+ * correctly, and so a future divergence between the two edge kinds (e.g.
+ * `blocks` gaining a rule `relates-to` doesn't need) has an obvious, already
+ * -separate home to land in. UNLIKE `relates-to` (symmetric, non-cycle
+ * -checked — edges.ts's module doc), `blocks` IS cycle-checked: `src/cli/
+ * commands/update.ts` runs `edges.ts`'s full `validateTicketEdges` whenever
+ * the returned `patch` touches `blocks`, same as it already does for
+ * `relates_to`.
+ */
+export interface BlocksOpText {
+  op: "+" | "-";
+  ref: string;
+}
+
+/** A `--blocks <±ref>` entry AFTER `src/cli/commands/update.ts` has
+ * resolved its ref text to a real {@link TicketId} via `resolveTicketRef`
+ * — what {@link buildUpdate} actually consumes (see {@link UpdateInput}). */
+export interface BlocksOp {
+  op: "+" | "-";
+  id: TicketId;
+}
+
+/** Parse one `--blocks +<ref>`/`--blocks -<ref>` entry — see
+ * {@link parseRelatesToOpText}'s doc for why this is deliberately the same
+ * logic under a `--blocks`-specific name. */
+export function parseBlocksOpText(raw: string): BlocksOpText {
+  const sigil = raw.charAt(0);
+  if (sigil !== "+" && sigil !== "-") {
+    throw new SlopError(
+      `--blocks "${raw}": must start with + (add) or - (remove), e.g. --blocks +auth-migration ` +
+        "--blocks -old-spike",
+      EXIT_CODES.USAGE_ERROR,
+    );
+  }
+  const ref = raw.slice(1).trim();
+  if (ref.length === 0) {
+    throw new SlopError(`--blocks "${raw}": nothing after the ${sigil}`, EXIT_CODES.USAGE_ERROR);
+  }
+  return { op: sigil, ref };
+}
+
+/** Apply already-resolved add/remove ops to a `TicketId[]` SET field — the
+ * shared engine behind {@link applyRelatesToOps}/`applyBlocksOps` below
+ * (both `relates_to`/`blocks` are sets, not multisets: edges.ts's
+ * `assertDegreeCap` rejects a duplicate target as an error, same as
+ * `--blocks` on `new`), so `+` on an already-present target and `-` on an
+ * absent one are both no-ops, never an error. */
+function applyIdSetOps(
+  current: readonly TicketId[],
+  ops: readonly { op: "+" | "-"; id: TicketId }[],
+): TicketId[] {
   const ids = [...current];
   for (const { op, id } of ops) {
     if (op === "+") {
@@ -155,6 +232,31 @@ function applyRelatesToOps(current: readonly TicketId[], ops: readonly RelatesTo
     }
   }
   return ids;
+}
+
+function applyRelatesToOps(current: readonly TicketId[], ops: readonly RelatesToOp[]): TicketId[] {
+  return applyIdSetOps(current, ops);
+}
+
+function applyBlocksOps(current: readonly TicketId[], ops: readonly BlocksOp[]): TicketId[] {
+  return applyIdSetOps(current, ops);
+}
+
+/** The value to store on `ticket.parent` for an already-resolved
+ * `--parent <ref>` — `undefined` only for `resolution.kind === "none"`,
+ * which `src/cli/commands/update.ts` never actually passes in (it only
+ * calls `resolveParentRef` — and thus only ever produces a
+ * `parentResolution` at all — when `--parent` was given a value; see
+ * {@link UpdateInput.parentResolution}'s doc). Mirrors `parent.ts`'s own
+ * `ancestryFor`, minus the `root_id`/`path` half that function also
+ * computes — `update` has no fresh id to compute a NEW root from the way
+ * `new` does, and reconciling an EXISTING ticket's `root_id`/`path` against
+ * a changed `parent` is `recomputeAncestry`'s job, one layer up (needs
+ * every other ticket — I/O). */
+function parentValueFromResolution(resolution: ParentResolution): string | undefined {
+  if (resolution.kind === "local") return resolution.ticket.id;
+  if (resolution.kind === "external") return resolution.ref;
+  return undefined;
 }
 
 function applyLabelOps(current: readonly string[], ops: readonly LabelOp[]): string[] {
@@ -200,6 +302,34 @@ export interface UpdateInput {
    * `buildUpdate` call site to spell out an empty array.
    */
   relatesToOps?: RelatesToOp[];
+  /** Already-resolved `--blocks <±ref>` entries (repeatable) — same
+   * resolved-elsewhere convention as {@link relatesToOps}; see
+   * {@link BlocksOp}'s doc for the `blocks` vs `relates_to` distinction
+   * (cycle-checked). Optional for the same `draft.ts`/`undraft.ts` reason. */
+  blocksOps?: BlocksOp[];
+  /** Raw `--owner <name>` value, or `undefined` if omitted — a plain
+   * string, resolved to `{name, kind: "human"}` here (same convention
+   * `tickets/new.ts`'s own `ownerRaw` uses), never `null`: `update` has no
+   * supported way to CLEAR an owner (mirrors `--name`'s own "set/replace
+   * only" scope) — hand-edit via `slop edit` for that rarer case. */
+  ownerRaw?: string;
+  /**
+   * Already-resolved `--parent <ref>` — `src/cli/commands/update.ts` has
+   * turned the raw ref text into a {@link ParentResolution} via
+   * `parent.ts`'s `resolveParentRef` (local ref lookup OR an external
+   * `jira:`-shaped ref, exactly `new --parent`'s own resolution) before
+   * this ever runs. `undefined` when `--parent` was omitted entirely —
+   * `buildUpdate` only ever SETS `ticket.parent` from this (never clears
+   * it: there is no `--parent` value meaning "no parent", matching `--name`'s
+   * "set/replace only" scope above). Only `ticket.parent` itself is set
+   * here; `root_id`/`path` are NOT recomputed by this pure function (that
+   * needs every OTHER ticket, i.e. I/O — `src/cli/commands/update.ts` runs
+   * `parent.ts`'s `recomputeAncestry` itself, under the same lock, whenever
+   * the returned `patch` touches `parent`, then persists ITS returned
+   * `root_id`/`path`/descendant cascade on top of what this function
+   * already computed — see this module's top doc).
+   */
+  parentResolution?: ParentResolution;
 }
 
 export interface UpdateResult {
@@ -221,7 +351,10 @@ function hasAnyInput(input: UpdateInput): boolean {
     input.detailsRaw !== undefined ||
     input.acceptance.length > 0 ||
     input.context.length > 0 ||
-    (input.relatesToOps?.length ?? 0) > 0
+    (input.relatesToOps?.length ?? 0) > 0 ||
+    (input.blocksOps?.length ?? 0) > 0 ||
+    input.ownerRaw !== undefined ||
+    input.parentResolution !== undefined
   );
 }
 
@@ -235,11 +368,12 @@ function hasAnyInput(input: UpdateInput): boolean {
  *     illegal transition per `state.ts`'s `checkStateTransition` — this is
  *     B1's brief's "must reject illegal transitions per §2 with exit 6".
  *
- * Does NOT itself run `edges.ts`'s `validateTicketEdges` degree-cap check
- * for `--relates-to` — that needs every OTHER ticket in the db (I/O), which
- * this pure function never does; `src/cli/commands/update.ts` runs it,
- * under the same lock, whenever the returned `patch` actually touches
- * `relates_to`.
+ * Does NOT itself run `edges.ts`'s `validateTicketEdges` degree-cap/cycle
+ * checks for `--relates-to`/`--blocks`/`--parent`, or `parent.ts`'s
+ * `recomputeAncestry` for `--parent` — both need every OTHER ticket in the
+ * db (I/O), which this pure function never does; `src/cli/commands/
+ * update.ts` runs them, under the same lock, whenever the returned `patch`
+ * actually touches `relates_to`/`blocks`/`parent`.
  */
 export function buildUpdate(
   current: Ticket,
@@ -249,7 +383,8 @@ export function buildUpdate(
   if (!hasAnyInput(input)) {
     throw new SlopError(
       "nothing to update — pass at least one of --progress/--state/--priority/--label/" +
-        "--name/--spec/--summary/--details/--acceptance/--context/--relates-to",
+        "--name/--spec/--summary/--details/--acceptance/--context/--relates-to/--blocks/" +
+        "--owner/--parent",
       EXIT_CODES.USAGE_ERROR,
     );
   }
@@ -313,6 +448,12 @@ export function buildUpdate(
     priority: input.priority ?? current.priority,
     labels: applyLabelOps(current.labels, labelOps),
     relates_to: applyRelatesToOps(current.relates_to, input.relatesToOps ?? []),
+    blocks: applyBlocksOps(current.blocks, input.blocksOps ?? []),
+    owner: input.ownerRaw !== undefined ? { name: input.ownerRaw, kind: "human" } : current.owner,
+    parent:
+      input.parentResolution !== undefined
+        ? parentValueFromResolution(input.parentResolution)
+        : current.parent,
     latest_note: input.progress ?? current.latest_note,
   };
 
@@ -381,6 +522,15 @@ export function buildUpdate(
   }
   if ((input.relatesToOps?.length ?? 0) > 0 && patchedFields.has("relates_to")) {
     payload.relates_to = validated.relates_to;
+  }
+  if ((input.blocksOps?.length ?? 0) > 0 && patchedFields.has("blocks")) {
+    payload.blocks = validated.blocks;
+  }
+  if (input.ownerRaw !== undefined && patchedFields.has("owner")) {
+    payload.owner = validated.owner;
+  }
+  if (input.parentResolution !== undefined && patchedFields.has("parent")) {
+    payload.parent = validated.parent ?? null;
   }
 
   return { ticket: validated, patch, verb, payload };

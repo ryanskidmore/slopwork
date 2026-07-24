@@ -7,6 +7,7 @@ import {
   EXIT_CODES,
   nowIso,
   sessionSchema,
+  shortTicketCode,
   ticketSchema,
 } from "../../core/index.js";
 import {
@@ -37,6 +38,7 @@ import { assertMaxLength, printWarning, sessionOwnershipWarning } from "./shared
 interface DropCommandOptions {
   reason: string;
   transcript?: string;
+  json?: boolean;
 }
 
 /** Same shape as `done.ts`'s `DONE_SESSION_FIELDS` — see that module's doc. */
@@ -213,6 +215,30 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
     process.stderr.write(`${formatIndexProblems(result.cascade.problems)}\n`);
   }
 
+  if (opts.json) {
+    // closing-loop-commands-lack-json: same `unblocked`/`problems` shape
+    // as `done --json` (both run the identical B4 done-cascade) — see that
+    // command's doc for the field-naming rationale.
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          id: result.ticket.id,
+          slug: result.ticket.slug,
+          handle: shortTicketCode(result.ticket.id),
+          name: result.ticket.name,
+          state: result.ticket.state,
+          reason: opts.reason,
+          transcript: result.session?.transcript_ref ?? null,
+          unblocked: result.cascade.unblocked,
+          problems: result.cascade.problems.map((p) => ({ id: p.id, message: p.message })),
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    return;
+  }
+
   process.stdout.write(
     `dropped ${result.ticket.id} (${result.ticket.slug})\n` +
       `  ${result.ticket.name}\n` +
@@ -243,6 +269,10 @@ export function registerDropCommand(program: Command): void {
     .option(
       "--transcript <path>",
       "manual transcript path (only relevant if there's an active session to finalize)",
+    )
+    .option(
+      "--json",
+      "machine-readable result (id, slug, handle, name, state, reason, transcript, unblocked, problems)",
     )
     .action(runDrop);
 }

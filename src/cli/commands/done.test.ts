@@ -572,6 +572,54 @@ describe("runDone (in-process)", () => {
     expect(dependentTicket.state).toBe("open");
   });
 
+  // closing-loop-commands-lack-json: the motivating example from this
+  // ticket's own brief — "done's unblocked-cascade list is prose only" —
+  // gets its own dedicated assertion: `unblocked` must be a real
+  // `TicketId[]`, not text an agent would otherwise have to scrape.
+  it("--json returns a stable, machine-readable shape, including the unblocked-cascade list as an array", async () => {
+    const root = await makeTempRepo("slop-done-inproc-json-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const dependent = await jsonNewTicket(root, "Dependent ticket (json)");
+    const id = await jsonNewTicket(root, "Blocking ticket (json)", { blocks: [dependent] });
+    await startTicket(root, id);
+    const reviewOut = captureOutput();
+    try {
+      await withCwd(root, () => runReview(id, { mr: "https://example.com/pr/9" }));
+    } finally {
+      reviewOut.restore();
+    }
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () =>
+        runDone(id, { note: "shipped via json", outcome: "Full writeup.", json: true }),
+      );
+      const body = JSON.parse(out.stdout()) as {
+        id: TicketId;
+        slug: string;
+        handle: string;
+        name: string;
+        state: string;
+        note: string;
+        resolution_set: boolean;
+        transcript: string | null;
+        unblocked: TicketId[];
+        problems: unknown[];
+        skipped_review: boolean;
+      };
+      expect(body.id).toBe(id);
+      expect(body.state).toBe("done");
+      expect(body.note).toBe("shipped via json");
+      expect(body.resolution_set).toBe(true);
+      expect(body.unblocked).toEqual([dependent]);
+      expect(body.problems).toEqual([]);
+      expect(body.skipped_review).toBe(false);
+      expect(body.handle).toMatch(/^t-/);
+    } finally {
+      out.restore();
+    }
+  });
+
   it("completes in_progress -> done directly for a non-adhoc ticket, nagging on stderr", async () => {
     const root = await makeTempRepo("slop-done-inproc-nag-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });

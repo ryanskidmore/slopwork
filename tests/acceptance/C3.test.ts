@@ -189,6 +189,12 @@ const ORACLE: Record<Exclude<Op, "update">, Partial<Record<TicketState, TicketSt
   // dedicated coverage (C1.test.ts) — see runPropertyCase's skip below.
   start: { open: "in_progress", review: "in_progress" },
   stop: { in_progress: "open" },
+  // in_progress -> review only; review -> review (MR attach/replace,
+  // review-no-mr-nag-advises) is deliberately NOT modeled here — like
+  // `update`, its legality is a function of BOTH `expectedState` AND an
+  // extra parameter (`mrPresent`), not `expectedState` alone, so it can't
+  // be one fixed entry in this state-only table. See runPropertyCase's
+  // own special-case for it, right next to `update`'s.
   review: { in_progress: "review" },
   // C3's revised decision: review is OPTIONAL — done is reachable via
   // review OR directly from in_progress (§2's diagram draws both edges
@@ -274,12 +280,22 @@ async function runPropertyCase(
     // `update --state` (Fix 2): legality is a function of BOTH
     // `expectedState` and the generated target, via `isUpdateStateLegal`
     // above, not a lookup into the per-op-fixed-target `ORACLE`.
+    //
+    // `review` from `review` (review-no-mr-nag-advises): legality is a
+    // function of BOTH `expectedState` and `mrPresent` — legal (staying
+    // "review") iff `mrPresent`, same special-casing discipline as
+    // `update` just above, and for the identical reason (`ORACLE`'s shape
+    // can't express a second parameter).
     const legalTo: TicketState | undefined =
       op === "update"
         ? isUpdateStateLegal(expectedState, updateTarget)
           ? updateTarget
           : undefined
-        : ORACLE[op][expectedState];
+        : op === "review" && expectedState === "review"
+          ? mrPresent
+            ? "review"
+            : undefined
+          : ORACLE[op][expectedState];
     const args = argsFor(op, slug, mrPresent, updateTarget);
     const result = runSlop(args, root);
 

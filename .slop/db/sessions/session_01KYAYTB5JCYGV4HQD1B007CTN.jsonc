@@ -1,0 +1,48 @@
+{
+  "id": "session_01KYAYTB5JCYGV4HQD1B007CTN",
+  "ticket": "ticket_01KYAPMHNGJQH29YK7ZDFVVAJC",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "worktree-agent-a22cbcad3bf1b83e5",
+    "commit_at_start": "7df7be2cf49815b82b3e4d7ebeb17938b5944ce8"
+  },
+  "started_at": "2026-07-24T20:59:36.498Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Move review.ts's no-mr nag from before ref-resolution/validation to after the transaction commits",
+          "checked": true
+        },
+        {
+          "text": "Move stop.ts's no-note nag from before assertStoppable to after the transaction commits",
+          "checked": true
+        },
+        {
+          "text": "Update surrounding doc comments in both files",
+          "checked": true
+        },
+        {
+          "text": "Add regression tests: review/stop on a nonexistent or illegal-state ref prints NO nag",
+          "checked": true
+        },
+        {
+          "text": "Run build/test/lint/typecheck/format, commit, slop review",
+          "checked": false
+        }
+      ],
+      "created_at": "2026-07-24T21:00:05.287Z"
+    }
+  ],
+  "end_summary": null,
+  "transcript_ref": "transcripts/session_01KYAYTB5JCYGV4HQD1B007CTN.jsonl"
+}

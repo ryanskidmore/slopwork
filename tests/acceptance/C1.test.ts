@@ -552,6 +552,11 @@ describe("C1: Sessions", () => {
       await createTicket(paths, ticket, ctx, ticketCreated);
       const result = runSlop(["stop", ticket.slug], dir);
       expect(result.status).toBe(6);
+      // nags-print-before-validation-review: no --note was given either —
+      // the no-`--note` nag (line 546 above, "nudges ... when --note is
+      // omitted") must not ALSO print here, asserting a stop that never
+      // happened.
+      expect(result.stderr).not.toMatch(/no --note/i);
     });
   });
 });

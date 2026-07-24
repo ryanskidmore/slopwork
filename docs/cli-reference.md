@@ -213,7 +213,13 @@ result naming the target plus every new child's id/slug.
 ```sh
 slop draft <ref>      # -> draft (never ready, never startable)
 slop undraft <ref>    # -> open
+slop draft <ref> --json     # {id, slug, handle, name, state, already_draft}
+slop undraft <ref> --json   # {id, slug, handle, name, state, already_open}
 ```
+
+Re-running either on a ticket already at its target state is an idempotent
+no-op (distinct stdout wording, `already_draft`/`already_open: true` in
+`--json`), not an error.
 
 ### `edit`
 
@@ -224,12 +230,26 @@ slop edit <ref>
 Opens `<ref>`'s ticket JSONC file in `$VISUAL`/`$EDITOR` for direct
 hand-editing.
 
+**Non-TTY safety**: if neither `$VISUAL` nor `$EDITOR` is set AND stdin/
+stdout isn't a real terminal, `edit` refuses to launch the platform
+default (`vi`/`notepad`) — that combination used to block forever waiting
+for interactive input that can never arrive (a harness-driven pipe that's
+never closed). It fails fast instead (`USAGE_ERROR`, exit `2`), naming
+`update --parent/--blocks/--owner/--relates-to` as the non-interactive
+alternative for the edge/owner repair `edit` used to be the only way to
+do. An explicitly configured `$VISUAL`/`$EDITOR` is exempt from this guard
+even off a real terminal (it's trusted to be non-interactive-safe on
+purpose).
+
 ### `update`
 
 The general mutator — every dedicated verb command above is sugar over
 this for the one edge it can perform (`draft ⇄ open`); everything else
 (state transitions with side effects) needs its own command, see
-[Concepts → state machine](concepts.md#state-machine).
+[Concepts → state machine](concepts.md#state-machine). Also the
+non-interactive path for post-creation edge/owner repair
+(`--parent`/`--blocks`/`--owner`/`--relates-to`) — previously `edit`'s
+`$EDITOR` hand-edit was the only way to touch these fields at all.
 
 ```sh
 slop update <ref> --progress "one-line status note"
@@ -241,6 +261,10 @@ slop update <ref> --spec - < new-spec.json
 slop update <ref> --state open      # only draft <-> open is legal here
 slop update <ref> --relates-to +other-ticket-slug
 slop update <ref> --relates-to +new-related --relates-to -no-longer-related
+slop update <ref> --blocks +some-other-ticket
+slop update <ref> --owner priya
+slop update <ref> --parent new-parent-slug
+slop update <ref> --parent jira:PROJ-123
 ```
 
 | Flag | Meaning |
@@ -256,6 +280,10 @@ slop update <ref> --relates-to +new-related --relates-to -no-longer-related
 | `--context <text>` | replace `context[]` wholesale — structured, preferred over `--spec` JSON (repeatable); the rest of the spec is untouched |
 | `--spec <json>` | replace the WHOLE spec; `-` reads from stdin. Mutually exclusive with the four flags above |
 | `--relates-to <±ref>` | `+ref` to add, `-ref` to remove a `relates-to` edge — symmetric, informational (repeatable) |
+| `--blocks <±ref>` | `+ref` to add, `-ref` to remove a `blocks` edge — cycle-checked, same as `new --blocks` (repeatable) |
+| `--owner <actor>` | set/replace the owning actor (`{name, kind: "human"}`). No supported way to CLEAR via `update` — hand-edit via `edit` for that |
+| `--parent <ref>` | reparent `<ref>` under this ticket, or an external ref (`jira:PROJ-123`); recomputes `root_id`/`path` for `<ref>` AND every existing descendant. No supported way to CLEAR a parent via `update` |
+| `--json` | machine-readable result: `{id, slug, handle, name, state, priority, reparented_descendants}` — same field names as `new --json`; `reparented_descendants` is `0` except on a `--parent` call that moved existing descendants. Works on both the locked and the lock-free pure-`--progress` path. |
 
 Unlike `--spec` (which replaces the entire spec blob — an omitted key
 resets to its schema default), `--summary`/`--details`/`--acceptance`/
@@ -267,24 +295,28 @@ entirely, the current array is untouched. Combining `--spec` with any of
 the four is a `USAGE_ERROR` (exit 2) — two different ways to say what the
 spec is.
 
-`--relates-to` is the one edge `update` can touch — `parent`/`blocks`/
-`discovered-from` still can't be changed after creation (aside from
-`--blocks` at `new` time; hand-edit via `edit` for those). It uses the
-same `+`/`-` sigil convention as `--label` (rather than a separate
-`--unrelate` flag) because that's the established `update` convention for
-"add or remove, repeatable, one flag"; `new --relates-to <ref>` above
-stays bare (no sigil) because `new` only ever adds, same as `--blocks`.
-Each ref is resolved and re-validated the same way `new`'s edge flags are
-(existence, the per-edge-kind degree cap); a redundant add/remove (e.g.
-`+already-related`, or `-` on a target that isn't related) is a no-op, not
-an error.
+`--relates-to`/`--blocks`/`--owner`/`--parent` are the edge/ownership
+fields `update` can touch — `discovered-from` still can't be changed
+after creation (hand-edit via `edit` for that). `--relates-to`/`--blocks`
+use the same `+`/`-` sigil convention as `--label` (rather than a separate
+`--unrelate`/`--unblock` flag) because that's the established `update`
+convention for "add or remove, repeatable, one flag"; `new --relates-to
+<ref>`/`new --blocks <ref>` stay bare (no sigil) because `new` only ever
+adds. Each ref is resolved and re-validated the same way `new`'s edge
+flags are (existence, the per-edge-kind degree cap, and — for `--blocks`/
+`--parent` only, not `--relates-to` — a cycle check); a redundant
+add/remove (e.g. `+already-related`, or `-` on a target that isn't
+related) is a no-op, not an error. `--owner`/`--parent` are plain
+set/replace flags (no sigil): re-stating the same value is a no-op, and
+neither has a `--parent`/`--owner`-clearing counterpart — `edit` remains
+the only way to remove a parent or owner entirely.
 
 A **pure `--progress`-only call** (nothing else on the command line) is
 lock-free — see
 [Concurrency & merging](concurrency-and-merging.md#lock-free-progress-updates).
-Any call that touches `--relates-to` always takes the locked read-modify
--write path (same as `--label`/`--priority`/etc.) — never the lock-free
-`--progress`-only path.
+Any call that touches `--relates-to`/`--blocks`/`--owner`/`--parent`
+always takes the locked read-modify-write path (same as
+`--label`/`--priority`/etc.) — never the lock-free `--progress`-only path.
 
 ---
 
@@ -370,12 +402,24 @@ position, nothing partially applied.
 ```sh
 slop review <ref> --mr https://github.com/org/repo/pull/42
 slop review <ref>                       # legal, but nags on stderr
+slop review <ref> --mr <url>            # also legal AGAIN once <ref> is already in review — attaches/replaces the link
 ```
 
 Moves `in_progress → review`. `--mr` is recommended, not required (D15):
 omitting it still moves the ticket, but nags on stderr and leaves
 `review.mr` absent. `--transcript <path>` overrides transcript
 auto-detection for this call.
+
+Re-running `review <ref> --mr <url>` on a ticket **already** in review is
+also legal — an idempotent attach/replace of the MR link, not a new
+review round (no new session, state stays `review`). This is the exact
+recovery path the no-`--mr` nag advises; a bare `review <ref>` (no `--mr`)
+on an already-review ticket is still rejected (`CONFLICT`, exit `6`) —
+there's nothing to update without a link to attach.
+
+`--json` returns `{id, slug, handle, name, state, review, transcript,
+already_in_review}` — `review` is `null`, or `{mr, requested_at, by}`
+(same shape as `show --json`'s ticket field, `mr: null` when absent).
 
 ### `stop`
 
@@ -387,6 +431,9 @@ Ends the current session without completing the ticket: hands it back to
 `open`, records the handoff note, captures the harness transcript. Never
 blocks if the transcript can't be found — warns instead. `--transcript
 <path>` is a manual override.
+
+`--json` returns `{id, slug, handle, name, state, session_id, note,
+transcript}`.
 
 ### `done`
 
@@ -406,10 +453,19 @@ ticket this one was blocking that just became unblocked.
 | `--note <text>` | completion note (also becomes the session's end summary and the ticket's `latest_note`) |
 | `--outcome <text>` | long-form resolution writeup stored on the ticket; `-` reads stdin |
 | `--transcript <path>` | manual transcript path override |
+| `--json` | machine-readable result — see below |
 
 Completing a non-`adhoc` ticket directly from `in_progress` (never went
 through `review`) still succeeds but nags on stderr; `adhoc` tickets and
 the `review → done` path never nag.
+
+`--json` returns `{id, slug, handle, name, state, note, resolution_set,
+transcript, unblocked, problems, skipped_review}` — `unblocked` is the
+`TicketId[]` cascade list the prose output only ever joined into a
+comma-separated string; `problems` is `{id, message}[]` (any ticket/
+session file the cascade's own scan couldn't read, almost always `[]`);
+`resolution_set` is a boolean (whether `--outcome` set a resolution),
+never the resolution text itself — fetch that with `show --json`.
 
 ### `drop`
 
@@ -422,6 +478,11 @@ is **required**. Finalizes an active session if one exists, and runs the
 same done-cascade `done` does — a dropped ticket also stops blocking its
 dependents. `--transcript <path>` only matters if there's an active
 session to finalize.
+
+`--json` returns `{id, slug, handle, name, state, reason, transcript,
+unblocked, problems}` — same `unblocked`/`problems` shape as `done
+--json` (both run the identical cascade); `transcript` is `null` when
+there was no active session to finalize.
 
 ---
 

@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import { shortTicketCode } from "../../core/index.js";
 import {
   readTicket,
   repoPaths,
@@ -11,7 +12,11 @@ import { assertDraftable } from "../../tickets/draft.js";
 import { buildUpdate } from "../../tickets/update.js";
 import { loadConfig, resolveActor } from "../actor.js";
 
-export async function runDraft(ref: string): Promise<void> {
+interface DraftCommandOptions {
+  json?: boolean;
+}
+
+export async function runDraft(ref: string, opts: DraftCommandOptions = {}): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
   const config = await loadConfig(paths);
@@ -61,6 +66,27 @@ export async function runDraft(ref: string): Promise<void> {
     return { ticket, alreadyDraft: false };
   });
 
+  if (opts.json) {
+    // closing-loop-commands-lack-json (nice-to-have): same small shape as
+    // `update --json`'s own result, plus `already_draft` naming the
+    // no-op case the text output distinguishes with different wording.
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          id: result.ticket.id,
+          slug: result.ticket.slug,
+          handle: shortTicketCode(result.ticket.id),
+          name: result.ticket.name,
+          state: result.ticket.state,
+          already_draft: result.alreadyDraft,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    return;
+  }
+
   if (result.alreadyDraft) {
     process.stdout.write(
       `${result.ticket.id}  (slug: ${result.ticket.slug}) is already draft — no changes made\n` +
@@ -83,5 +109,6 @@ export function registerDraftCommand(program: Command): void {
     .command("draft")
     .description("Move a ticket to draft state (drafts are never `ready` and never started).")
     .argument("<ref>", "ticket to move to draft")
+    .option("--json", "machine-readable result (id, slug, handle, name, state, already_draft)")
     .action(runDraft);
 }

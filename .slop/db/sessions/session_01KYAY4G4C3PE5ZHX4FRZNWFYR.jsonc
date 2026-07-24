@@ -1,0 +1,68 @@
+{
+  "id": "session_01KYAY4G4C3PE5ZHX4FRZNWFYR",
+  "ticket": "ticket_01KYAPJWDBDJWJ8CP9MCYS4EE0",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "worktree-agent-a22cbcad3bf1b83e5",
+    "commit_at_start": "d94245448a44648640f3bc71fda2216ac9dcc69b"
+  },
+  "started_at": "2026-07-24T20:47:40.684Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Design stable JSON shapes for update/review/stop/done/drop (+draft/undraft nice-to-have) --json",
+          "checked": true
+        },
+        {
+          "text": "Add --json to update.ts (both pure-progress and full paths)",
+          "checked": true
+        },
+        {
+          "text": "Add --json to review.ts",
+          "checked": true
+        },
+        {
+          "text": "Add --json to stop.ts",
+          "checked": true
+        },
+        {
+          "text": "Add --json to done.ts (including unblocked cascade + problems)",
+          "checked": true
+        },
+        {
+          "text": "Add --json to drop.ts (including unblocked cascade)",
+          "checked": true
+        },
+        {
+          "text": "Add --json to draft.ts/undraft.ts",
+          "checked": true
+        },
+        {
+          "text": "Add in-process regression tests per command",
+          "checked": true
+        },
+        {
+          "text": "Update docs/cli-reference.md for each command's --json",
+          "checked": true
+        },
+        {
+          "text": "Run build/test/lint/typecheck/format, commit, slop review",
+          "checked": false
+        }
+      ],
+      "created_at": "2026-07-24T20:49:31.744Z"
+    }
+  ],
+  "end_summary": null,
+  "transcript_ref": "transcripts/session_01KYAY4G4C3PE5ZHX4FRZNWFYR.jsonl"
+}

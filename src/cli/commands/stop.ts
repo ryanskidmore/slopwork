@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { END_SUMMARY_MAX_LENGTH, sessionSchema } from "../../core/index.js";
+import { END_SUMMARY_MAX_LENGTH, sessionSchema, shortTicketCode } from "../../core/index.js";
 import {
   readSession,
   readTicket,
@@ -23,6 +23,7 @@ import { assertMaxLength, printWarning, sessionOwnershipWarning } from "./shared
 interface StopCommandOptions {
   note?: string;
   transcript?: string;
+  json?: boolean;
 }
 
 /**
@@ -46,13 +47,13 @@ export async function runStop(ref: string, opts: StopCommandOptions): Promise<vo
   // "a stopped session's transcript is often the most valuable one" — a
   // note is what makes the *next* session fast to resume without having
   // to read that whole transcript). Nudge, don't block: an agent forced to
-  // supply *something* would just write a useless placeholder note.
-  if (opts.note === undefined || opts.note.trim().length === 0) {
-    printWarning(
-      "no --note handoff given — the next session (or your future self) will have to reconstruct " +
-        `context from scratch. Consider \`slop stop ${ref} --note "..."\`.`,
-    );
-  } else {
+  // supply *something* would just write a useless placeholder note. The
+  // nag itself is deferred to AFTER the transaction commits, below — see
+  // nags-print-before-validation-review's doc there — but the length
+  // VALIDATION stays here, up front: it's a usage-error check (never
+  // prints anything, so it can't misleadingly assert a stop that never
+  // happened), and the earlier it runs the less work a doomed call wastes.
+  if (opts.note !== undefined && opts.note.trim().length > 0) {
     assertMaxLength("--note", opts.note, END_SUMMARY_MAX_LENGTH);
   }
 
@@ -167,6 +168,22 @@ export async function runStop(ref: string, opts: StopCommandOptions): Promise<vo
     };
   });
 
+  // nags-print-before-validation-review: the no-`--note` nag now prints
+  // HERE — after the transaction above has already committed — rather
+  // than up front before `ref` was even resolved/validated. It used to
+  // print unconditionally as soon as `opts.note` was known to be absent,
+  // so `slop stop no-such-ticket` (no --note) printed "the next session
+  // will have to reconstruct context from scratch" and THEN failed
+  // NOT_FOUND — a nag asserting a stop that never happened, same class of
+  // bug `review.ts`'s no-`--mr` nag had. Matches `done.ts`'s
+  // `skippedReview` nag's position/convention exactly.
+  if (opts.note === undefined || opts.note.trim().length === 0) {
+    printWarning(
+      "no --note handoff given — the next session (or your future self) will have to reconstruct " +
+        `context from scratch. Consider \`slop stop ${ref} --note "..."\`.`,
+    );
+  }
+
   // Printed AFTER the transaction commits, deliberately: a transcript
   // problem is a warning, never a reason the state change itself could
   // fail (this is the C4 acceptance criterion's second half, made
@@ -174,6 +191,30 @@ export async function runStop(ref: string, opts: StopCommandOptions): Promise<vo
   // the session-ownership warning (sessionOwnershipWarning's own doc).
   if (result.transcriptWarning !== null) printWarning(result.transcriptWarning);
   if (result.ownershipWarning !== null) printWarning(result.ownershipWarning);
+
+  if (opts.json) {
+    // closing-loop-commands-lack-json: field names mirror `start --json`'s
+    // own `session`/`ticket` split (id/slug/name/state on the ticket;
+    // session gets its own `id`), plus `note`/`transcript` naming the two
+    // pieces of data this command's own text output already surfaces.
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          id: result.ticket.id,
+          slug: result.ticket.slug,
+          handle: shortTicketCode(result.ticket.id),
+          name: result.ticket.name,
+          state: result.ticket.state,
+          session_id: result.session.id,
+          note: result.session.end_summary,
+          transcript: result.session.transcript_ref,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    return;
+  }
 
   process.stdout.write(
     `stopped ${result.session.id} on ${result.ticket.id} (${result.ticket.slug})\n` +
@@ -199,6 +240,10 @@ export function registerStopCommand(program: Command): void {
     .option(
       "--transcript <path>",
       "manual transcript path (works for any harness; overrides auto-detection when the file exists)",
+    )
+    .option(
+      "--json",
+      "machine-readable result (id, slug, handle, name, state, session_id, note, transcript)",
     )
     .action(runStop);
 }

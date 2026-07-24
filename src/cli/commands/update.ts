@@ -1,6 +1,6 @@
 import type { Command } from "commander";
-import { fixedClock, systemClock } from "../../core/index.js";
-import type { Ticket } from "../../core/index.js";
+import { fixedClock, shortTicketCode, systemClock } from "../../core/index.js";
+import type { JsoncPatchEntry, Ticket } from "../../core/index.js";
 import {
   appendEvent,
   listTickets,
@@ -12,10 +12,11 @@ import {
   withLock,
 } from "../../repo/index.js";
 import { validateTicketEdges } from "../../tickets/edges.js";
-import { buildUpdate, parseRelatesToOpText } from "../../tickets/update.js";
-import type { RelatesToOp, UpdateInput } from "../../tickets/update.js";
+import { recomputeAncestry, resolveParentRef } from "../../tickets/parent.js";
+import { buildUpdate, parseBlocksOpText, parseRelatesToOpText } from "../../tickets/update.js";
+import type { BlocksOp, RelatesToOp, UpdateInput } from "../../tickets/update.js";
 import { loadConfig, resolveActor } from "../actor.js";
-import { collect, parsePriority, readStdin } from "./shared.js";
+import { collect, parsePriority, printWarning, readStdin } from "./shared.js";
 
 interface UpdateCommandOptions {
   progress?: string;
@@ -29,6 +30,10 @@ interface UpdateCommandOptions {
   acceptance: string[];
   context: string[];
   relatesTo: string[];
+  blocks: string[];
+  owner?: string;
+  parent?: string;
+  json?: boolean;
 }
 
 /**
@@ -50,18 +55,60 @@ function pureProgressNote(opts: UpdateCommandOptions): string | undefined {
     opts.details !== undefined ||
     opts.acceptance.length > 0 ||
     opts.context.length > 0 ||
-    opts.relatesTo.length > 0
+    opts.relatesTo.length > 0 ||
+    opts.blocks.length > 0 ||
+    opts.owner !== undefined ||
+    opts.parent !== undefined
   ) {
     return undefined;
   }
   return opts.progress;
 }
 
-function printUpdated(ticket: Pick<Ticket, "id" | "slug" | "name" | "state" | "priority">): void {
+/**
+ * closing-loop-commands-lack-json: `--json` result — a small, stable
+ * shape naming exactly the fields the human-readable output already
+ * prints, with `handle` added for parity with `new --json`'s own result
+ * (E1) — every mutator that reads a ticket back should surface the same
+ * short, typeable handle, not just the commands that create one. Field
+ * names deliberately match `new`'s JSON keys (`id`/`slug`/`handle`/`name`/
+ * `state`/`priority`) rather than inventing a parallel vocabulary.
+ * `reparented_descendants` (edit-vi-fallback-hangs-agents) is purely
+ * additive — 0 on every call that isn't a `--parent` reparent — so it
+ * doesn't disturb this already-documented shape (same "additive, existing
+ * consumers only read known keys" reasoning `new --json`'s own `handle`
+ * used when it was added).
+ */
+function printUpdated(
+  ticket: Pick<Ticket, "id" | "slug" | "name" | "state" | "priority">,
+  json: boolean | undefined,
+  reparentedDescendants = 0,
+): void {
+  if (json) {
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          id: ticket.id,
+          slug: ticket.slug,
+          handle: shortTicketCode(ticket.id),
+          name: ticket.name,
+          state: ticket.state,
+          priority: ticket.priority,
+          reparented_descendants: reparentedDescendants,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    return;
+  }
   process.stdout.write(
     `updated ${ticket.id}  (slug: ${ticket.slug})\n` +
       `  ${ticket.name}\n` +
-      `  state: ${ticket.state}  priority: ${ticket.priority}\n`,
+      `  state: ${ticket.state}  priority: ${ticket.priority}\n` +
+      (reparentedDescendants > 0
+        ? `  reparented — root_id/path recomputed for ${reparentedDescendants} descendant(s)\n`
+        : ""),
   );
 }
 
@@ -111,7 +158,7 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
       );
     }
 
-    printUpdated(initialTicket);
+    printUpdated(initialTicket, opts.json);
     return;
   }
 
@@ -124,7 +171,16 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
         ? await readStdin()
         : opts.details;
 
-  const ticket = await withLock(paths.lockFile, async () => {
+  // edit-vi-fallback-hangs-agents: collected here, printed AFTER the lock
+  // below resolves — never before validation succeeds (nags-print-before
+  // -validation-review's discipline) — so a malformed `jira:`-shaped
+  // `--parent` ref's format-mismatch warning (§8.2 item 5, `new --parent`'s
+  // own `resolveParentRef` behavior) never fires ahead of a doomed call
+  // that failed for some OTHER reason (e.g. a degree-cap CONFLICT from the
+  // same `--blocks` flags).
+  const warnings: string[] = [];
+
+  const { ticket, reparentedDescendants } = await withLock(paths.lockFile, async (lock) => {
     const current = await readTicket(paths, initialTicket.id);
 
     // `--relates-to <±ref>` refs are resolved here, fresh, under the same
@@ -141,6 +197,28 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
       relatesToOps.push({ op, id: target.id });
     }
 
+    // `--blocks <±ref>` — identical resolution shape, edit-vi-fallback
+    // -hangs-agents's extension of the same pattern (see tickets/update.ts's
+    // `BlocksOp` doc for the `blocks`-vs-`relates_to` distinction).
+    const blocksOps: BlocksOp[] = [];
+    for (const raw of opts.blocks) {
+      const { op, ref } = parseBlocksOpText(raw);
+      const target = await resolveTicketRef(paths, ref);
+      blocksOps.push({ op, id: target.id });
+    }
+
+    // `--parent <ref>` — resolved the exact same way `new --parent` is
+    // (tickets/parent.ts's `resolveParentRef`: a local ref via
+    // `resolveTicketRef`, or an external `jira:`-shaped ref accepted as-is
+    // with a warn-only format check). `undefined` (never even attempted)
+    // when `--parent` was omitted — mirrors `relatesToOps`/`blocksOps`
+    // only ever being resolved from what was actually given.
+    const parentResolution =
+      opts.parent !== undefined ? await resolveParentRef(paths, opts.parent) : undefined;
+    if (parentResolution?.kind === "external" && parentResolution.warning) {
+      warnings.push(parentResolution.warning);
+    }
+
     const input: UpdateInput = {
       progress: opts.progress,
       state: opts.state,
@@ -153,6 +231,9 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
       acceptance: opts.acceptance,
       context: opts.context,
       relatesToOps,
+      blocksOps,
+      ownerRaw: opts.owner,
+      parentResolution,
     };
 
     // One clock reading shared by the ticket write AND its event: keeps
@@ -161,26 +242,101 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
     // accompanying event's `at` can then never disagree with the ticket's
     // own `last_activity_at`/`updated_at` it's describing.
     const clock = fixedClock(systemClock.now());
-    const { ticket, patch, verb, payload } = buildUpdate(current, input, clock);
+    const built = buildUpdate(current, input, clock);
+    let { ticket, patch } = built;
+    const { verb, payload } = built;
 
-    // B3: `relates_to` is the one edge field `update` can touch
-    // (ticket_01KYA3Z9FNZ2FDMDRWNKR9EV7J) — whenever the patch actually
-    // changes it, re-run the exact same degree-cap/target-existence/cycle
-    // validation `new`'s `--blocks`/`--relates-to` go through (edges.ts's
-    // `validateTicketEdges`, the single entry point its own doc says every
-    // edge-mutating write path should call) before this ticket is ever
-    // persisted. Gated on the patch (not merely `relatesToOps.length > 0`)
-    // so a fully redundant `--relates-to` (e.g. `+already-present`) with
-    // nothing else given — a real, already-handled no-op patch — never
-    // pays for a `listTickets` scan it doesn't need. Every other edge kind
-    // is untouched by `update` (parent/blocks/discovered_from never appear
-    // in `UPDATE_TOUCHABLE_FIELDS`), so the parent-cycle/blocks-cycle
-    // checks inside `validateTicketEdges` are always a no-op against this
+    // B3: `relates_to`/`blocks`/`parent` are the edge fields `update` can
+    // touch (ticket_01KYA3Z9FNZ2FDMDRWNKR9EV7J;
+    // edit-vi-fallback-hangs-agents extends this to `blocks`/`parent`) —
+    // whenever the patch actually changes any of them, re-run the exact
+    // same degree-cap/target-existence/cycle validation `new`'s own edge
+    // flags go through (edges.ts's `validateTicketEdges`, the single entry
+    // point its own doc says every edge-mutating write path should call)
+    // before this ticket is ever persisted. Gated on the patch (not merely
+    // "was an edge flag given") so a fully redundant `--relates-to`/
+    // `--blocks` (e.g. `+already-present`) with nothing else given — a
+    // real, already-handled no-op patch — never pays for a `listTickets`
+    // scan it doesn't need. `discovered_from` remains untouched by
+    // `update` (never appears in `UPDATE_TOUCHABLE_FIELDS`), so its own
+    // slice of `validateTicketEdges`'s checks stays a no-op against this
     // particular write — cheap insurance against an already-inconsistent
     // (e.g. hand-edited) db, not dead code.
-    if (patch.some((entry) => entry.path[0] === "relates_to")) {
+    let reparentedDescendants = 0;
+    const touchesEdges = patch.some((entry) =>
+      (["blocks", "relates_to", "parent"] as const).includes(
+        entry.path[0] as "blocks" | "relates_to" | "parent",
+      ),
+    );
+    if (touchesEdges) {
       const others = await listTickets(paths);
       validateTicketEdges(ticket, others);
+
+      // `--parent` changed: `buildUpdate` only ever sets `ticket.parent`
+      // itself (it has no `others` to recompute ancestry with — see
+      // tickets/update.ts's top doc) — `root_id`/`path` here are still
+      // `current`'s stale values. `recomputeAncestry` (parent.ts, same
+      // function `edit.ts`'s own reparent path uses) derives the correct
+      // ones from the NOW-validated `parent` chain, plus every EXISTING
+      // descendant's own `root_id`/`path` that must move with it.
+      // `validateTicketEdges` above has already confirmed `parent` is
+      // acyclic and (if local) resolves to a real ticket in `others` —
+      // `recomputeAncestry`'s own documented precondition.
+      if (patch.some((entry) => entry.path[0] === "parent")) {
+        const { ticket: reparented, descendants, changed } = recomputeAncestry(ticket, others);
+        if (changed) {
+          ticket = reparented;
+          // `patch` already carries the (correct) new `parent` value from
+          // `buildUpdate` above — only `root_id`/`path` need adding on
+          // top; patch.ts's own doc: a patch only needs to CONTAIN every
+          // changed field, never be perfectly minimal.
+          patch = [
+            ...patch,
+            { path: ["root_id"], value: reparented.root_id },
+            { path: ["path"], value: reparented.path },
+          ];
+          reparentedDescendants = descendants.length;
+
+          // `patch` is guaranteed non-empty here — it already contained a
+          // `parent` entry to reach this branch at all, plus the
+          // `root_id`/`path` entries just appended above.
+          await updateTicket(
+            paths,
+            current.id,
+            patch,
+            ticket,
+            { actor, session: null },
+            { verb, payload },
+            clock,
+          );
+
+          for (const descendant of descendants) {
+            // Fencing contract (lock.ts): re-check between each entity
+            // write once more than one write is happening under this
+            // acquisition — same discipline edit.ts's own descendant loop
+            // follows.
+            await lock.assertHeld();
+            const descendantPatch: JsoncPatchEntry[] = [
+              { path: ["root_id"], value: descendant.root_id },
+              { path: ["path"], value: descendant.path },
+              { path: ["updated_at"], value: descendant.updated_at },
+            ];
+            await updateTicket(
+              paths,
+              descendant.id,
+              descendantPatch,
+              descendant,
+              { actor, session: null },
+              {
+                verb: "ticket.updated",
+                payload: { method: "update", reparent_root: ticket.id },
+              },
+            );
+          }
+
+          return { ticket, reparentedDescendants };
+        }
+      }
     }
 
     if (patch.length === 0) {
@@ -191,7 +347,7 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
       // and no event, rather than (as before) still taking the lock's
       // write and emitting an empty-payload event for a call that
       // changed nothing.
-      return ticket;
+      return { ticket, reparentedDescendants };
     }
 
     await updateTicket(
@@ -204,24 +360,29 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
       clock,
     );
 
-    return ticket;
+    return { ticket, reparentedDescendants };
   });
 
-  printUpdated(ticket);
+  for (const w of warnings) printWarning(w);
+  printUpdated(ticket, opts.json, reparentedDescendants);
 }
 
 /** `slop update` — design.md §4.2; work item B1.
  *
  * The general mutator: `new`'s sugar flags and the dedicated verb commands
  * (`draft`/`undraft`/`review`/`stop`/`done`/`drop`/`plan --check`, …) are
- * all expressible in terms of `update`.
+ * all expressible in terms of `update`. Also the non-interactive path for
+ * post-creation edge/owner repair (`--parent`/`--blocks`/`--owner`
+ * /`--relates-to`) that used to require `slop edit` (edit-vi-fallback
+ * -hangs-agents) — `edit`'s `$EDITOR` fallback can hang forever on a
+ * non-TTY; these flags never do.
  */
 export function registerUpdateCommand(program: Command): void {
   program
     .command("update")
     .description(
       "General ticket mutator (progress notes, state, priority, labels, name, spec, " +
-        "relates-to); the verb commands are sugar over this.",
+        "relates-to, blocks, owner, parent); the verb commands are sugar over this.",
     )
     .argument("<ref>", "ticket to update")
     .option("--progress <note>", "append a progress note and bump last_activity_at")
@@ -270,6 +431,26 @@ export function registerUpdateCommand(program: Command): void {
       "add (+ref) or remove (-ref) a relates-to edge — symmetric, informational (repeatable)",
       collect,
       [] as string[],
+    )
+    .option(
+      "--blocks <±ref>",
+      "add (+ref) or remove (-ref) a blocks edge — cycle-checked, same as `new --blocks` (repeatable)",
+      collect,
+      [] as string[],
+    )
+    .option(
+      "--owner <actor>",
+      "set/replace the owning actor (no supported way to clear via update — hand-edit via `slop edit` for that)",
+    )
+    .option(
+      "--parent <ref>",
+      "reparent <ref> under this ticket, or an external ref (e.g. jira:PROJ-123); recomputes " +
+        "root_id/path for <ref> AND every existing descendant. No supported way to clear a parent " +
+        "via update — hand-edit via `slop edit` for that.",
+    )
+    .option(
+      "--json",
+      "machine-readable result (id, slug, handle, name, state, priority, reparented_descendants)",
     )
     .action(runUpdate);
 }

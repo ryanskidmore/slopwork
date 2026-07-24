@@ -76,6 +76,7 @@ describe("runSearch (in-process)", () => {
         runUpdate(id, {
           label: [],
           relatesTo: [],
+          blocks: [],
           acceptance: [],
           context: [],
           progress: "mentions gadgetronic",
@@ -90,6 +91,7 @@ describe("runSearch (in-process)", () => {
         runUpdate(id, {
           label: [],
           relatesTo: [],
+          blocks: [],
           acceptance: [],
           context: [],
           progress: "a later, unrelated note",

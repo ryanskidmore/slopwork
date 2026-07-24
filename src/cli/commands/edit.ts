@@ -21,6 +21,7 @@ import { fullFieldPatch } from "../../tickets/patch.js";
 import { recomputeAncestry } from "../../tickets/parent.js";
 import { loadConfig, resolveActor } from "../actor.js";
 import { SlopError } from "../errors.js";
+import { isInteractive } from "../init/prompt.js";
 
 /** `$VISUAL` first, then `$EDITOR`, then a platform-appropriate fallback:
  * `vi` is present on essentially every real Unix system this binary
@@ -33,7 +34,17 @@ import { SlopError } from "../errors.js";
  * crash" posture used elsewhere in this codebase). A launch failure even
  * for that fallback (e.g. a minimal container with no editor at all) is
  * where the "clear error if none" half of B1's brief actually fires — see
- * `runEdit`'s `result.error` handling below. */
+ * `runEdit`'s `result.error` handling below.
+ *
+ * edit-vi-fallback-hangs-agents: this function only ever picks WHICH
+ * command to launch — it never checks whether launching it is actually
+ * safe. `runEdit` below is what refuses to launch the FALLBACK branch
+ * (neither `$VISUAL` nor `$EDITOR` set) on a non-TTY: `vi`/`notepad` are
+ * interactive by nature, and `spawnSync(..., {stdio: "inherit"})` on a
+ * non-interactive stdin (a harness-driven pipe that's never closed) would
+ * otherwise block forever with no timeout anywhere in this codebase to
+ * rescue it. An explicitly configured `$VISUAL`/`$EDITOR` is exempt from
+ * that guard — see `runEdit`'s own comment for the exact scoping. */
 export function pickEditorCommand(): string {
   if (process.env.VISUAL) return process.env.VISUAL;
   if (process.env.EDITOR) return process.env.EDITOR;
@@ -96,6 +107,39 @@ export async function runEdit(ref: string): Promise<void> {
       EXIT_CODES.USAGE_ERROR,
     );
   }
+
+  // edit-vi-fallback-hangs-agents: falling back to the platform default
+  // (`vi`/`notepad`, `pickEditorCommand`'s own doc) with no TTY to drive it
+  // blocks FOREVER, not just fails fast — `spawnSync` below inherits this
+  // process's own stdio (`stdio: "inherit"`), and a non-interactive stdin
+  // (a pipe that's simply never closed, the common shape of a harness
+  // driving this CLI programmatically — same hazard `init/prompt.ts`'s own
+  // `isInteractive` doc calls out) leaves `vi` sitting there waiting for
+  // keystrokes that will never arrive, with no timeout anywhere in this
+  // codebase to rescue it. Reproduced directly: unset $VISUAL/$EDITOR,
+  // pipe /dev/null (or any non-TTY) into `slop edit <ref>`'s stdin, and it
+  // never returns.
+  //
+  // Scoped to EXACTLY the fallback case — `!process.env.VISUAL &&
+  // !process.env.EDITOR`, the same condition `pickEditorCommand` itself
+  // branches on — not "any non-interactive edit": an explicitly configured
+  // $VISUAL/$EDITOR (e.g. a scripted, non-interactive-safe editor a
+  // harness sets up on purpose) is trusted to know what it's doing even
+  // off a real terminal, exactly the way `edit.test.ts`'s fake-editor
+  // suite already drives this function under vitest (never a TTY there
+  // either) by always setting $VISUAL first.
+  if (!process.env.VISUAL && !process.env.EDITOR && !isInteractive()) {
+    throw new SlopError(
+      `no $VISUAL/$EDITOR configured and stdin/stdout is not a TTY — refusing to launch "${editorCmd}", ` +
+        "which would block forever waiting for interactive input that can never arrive. Set " +
+        "$VISUAL or $EDITOR to a non-interactive-safe command if you need `edit` here, or use a " +
+        "non-interactive alternative: `slop update <ref> --parent <ref> / --blocks <±ref> / " +
+        "--owner <name> / --relates-to <±ref>` covers the edge/owner repair `edit` was previously " +
+        "the only way to do (see `slop update --help`).",
+      EXIT_CODES.USAGE_ERROR,
+    );
+  }
+
   const args = [...parts.slice(1), filePath];
 
   // Design.md's own wording — "open the ticket's JSONC file in $EDITOR" —

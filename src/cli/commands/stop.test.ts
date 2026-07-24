@@ -252,6 +252,41 @@ describe("runStop (in-process)", () => {
     expect(ticket.active_session).toBeNull();
   });
 
+  // closing-loop-commands-lack-json
+  it("--json returns a stable, machine-readable shape and keeps stdout clean JSON", async () => {
+    const root = await makeTempRepo("slop-stop-inproc-json-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "JSON stop ticket");
+    const startOut = captureOutput();
+    try {
+      await withCwd(root, () => runStart(id, {}));
+    } finally {
+      startOut.restore();
+    }
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runStop(id, { note: "handoff via json", json: true }));
+      const body = JSON.parse(out.stdout()) as {
+        id: TicketId;
+        slug: string;
+        handle: string;
+        name: string;
+        state: string;
+        session_id: string;
+        note: string;
+        transcript: string | null;
+      };
+      expect(body.id).toBe(id);
+      expect(body.state).toBe("open");
+      expect(body.note).toBe("handoff via json");
+      expect(body.session_id).toMatch(/^session_/);
+      expect(body.handle).toMatch(/^t-/);
+    } finally {
+      out.restore();
+    }
+  });
+
   it("ticket_01KYAPN9NXY6RPSV6WGR42CJHJ: warns on stderr (but still succeeds) when the acting actor differs from who started the session", async () => {
     const root = await makeTempRepo("slop-stop-inproc-ownership-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });
@@ -302,7 +337,11 @@ describe("runStop (in-process)", () => {
     expect((await readTicket(paths, id)).state).toBe("open");
   });
 
-  it("refuses to stop a ticket with no active session (CONFLICT-shaped assertStoppable failure)", async () => {
+  // nags-print-before-validation-review: `{}` (no --note) is the exact
+  // shape the no-`--note` nag used to fire for UNCONDITIONALLY, before
+  // `assertStoppable` ever ran — this asserts stderr stays empty on the
+  // failure path.
+  it("refuses to stop a ticket with no active session (CONFLICT-shaped assertStoppable failure), printing no no-note nag", async () => {
     const root = await makeTempRepo("slop-stop-inproc-noactive-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });
     const id = await jsonNewTicket(root, "Never started ticket");
@@ -310,6 +349,7 @@ describe("runStop (in-process)", () => {
     const out = captureOutput();
     try {
       await expect(withCwd(root, () => runStop(id, {}))).rejects.toThrow();
+      expect(out.stderr()).toBe("");
     } finally {
       out.restore();
     }
@@ -353,6 +393,9 @@ describe("runStop (in-process)", () => {
       await expect(
         withCwd(root, () => runStop(id, { transcript: fakeTranscript })),
       ).rejects.toMatchObject({ exitCode: EXIT_CODES.CONFLICT });
+      // nags-print-before-validation-review: no --note was given either —
+      // the no-`--note` nag must not print alongside this CONFLICT.
+      expect(out.stderr()).toBe("");
     } finally {
       out.restore();
     }
@@ -367,7 +410,11 @@ describe("runStop (in-process)", () => {
     expect(ticket.state).toBe("review");
   });
 
-  it("throws NOT_FOUND for an unresolvable ref", async () => {
+  // nags-print-before-validation-review: the ticket's own motivating
+  // example — `slop stop no-such-ticket` (no --note) used to print the
+  // no-`--note` nag and THEN fail NOT_FOUND, asserting a stop that never
+  // happened.
+  it("throws NOT_FOUND for an unresolvable ref, printing no no-note nag", async () => {
     const root = await makeTempRepo("slop-stop-inproc-notfound-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });
     const out = captureOutput();
@@ -375,6 +422,7 @@ describe("runStop (in-process)", () => {
       await expect(withCwd(root, () => runStop("no-such-ticket", {}))).rejects.toMatchObject({
         exitCode: EXIT_CODES.NOT_FOUND,
       });
+      expect(out.stderr()).toBe("");
     } finally {
       out.restore();
     }

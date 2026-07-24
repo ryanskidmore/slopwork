@@ -137,6 +137,55 @@ describe("runDrop (in-process)", () => {
     expect(ticket.active_session).toBeNull();
   });
 
+  // closing-loop-commands-lack-json
+  it("--json returns a stable, machine-readable shape, including the unblocked-cascade list as an array", async () => {
+    const root = await makeTempRepo("slop-drop-inproc-json-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const dependent = await jsonNewTicket(root, "Dependent ticket (json drop)");
+    const blockOut = captureOutput();
+    let id: TicketId;
+    try {
+      await withCwd(root, () =>
+        runNew("Blocking ticket (json drop)", {
+          blocks: [dependent],
+          relatesTo: [],
+          label: [],
+          acceptance: [],
+          context: [],
+          json: true,
+        }),
+      );
+      id = (JSON.parse(blockOut.stdout()) as { id: TicketId }).id;
+    } finally {
+      blockOut.restore();
+    }
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runDrop(id, { reason: "superseded", json: true }));
+      const body = JSON.parse(out.stdout()) as {
+        id: TicketId;
+        slug: string;
+        handle: string;
+        name: string;
+        state: string;
+        reason: string;
+        transcript: string | null;
+        unblocked: TicketId[];
+        problems: unknown[];
+      };
+      expect(body.id).toBe(id);
+      expect(body.state).toBe("dropped");
+      expect(body.reason).toBe("superseded");
+      expect(body.unblocked).toEqual([dependent]);
+      expect(body.problems).toEqual([]);
+      expect(body.transcript).toBeNull();
+      expect(body.handle).toMatch(/^t-/);
+    } finally {
+      out.restore();
+    }
+  });
+
   it("ticket_01KYAPN9NXY6RPSV6WGR42CJHJ: warns on stderr (but still succeeds) when the acting actor differs from who started the session", async () => {
     const root = await makeTempRepo("slop-drop-inproc-ownership-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });

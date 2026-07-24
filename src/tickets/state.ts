@@ -135,12 +135,34 @@
  *
  * None of the three carries a same-state shortcut the way `draft`/
  * `undraft` (via `checkStateTransition`'s `from === to` rule) do — re
- * -running `slop review`/`slop done` on a ticket already at that state is
- * rejected, not a no-op: v0 stores exactly one MR per review round (§8.2
- * item 4), so there is no supported "update the MR while still in
- * review" flow, and `done`/`drop` are one-way, side-effecting actions
- * where "already there" is a genuine usage mistake worth surfacing, not
- * something to swallow silently.
+ * -running `slop done` on a ticket already `done` is rejected, not a
+ * no-op, and `drop` is a one-way, side-effecting action where "already
+ * there" is a genuine usage mistake worth surfacing, not something to
+ * swallow silently.
+ *
+ * ---------------------------------------------------------------------
+ * review-no-mr-nag-advises: `review -> review` IS legal, but only to
+ * attach/replace the MR link
+ * ---------------------------------------------------------------------
+ *
+ * v0 originally rejected `review -> review` unconditionally (kept above,
+ * in spirit, for `done`/`drop`): the reasoning was "v0 stores exactly one
+ * MR per review round, so there is no supported 'update the MR while
+ * still in review' flow." That turned out to be a real hole: `review`'s
+ * own no-`--mr` nag (`src/cli/commands/review.ts`) tells the caller to
+ * "pass --mr <url> when you have one" / "re-run once the MR exists" —
+ * advice this table then rejected outright, since a review-state ticket
+ * had no legal way back into `review` at all. `checkReviewEntry` now takes
+ * a second `hasMr` parameter: `review -> review` is legal iff `hasMr` is
+ * `true` (i.e. `--mr` was actually given) — an idempotent "attach or
+ * replace the MR link" call, not a full re-entry (no new session, no
+ * `re_entry` flag; `buildReviewedTicket` already produces the right
+ * result for ANY current state, MR-attach included — the state-machine
+ * gate here was the only thing standing in the way). A BARE `slop review
+ * <ref>` (no `--mr`) on an already-review ticket is still rejected —
+ * there is genuinely nothing to update in that case, and the reason
+ * names the actual working recovery (`--mr <url>`, `slop done`, or `slop
+ * start` to re-enter).
  */
 import type { TicketState } from "../core/index.js";
 
@@ -280,25 +302,36 @@ function terminalStateCheck(from: TicketState): StateTransitionCheck | null {
 }
 
 /**
- * `in_progress -> review` (D15) — the sole legal entry into `review`,
- * matching §2's diagram exactly. `slop review` (C3) checks this directly
- * instead of routing through `checkStateTransition`, because — unlike
- * `update --state` — it DOES have what the transition needs (the MR
- * link, `review.by`/`requested_at`); it is exactly the "dedicated
- * command" `checkStateTransition`'s own `to === "review"` rejection
- * above points at. No same-state shortcut: see this module's doc.
+ * `in_progress -> review` (D15) — the sole legal entry into `review` from
+ * a DIFFERENT state, matching §2's diagram exactly. `slop review` (C3)
+ * checks this directly instead of routing through `checkStateTransition`,
+ * because — unlike `update --state` — it DOES have what the transition
+ * needs (the MR link, `review.by`/`requested_at`); it is exactly the
+ * "dedicated command" `checkStateTransition`'s own `to === "review"`
+ * rejection above points at.
+ *
+ * `review -> review` is ALSO legal, but only when `hasMr` is `true` — see
+ * this module's doc, "review-no-mr-nag-advises": attaching or replacing
+ * the MR link on an already-review ticket (`slop review <ref> --mr
+ * <url>`), not a full re-entry. `hasMr` defaults to `false` so every
+ * existing call site that hasn't been updated to pass it keeps today's
+ * stricter (always-reject) behavior rather than silently gaining a new
+ * legal edge.
  */
-export function checkReviewEntry(from: TicketState): StateTransitionCheck {
+export function checkReviewEntry(from: TicketState, hasMr = false): StateTransitionCheck {
   if (from === "in_progress") return { ok: true };
   const terminal = terminalStateCheck(from);
   if (terminal !== null) return terminal;
   if (from === "review") {
+    if (hasMr) return { ok: true };
     return {
       ok: false,
       reason:
-        'ticket is already in "review" (design.md §2 has no review -> review edge; v0 stores one MR ' +
-        "per review round, §8.2 item 4) — run `slop done` to close it out, or `slop start` to re-enter " +
-        "as a changes-requested round (D15)",
+        'ticket is already in "review" with no --mr given — there is nothing to update ' +
+        "(design.md §2 has no bare review -> review edge). Pass --mr <url> to attach or replace " +
+        "the MR link (e.g. `slop review <ref> --mr <url>`, which works even while already in " +
+        "review), run `slop done` to close it out, or `slop start` to re-enter as a " +
+        "changes-requested round (D15)",
     };
   }
   return {

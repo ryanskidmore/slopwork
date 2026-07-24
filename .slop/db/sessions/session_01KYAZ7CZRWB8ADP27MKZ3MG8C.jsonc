@@ -1,0 +1,52 @@
+{
+  "id": "session_01KYAZ7CZRWB8ADP27MKZ3MG8C",
+  "ticket": "ticket_01KYAPJVVNSESE8TM6523NRAKK",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "worktree-agent-a22cbcad3bf1b83e5",
+    "commit_at_start": "95e123b323e00a6ac1efee425b4cbb2fb01951bf"
+  },
+  "started_at": "2026-07-24T21:06:44.344Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Fix edit.ts: fail fast (exit 2) when falling back to vi/notepad on non-TTY, using isInteractive() from init/prompt.ts",
+          "checked": true
+        },
+        {
+          "text": "Extend tickets/update.ts: add ownerRaw, blocksOps (mirrors relatesToOps), parentResolution inputs; extend UPDATE_TOUCHABLE_FIELDS/UPDATE_CONTENT_FIELDS/hasAnyInput/payload",
+          "checked": true
+        },
+        {
+          "text": "Extend cli/commands/update.ts: resolve --owner/--blocks/--parent, call validateTicketEdges + recomputeAncestry + descendant cascade when patch touches blocks/relates_to/parent, register new flags",
+          "checked": true
+        },
+        {
+          "text": "Add regression tests: edit.ts non-TTY fail-fast; update --owner/--blocks/--parent (add/remove, reparent + descendant cascade, cycle/degree-cap rejection)",
+          "checked": true
+        },
+        {
+          "text": "Update docs/cli-reference.md for edit and update",
+          "checked": true
+        },
+        {
+          "text": "Run build/test/lint/typecheck/format, commit, slop review",
+          "checked": false
+        }
+      ],
+      "created_at": "2026-07-24T21:08:34.915Z"
+    }
+  ],
+  "end_summary": null,
+  "transcript_ref": "transcripts/session_01KYAZ7CZRWB8ADP27MKZ3MG8C.jsonl"
+}

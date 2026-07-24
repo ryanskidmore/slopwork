@@ -1,0 +1,17 @@
+{
+  "id": "event_01KYAZ6R3DWFQKE4R32M1C7883",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYAPMHNGJQH29YK7ZDFVVAJC"
+  },
+  "payload": {
+    "progress": "Moved review.ts's no-mr nag and stop.ts's no-note nag to print AFTER their withLock transactions commit (matching done.ts's skippedReview convention), instead of before ref-resolution/validation. Enhanced existing failure-path tests (review.test.ts, stop.test.ts, C1.test.ts acceptance) to assert stderr stays empty when the command then fails with NOT_FOUND/CONFLICT. Full suite (1903 tests) + lint/typecheck/format/build all pass."
+  },
+  "at": "2026-07-24T21:06:22.957Z"
+}
