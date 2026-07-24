@@ -28,18 +28,96 @@ import { type ConfigYamlInput, stringifyConfigYaml } from "../../src/cli/config-
 import { atomicWriteFile, ensureDbDirs, type RepoPaths } from "../../src/repo/index.js";
 
 /**
+ * Every harness/actor-identity env var real command code reads at runtime
+ * — `src/sessions/harness.ts`'s `sniffHarnessKind`/`sessionIdForKind`
+ * (`CLAUDECODE`, `OPENCODE`, `CODEX_SANDBOX`,
+ * `CODEX_SANDBOX_NETWORK_DISABLED`, `CLAUDE_CODE_SESSION_ID`),
+ * `src/sessions/transcript.ts`'s `$CODEX_HOME` fallback (`CODEX_HOME`),
+ * and `src/cli/actor.ts`'s D17 `SLOP_ACTOR` env read — scrubbed by
+ * {@link withCwd} below for the duration of every in-process command run.
+ *
+ * Why: every `run<Cmd>` test in this file's callers runs inside THIS test
+ * process's own ambient environment. Locally that's often a live coding-
+ * agent session (e.g. Claude Code itself sets `CLAUDECODE=1`/
+ * `CLAUDE_CODE_SESSION_ID` on every process it spawns, including `bun run
+ * test`), which makes harness detection — and therefore transcript-capture
+ * warnings, `--harness`-less auto-detection, actor `kind` — resolve
+ * DIFFERENTLY than it does in CI, where none of these vars are ever set.
+ * A test that passed locally under such a session and asserted on that
+ * env-dependent behavior (e.g. "stderr is empty") would then fail in CI,
+ * or vice versa. Scrubbing these unconditionally before every in-process
+ * run reproduces CI's env regardless of where/how the suite is actually
+ * invoked, so behavior here is deterministic everywhere.
+ */
+const HARNESS_ENV_KEYS = [
+  "CLAUDECODE",
+  "CLAUDE_CODE_SESSION_ID",
+  "OPENCODE",
+  "CODEX_SANDBOX",
+  "CODEX_SANDBOX_NETWORK_DISABLED",
+  "CODEX_HOME",
+  "SLOP_ACTOR",
+] as const;
+
+/**
+ * Delete every {@link HARNESS_ENV_KEYS} var from `process.env`, then apply
+ * `overrides` on top (a test that wants ONE specific signal back — e.g.
+ * init.test.ts's `CLAUDECODE=1` skill-install test — passes it here rather
+ * than mutating `process.env` itself around the call, so it composes with
+ * the scrub instead of racing it: the override is applied AFTER the scrub
+ * deletes everything, and is restored by {@link restoreScrubbedEnv} the
+ * same as everything else). Returns the pre-scrub values of every touched
+ * key (scrub keys plus any extra override keys) for that restore.
+ */
+function scrubHarnessEnv(
+  overrides: Readonly<Record<string, string | undefined>>,
+): Record<string, string | undefined> {
+  const saved: Record<string, string | undefined> = {};
+  const keys = new Set<string>([...HARNESS_ENV_KEYS, ...Object.keys(overrides)]);
+  for (const key of keys) {
+    saved[key] = process.env[key];
+    delete process.env[key];
+  }
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value !== undefined) process.env[key] = value;
+  }
+  return saved;
+}
+
+/** Restore exactly what {@link scrubHarnessEnv} saved, undoing both the scrub and any overrides. */
+function restoreScrubbedEnv(saved: Readonly<Record<string, string | undefined>>): void {
+  for (const [key, value] of Object.entries(saved)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+}
+
+/**
  * Run `fn` with `process.cwd()` pointed at `dir`, restoring the original cwd
  * in a `finally` regardless of whether `fn` resolves, rejects, or throws
  * synchronously. This is the load-bearing piece of this file — see the
  * module doc above.
+ *
+ * Also scrubs every {@link HARNESS_ENV_KEYS} var for the duration of `fn`
+ * (see that constant's own doc for why), restoring the original
+ * `process.env` state in the same `finally` as the cwd. `envOverrides`, if
+ * given, is applied on top of the scrub — for the rare test that wants one
+ * specific harness-identity var back (e.g. `CLAUDECODE: "1"`) rather than
+ * the deterministic-everywhere default.
  */
-export async function withCwd<T>(dir: string, fn: () => Promise<T> | T): Promise<T> {
+export async function withCwd<T>(
+  dir: string,
+  fn: () => Promise<T> | T,
+  envOverrides: Readonly<Record<string, string | undefined>> = {},
+): Promise<T> {
   const prev = process.cwd();
+  const savedEnv = scrubHarnessEnv(envOverrides);
   process.chdir(dir);
   try {
     return await fn();
   } finally {
     process.chdir(prev);
+    restoreScrubbedEnv(savedEnv);
   }
 }
 

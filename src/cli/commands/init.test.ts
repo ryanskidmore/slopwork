@@ -1,6 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
 import { configSchema } from "../../core/index.js";
@@ -12,17 +12,16 @@ import { runInit } from "./init.js";
 // .gitkeep placeholders, AGENTS.md/SKILL.md generation, .gitignore
 // management, the CLAUDE.md link offer). Driven directly against a fresh
 // mkdtemp() root via withCwd (tests/support/cli-harness.ts) — every call
-// below runs with CLAUDECODE unset unless a test says otherwise, and
+// below deterministically runs with CLAUDECODE unset (withCwd scrubs it,
+// and every other harness-identity env var, for the duration of the call
+// and restores it after — see cli-harness.ts's own doc), regardless of
+// whatever this TEST PROCESS's own ambient environment happens to be, and
 // stdin/stdout are never real TTYs under vitest, so `isInteractive()`
 // (src/cli/init/prompt.ts) is always false here: no prompt can ever hang
-// this suite.
-
-const originalClaudeCode = process.env.CLAUDECODE;
-
-afterEach(() => {
-  if (originalClaudeCode === undefined) delete process.env.CLAUDECODE;
-  else process.env.CLAUDECODE = originalClaudeCode;
-});
+// this suite. The "Claude Code skill install" describe block below is the
+// one place that needs CLAUDECODE=1 back — it passes it as `withCwd`'s
+// `envOverrides` rather than mutating `process.env` itself, so it composes
+// with the scrub instead of racing it.
 
 describe("runInit — fresh repo", () => {
   it("creates config.yaml, the db/ skeleton with .gitkeep placeholders, AGENTS.md, and a managed .gitignore section", async () => {
@@ -136,14 +135,14 @@ describe("runInit — re-running against an already-initialized repo", () => {
 describe("runInit — Claude Code skill install", () => {
   it("installs .claude/skills/slopwork/SKILL.md when CLAUDECODE=1", async () => {
     const root = await makeTempRepo("slop-init-claude-env-");
-    process.env.CLAUDECODE = "1";
     const out = captureOutput();
     try {
-      await withCwd(root, () => runInit({ yes: true, project: "p", user: "u" }));
+      await withCwd(root, () => runInit({ yes: true, project: "p", user: "u" }), {
+        CLAUDECODE: "1",
+      });
       expect(out.stdout()).toContain("SKILL.md   (generated");
     } finally {
       out.restore();
-      delete process.env.CLAUDECODE;
     }
     const skill = await readFile(join(root, ".claude", "skills", "slopwork", "SKILL.md"), "utf8");
     expect(skill.length).toBeGreaterThan(0);
@@ -151,9 +150,11 @@ describe("runInit — Claude Code skill install", () => {
 
   it("does not install the skill when no Claude Code signal is present", async () => {
     const root = await makeTempRepo("slop-init-noclaude-");
-    delete process.env.CLAUDECODE;
     const out = captureOutput();
     try {
+      // No envOverrides — withCwd's own scrub already guarantees
+      // CLAUDECODE is unset here, deterministically, regardless of this
+      // test process's own ambient environment.
       await withCwd(root, () => runInit({ yes: true, project: "p", user: "u" }));
       expect(out.stdout()).not.toContain("SKILL.md");
     } finally {

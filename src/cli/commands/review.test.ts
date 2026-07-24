@@ -1,3 +1,5 @@
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
@@ -111,9 +113,25 @@ describe("runReview (in-process)", () => {
     const id = await jsonNewTicket(root, "In-progress ticket to review");
     await startTicket(root, id);
 
+    // cli-harness.ts's withCwd deterministically scrubs every
+    // harness-identity env var (harness `other`, matching CI), so a
+    // captureTranscript call with no --transcript given would otherwise
+    // ALWAYS produce a "could not locate a transcript" warning on stderr
+    // here — pass a real --transcript file so this test's stderr-is-empty
+    // assertion below stays a meaningful "the whole review call, including
+    // transcript capture, succeeded cleanly" check rather than a vacuous
+    // one that merely tolerates that warning.
+    const transcriptFile = join(root, "transcript.jsonl");
+    await writeFile(transcriptFile, '{"turn":"review"}\n', "utf8");
+
     const out = captureOutput();
     try {
-      await withCwd(root, () => runReview(id, { mr: "https://example.com/org/repo/pull/1" }));
+      await withCwd(root, () =>
+        runReview(id, {
+          mr: "https://example.com/org/repo/pull/1",
+          transcript: transcriptFile,
+        }),
+      );
       expect(out.stdout()).toContain("moved to review");
       expect(out.stdout()).toContain("mr: https://example.com/org/repo/pull/1");
       expect(out.stderr()).toBe("");
