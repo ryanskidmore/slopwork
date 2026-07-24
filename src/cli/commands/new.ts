@@ -10,6 +10,7 @@ interface NewCommandOptions {
   spec?: string;
   parent?: string;
   blocks: string[];
+  relatesTo: string[];
   discoveredFrom?: string;
   label: string[];
   draft?: boolean;
@@ -34,6 +35,7 @@ async function runNew(name: string, opts: NewCommandOptions): Promise<void> {
     specRaw,
     parentRaw: opts.parent,
     blocksRaw: opts.blocks,
+    relatesToRaw: opts.relatesTo,
     discoveredFromRaw: opts.discoveredFrom,
     labels: opts.label,
     draft: opts.draft ?? false,
@@ -124,6 +126,12 @@ export function registerNewCommand(program: Command): void {
     .option(
       "--blocks <ref>",
       "ref of a ticket this one blocks (repeatable)",
+      collect,
+      [] as string[],
+    )
+    .option(
+      "--relates-to <ref>",
+      "ref of a ticket this one relates to — symmetric, informational (repeatable)",
       collect,
       [] as string[],
     )

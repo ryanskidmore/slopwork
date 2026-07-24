@@ -3,6 +3,7 @@ import { fixedClock, systemClock } from "../../core/index.js";
 import type { Ticket } from "../../core/index.js";
 import {
   appendEvent,
+  listTickets,
   readTicket,
   repoPaths,
   requireRepoRoot,
@@ -10,8 +11,9 @@ import {
   updateTicket,
   withLock,
 } from "../../repo/index.js";
-import { buildUpdate } from "../../tickets/update.js";
-import type { UpdateInput } from "../../tickets/update.js";
+import { validateTicketEdges } from "../../tickets/edges.js";
+import { buildUpdate, parseRelatesToOpText } from "../../tickets/update.js";
+import type { RelatesToOp, UpdateInput } from "../../tickets/update.js";
 import { loadConfig, resolveActor } from "../actor.js";
 import { collect, parsePriority, readStdin } from "./shared.js";
 
@@ -22,6 +24,7 @@ interface UpdateCommandOptions {
   label: string[];
   name?: string;
   spec?: string;
+  relatesTo: string[];
 }
 
 /**
@@ -38,7 +41,8 @@ function pureProgressNote(opts: UpdateCommandOptions): string | undefined {
     opts.priority !== undefined ||
     opts.label.length > 0 ||
     opts.name !== undefined ||
-    opts.spec !== undefined
+    opts.spec !== undefined ||
+    opts.relatesTo.length > 0
   ) {
     return undefined;
   }
@@ -109,6 +113,20 @@ async function runUpdate(ref: string, opts: UpdateCommandOptions): Promise<void>
   const ticket = await withLock(paths.lockFile, async () => {
     const current = await readTicket(paths, initialTicket.id);
 
+    // `--relates-to <±ref>` refs are resolved here, fresh, under the same
+    // lock as `current` above — mirroring `new`'s `--blocks` resolution
+    // (tickets/new.ts), just relocated to this CLI layer because
+    // `tickets/update.ts` is deliberately kept pure/no-I/O (see its top
+    // doc). A ref that fails to resolve throws NOT_FOUND/AMBIGUOUS_REF/
+    // USAGE_ERROR straight out of `resolveTicketRef`, before `buildUpdate`
+    // (and thus any write) ever runs.
+    const relatesToOps: RelatesToOp[] = [];
+    for (const raw of opts.relatesTo) {
+      const { op, ref } = parseRelatesToOpText(raw);
+      const target = await resolveTicketRef(paths, ref);
+      relatesToOps.push({ op, id: target.id });
+    }
+
     const input: UpdateInput = {
       progress: opts.progress,
       state: opts.state,
@@ -116,6 +134,7 @@ async function runUpdate(ref: string, opts: UpdateCommandOptions): Promise<void>
       labelOps: opts.label,
       name: opts.name,
       specRaw,
+      relatesToOps,
     };
 
     // One clock reading shared by the ticket write AND its event: keeps
@@ -125,6 +144,26 @@ async function runUpdate(ref: string, opts: UpdateCommandOptions): Promise<void>
     // own `last_activity_at`/`updated_at` it's describing.
     const clock = fixedClock(systemClock.now());
     const { ticket, patch, verb, payload } = buildUpdate(current, input, clock);
+
+    // B3: `relates_to` is the one edge field `update` can touch
+    // (ticket_01KYA3Z9FNZ2FDMDRWNKR9EV7J) — whenever the patch actually
+    // changes it, re-run the exact same degree-cap/target-existence/cycle
+    // validation `new`'s `--blocks`/`--relates-to` go through (edges.ts's
+    // `validateTicketEdges`, the single entry point its own doc says every
+    // edge-mutating write path should call) before this ticket is ever
+    // persisted. Gated on the patch (not merely `relatesToOps.length > 0`)
+    // so a fully redundant `--relates-to` (e.g. `+already-present`) with
+    // nothing else given — a real, already-handled no-op patch — never
+    // pays for a `listTickets` scan it doesn't need. Every other edge kind
+    // is untouched by `update` (parent/blocks/discovered_from never appear
+    // in `UPDATE_TOUCHABLE_FIELDS`), so the parent-cycle/blocks-cycle
+    // checks inside `validateTicketEdges` are always a no-op against this
+    // particular write — cheap insurance against an already-inconsistent
+    // (e.g. hand-edited) db, not dead code.
+    if (patch.some((entry) => entry.path[0] === "relates_to")) {
+      const others = await listTickets(paths);
+      validateTicketEdges(ticket, others);
+    }
 
     if (patch.length === 0) {
       // Deferred item: a genuinely no-op update — nothing in
@@ -163,8 +202,8 @@ export function registerUpdateCommand(program: Command): void {
   program
     .command("update")
     .description(
-      "General ticket mutator (progress notes, state, priority, labels, name, spec); " +
-        "the verb commands are sugar over this.",
+      "General ticket mutator (progress notes, state, priority, labels, name, spec, " +
+        "relates-to); the verb commands are sugar over this.",
     )
     .argument("<ref>", "ticket to update")
     .option("--progress <note>", "append a progress note and bump last_activity_at")
@@ -181,5 +220,11 @@ export function registerUpdateCommand(program: Command): void {
     )
     .option("--name <name>", "rename the ticket")
     .option("--spec <json>", 'replace the ticket spec as JSON; pass "-" to read from stdin')
+    .option(
+      "--relates-to <±ref>",
+      "add (+ref) or remove (-ref) a relates-to edge — symmetric, informational (repeatable)",
+      collect,
+      [] as string[],
+    )
     .action(runUpdate);
 }

@@ -38,6 +38,7 @@ function baseInput(overrides: Partial<NewTicketInput> = {}): NewTicketInput {
   return {
     name: "Add auth provider",
     blocksRaw: [],
+    relatesToRaw: [],
     labels: [],
     draft: false,
     adhoc: false,
@@ -148,6 +149,22 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
     expect(ticket.blocks.sort()).toEqual([b1.id, b2.id].sort());
   });
 
+  // ticket_01KYA3Z9FNZ2FDMDRWNKR9EV7J: `--relates-to` mirrors `--blocks`
+  // exactly (same resolution, same dedup treatment) — the only difference
+  // is which ticket field the resolved ids land in.
+  it("--relates-to (repeatable, resolved to ticket ids)", async () => {
+    const r1 = makeTicket({ slug: "r1" });
+    const r2 = makeTicket({ slug: "r2" });
+    await createTicket(paths, r1, ctx, createdEvent);
+    await createTicket(paths, r2, ctx, createdEvent);
+    const { ticket } = await buildNewTicket(
+      paths,
+      baseInput({ relatesToRaw: ["r1", "r2"] }),
+      clock,
+    );
+    expect(ticket.relates_to.sort()).toEqual([r1.id, r2.id].sort());
+  });
+
   it("--discovered-from (resolved to a one-element array)", async () => {
     const origin = makeTicket({ slug: "origin" });
     await createTicket(paths, origin, ctx, createdEvent);
@@ -197,9 +214,11 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
   it("all flags combined at once", async () => {
     const parent = makeTicket({ slug: "combo-parent" });
     const blocker = makeTicket({ slug: "combo-blocker" });
+    const related = makeTicket({ slug: "combo-related" });
     const origin = makeTicket({ slug: "combo-origin" });
     await createTicket(paths, parent, ctx, createdEvent);
     await createTicket(paths, blocker, ctx, createdEvent);
+    await createTicket(paths, related, ctx, createdEvent);
     await createTicket(paths, origin, ctx, createdEvent);
 
     const { ticket, warnings } = await buildNewTicket(
@@ -208,6 +227,7 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
         specRaw: JSON.stringify({ summary: "Combo summary" }),
         parentRaw: "combo-parent",
         blocksRaw: ["combo-blocker"],
+        relatesToRaw: ["combo-related"],
         discoveredFromRaw: "combo-origin",
         labels: ["a:b"],
         draft: true,
@@ -223,6 +243,7 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
     expect(ticket.root_id).toBe(parent.id);
     expect(ticket.path).toEqual([parent.id]);
     expect(ticket.blocks).toEqual([blocker.id]);
+    expect(ticket.relates_to).toEqual([related.id]);
     expect(ticket.discovered_from).toEqual([origin.id]);
     expect(ticket.labels).toEqual(["a:b"]);
     expect(ticket.state).toBe("draft");
@@ -238,10 +259,16 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
     ).rejects.toMatchObject({ exitCode: 4 });
   });
 
+  it("throws NOT_FOUND for an unresolvable --relates-to ref", async () => {
+    await expect(
+      buildNewTicket(paths, baseInput({ relatesToRaw: ["no-such-ticket"] }), clock),
+    ).rejects.toMatchObject({ exitCode: 4 });
+  });
+
   // B3: buildNewTicket now runs the graph module (edges.ts) before
   // returning — a cycle is structurally impossible at creation (see B3's
-  // report for why), but the degree cap and --blocks deduplication are
-  // both real, reachable creation-time behaviors.
+  // report for why), but the degree cap and --blocks/--relates-to
+  // deduplication are both real, reachable creation-time behaviors.
   describe("B3: graph validation wired into `new`", () => {
     it("--blocks repeated for the SAME ticket is deduplicated, not stored twice", async () => {
       const b1 = makeTicket({ slug: "b1" });
@@ -259,6 +286,31 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
       }
       await expect(
         buildNewTicket(paths, baseInput({ blocksRaw: blockers.map((b) => b.slug) }), clock),
+      ).rejects.toMatchObject({ exitCode: 6 });
+    });
+
+    // ticket_01KYA3Z9FNZ2FDMDRWNKR9EV7J: `--relates-to` goes through the
+    // exact same resolution + validation path as `--blocks` above.
+    it("--relates-to repeated for the SAME ticket is deduplicated, not stored twice", async () => {
+      const r1 = makeTicket({ slug: "r1" });
+      await createTicket(paths, r1, ctx, createdEvent);
+      const { ticket } = await buildNewTicket(
+        paths,
+        baseInput({ relatesToRaw: ["r1", "r1"] }),
+        clock,
+      );
+      expect(ticket.relates_to).toEqual([r1.id]);
+    });
+
+    it("rejects --relates-to past the per-ticket per-edge-kind cap (exit 6)", async () => {
+      const relateds: Ticket[] = [];
+      for (let i = 0; i < 501; i++) {
+        const t = makeTicket({ slug: `related-${i}` });
+        await createTicket(paths, t, ctx, createdEvent);
+        relateds.push(t);
+      }
+      await expect(
+        buildNewTicket(paths, baseInput({ relatesToRaw: relateds.map((r) => r.slug) }), clock),
       ).rejects.toMatchObject({ exitCode: 6 });
     });
   });

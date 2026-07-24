@@ -60,9 +60,15 @@ ref is the root of its own local subtree. `blocks`, `relates-to`, and
 `discovered-from` always target a local ticket.
 
 **What has a CLI flag today:** `slop new` accepts `--parent`, `--blocks`,
-and `--discovered-from`. **There is no CLI flag to set a `relates-to` edge**
-in the current command surface — it exists in the schema and is rendered
-in `slop show`/`slop web` where present, but nothing writes one yet.
+`--relates-to`, and `--discovered-from` — every one of them add-only, set
+at creation time. `slop update` additionally accepts `--relates-to <±ref>`
+(`+ref` to add, `-ref` to remove) to change an EXISTING ticket's
+`relates-to` edges after creation — see
+[CLI reference → `new`](cli-reference.md#new) and
+[→ `update`](cli-reference.md#update) for the full flag docs. `parent`/
+`blocks`/`discovered-from` still have no post-creation CLI flag (aside
+from `--blocks` at `new` time) — hand-edit via `slop edit` remains the
+only way to change those after the fact.
 
 ### Session
 

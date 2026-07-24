@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { fixedClock } from "../core/clock.js";
 import type { Ticket } from "../core/index.js";
 import { newTicketId, ticketSchema } from "../core/index.js";
-import { buildUpdate, parseLabelOp } from "./update.js";
+import { buildUpdate, parseLabelOp, parseRelatesToOpText } from "./update.js";
 import type { UpdateInput } from "./update.js";
 
 const clock = fixedClock(new Date("2026-07-23T12:00:00.000Z"));
@@ -44,6 +44,27 @@ describe("parseLabelOp", () => {
   });
 });
 
+// ticket_01KYA3Z9FNZ2FDMDRWNKR9EV7J: `--relates-to <±ref>` uses the same
+// sigil convention as `--label <±label>` — mirrors parseLabelOp's own
+// tests, just naming a ref rather than a label.
+describe("parseRelatesToOpText", () => {
+  it("parses + and -", () => {
+    expect(parseRelatesToOpText("+auth-migration")).toEqual({
+      op: "+",
+      ref: "auth-migration",
+    });
+    expect(parseRelatesToOpText("-old-spike")).toEqual({ op: "-", ref: "old-spike" });
+  });
+
+  it("rejects a missing sigil", () => {
+    expect(() => parseRelatesToOpText("auth-migration")).toThrow();
+  });
+
+  it("rejects an empty ref after the sigil", () => {
+    expect(() => parseRelatesToOpText("+")).toThrow();
+  });
+});
+
 describe("buildUpdate", () => {
   it("rejects a call with no flags at all", () => {
     expect(() => buildUpdate(makeTicket(), baseInput(), clock)).toThrow();
@@ -74,6 +95,98 @@ describe("buildUpdate", () => {
     const before = makeTicket({ labels: ["dup"] });
     const result = buildUpdate(before, baseInput({ labelOps: ["+dup"] }), clock);
     expect(result.ticket.labels).toEqual(["dup"]);
+  });
+
+  // ticket_01KYA3Z9FNZ2FDMDRWNKR9EV7J: `--relates-to <±ref>` add/remove.
+  // `buildUpdate` only ever sees already-resolved `TicketId`s here — ref
+  // resolution is `src/cli/commands/update.ts`'s job (see this module's
+  // top doc) — so these tests exercise `relatesToOps` directly, the same
+  // way the `--label` tests above pass already-parsed `labelOps` text.
+  describe("--relates-to", () => {
+    it("+id adds a relates-to edge", () => {
+      const target = newTicketId();
+      const before = makeTicket({ relates_to: [] });
+      const result = buildUpdate(
+        before,
+        baseInput({ relatesToOps: [{ op: "+", id: target }] }),
+        clock,
+      );
+      expect(result.ticket.relates_to).toEqual([target]);
+      expect(result.payload).toMatchObject({ relates_to: [target] });
+    });
+
+    it("-id removes a relates-to edge", () => {
+      const target = newTicketId();
+      const before = makeTicket({ relates_to: [target] });
+      const result = buildUpdate(
+        before,
+        baseInput({ relatesToOps: [{ op: "-", id: target }] }),
+        clock,
+      );
+      expect(result.ticket.relates_to).toEqual([]);
+    });
+
+    it("+id and -id combined in one call: add one, remove another", () => {
+      const keep = newTicketId();
+      const drop = newTicketId();
+      const add = newTicketId();
+      const before = makeTicket({ relates_to: [keep, drop] });
+      const result = buildUpdate(
+        before,
+        baseInput({
+          relatesToOps: [
+            { op: "+", id: add },
+            { op: "-", id: drop },
+          ],
+        }),
+        clock,
+      );
+      expect(result.ticket.relates_to.sort()).toEqual([keep, add].sort());
+    });
+
+    it("+id on an already-present target is a no-op (no duplicate, edges are a set)", () => {
+      const target = newTicketId();
+      const before = makeTicket({
+        relates_to: [target],
+        updated_at: "2026-07-23T10:00:00.000Z",
+        last_activity_at: "2026-07-23T10:00:00.000Z",
+      });
+      const result = buildUpdate(
+        before,
+        baseInput({ relatesToOps: [{ op: "+", id: target }] }),
+        clock,
+      );
+      expect(result.ticket.relates_to).toEqual([target]);
+      // Fully redundant, nothing else given: no bump, empty patch, empty
+      // payload — same "no fake mutation" rule as the `--label` no-op above.
+      expect(result.ticket.updated_at).toBe("2026-07-23T10:00:00.000Z");
+      expect(result.patch).toEqual([]);
+      expect(result.payload).toEqual({});
+    });
+
+    it("-id on an absent target is a no-op", () => {
+      const before = makeTicket({ relates_to: [] });
+      const result = buildUpdate(
+        before,
+        baseInput({ relatesToOps: [{ op: "-", id: newTicketId() }] }),
+        clock,
+      );
+      expect(result.ticket.relates_to).toEqual([]);
+      expect(result.patch).toEqual([]);
+    });
+
+    it("the patch includes relates_to when it actually changed", () => {
+      const target = newTicketId();
+      const before = makeTicket({ relates_to: [] });
+      const result = buildUpdate(
+        before,
+        baseInput({ relatesToOps: [{ op: "+", id: target }] }),
+        clock,
+      );
+      const paths = result.patch.map((p) => p.path[0]);
+      expect(paths).toContain("relates_to");
+      expect(paths).toContain("updated_at");
+    });
   });
 
   it("--name renames WITHOUT touching the slug (D12: slugs are stable handles)", () => {

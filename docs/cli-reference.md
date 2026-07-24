@@ -111,6 +111,7 @@ could read, reports every problem, and exits `1` if any remain.
 slop new "Adding new auth provider"
 slop new "Fix login redirect" --parent jira:PROJ-123 --priority 1
 slop new "Add OAuth callback tests" --discovered-from add-oauth-provider
+slop new "Track the migration spike" --relates-to migration-spike
 slop new "Spike: passkeys" --draft
 slop new --spec - "Detailed ticket" < spec.json
 ```
@@ -120,6 +121,7 @@ slop new --spec - "Detailed ticket" < spec.json
 | `--spec <json>` | ticket spec as JSON; `-` reads from stdin |
 | `--parent <ref>` | parent ticket ref, slug, or external ref (`jira:PROJ-123`) |
 | `--blocks <ref>` | this ticket blocks `<ref>` (repeatable) |
+| `--relates-to <ref>` | this ticket relates to `<ref>` — symmetric, informational (repeatable) |
 | `--discovered-from <ref>` | the ticket this work was discovered while doing |
 | `--label <key:value>` | repeatable |
 | `--draft` | create in draft state (never appears in `ready`) |
@@ -129,10 +131,13 @@ slop new --spec - "Detailed ticket" < spec.json
 | `--slug <slug>` | explicit branch-style handle, optionally `type/`-prefixed; auto-generated from the name when omitted |
 | `--json` | machine-readable result |
 
-Without `--spec`, the spec defaults to `{summary: <name>}`. There is
-**no `--relates-to` flag** — see
-[Concepts → Edge](concepts.md#edge) for what edges are and aren't
-CLI-settable today.
+Without `--spec`, the spec defaults to `{summary: <name>}`. `--relates-to`
+is add-only here, same as `--blocks`/`--discovered-from` — every ref given
+is resolved and validated (existence, the per-edge-kind degree cap) exactly
+like `--blocks`; a repeated `--relates-to` naming the same ticket twice is
+deduplicated, not stored twice. To add or remove a `relates-to` edge on an
+**existing** ticket, see `update`'s own `--relates-to <±ref>` below — see
+[Concepts → Edge](concepts.md#edge) for what the edge itself means.
 
 ### `split`
 
@@ -174,6 +179,8 @@ slop update <ref> --priority 0 --label +urgent --label -stale
 slop update <ref> --name "Better ticket name"
 slop update <ref> --spec - < new-spec.json
 slop update <ref> --state open      # only draft <-> open is legal here
+slop update <ref> --relates-to +other-ticket-slug
+slop update <ref> --relates-to +new-related --relates-to -no-longer-related
 ```
 
 | Flag | Meaning |
@@ -184,10 +191,26 @@ slop update <ref> --state open      # only draft <-> open is legal here
 | `--label <±label>` | `+label` to add, `-label` to remove (repeatable) |
 | `--name <name>` | rename |
 | `--spec <json>` | replace the spec; `-` reads from stdin |
+| `--relates-to <±ref>` | `+ref` to add, `-ref` to remove a `relates-to` edge — symmetric, informational (repeatable) |
+
+`--relates-to` is the one edge `update` can touch — `parent`/`blocks`/
+`discovered-from` still can't be changed after creation (aside from
+`--blocks` at `new` time; hand-edit via `edit` for those). It uses the
+same `+`/`-` sigil convention as `--label` (rather than a separate
+`--unrelate` flag) because that's the established `update` convention for
+"add or remove, repeatable, one flag"; `new --relates-to <ref>` above
+stays bare (no sigil) because `new` only ever adds, same as `--blocks`.
+Each ref is resolved and re-validated the same way `new`'s edge flags are
+(existence, the per-edge-kind degree cap); a redundant add/remove (e.g.
+`+already-related`, or `-` on a target that isn't related) is a no-op, not
+an error.
 
 A **pure `--progress`-only call** (nothing else on the command line) is
 lock-free — see
 [Concurrency & merging](concurrency-and-merging.md#lock-free-progress-updates).
+Any call that touches `--relates-to` always takes the locked read-modify
+-write path (same as `--label`/`--priority`/etc.) — never the lock-free
+`--progress`-only path.
 
 ---
 

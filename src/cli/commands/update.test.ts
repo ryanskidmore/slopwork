@@ -325,3 +325,128 @@ describe("update: a PURE no-op call writes nothing and emits no event (CLI-layer
     expect(eventsAfter.map((e) => e.id)).toEqual(eventsBefore.map((e) => e.id));
   });
 });
+
+// ---------------------------------------------------------------------------
+// ticket_01KYA3Z9FNZ2FDMDRWNKR9EV7J: `update --relates-to <±ref>` — the
+// relates-to edge previously had no CLI flag on any mutating command at
+// all; this is the `update`-side half (`new --relates-to <ref>`, bare
+// add-only, is the other half — see new.test.ts). Same `+ref`/`-ref`
+// sigil convention as `--label`, validated via the same edges.ts module
+// `new` uses (`validateTicketEdges`).
+// ---------------------------------------------------------------------------
+
+describe("update --relates-to <±ref>: add/remove a relates-to edge (ticket_01KYA3Z9FNZ2FDMDRWNKR9EV7J)", () => {
+  it("--help lists --relates-to", () => {
+    const result = spawnSync("bun", [cliEntry, "update", "--help"], { encoding: "utf8" });
+    expect(result.stdout).toContain("--relates-to");
+  });
+
+  it("+ref adds a relates-to edge, visible via `show --json`", async () => {
+    const { dir } = await makeCliRepo();
+    const main = newTicketCli(dir, "ryan", "Main ticket");
+    const target = newTicketCli(dir, "ryan", "Related target");
+
+    const result = mustRunSlopSource(
+      ["update", main.id, "--relates-to", `+${target.slug}`],
+      dir,
+      "ryan",
+    );
+    expect(result.status, result.stderr).toBe(0);
+
+    const paths = repoPaths(dir);
+    const after = await readTicket(paths, main.id);
+    expect(after.relates_to).toEqual([target.id]);
+  });
+
+  it("-ref removes a previously-added relates-to edge", async () => {
+    const { dir } = await makeCliRepo();
+    const main = newTicketCli(dir, "ryan", "Main ticket");
+    const target = newTicketCli(dir, "ryan", "Related target");
+    mustRunSlopSource(["update", main.id, "--relates-to", `+${target.slug}`], dir, "ryan");
+
+    const result = mustRunSlopSource(
+      ["update", main.id, "--relates-to", `-${target.slug}`],
+      dir,
+      "ryan",
+    );
+    expect(result.status, result.stderr).toBe(0);
+
+    const paths = repoPaths(dir);
+    const after = await readTicket(paths, main.id);
+    expect(after.relates_to).toEqual([]);
+  });
+
+  it("add and remove combined in one call (repeatable flag)", async () => {
+    const { dir } = await makeCliRepo();
+    const main = newTicketCli(dir, "ryan", "Main ticket");
+    const keep = newTicketCli(dir, "ryan", "Keep this one");
+    const drop = newTicketCli(dir, "ryan", "Drop this one");
+    const add = newTicketCli(dir, "ryan", "Add this one");
+    mustRunSlopSource(
+      ["update", main.id, "--relates-to", `+${keep.slug}`, "--relates-to", `+${drop.slug}`],
+      dir,
+      "ryan",
+    );
+
+    const result = mustRunSlopSource(
+      ["update", main.id, "--relates-to", `+${add.slug}`, "--relates-to", `-${drop.slug}`],
+      dir,
+      "ryan",
+    );
+    expect(result.status, result.stderr).toBe(0);
+
+    const paths = repoPaths(dir);
+    const after = await readTicket(paths, main.id);
+    expect(after.relates_to.sort()).toEqual([keep.id, add.id].sort());
+  });
+
+  it("rejects a nonexistent --relates-to ref (exit 4, NOT_FOUND), leaving the ticket untouched", async () => {
+    const { dir } = await makeCliRepo();
+    const main = newTicketCli(dir, "ryan", "Main ticket");
+    const paths = repoPaths(dir);
+    const before = await readTicket(paths, main.id);
+
+    const result = runSlopSource(
+      ["update", main.id, "--relates-to", "+no-such-ticket"],
+      dir,
+      "ryan",
+    );
+    expect(result.status).toBe(4);
+    expect(result.stderr).toMatch(/no-such-ticket/);
+
+    const after = await readTicket(paths, main.id);
+    expect(after).toEqual(before);
+  });
+
+  it("rejects a --relates-to entry missing the +/- sigil (exit 2, USAGE_ERROR)", async () => {
+    const { dir } = await makeCliRepo();
+    const main = newTicketCli(dir, "ryan", "Main ticket");
+    const target = newTicketCli(dir, "ryan", "Related target");
+
+    const result = runSlopSource(["update", main.id, "--relates-to", target.slug], dir, "ryan");
+    expect(result.status).toBe(2);
+  });
+
+  it("a redundant +ref on an already-present target is a no-op: no new event, ticket unchanged", async () => {
+    const { dir } = await makeCliRepo();
+    const main = newTicketCli(dir, "ryan", "Main ticket");
+    const target = newTicketCli(dir, "ryan", "Related target");
+    mustRunSlopSource(["update", main.id, "--relates-to", `+${target.slug}`], dir, "ryan");
+
+    const paths = repoPaths(dir);
+    const before = await readTicket(paths, main.id);
+    const eventsBefore = await queryEvents(paths, { ticket: main.id });
+
+    const result = mustRunSlopSource(
+      ["update", main.id, "--relates-to", `+${target.slug}`],
+      dir,
+      "ryan",
+    );
+    expect(result.status, result.stderr).toBe(0);
+
+    const after = await readTicket(paths, main.id);
+    expect(after).toEqual(before);
+    const eventsAfter = await queryEvents(paths, { ticket: main.id });
+    expect(eventsAfter.map((e) => e.id)).toEqual(eventsBefore.map((e) => e.id));
+  });
+});

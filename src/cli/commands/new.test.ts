@@ -123,3 +123,57 @@ describe("new: surfaces the t-<code> short handle (ticket_01KY9RVF2DCG6TDQ8EBSGX
     expect(showB.stdout).toContain(bBody.id);
   });
 });
+
+// ticket_01KYA3Z9FNZ2FDMDRWNKR9EV7J: `new --relates-to <ref>` — the
+// relates-to edge previously had no CLI flag on any mutating command;
+// this is the new one, mirroring `--blocks` exactly (bare ref, repeatable,
+// add-only). Real-CLI-spawned, same convention as this file's other tests.
+describe("new --relates-to <ref>: sets a relates-to edge (ticket_01KYA3Z9FNZ2FDMDRWNKR9EV7J)", () => {
+  it("--help lists --relates-to", () => {
+    const result = spawnSync("bun", [cliEntry, "new", "--help"], { encoding: "utf8" });
+    expect(result.stdout).toContain("--relates-to");
+  });
+
+  it("adds a relates-to edge to an existing ticket, visible via `show --json`", async () => {
+    const root = await makeFixtureRepo();
+    const target = mustRunSlop(["new", "Target ticket", "--json"], root);
+    const targetBody = JSON.parse(target.stdout) as { id: string; slug: string };
+
+    const result = mustRunSlop(
+      ["new", "Ticket relating to target", "--relates-to", targetBody.slug],
+      root,
+    );
+    const created = CREATED_LINE.exec(result.stdout);
+    const id = created?.[1] as string;
+
+    const show = mustRunSlop(["show", id, "--json"], root);
+    const shown = JSON.parse(show.stdout) as { ticket: { relates_to: string[] } };
+    expect(shown.ticket.relates_to).toEqual([targetBody.id]);
+  });
+
+  it("is repeatable — multiple --relates-to flags all land in relates_to", async () => {
+    const root = await makeFixtureRepo();
+    const a = mustRunSlop(["new", "Related A", "--json"], root);
+    const b = mustRunSlop(["new", "Related B", "--json"], root);
+    const aBody = JSON.parse(a.stdout) as { id: string; slug: string };
+    const bBody = JSON.parse(b.stdout) as { id: string; slug: string };
+
+    const result = mustRunSlop(
+      ["new", "Multi-relates ticket", "--relates-to", aBody.slug, "--relates-to", bBody.slug],
+      root,
+    );
+    const created = CREATED_LINE.exec(result.stdout);
+    const id = created?.[1] as string;
+
+    const show = mustRunSlop(["show", id, "--json"], root);
+    const shown = JSON.parse(show.stdout) as { ticket: { relates_to: string[] } };
+    expect(shown.ticket.relates_to.sort()).toEqual([aBody.id, bBody.id].sort());
+  });
+
+  it("rejects a nonexistent --relates-to ref (exit 4, NOT_FOUND)", async () => {
+    const root = await makeFixtureRepo();
+    const result = runSlop(["new", "Bad relates-to", "--relates-to", "no-such-ticket"], root);
+    expect(result.status).toBe(4);
+    expect(result.stderr).toMatch(/no-such-ticket/);
+  });
+});

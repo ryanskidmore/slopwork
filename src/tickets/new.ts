@@ -35,6 +35,13 @@ export interface NewTicketInput {
   parentRaw?: string;
   /** Raw `--blocks` ref texts (repeatable). */
   blocksRaw: string[];
+  /**
+   * Raw `--relates-to` ref texts (repeatable) — mirrors `blocksRaw`
+   * exactly: `relates-to` is a symmetric, non-cycle-checked edge
+   * (edges.ts's module doc), so there's nothing direction-sensitive about
+   * resolving it the same way `blocks` is resolved.
+   */
+  relatesToRaw: string[];
   /** Raw `--discovered-from` ref text, or `undefined` if omitted. */
   discoveredFromRaw?: string;
   labels: string[];
@@ -91,18 +98,20 @@ async function resolveSlug(paths: RepoPaths, input: NewTicketInput): Promise<str
 /**
  * Build (but do not persist) the new ticket. Throws:
  *   - whatever `resolveTicketRef` throws (NOT_FOUND/AMBIGUOUS_REF/USAGE_ERROR)
- *     for an unresolvable `--parent`/`--blocks`/`--discovered-from` local ref;
+ *     for an unresolvable `--parent`/`--blocks`/`--relates-to`/`--discovered-from`
+ *     local ref;
  *   - a USAGE_ERROR `SlopError` if `--slug` is given but malformed (see
  *     {@link resolveSlug}), or if the assembled candidate fails
  *     `ticketSchema` validation (bad priority, empty name, an over-long
  *     label, ...) — every field-level constraint funnels through one
  *     final validation pass rather than being hand-checked piecemeal;
  *   - a CONFLICT (exit 6) `SlopError` (B3, `edges.ts`'s `validateTicketEdges`)
- *     if `--blocks` would exceed the per-ticket per-edge-kind degree cap.
- *     A cycle is structurally impossible at creation time — a brand-new
- *     id can't already be named by anything else's edges — but the same
- *     validation call runs here anyway for one uniform code path shared
- *     with `edit`'s re-validation, rather than a special-cased subset.
+ *     if `--blocks`/`--relates-to` would exceed the per-ticket per-edge-kind
+ *     degree cap. A cycle is structurally impossible at creation time — a
+ *     brand-new id can't already be named by anything else's edges — but
+ *     the same validation call runs here anyway for one uniform code path
+ *     shared with `edit`'s re-validation, rather than a special-cased
+ *     subset.
  */
 export async function buildNewTicket(
   paths: RepoPaths,
@@ -136,6 +145,19 @@ export async function buildNewTicket(
     }
   }
 
+  // `--relates-to`: same resolution + dedup treatment as `--blocks` above
+  // (edges are a set, not a multiset) — the only difference is which
+  // ticket field the resolved ids land in.
+  const relatesTo: TicketId[] = [];
+  const seenRelatesTo = new Set<TicketId>();
+  for (const ref of input.relatesToRaw) {
+    const target = await resolveTicketRef(paths, ref);
+    if (!seenRelatesTo.has(target.id)) {
+      seenRelatesTo.add(target.id);
+      relatesTo.push(target.id);
+    }
+  }
+
   const discoveredFrom: TicketId[] = [];
   if (input.discoveredFromRaw !== undefined) {
     const target = await resolveTicketRef(paths, input.discoveredFromRaw);
@@ -158,7 +180,7 @@ export async function buildNewTicket(
     adhoc: input.adhoc,
     parent: ancestry.parent,
     blocks,
-    relates_to: [],
+    relates_to: relatesTo,
     discovered_from: discoveredFrom,
     root_id: ancestry.rootId,
     path: ancestry.path,
