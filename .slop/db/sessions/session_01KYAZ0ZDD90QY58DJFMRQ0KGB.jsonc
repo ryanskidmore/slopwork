@@ -1,0 +1,44 @@
+{
+  "id": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB",
+  "ticket": "ticket_01KYAPMHVDARHGCDZPAADXM94R",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "worktree-agent-a2f73771765d13db7",
+    "commit_at_start": "47c3a52e6ee80366016ad0dc193ba8b0f7094ce4"
+  },
+  "started_at": "2026-07-24T21:03:13.837Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "confirm NOT_IMPLEMENTED(3) has no throw site anywhere in src/",
+          "checked": true
+        },
+        {
+          "text": "mark exit 3 reserved/unreachable in README.md, docs/cli-reference.md, exit-codes.ts doc table",
+          "checked": true
+        },
+        {
+          "text": "drop the unenforced D1 owner-requirement claim from new.ts --owner help text",
+          "checked": true
+        },
+        {
+          "text": "add regression tests (new.test.ts: help text + ownerless root ticket succeeds)",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T21:07:31.839Z"
+    }
+  ],
+  "end_summary": null,
+  "transcript_ref": "transcripts/session_01KYAZ0ZDD90QY58DJFMRQ0KGB.jsonl"
+}
