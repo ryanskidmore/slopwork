@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { EXIT_CODES } from "../core/index.js";
+import { SlopError } from "../cli/errors.js";
 import { defaultSpec, defaultSummaryFromName, parseSpecInput } from "./spec.js";
 
 describe("defaultSpec", () => {
@@ -64,11 +66,18 @@ describe("parseSpecInput (D10: bare markdown -> details_md)", () => {
     expect(spec.details_md).toBe(raw);
   });
 
-  it("a JSON object that fails spec validation falls through to markdown, verbatim", () => {
+  it("a JSON object with only known keys that fails spec validation errors as USAGE_ERROR, naming the field", () => {
     const raw = JSON.stringify({ acceptance: "not an array" });
-    const spec = parseSpecInput(raw, "Ticket name");
-    expect(spec.details_md).toBe(raw);
-    expect(spec.summary).toBe("Ticket name");
+    let caught: unknown;
+    try {
+      parseSpecInput(raw, "Ticket name");
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(SlopError);
+    const err = caught as SlopError;
+    expect(err.exitCode).toBe(EXIT_CODES.USAGE_ERROR);
+    expect(err.message).toContain("acceptance");
   });
 
   it("empty input yields an empty details_md and the name as summary", () => {
@@ -77,20 +86,39 @@ describe("parseSpecInput (D10: bare markdown -> details_md)", () => {
     expect(spec.summary).toBe("Ticket name");
   });
 
-  it("a JSON object with an unknown top-level key never silently loses the value: falls through to markdown, verbatim", () => {
+  it("a JSON object with an unknown top-level key errors as USAGE_ERROR naming the key, rather than silently discarding it", () => {
     const raw = JSON.stringify({ details: "my writeup" });
-    const spec = parseSpecInput(raw, "Ticket name");
-    // The would-be-lost prose must still be present somewhere in the result.
-    expect(spec.details_md).toContain("my writeup");
-    expect(spec.details_md).toBe(raw);
-    expect(spec.summary).toBe("Ticket name");
+    let caught: unknown;
+    try {
+      parseSpecInput(raw, "Ticket name");
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(SlopError);
+    const err = caught as SlopError;
+    expect(err.exitCode).toBe(EXIT_CODES.USAGE_ERROR);
+    expect(err.message).toContain("details");
   });
 
-  it("a JSON object mixing known and unknown top-level keys also falls through to markdown, verbatim", () => {
+  it("a JSON object mixing known and unknown top-level keys also errors as USAGE_ERROR naming the unknown key", () => {
     const raw = JSON.stringify({ summary: "Custom summary", details: "my writeup" });
+    let caught: unknown;
+    try {
+      parseSpecInput(raw, "Ticket name");
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(SlopError);
+    const err = caught as SlopError;
+    expect(err.exitCode).toBe(EXIT_CODES.USAGE_ERROR);
+    expect(err.message).toContain("details");
+  });
+
+  it("a truncated/malformed JSON-looking spec (starts with { but isn't valid JSON) falls through to markdown, unchanged", () => {
+    const raw = '{"summary": "oops, truncated';
     const spec = parseSpecInput(raw, "Ticket name");
-    expect(spec.details_md).toContain("my writeup");
     expect(spec.details_md).toBe(raw);
+    expect(spec.summary).toBe("Ticket name");
   });
 
   it("a JSON object with only known top-level keys still parses structurally, unchanged", () => {

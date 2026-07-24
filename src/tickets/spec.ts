@@ -7,7 +7,9 @@
  * acceptance criterion.
  */
 import type { Spec } from "../core/index.js";
-import { specSchema } from "../core/index.js";
+import { EXIT_CODES, specSchema } from "../core/index.js";
+import { SlopError } from "../cli/errors.js";
+import { formatZodIssuesForUsage } from "./validate.js";
 
 /** `summary` defaults sensibly from the ticket name (B1 brief) — the name
  * is already schema-bounded to 300 chars, comfortably under `summary`'s
@@ -36,27 +38,30 @@ const SPEC_SCHEMA_KEYS = new Set(Object.keys(specSchema.shape));
  *   1. Try `JSON.parse(raw)`. If that throws, or the result isn't a plain
  *      object (arrays and bare JSON primitives — `"hello"`, `42`, `true`
  *      — are all valid JSON but not spec-shaped), `raw` is not
- *      JSON-structural at all: fall straight to the markdown path.
- *   2. If it IS a plain object but carries any top-level key outside
- *      {@link SPEC_SCHEMA_KEYS} (`summary`, `details_md`, `acceptance`,
- *      `context`, `meta`, `v`), treat it the same as a validation failure
- *      (see 4) rather than letting `specSchema.safeParse` silently strip
- *      the unrecognized key(s) and default the rest — that would look like
- *      success while quietly losing whatever content lived under the typo.
- *   3. Otherwise, merge `{ summary: <default from name> }` underneath the
- *      parsed object (so a JSON spec that omits `summary` still gets the
- *      same "defaults from name" treatment as the no-`--spec` case) and
- *      validate the result against {@link specSchema}. If it validates,
- *      that's the spec — used structurally, exactly as D10 asks.
- *   4. If it's a JSON object but DOESN'T validate against `specSchema`
- *      (wrong field types, unrecognized top-level keys, unexpected shape,
- *      ...) — still not "matching the spec schema" — fall through to the
- *      markdown path too, with the original raw text (JSON and all)
- *      landing verbatim in `details_md`. This is a deliberate, honest
- *      fallback rather than a rejection: a human/agent typing free-form
- *      text that happens to start with `{` should never get a confusing
- *      schema-validation error for what was always meant as prose, and the
- *      original text — unknown keys included — is never dropped.
+ *      JSON-structural at all: fall straight to the markdown path, with
+ *      `raw` landing whole in `details_md` — unchanged, still a
+ *      deliberate, honest fallback: free-form prose that merely happens
+ *      not to parse as JSON was never meant structurally.
+ *   2. If it IS a plain object, it was clearly *meant* as a structured
+ *      spec (D10: "Specs = structured JSON"), so from here on a failure
+ *      to match {@link specSchema} is a hard error, not a silent
+ *      degrade-to-prose: this review's own first ticket lost content this
+ *      way (a typo'd key quietly became the whole `details_md`, no
+ *      warning, exit 0). Two sub-cases, both a `SlopError` USAGE_ERROR
+ *      (exit 2) naming the offending key/issue:
+ *        a. any top-level key outside {@link SPEC_SCHEMA_KEYS} (`summary`,
+ *           `details_md`, `acceptance`, `context`, `meta`, `v`) — reported
+ *           by name rather than let `specSchema.safeParse` silently strip
+ *           it and default the rest;
+ *        b. a known-keys-only object that still fails `specSchema` (wrong
+ *           field types, out-of-range values, ...) — reported via
+ *           {@link formatZodIssuesForUsage} so the message names the exact
+ *           field/issue instead of a raw `ZodError` dump.
+ *   3. Otherwise (only known keys, and it validates), merge
+ *      `{ summary: <default from name> }` underneath the parsed object (so
+ *      a JSON spec that omits `summary` still gets the same "defaults from
+ *      name" treatment as the no-`--spec` case) and return the validated
+ *      spec — used structurally, exactly as D10 asks.
  */
 export function parseSpecInput(raw: string, name: string): Spec {
   let parsedJson: unknown;
@@ -71,12 +76,25 @@ export function parseSpecInput(raw: string, name: string): Spec {
 
   if (isJsonObject) {
     const parsedObject = parsedJson as Record<string, unknown>;
-    const hasOnlyKnownKeys = Object.keys(parsedObject).every((key) => SPEC_SCHEMA_KEYS.has(key));
-    if (hasOnlyKnownKeys) {
-      const candidate = { summary: defaultSummaryFromName(name), ...parsedObject };
-      const result = specSchema.safeParse(candidate);
-      if (result.success) return result.data;
+    const unknownKeys = Object.keys(parsedObject).filter((key) => !SPEC_SCHEMA_KEYS.has(key));
+    if (unknownKeys.length > 0) {
+      throw new SlopError(
+        `--spec: unknown key(s) ${unknownKeys.map((k) => `"${k}"`).join(", ")} — known spec ` +
+          `keys are ${Array.from(SPEC_SCHEMA_KEYS).join(", ")}. If this was meant as free-form ` +
+          `prose, it can't start with "{"/parse as a JSON object.`,
+        EXIT_CODES.USAGE_ERROR,
+      );
     }
+
+    const candidate = { summary: defaultSummaryFromName(name), ...parsedObject };
+    const result = specSchema.safeParse(candidate);
+    if (!result.success) {
+      throw new SlopError(
+        formatZodIssuesForUsage("--spec: invalid spec JSON", result.error),
+        EXIT_CODES.USAGE_ERROR,
+      );
+    }
+    return result.data;
   }
 
   return specSchema.parse({ summary: defaultSummaryFromName(name), details_md: raw });

@@ -139,6 +139,17 @@ deduplicated, not stored twice. To add or remove a `relates-to` edge on an
 **existing** ticket, see `update`'s own `--relates-to <±ref>` below — see
 [Concepts → Edge](concepts.md#edge) for what the edge itself means.
 
+`--spec`'s value is either a JSON object matching the spec schema
+(`summary`/`details_md`/`acceptance[]`/`context[]`/`meta`/`v`), used
+structurally, or bare markdown prose, which lands whole in `details_md`.
+If a `--spec` value **parses as a JSON object** but carries an unknown
+top-level key (a typo, e.g. `acceptence`) or otherwise fails the spec
+schema, that's a hard error (`USAGE_ERROR`, exit 2) naming the offending
+key/issue — never a silent fallback, since that would quietly turn the
+JSON into prose and lose the key. Only text that isn't JSON-object-shaped
+at all (doesn't parse as JSON, or parses to an array/primitive) falls
+through to the `details_md` markdown path.
+
 ### `split`
 
 ```sh

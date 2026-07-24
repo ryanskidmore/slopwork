@@ -1,0 +1,52 @@
+{
+  "id": "session_01KYARBR3Q7AB51NYHAZ5NG3RC",
+  "ticket": "ticket_01KYAPHGJ9Y6DCN9EGHRX2KRA0",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "worktree-agent-aa1a4517430374aa8",
+    "commit_at_start": "0dc5de382c90250e96b6d04a007c58e0a674be0f"
+  },
+  "started_at": "2026-07-24T19:06:46.775Z",
+  "ended_at": "2026-07-24T19:12:40.390Z",
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "modify parseSpecInput to throw USAGE_ERROR when raw is a JSON object that fails the known-keys/schema gate",
+          "checked": true
+        },
+        {
+          "text": "keep bare-markdown fallback for non-JSON-object raw text",
+          "checked": true
+        },
+        {
+          "text": "update callers (new.ts, update.ts) if needed to let the error propagate cleanly",
+          "checked": true
+        },
+        {
+          "text": "add regression tests for typo key, wrong-type field, and bare markdown fallback",
+          "checked": true
+        },
+        {
+          "text": "update onboarding content and cli-reference docs if spec parsing behavior changed",
+          "checked": true
+        },
+        {
+          "text": "run full verification suite",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T19:06:53.549Z"
+    }
+  ],
+  "end_summary": "JSON-object --spec that fails the known-keys/schema gate now errors USAGE_ERROR(2) naming the offending key/issue, instead of silently degrading to details_md prose. Bare non-JSON markdown unaffected. Landing in this worktree's next commit.",
+  "transcript_ref": "transcripts/session_01KYARBR3Q7AB51NYHAZ5NG3RC.jsonl"
+}

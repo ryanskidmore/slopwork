@@ -223,6 +223,32 @@ describe("B1: new / show / edit / update", () => {
       expect(mdTicket.spec.details_md).toBe("just prose");
     });
 
+    it("--spec JSON with an unknown top-level key errors USAGE_ERROR(2) naming the key, instead of silently becoming details_md prose", async () => {
+      const fixture = await makeFixture();
+      const raw = JSON.stringify({ acceptence: "typo'd key" });
+      const result = runSlop(["new", "Typo key spec", "--spec", raw], fixture.root);
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain("acceptence");
+      const listing = await readdir(fixture.paths.ticketsDir);
+      expect(listing).toEqual([]); // nothing was persisted
+    });
+
+    it("--spec JSON with only known keys but a schema violation errors USAGE_ERROR(2) naming the field", async () => {
+      const fixture = await makeFixture();
+      const raw = JSON.stringify({ acceptance: "not an array" });
+      const result = runSlop(["new", "Bad shape spec", "--spec", raw], fixture.root);
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain("acceptance");
+    });
+
+    it("--spec truncated/malformed JSON (not valid JSON at all) still falls through to details_md, unchanged", async () => {
+      const fixture = await makeFixture();
+      const raw = '{"summary": "oops, truncated';
+      const { id } = await createTicketViaCli(fixture, "Truncated JSON spec", ["--spec", raw]);
+      const ticket = await readTicketFile(fixture.paths, id);
+      expect(ticket.spec.details_md).toBe(raw);
+    });
+
     it("--parent <local ref> (slug/prefix/full id all work — see also the dedicated slug+prefix describe below)", async () => {
       const fixture = await makeFixture();
       const { id: parentId, slug: parentSlug } = await createTicketViaCli(fixture, "Parent ticket");
@@ -675,6 +701,20 @@ describe("B1: new / show / edit / update", () => {
       );
       expect(result.status, result.stderr).toBe(0);
       expect((await readTicketFile(fixture.paths, id)).spec.summary).toBe("Replaced summary");
+    });
+
+    it("--spec JSON with an unknown top-level key on update errors USAGE_ERROR(2), leaving the existing spec untouched", async () => {
+      const fixture = await makeFixture();
+      const { id } = await createTicketViaCli(fixture, "Spec update typo");
+      const before = await readTicketFile(fixture.paths, id);
+      const result = runSlop(
+        ["update", id, "--spec", JSON.stringify({ acceptence: "typo'd key" })],
+        fixture.root,
+      );
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain("acceptence");
+      const after = await readTicketFile(fixture.paths, id);
+      expect(after.spec).toEqual(before.spec);
     });
 
     it("no flags at all is a usage error", async () => {
