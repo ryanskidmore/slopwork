@@ -261,6 +261,7 @@ describe("runShow (in-process)", () => {
         runUpdate(id, {
           label: [],
           relatesTo: [],
+          blocks: [],
           acceptance: [],
           context: [],
           progress: "fresh progress note",

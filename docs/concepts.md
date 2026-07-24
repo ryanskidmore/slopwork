@@ -61,14 +61,18 @@ ref is the root of its own local subtree. `blocks`, `relates-to`, and
 
 **What has a CLI flag today:** `slop new` accepts `--parent`, `--blocks`,
 `--relates-to`, and `--discovered-from` — every one of them add-only, set
-at creation time. `slop update` additionally accepts `--relates-to <±ref>`
-(`+ref` to add, `-ref` to remove) to change an EXISTING ticket's
-`relates-to` edges after creation — see
+at creation time. `slop update` additionally accepts `--relates-to <±ref>`,
+`--blocks <±ref>` (`+ref` to add, `-ref` to remove either), `--owner
+<actor>`, and `--parent <ref>` (plain set/replace, no sigil) to change an
+EXISTING ticket's edges/owner after creation
+(edit-vi-fallback-hangs-agents: a non-interactive alternative to `slop
+edit`, whose `$EDITOR` fallback can hang forever on a non-TTY — see
+[CLI reference → `edit`](cli-reference.md#edit)) — see
 [CLI reference → `new`](cli-reference.md#new) and
-[→ `update`](cli-reference.md#update) for the full flag docs. `parent`/
-`blocks`/`discovered-from` still have no post-creation CLI flag (aside
-from `--blocks` at `new` time) — hand-edit via `slop edit` remains the
-only way to change those after the fact.
+[→ `update`](cli-reference.md#update) for the full flag docs. Only
+`discovered-from` still has no post-creation CLI flag at all — hand-edit
+via `slop edit` remains the only way to change it (or to CLEAR a
+`parent`/`owner`, which `update` can set/replace but not remove).
 
 ### Session
 

@@ -3,7 +3,7 @@ import { fixedClock } from "../core/clock.js";
 import type { Ticket } from "../core/index.js";
 import { EXIT_CODES, newTicketId, ticketSchema } from "../core/index.js";
 import { SlopError } from "../cli/errors.js";
-import { buildUpdate, parseLabelOp, parseRelatesToOpText } from "./update.js";
+import { buildUpdate, parseBlocksOpText, parseLabelOp, parseRelatesToOpText } from "./update.js";
 import type { UpdateInput } from "./update.js";
 
 const clock = fixedClock(new Date("2026-07-23T12:00:00.000Z"));
@@ -76,6 +76,23 @@ describe("parseRelatesToOpText", () => {
 
   it("rejects an empty ref after the sigil", () => {
     expect(() => parseRelatesToOpText("+")).toThrow();
+  });
+});
+
+// edit-vi-fallback-hangs-agents: `--blocks <±ref>` uses the identical
+// sigil convention/logic as `--relates-to <±ref>` — see BlocksOp's doc.
+describe("parseBlocksOpText", () => {
+  it("parses + and -", () => {
+    expect(parseBlocksOpText("+auth-migration")).toEqual({ op: "+", ref: "auth-migration" });
+    expect(parseBlocksOpText("-old-spike")).toEqual({ op: "-", ref: "old-spike" });
+  });
+
+  it("rejects a missing sigil", () => {
+    expect(() => parseBlocksOpText("auth-migration")).toThrow();
+  });
+
+  it("rejects an empty ref after the sigil", () => {
+    expect(() => parseBlocksOpText("+")).toThrow();
   });
 });
 
@@ -200,6 +217,193 @@ describe("buildUpdate", () => {
       const paths = result.patch.map((p) => p.path[0]);
       expect(paths).toContain("relates_to");
       expect(paths).toContain("updated_at");
+    });
+  });
+
+  // edit-vi-fallback-hangs-agents: `--blocks <±ref>` mirrors `--relates-to`
+  // exactly at this pure layer — `buildUpdate` only ever sees already
+  // -resolved `TicketId`s (see `BlocksOp`'s doc); the CYCLE-checking
+  // difference between `blocks`/`relates_to` lives one layer up, in
+  // `src/cli/commands/update.ts`'s `validateTicketEdges` call, not here.
+  describe("--blocks", () => {
+    it("+id adds a blocks edge", () => {
+      const target = newTicketId();
+      const before = makeTicket({ blocks: [] });
+      const result = buildUpdate(
+        before,
+        baseInput({ blocksOps: [{ op: "+", id: target }] }),
+        clock,
+      );
+      expect(result.ticket.blocks).toEqual([target]);
+      expect(result.payload).toMatchObject({ blocks: [target] });
+    });
+
+    it("-id removes a blocks edge", () => {
+      const target = newTicketId();
+      const before = makeTicket({ blocks: [target] });
+      const result = buildUpdate(
+        before,
+        baseInput({ blocksOps: [{ op: "-", id: target }] }),
+        clock,
+      );
+      expect(result.ticket.blocks).toEqual([]);
+    });
+
+    it("+id and -id combined in one call: add one, remove another", () => {
+      const keep = newTicketId();
+      const drop = newTicketId();
+      const add = newTicketId();
+      const before = makeTicket({ blocks: [keep, drop] });
+      const result = buildUpdate(
+        before,
+        baseInput({
+          blocksOps: [
+            { op: "+", id: add },
+            { op: "-", id: drop },
+          ],
+        }),
+        clock,
+      );
+      expect(result.ticket.blocks.sort()).toEqual([keep, add].sort());
+    });
+
+    it("+id on an already-present target is a no-op (no duplicate, edges are a set)", () => {
+      const target = newTicketId();
+      const before = makeTicket({
+        blocks: [target],
+        updated_at: "2026-07-23T10:00:00.000Z",
+        last_activity_at: "2026-07-23T10:00:00.000Z",
+      });
+      const result = buildUpdate(
+        before,
+        baseInput({ blocksOps: [{ op: "+", id: target }] }),
+        clock,
+      );
+      expect(result.ticket.blocks).toEqual([target]);
+      expect(result.ticket.updated_at).toBe("2026-07-23T10:00:00.000Z");
+      expect(result.patch).toEqual([]);
+      expect(result.payload).toEqual({});
+    });
+
+    it("the patch includes blocks when it actually changed", () => {
+      const target = newTicketId();
+      const before = makeTicket({ blocks: [] });
+      const result = buildUpdate(
+        before,
+        baseInput({ blocksOps: [{ op: "+", id: target }] }),
+        clock,
+      );
+      const paths = result.patch.map((p) => p.path[0]);
+      expect(paths).toContain("blocks");
+      expect(paths).toContain("updated_at");
+    });
+  });
+
+  // edit-vi-fallback-hangs-agents: `--owner <name>` — a plain set/replace,
+  // same "raw text -> {name, kind: 'human'}" convention `tickets/new.ts`'s
+  // own `ownerRaw` uses.
+  describe("--owner", () => {
+    it("sets the owner from ownerRaw", () => {
+      const before = makeTicket({ owner: null });
+      const result = buildUpdate(before, baseInput({ ownerRaw: "priya" }), clock);
+      expect(result.ticket.owner).toEqual({ name: "priya", kind: "human" });
+      expect(result.payload).toMatchObject({ owner: { name: "priya", kind: "human" } });
+    });
+
+    it("replaces an already-set owner", () => {
+      const before = makeTicket({ owner: { name: "ryan", kind: "human" } });
+      const result = buildUpdate(before, baseInput({ ownerRaw: "sam" }), clock);
+      expect(result.ticket.owner).toEqual({ name: "sam", kind: "human" });
+    });
+
+    it("rejects a blank ownerRaw (USAGE_ERROR) via the final schema validation", () => {
+      const before = makeTicket({ owner: null });
+      let caught: unknown;
+      try {
+        buildUpdate(before, baseInput({ ownerRaw: "   " }), clock);
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(SlopError);
+      expect((caught as SlopError).exitCode).toBe(EXIT_CODES.USAGE_ERROR);
+    });
+
+    it("re-stating the exact same owner is a no-op (empty patch/payload)", () => {
+      const before = makeTicket({
+        owner: { name: "ryan", kind: "human" },
+        updated_at: "2026-07-23T10:00:00.000Z",
+      });
+      const result = buildUpdate(before, baseInput({ ownerRaw: "ryan" }), clock);
+      expect(result.ticket.updated_at).toBe("2026-07-23T10:00:00.000Z");
+      expect(result.patch).toEqual([]);
+      expect(result.payload).toEqual({});
+    });
+  });
+
+  // edit-vi-fallback-hangs-agents: `--parent <ref>` — `buildUpdate` only
+  // ever sets `ticket.parent` itself from an already-resolved
+  // `ParentResolution` (`src/cli/commands/update.ts`'s job to produce, via
+  // `resolveParentRef`); `root_id`/`path` are deliberately NOT recomputed
+  // here (no `others` to recompute them from — see this module's top doc
+  // and `UpdateInput.parentResolution`'s doc) — that's
+  // `src/cli/commands/update.ts`'s job, via `recomputeAncestry`, once it
+  // sees `patch` touch `parent`. These tests pin exactly that split: only
+  // `parent` moves at this layer, `root_id`/`path` stay whatever `current`
+  // already had.
+  describe("--parent", () => {
+    it("a local parent resolution sets ticket.parent to the resolved ticket's id (root_id/path untouched here)", () => {
+      const target = makeTicket({ name: "Target parent" });
+      const before = makeTicket({ root_id: newTicketId() }); // some pre-existing root_id
+      const result = buildUpdate(
+        before,
+        baseInput({ parentResolution: { kind: "local", ticket: target } }),
+        clock,
+      );
+      expect(result.ticket.parent).toBe(target.id);
+      // Unrecomputed at this layer — still current's stale value.
+      expect(result.ticket.root_id).toBe(before.root_id);
+      expect(result.payload).toMatchObject({ parent: target.id });
+    });
+
+    it("an external parent resolution sets ticket.parent to the external ref text", () => {
+      const before = makeTicket();
+      const result = buildUpdate(
+        before,
+        baseInput({
+          parentResolution: { kind: "external", ref: "jira:PROJ-123" },
+        }),
+        clock,
+      );
+      expect(result.ticket.parent).toBe("jira:PROJ-123");
+    });
+
+    it("the patch includes parent when it actually changed", () => {
+      const target = makeTicket({ name: "Target parent" });
+      const before = makeTicket();
+      const result = buildUpdate(
+        before,
+        baseInput({ parentResolution: { kind: "local", ticket: target } }),
+        clock,
+      );
+      const paths = result.patch.map((p) => p.path[0]);
+      expect(paths).toContain("parent");
+      expect(paths).toContain("updated_at");
+    });
+
+    it("re-stating the exact same parent is a no-op (empty patch/payload)", () => {
+      const target = makeTicket({ name: "Target parent" });
+      const before = makeTicket({
+        parent: target.id,
+        updated_at: "2026-07-23T10:00:00.000Z",
+      });
+      const result = buildUpdate(
+        before,
+        baseInput({ parentResolution: { kind: "local", ticket: target } }),
+        clock,
+      );
+      expect(result.ticket.updated_at).toBe("2026-07-23T10:00:00.000Z");
+      expect(result.patch).toEqual([]);
+      expect(result.payload).toEqual({});
     });
   });
 
