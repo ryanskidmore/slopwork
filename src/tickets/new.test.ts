@@ -90,6 +90,21 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
     expect(warnings).toEqual([]);
   });
 
+  it("an empty or whitespace-only name is a clean USAGE_ERROR(2), never a raw ZodError (regression: raw-zoderrors-escape-as-exit)", async () => {
+    let caughtEmpty: unknown;
+    try {
+      await buildNewTicket(paths, baseInput({ name: "" }), clock);
+    } catch (err) {
+      caughtEmpty = err;
+    }
+    expect(caughtEmpty).toMatchObject({ exitCode: EXIT_CODES.USAGE_ERROR });
+    expect((caughtEmpty as { name?: string }).name).not.toBe("ZodError");
+
+    await expect(buildNewTicket(paths, baseInput({ name: "   " }), clock)).rejects.toMatchObject({
+      exitCode: EXIT_CODES.USAGE_ERROR,
+    });
+  });
+
   it("--spec (JSON, structural)", async () => {
     const { ticket } = await buildNewTicket(
       paths,

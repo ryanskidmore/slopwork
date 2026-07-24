@@ -332,7 +332,9 @@ Step text and `--check`/`--uncheck` are mutually exclusive; `--check` and
 `--uncheck` are mutually exclusive with each other. Supplying step text
 always creates a **new plan version** (diffable from the last); checking or
 unchecking a step number (1-based) mutates the *current* version in place
-— it does not version-bump.
+— it does not version-bump. Every step's text must be non-blank; a
+blank/whitespace-only step is a `USAGE_ERROR` (exit 2) naming its 1-based
+position, nothing partially applied.
 
 ### `review`
 

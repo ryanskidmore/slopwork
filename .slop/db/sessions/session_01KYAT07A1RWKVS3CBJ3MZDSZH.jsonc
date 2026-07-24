@@ -1,0 +1,52 @@
+{
+  "id": "session_01KYAT07A1RWKVS3CBJ3MZDSZH",
+  "ticket": "ticket_01KYAPMH3580PYJ6C06NEQXT3Q",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "worktree-agent-aa1a4517430374aa8",
+    "commit_at_start": "919fcd8d8fb6ddf5d8ae723f93e6382759e5522c"
+  },
+  "started_at": "2026-07-24T19:35:26.273Z",
+  "ended_at": "2026-07-24T19:45:25.768Z",
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "reproduce both bugs against the compiled binary",
+          "checked": true
+        },
+        {
+          "text": "harden tickets/spec.ts: defaultSpec + parseSpecInput's bare-markdown fallback to never raw-throw on a blank name",
+          "checked": true
+        },
+        {
+          "text": "fix sessions/plan.ts's buildPlanVersion: explicit per-step blank check + safeParse backstop, USAGE_ERROR naming the 1-based step",
+          "checked": true
+        },
+        {
+          "text": "add regression tests (spec.test.ts, new.test.ts, plan.test.ts, B1.test.ts, C2.test.ts)",
+          "checked": true
+        },
+        {
+          "text": "update docs/cli-reference.md's plan section",
+          "checked": true
+        },
+        {
+          "text": "run full verification suite",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T19:44:55.415Z"
+    }
+  ],
+  "end_summary": "Fixed both repro cases: (1) slop new '' / '   ' used to derive an empty spec.summary from the blank name and let a raw specSchema.parse throw an uncaught ZodError naming the internal 'summary' field before ticketSchema's own clean validation ever ran — tickets/spec.ts's defaultSpec/parseSpecInput now validate via safeParse with an explicit blank-name check, erroring USAGE_ERROR(2) with a message naming 'name'. (2) slop plan <ref> '' used planVersionSchema.parse (raw) which threw a raw ZodError naming 'steps.0.text' — sessions/plan.ts's buildPlanVersion now explicitly rejects any blank step up front, naming its 1-based position, exit 2, plus a safeParse backstop for any other future constraint. Neither path ever partially applies on rejection.",
+  "transcript_ref": "transcripts/session_01KYAT07A1RWKVS3CBJ3MZDSZH.jsonl"
+}

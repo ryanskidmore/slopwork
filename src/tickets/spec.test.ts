@@ -21,6 +21,31 @@ describe("defaultSpec", () => {
       v: 1,
     });
   });
+
+  it("an empty name is a clean USAGE_ERROR(2), never a raw ZodError (regression: raw-zoderrors-escape-as-exit)", () => {
+    let caught: unknown;
+    try {
+      defaultSpec("");
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(SlopError);
+    const err = caught as SlopError;
+    expect(err.exitCode).toBe(EXIT_CODES.USAGE_ERROR);
+    expect(err.name).not.toBe("ZodError");
+    expect(err.message.toLowerCase()).toContain("name");
+  });
+
+  it("a whitespace-only name is also a clean USAGE_ERROR(2)", () => {
+    let caught: unknown;
+    try {
+      defaultSpec("   ");
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(SlopError);
+    expect((caught as SlopError).exitCode).toBe(EXIT_CODES.USAGE_ERROR);
+  });
 });
 
 describe("defaultSummaryFromName", () => {
@@ -57,6 +82,19 @@ describe("parseSpecInput (D10: bare markdown -> details_md)", () => {
     const spec = parseSpecInput(raw, "Ticket name");
     expect(spec.details_md).toBe(raw);
     expect(spec.summary).toBe("Ticket name");
+  });
+
+  it("bare markdown with a blank name is a clean USAGE_ERROR(2), never a raw ZodError (regression: raw-zoderrors-escape-as-exit)", () => {
+    let caught: unknown;
+    try {
+      parseSpecInput("just prose", "");
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(SlopError);
+    const err = caught as SlopError;
+    expect(err.exitCode).toBe(EXIT_CODES.USAGE_ERROR);
+    expect(err.name).not.toBe("ZodError");
   });
 
   it("a JSON array is not spec-structural — falls through to markdown", () => {

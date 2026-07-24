@@ -18,9 +18,41 @@ export function defaultSummaryFromName(name: string): string {
   return name.trim();
 }
 
+/**
+ * Build a spec whose `summary` is derived from `name`, validating the
+ * result via `specSchema.safeParse` rather than a bare (throwing) `.parse`
+ * — `raw-zoderrors-escape-as-exit`: `slop new ""` used to derive an EMPTY
+ * `summary` from the blank name and let a raw `specSchema.parse` throw an
+ * uncaught `ZodError` (a JSON issues array naming the internal `summary`
+ * field, not the `name` the user actually typed) straight out of
+ * `defaultSpec`, before `buildNewTicket`'s own `ticketSchema.safeParse`
+ * ever got a chance to reject the blank `name` with a clean message.
+ * Checked explicitly UP FRONT for the common case (a blank name — the
+ * only way `summary`'s `min(1)` can fail here, since a `name` long enough
+ * to blow `summary`'s 500-char cap is vanishingly unlikely but still
+ * handled by the `safeParse` fallback below, never a raw throw either
+ * way) — same "explicit check for the expected failure, safe fallback for
+ * everything else" layering `tickets/split.ts`'s own blank-name guard
+ * uses.
+ */
+function specFromNameDerivedSummary(name: string, extra: Record<string, unknown> = {}): Spec {
+  const summary = defaultSummaryFromName(name);
+  if (summary.length === 0) {
+    throw new SlopError("ticket name must be non-blank", EXIT_CODES.USAGE_ERROR);
+  }
+  const result = specSchema.safeParse({ summary, ...extra });
+  if (!result.success) {
+    throw new SlopError(
+      formatZodIssuesForUsage("invalid ticket name", result.error),
+      EXIT_CODES.USAGE_ERROR,
+    );
+  }
+  return result.data;
+}
+
 /** The spec `new` builds when `--spec` is omitted entirely. */
 export function defaultSpec(name: string): Spec {
-  return specSchema.parse({ summary: defaultSummaryFromName(name) });
+  return specFromNameDerivedSummary(name);
 }
 
 /** The complete set of top-level keys `specSchema` knows about. Every field
@@ -97,7 +129,7 @@ export function parseSpecInput(raw: string, name: string): Spec {
     return result.data;
   }
 
-  return specSchema.parse({ summary: defaultSummaryFromName(name), details_md: raw });
+  return specFromNameDerivedSummary(name, { details_md: raw });
 }
 
 /**

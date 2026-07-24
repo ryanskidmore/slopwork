@@ -419,6 +419,23 @@ describe("B1: new / show / edit / update", () => {
       expect(bad.status).toBe(2); // USAGE_ERROR
     });
 
+    it("an empty or whitespace-only name is a clean USAGE_ERROR(2), never a raw ZodError JSON dump (regression: raw-zoderrors-escape-as-exit)", async () => {
+      const fixture = await makeFixture();
+
+      const empty = runSlop(["new", ""], fixture.root);
+      expect(empty.status).toBe(2);
+      expect(empty.stderr).not.toContain("ZodError");
+      expect(empty.stderr).not.toMatch(/^\s*error:\s*\[/); // not a raw JSON issues array
+      expect(empty.stderr.toLowerCase()).toContain("name");
+
+      const whitespace = runSlop(["new", "   "], fixture.root);
+      expect(whitespace.status).toBe(2);
+      expect(whitespace.stderr).not.toContain("ZodError");
+
+      const listing = await readdir(fixture.paths.ticketsDir);
+      expect(listing).toEqual([]); // nothing persisted for either rejected call
+    });
+
     it("every flag combined in a single `new` call", async () => {
       const fixture = await makeFixture();
       const { id: parentId, slug: parentSlug } = await createTicketViaCli(fixture, "Combo parent");

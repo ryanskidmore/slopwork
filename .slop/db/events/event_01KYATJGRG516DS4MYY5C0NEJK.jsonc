@@ -1,0 +1,19 @@
+{
+  "id": "event_01KYATJGRG516DS4MYY5C0NEJK",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": "session_01KYAT07A1RWKVS3CBJ3MZDSZH",
+  "verb": "session.ended",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KYAT07A1RWKVS3CBJ3MZDSZH"
+  },
+  "payload": {
+    "reason": "done",
+    "note": "Fixed both repro cases: (1) slop new '' / '   ' used to derive an empty spec.summary from the blank name and let a raw specSchema.parse throw an uncaught ZodError naming the internal 'summary' field before ticketSchema's own clean validation ever ran — tickets/spec.ts's defaultSpec/parseSpecInput now validate via safeParse with an explicit blank-name check, erroring USAGE_ERROR(2) with a message naming 'name'. (2) slop plan <ref> '' used planVersionSchema.parse (raw) which threw a raw ZodError naming 'steps.0.text' — sessions/plan.ts's buildPlanVersion now explicitly rejects any blank step up front, naming its 1-based position, exit 2, plus a safeParse backstop for any other future constraint. Neither path ever partially applies on rejection.",
+    "transcript_ref": "transcripts/session_01KYAT07A1RWKVS3CBJ3MZDSZH.jsonl"
+  },
+  "at": "2026-07-24T19:45:25.776Z"
+}
