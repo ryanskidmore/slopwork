@@ -24,6 +24,10 @@ interface UpdateCommandOptions {
   label: string[];
   name?: string;
   spec?: string;
+  summary?: string;
+  details?: string;
+  acceptance: string[];
+  context: string[];
   relatesTo: string[];
 }
 
@@ -42,6 +46,10 @@ function pureProgressNote(opts: UpdateCommandOptions): string | undefined {
     opts.label.length > 0 ||
     opts.name !== undefined ||
     opts.spec !== undefined ||
+    opts.summary !== undefined ||
+    opts.details !== undefined ||
+    opts.acceptance.length > 0 ||
+    opts.context.length > 0 ||
     opts.relatesTo.length > 0
   ) {
     return undefined;
@@ -109,6 +117,12 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
 
   const specRaw =
     opts.spec === undefined ? undefined : opts.spec === "-" ? await readStdin() : opts.spec;
+  const detailsRaw =
+    opts.details === undefined
+      ? undefined
+      : opts.details === "-"
+        ? await readStdin()
+        : opts.details;
 
   const ticket = await withLock(paths.lockFile, async () => {
     const current = await readTicket(paths, initialTicket.id);
@@ -134,6 +148,10 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
       labelOps: opts.label,
       name: opts.name,
       specRaw,
+      summaryRaw: opts.summary,
+      detailsRaw,
+      acceptance: opts.acceptance,
+      context: opts.context,
       relatesToOps,
     };
 
@@ -219,7 +237,34 @@ export function registerUpdateCommand(program: Command): void {
       [] as string[],
     )
     .option("--name <name>", "rename the ticket")
-    .option("--spec <json>", 'replace the ticket spec as JSON; pass "-" to read from stdin')
+    .option(
+      "--spec <json>",
+      'replace the ticket spec as JSON; pass "-" to read from stdin. Mutually exclusive with ' +
+        "--summary/--details/--acceptance/--context.",
+    )
+    .option(
+      "--summary <text>",
+      "replace the spec summary — structured alternative to --spec (leaves the rest of the spec untouched)",
+    )
+    .option(
+      "--details <text>",
+      "replace the spec details_md prose — structured alternative to --spec " +
+        '(leaves the rest of the spec untouched); pass "-" to read from stdin',
+    )
+    .option(
+      "--acceptance <text>",
+      "replace the spec's acceptance[] wholesale — structured alternative to --spec " +
+        "(repeatable; leaves the rest of the spec untouched)",
+      collect,
+      [] as string[],
+    )
+    .option(
+      "--context <text>",
+      "replace the spec's context[] wholesale — structured alternative to --spec " +
+        "(repeatable; leaves the rest of the spec untouched)",
+      collect,
+      [] as string[],
+    )
     .option(
       "--relates-to <±ref>",
       "add (+ref) or remove (-ref) a relates-to edge — symmetric, informational (repeatable)",

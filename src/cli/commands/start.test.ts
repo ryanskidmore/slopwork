@@ -228,7 +228,16 @@ describe("start — Fix 2 (ticket_01KY93E3WYD13E71QM7GHWG1DE): fails CLOSED on a
 async function jsonNewTicket(root: string, name: string): Promise<TicketId> {
   const out = captureOutput();
   try {
-    await withCwd(root, () => runNew(name, { blocks: [], relatesTo: [], label: [], json: true }));
+    await withCwd(root, () =>
+      runNew(name, {
+        blocks: [],
+        relatesTo: [],
+        label: [],
+        acceptance: [],
+        context: [],
+        json: true,
+      }),
+    );
     return (JSON.parse(out.stdout()) as { id: TicketId }).id;
   } finally {
     out.restore();

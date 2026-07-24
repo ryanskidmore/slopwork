@@ -1,0 +1,19 @@
+{
+  "id": "event_01KYASHHWEC4Q5V65THAH2Z1HC",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": "session_01KYARQAF5S88H1S0E7P25F4AY",
+  "verb": "session.ended",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KYARQAF5S88H1S0E7P25F4AY"
+  },
+  "payload": {
+    "reason": "done",
+    "note": "Added first-class --summary/--details/--acceptance/--context flags to new/update. new: field flags build the spec directly (same defaults as no --spec). update: field flags overlay onto the CURRENT spec, field-by-field (say what changes, rest stays), unlike --spec's whole-blob replace. --spec is mutually exclusive with the field flags (USAGE_ERROR). Docs + onboarding house rule updated to recommend the flags over hand-assembled --spec JSON.",
+    "transcript_ref": "transcripts/session_01KYARQAF5S88H1S0E7P25F4AY.jsonl"
+  },
+  "at": "2026-07-24T19:27:25.582Z"
+}

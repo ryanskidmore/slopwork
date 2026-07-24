@@ -194,6 +194,8 @@ function baseOpts(overrides: Partial<Parameters<typeof runNew>[1]> = {}) {
     blocks: [] as string[],
     relatesTo: [] as string[],
     label: [] as string[],
+    acceptance: [] as string[],
+    context: [] as string[],
     ...overrides,
   };
 }

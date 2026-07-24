@@ -249,6 +249,58 @@ describe("B1: new / show / edit / update", () => {
       expect(ticket.spec.details_md).toBe(raw);
     });
 
+    it("--summary/--details/--acceptance/--context: structured spec flags, no --spec JSON needed", async () => {
+      const fixture = await makeFixture();
+      const { id } = await createTicketViaCli(fixture, "Structured spec ticket", [
+        "--summary",
+        "Structured summary",
+        "--details",
+        "Structured prose",
+        "--acceptance",
+        "criterion 1",
+        "--acceptance",
+        "criterion 2",
+        "--context",
+        "src/foo.ts:12",
+      ]);
+      const ticket = await readTicketFile(fixture.paths, id);
+      expect(ticket.spec.summary).toBe("Structured summary");
+      expect(ticket.spec.details_md).toBe("Structured prose");
+      expect(ticket.spec.acceptance).toEqual(["criterion 1", "criterion 2"]);
+      expect(ticket.spec.context).toEqual(["src/foo.ts:12"]);
+    });
+
+    it("--details - reads the details prose from stdin, same as --spec -", async () => {
+      const fixture = await makeFixture();
+      const spawned = runSlopWithStdin(
+        ["new", "Stdin details ticket", "--details", "-"],
+        fixture.root,
+        "# Heading\n\nSome *markdown* prose.",
+      );
+      expect(spawned.status, spawned.stderr).toBe(0);
+      const { id } = parseCreatedOutput(spawned.stdout);
+      const ticket = await readTicketFile(fixture.paths, id);
+      expect(ticket.spec.details_md).toBe("# Heading\n\nSome *markdown* prose.");
+    });
+
+    it("combining --spec with a structured field flag (e.g. --summary) is a USAGE_ERROR(2), nothing persisted", async () => {
+      const fixture = await makeFixture();
+      const result = runSlop(
+        [
+          "new",
+          "Conflicting spec flags",
+          "--spec",
+          JSON.stringify({ summary: "from json" }),
+          "--summary",
+          "from flag",
+        ],
+        fixture.root,
+      );
+      expect(result.status).toBe(2);
+      const listing = await readdir(fixture.paths.ticketsDir);
+      expect(listing).toEqual([]);
+    });
+
     it("--parent <local ref> (slug/prefix/full id all work — see also the dedicated slug+prefix describe below)", async () => {
       const fixture = await makeFixture();
       const { id: parentId, slug: parentSlug } = await createTicketViaCli(fixture, "Parent ticket");
@@ -713,6 +765,38 @@ describe("B1: new / show / edit / update", () => {
       );
       expect(result.status).toBe(2);
       expect(result.stderr).toContain("acceptence");
+      const after = await readTicketFile(fixture.paths, id);
+      expect(after.spec).toEqual(before.spec);
+    });
+
+    it("--acceptance on update replaces the acceptance[] wholesale, leaving summary/details/context untouched", async () => {
+      const fixture = await makeFixture();
+      const { id } = await createTicketViaCli(fixture, "Structured field update", [
+        "--summary",
+        "Original summary",
+        "--details",
+        "Original prose",
+        "--context",
+        "original ctx",
+      ]);
+      const result = runSlop(["update", id, "--acceptance", "new criterion"], fixture.root);
+      expect(result.status, result.stderr).toBe(0);
+      const ticket = await readTicketFile(fixture.paths, id);
+      expect(ticket.spec.acceptance).toEqual(["new criterion"]);
+      expect(ticket.spec.summary).toBe("Original summary");
+      expect(ticket.spec.details_md).toBe("Original prose");
+      expect(ticket.spec.context).toEqual(["original ctx"]);
+    });
+
+    it("combining --spec with a structured field flag on update is a USAGE_ERROR(2), leaving the spec untouched", async () => {
+      const fixture = await makeFixture();
+      const { id } = await createTicketViaCli(fixture, "Conflicting update spec flags");
+      const before = await readTicketFile(fixture.paths, id);
+      const result = runSlop(
+        ["update", id, "--spec", JSON.stringify({ summary: "x" }), "--summary", "y"],
+        fixture.root,
+      );
+      expect(result.status).toBe(2);
       const after = await readTicketFile(fixture.paths, id);
       expect(after.spec).toEqual(before.spec);
     });

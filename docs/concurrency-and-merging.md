@@ -134,10 +134,11 @@ so a lock-free progress note un-stales an `in_progress` ticket exactly
 like a locked update always did.
 
 **A `--progress` call combined with any other flag** (`--state`,
-`--priority`, `--label`, `--name`, `--spec`) is *not* lock-free — it takes
-the ordinary locked read-modify-write path and rewrites the ticket file
-directly, same as any other field change. Only the pure, no-other-flags
-case gets the lock-free treatment.
+`--priority`, `--label`, `--name`, `--spec`, `--summary`, `--details`,
+`--acceptance`, `--context`) is *not* lock-free — it takes the ordinary
+locked read-modify-write path and rewrites the ticket file directly, same
+as any other field change. Only the pure, no-other-flags case gets the
+lock-free treatment.
 
 ## The parallel-agents model
 

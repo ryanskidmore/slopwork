@@ -1,0 +1,17 @@
+{
+  "id": "event_01KYASH32MH1WC3HQ8K66E00R3",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYAPJW7E33FZ6QGD27NQFY8W"
+  },
+  "payload": {
+    "progress": "note: plan was set retroactively after most of the implementation was already done in this session — see handoff feedback at ticket close"
+  },
+  "at": "2026-07-24T19:27:10.420Z"
+}

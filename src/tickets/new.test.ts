@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { fixedClock } from "../core/clock.js";
 import type { Ticket } from "../core/index.js";
-import { newTicketId, ticketSchema } from "../core/index.js";
+import { EXIT_CODES, newTicketId, ticketSchema } from "../core/index.js";
 import type { EventContext, MutationEventSpec } from "../repo/events.js";
 import { ensureDbDirs } from "../repo/paths.js";
 import type { RepoPaths } from "../repo/paths.js";
@@ -39,6 +39,8 @@ function baseInput(overrides: Partial<NewTicketInput> = {}): NewTicketInput {
     name: "Add auth provider",
     blocksRaw: [],
     relatesToRaw: [],
+    acceptance: [],
+    context: [],
     labels: [],
     draft: false,
     adhoc: false,
@@ -106,6 +108,50 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
     );
     expect(ticket.spec.details_md).toBe("# Notes\nSome prose.");
     expect(ticket.spec.summary).toBe("Add auth provider");
+  });
+
+  it("--summary/--details/--acceptance/--context: structured spec fields, no --spec needed", async () => {
+    const { ticket } = await buildNewTicket(
+      paths,
+      baseInput({
+        summaryRaw: "Structured summary",
+        detailsRaw: "Structured prose",
+        acceptance: ["criterion 1", "criterion 2"],
+        context: ["src/foo.ts:12"],
+      }),
+      clock,
+    );
+    expect(ticket.spec.summary).toBe("Structured summary");
+    expect(ticket.spec.details_md).toBe("Structured prose");
+    expect(ticket.spec.acceptance).toEqual(["criterion 1", "criterion 2"]);
+    expect(ticket.spec.context).toEqual(["src/foo.ts:12"]);
+  });
+
+  it("--acceptance/--context alone still default summary from the name, same as no --spec at all", async () => {
+    const { ticket } = await buildNewTicket(
+      paths,
+      baseInput({ acceptance: ["criterion 1"] }),
+      clock,
+    );
+    expect(ticket.spec.summary).toBe("Add auth provider");
+    expect(ticket.spec.acceptance).toEqual(["criterion 1"]);
+  });
+
+  it("combining --spec with a structured field flag is a USAGE_ERROR, before any resolution happens", async () => {
+    await expect(
+      buildNewTicket(
+        paths,
+        baseInput({ specRaw: JSON.stringify({ summary: "x" }), summaryRaw: "y" }),
+        clock,
+      ),
+    ).rejects.toMatchObject({ exitCode: EXIT_CODES.USAGE_ERROR });
+    await expect(
+      buildNewTicket(
+        paths,
+        baseInput({ specRaw: JSON.stringify({ summary: "x" }), acceptance: ["a"] }),
+        clock,
+      ),
+    ).rejects.toMatchObject({ exitCode: EXIT_CODES.USAGE_ERROR });
   });
 
   it("--parent (local, resolved via slug)", async () => {

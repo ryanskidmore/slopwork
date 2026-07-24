@@ -21,7 +21,8 @@ import type { JsoncPatchEntry } from "../core/jsonc.js";
 import { SlopError } from "../cli/errors.js";
 import { diffTicketPatch } from "./patch.js";
 import { checkStateTransition } from "./state.js";
-import { parseSpecInput } from "./spec.js";
+import { applySpecFieldOverrides, hasSpecFieldOverrides, parseSpecInput } from "./spec.js";
+import type { SpecFieldOverrides } from "./spec.js";
 import { formatZodIssuesForUsage } from "./validate.js";
 
 /** Ticket fields `update` may ever touch — deliberately narrower than
@@ -174,6 +175,14 @@ export interface UpdateInput {
   name?: string;
   /** Raw `--spec` text (already read from stdin if `-`), or `undefined` if omitted. */
   specRaw?: string;
+  /** Raw `--summary` text, or `undefined` if omitted. */
+  summaryRaw?: string;
+  /** Raw `--details` text (already read from stdin if `-`), or `undefined` if omitted. */
+  detailsRaw?: string;
+  /** Raw `--acceptance` entries (repeatable); replaces `current.spec.acceptance` wholesale if non-empty, else leaves it untouched. */
+  acceptance: string[];
+  /** Raw `--context` entries (repeatable); same replace-if-given-else-untouched rule as `acceptance`. */
+  context: string[];
   /**
    * Already-resolved `--relates-to <±ref>` entries (repeatable) — the CLI
    * layer has already turned each ref TEXT into a real `TicketId` via
@@ -203,15 +212,20 @@ function hasAnyInput(input: UpdateInput): boolean {
     input.labelOps.length > 0 ||
     input.name !== undefined ||
     input.specRaw !== undefined ||
+    input.summaryRaw !== undefined ||
+    input.detailsRaw !== undefined ||
+    input.acceptance.length > 0 ||
+    input.context.length > 0 ||
     (input.relatesToOps?.length ?? 0) > 0
   );
 }
 
 /**
  * Build the update. Throws:
- *   - USAGE_ERROR if no flag was given at all, `--state` names an unknown
- *     state, a `--label` entry is malformed, or the resulting ticket fails
- *     schema validation;
+ *   - USAGE_ERROR if no flag was given at all, BOTH `--spec` and any of
+ *     `--summary`/`--details`/`--acceptance`/`--context` are given
+ *     together, `--state` names an unknown state, a `--label` entry is
+ *     malformed, or the resulting ticket fails schema validation;
  *   - CONFLICT (exit 6) if `--state` names a structurally-known but
  *     illegal transition per `state.ts`'s `checkStateTransition` — this is
  *     B1's brief's "must reject illegal transitions per §2 with exit 6".
@@ -229,8 +243,23 @@ export function buildUpdate(
 ): UpdateResult {
   if (!hasAnyInput(input)) {
     throw new SlopError(
-      "nothing to update — pass at least one of " +
-        "--progress/--state/--priority/--label/--name/--spec/--relates-to",
+      "nothing to update — pass at least one of --progress/--state/--priority/--label/" +
+        "--name/--spec/--summary/--details/--acceptance/--context/--relates-to",
+      EXIT_CODES.USAGE_ERROR,
+    );
+  }
+
+  const specFieldOverrides: SpecFieldOverrides = {
+    summary: input.summaryRaw,
+    details: input.detailsRaw,
+    acceptance: input.acceptance,
+    context: input.context,
+  };
+  const hasFieldOverrides = hasSpecFieldOverrides(specFieldOverrides);
+  if (input.specRaw !== undefined && hasFieldOverrides) {
+    throw new SlopError(
+      "--spec cannot be combined with --summary/--details/--acceptance/--context — " +
+        "pick one way to give the spec",
       EXIT_CODES.USAGE_ERROR,
     );
   }
@@ -261,7 +290,9 @@ export function buildUpdate(
     spec:
       input.specRaw !== undefined
         ? parseSpecInput(input.specRaw, input.name ?? current.name)
-        : current.spec,
+        : hasFieldOverrides
+          ? applySpecFieldOverrides(current.spec, specFieldOverrides)
+          : current.spec,
     state: targetState ?? current.state,
     // Defensive only, not reachable via this command today: `checkStateTransition`
     // (above) now rejects every `from === "review"` transition except the
@@ -340,7 +371,9 @@ export function buildUpdate(
   }
   if (labelOps.length > 0 && patchedFields.has("labels")) payload.labels = validated.labels;
   if (input.name !== undefined && patchedFields.has("name")) payload.name = validated.name;
-  if (input.specRaw !== undefined && patchedFields.has("spec")) payload.spec = true;
+  if ((input.specRaw !== undefined || hasFieldOverrides) && patchedFields.has("spec")) {
+    payload.spec = true;
+  }
   if ((input.relatesToOps?.length ?? 0) > 0 && patchedFields.has("relates_to")) {
     payload.relates_to = validated.relates_to;
   }

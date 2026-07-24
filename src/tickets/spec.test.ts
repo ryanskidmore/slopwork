@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { EXIT_CODES } from "../core/index.js";
 import { SlopError } from "../cli/errors.js";
-import { defaultSpec, defaultSummaryFromName, parseSpecInput } from "./spec.js";
+import {
+  applySpecFieldOverrides,
+  defaultSpec,
+  defaultSummaryFromName,
+  hasSpecFieldOverrides,
+  parseSpecInput,
+} from "./spec.js";
 
 describe("defaultSpec", () => {
   it("defaults summary from the name and leaves everything else at spec defaults", () => {
@@ -139,5 +145,85 @@ describe("parseSpecInput (D10: bare markdown -> details_md)", () => {
     expect(spec.context).toEqual(["c"]);
     expect(spec.meta).toEqual({ k: "v" });
     expect(spec.v).toBe(1);
+  });
+});
+
+describe("hasSpecFieldOverrides", () => {
+  it("false when nothing was given", () => {
+    expect(hasSpecFieldOverrides({ acceptance: [], context: [] })).toBe(false);
+  });
+
+  it("true for a summary-only override", () => {
+    expect(hasSpecFieldOverrides({ summary: "x", acceptance: [], context: [] })).toBe(true);
+  });
+
+  it("true for a details-only override", () => {
+    expect(hasSpecFieldOverrides({ details: "x", acceptance: [], context: [] })).toBe(true);
+  });
+
+  it("true for a non-empty acceptance list", () => {
+    expect(hasSpecFieldOverrides({ acceptance: ["a"], context: [] })).toBe(true);
+  });
+
+  it("true for a non-empty context list", () => {
+    expect(hasSpecFieldOverrides({ acceptance: [], context: ["c"] })).toBe(true);
+  });
+});
+
+describe("applySpecFieldOverrides (structured --summary/--details/--acceptance/--context)", () => {
+  it("with no overrides given, returns base unchanged", () => {
+    const base = defaultSpec("Ticket name");
+    const spec = applySpecFieldOverrides(base, { acceptance: [], context: [] });
+    expect(spec).toEqual(base);
+  });
+
+  it("--summary alone overrides only summary, base's details/acceptance/context untouched", () => {
+    const base = { ...defaultSpec("Ticket name"), details_md: "existing prose", acceptance: ["a"] };
+    const spec = applySpecFieldOverrides(base, {
+      summary: "New summary",
+      acceptance: [],
+      context: [],
+    });
+    expect(spec.summary).toBe("New summary");
+    expect(spec.details_md).toBe("existing prose");
+    expect(spec.acceptance).toEqual(["a"]);
+  });
+
+  it("--details alone overrides only details_md", () => {
+    const base = defaultSpec("Ticket name");
+    const spec = applySpecFieldOverrides(base, {
+      details: "new prose",
+      acceptance: [],
+      context: [],
+    });
+    expect(spec.details_md).toBe("new prose");
+    expect(spec.summary).toBe(base.summary);
+  });
+
+  it("--acceptance replaces the whole acceptance array, leaving context/summary/details untouched", () => {
+    const base = { ...defaultSpec("Ticket name"), context: ["existing ctx"] };
+    const spec = applySpecFieldOverrides(base, { acceptance: ["a1", "a2"], context: [] });
+    expect(spec.acceptance).toEqual(["a1", "a2"]);
+    expect(spec.context).toEqual(["existing ctx"]);
+  });
+
+  it("--context replaces the whole context array, leaving acceptance untouched", () => {
+    const base = { ...defaultSpec("Ticket name"), acceptance: ["existing accept"] };
+    const spec = applySpecFieldOverrides(base, { acceptance: [], context: ["c1"] });
+    expect(spec.context).toEqual(["c1"]);
+    expect(spec.acceptance).toEqual(["existing accept"]);
+  });
+
+  it("an empty --summary errors USAGE_ERROR naming the field, base is never silently kept", () => {
+    const base = defaultSpec("Ticket name");
+    let caught: unknown;
+    try {
+      applySpecFieldOverrides(base, { summary: "   ", acceptance: [], context: [] });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(SlopError);
+    expect((caught as SlopError).exitCode).toBe(EXIT_CODES.USAGE_ERROR);
+    expect((caught as SlopError).message).toContain("summary");
   });
 });

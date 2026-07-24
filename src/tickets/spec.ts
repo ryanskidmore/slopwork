@@ -99,3 +99,62 @@ export function parseSpecInput(raw: string, name: string): Spec {
 
   return specSchema.parse({ summary: defaultSummaryFromName(name), details_md: raw });
 }
+
+/**
+ * First-class `--summary`/`--details`/`--acceptance`/`--context` flags
+ * (as opposed to hand-assembled `--spec <json>`) — the structured
+ * alternative onboarding's house rules already ask for ("put acceptance
+ * criteria in `acceptance[]` and file/URL pointers in `context[]`, not
+ * buried in prose") without making every agent hand-serialize JSON in a
+ * shell arg (quoting hazards) or risk the unknown-key trap `--spec` now
+ * hard-errors on. `acceptance`/`context` default to `[]` (Commander's
+ * `collect` default for a repeatable flag), never `undefined` — same
+ * convention `--label`/`--blocks` already use.
+ */
+export interface SpecFieldOverrides {
+  summary?: string;
+  details?: string;
+  acceptance: string[];
+  context: string[];
+}
+
+/** `true` iff at least one structured field flag was actually given. */
+export function hasSpecFieldOverrides(overrides: SpecFieldOverrides): boolean {
+  return (
+    overrides.summary !== undefined ||
+    overrides.details !== undefined ||
+    overrides.acceptance.length > 0 ||
+    overrides.context.length > 0
+  );
+}
+
+/**
+ * Overlay whichever structured field flags were given on top of `base` —
+ * `defaultSpec(name)` for `new` (nothing existing to preserve, so an
+ * omitted flag falls back to the schema's own default, e.g. `summary`
+ * from the name), or `current.spec` for `update` (an omitted flag keeps
+ * today's value, the same "say what changes, the rest stays" convention
+ * `update`'s other field flags — `--priority`/`--name`/`--label` — already
+ * use, deliberately NOT `--spec`'s whole-blob-replace semantics). Only
+ * `summary`/`details_md` are overlaid scalar-wise; `acceptance`/`context`
+ * are overlaid as a whole array (given at all -> replaces; omitted ->
+ * `base`'s array, unchanged) — there is no per-entry add/remove sigil here,
+ * unlike `--label`.
+ */
+export function applySpecFieldOverrides(base: Spec, overrides: SpecFieldOverrides): Spec {
+  const candidate = {
+    ...base,
+    summary: overrides.summary ?? base.summary,
+    details_md: overrides.details ?? base.details_md,
+    acceptance: overrides.acceptance.length > 0 ? overrides.acceptance : base.acceptance,
+    context: overrides.context.length > 0 ? overrides.context : base.context,
+  };
+  const result = specSchema.safeParse(candidate);
+  if (!result.success) {
+    throw new SlopError(
+      formatZodIssuesForUsage("invalid spec field(s)", result.error),
+      EXIT_CODES.USAGE_ERROR,
+    );
+  }
+  return result.data;
+}

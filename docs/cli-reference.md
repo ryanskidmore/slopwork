@@ -113,12 +113,21 @@ slop new "Fix login redirect" --parent jira:PROJ-123 --priority 1
 slop new "Add OAuth callback tests" --discovered-from add-oauth-provider
 slop new "Track the migration spike" --relates-to migration-spike
 slop new "Spike: passkeys" --draft
+slop new "Detailed ticket" \
+  --summary "Short one-liner" \
+  --acceptance "criterion 1" --acceptance "criterion 2" \
+  --context "src/foo.ts:42" \
+  --details "Longer markdown prose"
 slop new --spec - "Detailed ticket" < spec.json
 ```
 
 | Flag | Meaning |
 |---|---|
-| `--spec <json>` | ticket spec as JSON; `-` reads from stdin |
+| `--summary <text>` | spec summary — structured, preferred over `--spec` JSON (default: the ticket name) |
+| `--details <text>` | spec `details_md` prose — structured, preferred over `--spec` JSON; `-` reads from stdin |
+| `--acceptance <text>` | an acceptance criterion — structured, preferred over `--spec` JSON (repeatable) |
+| `--context <text>` | a context note/file/URL pointer — structured, preferred over `--spec` JSON (repeatable) |
+| `--spec <json>` | ticket spec as JSON; `-` reads from stdin. Mutually exclusive with the four flags above |
 | `--parent <ref>` | parent ticket ref, slug, or external ref (`jira:PROJ-123`) |
 | `--blocks <ref>` | this ticket blocks `<ref>` (repeatable) |
 | `--relates-to <ref>` | this ticket relates to `<ref>` — symmetric, informational (repeatable) |
@@ -131,13 +140,22 @@ slop new --spec - "Detailed ticket" < spec.json
 | `--slug <slug>` | explicit branch-style handle, optionally `type/`-prefixed; auto-generated from the name when omitted |
 | `--json` | machine-readable result |
 
-Without `--spec`, the spec defaults to `{summary: <name>}`. `--relates-to`
-is add-only here, same as `--blocks`/`--discovered-from` — every ref given
-is resolved and validated (existence, the per-edge-kind degree cap) exactly
-like `--blocks`; a repeated `--relates-to` naming the same ticket twice is
+Without `--spec`/`--summary`/`--details`/`--acceptance`/`--context`, the
+spec defaults to `{summary: <name>}`. `--relates-to` is add-only here, same
+as `--blocks`/`--discovered-from` — every ref given is resolved and
+validated (existence, the per-edge-kind degree cap) exactly like
+`--blocks`; a repeated `--relates-to` naming the same ticket twice is
 deduplicated, not stored twice. To add or remove a `relates-to` edge on an
 **existing** ticket, see `update`'s own `--relates-to <±ref>` below — see
 [Concepts → Edge](concepts.md#edge) for what the edge itself means.
+
+**Prefer `--summary`/`--details`/`--acceptance`/`--context` over
+`--spec <json>`** — house rules already ask for structured
+`acceptance[]`/`context[]` rather than prose, and hand-assembling `--spec`
+JSON in a shell means quoting hazards plus the failure mode below; the
+structured flags are plain repeatable text, same convention as `--label`.
+They cannot be combined with `--spec` (a `USAGE_ERROR`, exit 2, if both are
+given — two different ways to say what the spec is).
 
 `--spec`'s value is either a JSON object matching the spec schema
 (`summary`/`details_md`/`acceptance[]`/`context[]`/`meta`/`v`), used
@@ -188,6 +206,8 @@ this for the one edge it can perform (`draft ⇄ open`); everything else
 slop update <ref> --progress "one-line status note"
 slop update <ref> --priority 0 --label +urgent --label -stale
 slop update <ref> --name "Better ticket name"
+slop update <ref> --acceptance "new criterion 1" --acceptance "new criterion 2"
+slop update <ref> --context "src/bar.ts:10"
 slop update <ref> --spec - < new-spec.json
 slop update <ref> --state open      # only draft <-> open is legal here
 slop update <ref> --relates-to +other-ticket-slug
@@ -201,8 +221,22 @@ slop update <ref> --relates-to +new-related --relates-to -no-longer-related
 | `--priority <0-3>` | |
 | `--label <±label>` | `+label` to add, `-label` to remove (repeatable) |
 | `--name <name>` | rename |
-| `--spec <json>` | replace the spec; `-` reads from stdin |
+| `--summary <text>` | replace the spec summary — structured, preferred over `--spec` JSON; the rest of the spec is untouched |
+| `--details <text>` | replace the spec `details_md` prose — structured, preferred over `--spec` JSON; `-` reads from stdin; the rest of the spec is untouched |
+| `--acceptance <text>` | replace `acceptance[]` wholesale — structured, preferred over `--spec` JSON (repeatable); the rest of the spec is untouched |
+| `--context <text>` | replace `context[]` wholesale — structured, preferred over `--spec` JSON (repeatable); the rest of the spec is untouched |
+| `--spec <json>` | replace the WHOLE spec; `-` reads from stdin. Mutually exclusive with the four flags above |
 | `--relates-to <±ref>` | `+ref` to add, `-ref` to remove a `relates-to` edge — symmetric, informational (repeatable) |
+
+Unlike `--spec` (which replaces the entire spec blob — an omitted key
+resets to its schema default), `--summary`/`--details`/`--acceptance`/
+`--context` follow `update`'s usual "say what changes, the rest stays"
+convention: each touches only its own field, on top of the ticket's
+CURRENT spec. `--acceptance`/`--context` replace their whole array when
+given at all (no per-entry add/remove sigil, unlike `--label`); omitted
+entirely, the current array is untouched. Combining `--spec` with any of
+the four is a `USAGE_ERROR` (exit 2) — two different ways to say what the
+spec is.
 
 `--relates-to` is the one edge `update` can touch — `parent`/`blocks`/
 `discovered-from` still can't be changed after creation (aside from

@@ -8,6 +8,10 @@ import { collect, parsePriority, printWarning, readStdin } from "./shared.js";
 
 interface NewCommandOptions {
   spec?: string;
+  summary?: string;
+  details?: string;
+  acceptance: string[];
+  context: string[];
   parent?: string;
   blocks: string[];
   relatesTo: string[];
@@ -29,10 +33,20 @@ export async function runNew(name: string, opts: NewCommandOptions): Promise<voi
 
   const specRaw =
     opts.spec === undefined ? undefined : opts.spec === "-" ? await readStdin() : opts.spec;
+  const detailsRaw =
+    opts.details === undefined
+      ? undefined
+      : opts.details === "-"
+        ? await readStdin()
+        : opts.details;
 
   const input: NewTicketInput = {
     name,
     specRaw,
+    summaryRaw: opts.summary,
+    detailsRaw,
+    acceptance: opts.acceptance,
+    context: opts.context,
     parentRaw: opts.parent,
     blocksRaw: opts.blocks,
     relatesToRaw: opts.relatesTo,
@@ -121,7 +135,31 @@ export function registerNewCommand(program: Command): void {
     .command("new")
     .description('Create a new ticket, e.g. slop new "Adding new auth provider".')
     .argument("<name>", "short ticket name")
-    .option("--spec <json>", 'ticket spec as JSON; pass "-" to read from stdin')
+    .option(
+      "--spec <json>",
+      'ticket spec as JSON; pass "-" to read from stdin. Mutually exclusive with ' +
+        "--summary/--details/--acceptance/--context.",
+    )
+    .option(
+      "--summary <text>",
+      "spec summary — structured alternative to --spec (default: the ticket name)",
+    )
+    .option(
+      "--details <text>",
+      'spec details_md prose — structured alternative to --spec; pass "-" to read from stdin',
+    )
+    .option(
+      "--acceptance <text>",
+      "an acceptance criterion — structured alternative to --spec (repeatable)",
+      collect,
+      [] as string[],
+    )
+    .option(
+      "--context <text>",
+      "a context note/file/URL pointer — structured alternative to --spec (repeatable)",
+      collect,
+      [] as string[],
+    )
     .option("--parent <ref>", "parent ticket ref, slug, or external ref (e.g. jira:PROJ-123)")
     .option(
       "--blocks <ref>",
