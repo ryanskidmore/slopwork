@@ -34,7 +34,7 @@ Slopworks (`slop`) tracks work as a dependency graph of tickets. You read it to 
 3. **Don't takeover.** If `start` warns that another session is active, stop and tell the human. Use `--takeover` only when explicitly instructed.
 4. **Stopping requires a handoff note.** The next session (probably another amnesiac you) starts from your `--note`. Write what you'd want to read: current state, next step, traps.
 5. **Prefer structured spec fields.** When creating tickets, put acceptance criteria in `acceptance[]` and file/URL pointers in `context[]`, not buried in prose.
-6. **Budget your reads.** Use `--json --budget N` on `ready` to cap output; use `slop context <ref>` to re-load your bearings after compaction instead of re-exploring the repo.
+6. **Budget your reads.** `ready`, `status`, `search`, `events`, and `context` all take `--json --budget N` to cap output (`show --context` too); use `slop context <ref>` to re-load your bearings after compaction instead of re-exploring the repo.
 
 ## Reference resolution
 
