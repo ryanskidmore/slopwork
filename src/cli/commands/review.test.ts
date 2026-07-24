@@ -318,7 +318,12 @@ describe("runReview (in-process)", () => {
     expect((await readTicket(paths, id)).review?.mr).toBe("https://example.com/org/repo/pull/10");
   });
 
-  it("refuses to review an open (never-started) ticket (CONFLICT, exit 6)", async () => {
+  // nags-print-before-validation-review: `mr` is omitted on every call
+  // below (the exact shape the no-`--mr` nag used to fire for
+  // UNCONDITIONALLY, before validation ever ran) — each asserts `stderr`
+  // is empty on the failure path, proving the nag no longer prints when
+  // the command then fails.
+  it("refuses to review an open (never-started) ticket (CONFLICT, exit 6), printing no no-mr nag", async () => {
     const root = await makeTempRepo("slop-review-inproc-conflict-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });
     const id = await jsonNewTicket(root, "Open ticket, never started");
@@ -328,12 +333,17 @@ describe("runReview (in-process)", () => {
       await expect(withCwd(root, () => runReview(id, {}))).rejects.toMatchObject({
         exitCode: EXIT_CODES.CONFLICT,
       });
+      expect(out.stderr()).toBe("");
     } finally {
       out.restore();
     }
   });
 
-  it("throws NOT_FOUND for an unresolvable ref", async () => {
+  // nags-print-before-validation-review: the ticket's own motivating
+  // example — `slop review no-such-ticket` (no --mr) used to print the
+  // "entering review with no merge/pull request link attached" nag and
+  // THEN fail NOT_FOUND, asserting a state change that never happened.
+  it("throws NOT_FOUND for an unresolvable ref, printing no no-mr nag", async () => {
     const root = await makeTempRepo("slop-review-inproc-notfound-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });
     const out = captureOutput();
@@ -341,6 +351,7 @@ describe("runReview (in-process)", () => {
       await expect(withCwd(root, () => runReview("no-such-ticket", {}))).rejects.toMatchObject({
         exitCode: EXIT_CODES.NOT_FOUND,
       });
+      expect(out.stderr()).toBe("");
     } finally {
       out.restore();
     }

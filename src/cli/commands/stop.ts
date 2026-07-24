@@ -47,13 +47,13 @@ export async function runStop(ref: string, opts: StopCommandOptions): Promise<vo
   // "a stopped session's transcript is often the most valuable one" — a
   // note is what makes the *next* session fast to resume without having
   // to read that whole transcript). Nudge, don't block: an agent forced to
-  // supply *something* would just write a useless placeholder note.
-  if (opts.note === undefined || opts.note.trim().length === 0) {
-    printWarning(
-      "no --note handoff given — the next session (or your future self) will have to reconstruct " +
-        `context from scratch. Consider \`slop stop ${ref} --note "..."\`.`,
-    );
-  } else {
+  // supply *something* would just write a useless placeholder note. The
+  // nag itself is deferred to AFTER the transaction commits, below — see
+  // nags-print-before-validation-review's doc there — but the length
+  // VALIDATION stays here, up front: it's a usage-error check (never
+  // prints anything, so it can't misleadingly assert a stop that never
+  // happened), and the earlier it runs the less work a doomed call wastes.
+  if (opts.note !== undefined && opts.note.trim().length > 0) {
     assertMaxLength("--note", opts.note, END_SUMMARY_MAX_LENGTH);
   }
 
@@ -167,6 +167,22 @@ export async function runStop(ref: string, opts: StopCommandOptions): Promise<vo
       ownershipWarning,
     };
   });
+
+  // nags-print-before-validation-review: the no-`--note` nag now prints
+  // HERE — after the transaction above has already committed — rather
+  // than up front before `ref` was even resolved/validated. It used to
+  // print unconditionally as soon as `opts.note` was known to be absent,
+  // so `slop stop no-such-ticket` (no --note) printed "the next session
+  // will have to reconstruct context from scratch" and THEN failed
+  // NOT_FOUND — a nag asserting a stop that never happened, same class of
+  // bug `review.ts`'s no-`--mr` nag had. Matches `done.ts`'s
+  // `skippedReview` nag's position/convention exactly.
+  if (opts.note === undefined || opts.note.trim().length === 0) {
+    printWarning(
+      "no --note handoff given — the next session (or your future self) will have to reconstruct " +
+        `context from scratch. Consider \`slop stop ${ref} --note "..."\`.`,
+    );
+  }
 
   // Printed AFTER the transaction commits, deliberately: a transcript
   // problem is a warning, never a reason the state change itself could

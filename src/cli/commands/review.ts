@@ -93,10 +93,12 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
   const config = await loadConfig(paths);
   const actor = resolveActor({ config, cwd: root });
 
-  // Normalised once, reused for the nag check below, the ticket build,
-  // and the event payload — an empty/whitespace-only --mr is treated the
-  // same as an omitted one throughout, rather than failing schema
-  // validation later on `reviewSchema`'s `z.url()`.
+  // Normalised once, reused for the nag printed AFTER the transaction
+  // commits (below — see nags-print-before-validation-review's doc there
+  // for why it moved), the ticket build, and the event payload — an
+  // empty/whitespace-only --mr is treated the same as an omitted one
+  // throughout, rather than failing schema validation later on
+  // `reviewSchema`'s `z.url()`.
   const mr = opts.mr !== undefined && opts.mr.trim().length > 0 ? opts.mr.trim() : undefined;
 
   // Fix 3 (adversarial review): validate --mr's URL shape UP FRONT — before
@@ -120,29 +122,6 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
         EXIT_CODES.USAGE_ERROR,
       );
     }
-  }
-
-  // D15/§8.1 item 3: --mr is required-WITH-WARNING, not required-with
-  // -block — nag on stderr, but still let the transition through (below).
-  // Printed early, unconditionally, mirroring stop.ts's --note nag — see
-  // that command for the identical rationale.
-  //
-  // review-no-mr-nag-advises: the "re-run once the MR exists" advice below
-  // now actually works — `slop review <ref> --mr <url>` is legal even when
-  // `<ref>` is already in review (`checkReviewEntry`'s `hasMr` branch,
-  // state.ts), an idempotent attach/replace of the MR link. Before that
-  // fix, this nag advised an action `checkReviewEntry` unconditionally
-  // rejected (`review -> review`, exit 6) — the wording here is kept in
-  // sync with what the state machine actually allows.
-  if (mr === undefined) {
-    printWarning(
-      `no --mr given — "${ref}" is entering review with no merge/pull request link attached. This ` +
-        "still works (D15), but a human reviewer has nothing to open. Pass --mr <url> when you have " +
-        "one, e.g. `slop review " +
-        ref +
-        " --mr <url>` — that also works to attach/replace the link later, even once " +
-        `"${ref}" is already in review.`,
-    );
   }
 
   const initialTicket = await resolveTicketRef(paths, ref);
@@ -252,6 +231,28 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
 
     return { session: finalSession, ticket: reviewedTicket, transcriptWarning: capture.warning };
   });
+
+  // nags-print-before-validation-review: the no-`--mr` nag now prints HERE
+  // — after the transaction above has already committed — rather than up
+  // front before `ref` was even resolved. It used to print unconditionally
+  // as soon as `mr` was known to be absent, so `slop review no-such-ticket`
+  // (no --mr) printed "entering review with no merge/pull request link
+  // attached" and THEN failed NOT_FOUND: a nag asserting a state change
+  // that never happened. D15/§8.1 item 3's required-with-warning
+  // philosophy only calls for a nag when the transition genuinely went
+  // through with no MR attached — exactly what "printed after `withLock`
+  // returns" now guarantees, matching `done.ts`'s `skippedReview` nag
+  // (same convention) and `stop.ts`'s identically-relocated `--note` nag.
+  if (mr === undefined) {
+    printWarning(
+      `no --mr given — "${ref}" is entering review with no merge/pull request link attached. This ` +
+        "still works (D15), but a human reviewer has nothing to open. Pass --mr <url> when you have " +
+        "one, e.g. `slop review " +
+        ref +
+        " --mr <url>` — that also works to attach/replace the link later, even once " +
+        `"${ref}" is already in review.`,
+    );
+  }
 
   // Printed after the transaction commits — never a reason review itself
   // could fail (same convention as stop.ts/done.ts).
