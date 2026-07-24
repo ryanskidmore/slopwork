@@ -1,0 +1,41 @@
+{
+  "id": "ticket_01KYAT19QM3WGW1PB8J5N0GMX0",
+  "name": "flaky test: ids.test.ts collision-batch test can fail ~0.2% of runs (true-random ULIDs, no fixed seed)",
+  "slug": "flaky-test-ids-test-ts",
+  "spec": {
+    "summary": "src/core/ids.test.ts \"distinct ids generally give distinct codes (no collisions across a realistic batch)\" draws 500 real newTicketId() ULIDs and asserts zero shortTicketCode collisions in a 36^5 space; birthday-paradox probability of a collision is ~0.2% per run, so the suite occasionally fails with no code regression (observed once during web-add-host-header-allowlist verification, passed on immediate re-run).",
+    "details_md": "",
+    "acceptance": [
+      "test is deterministic (seeded PRNG or a fixed id list) or tolerates a rare single collision without failing"
+    ],
+    "context": [
+      "src/core/ids.test.ts:178"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 3,
+  "labels": [],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYAPKSGB85E971TVHYZE54AP"
+  ],
+  "root_id": "ticket_01KYAT19QM3WGW1PB8J5N0GMX0",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T19:36:01.527Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T19:36:01.527Z",
+  "updated_at": "2026-07-24T19:36:01.527Z"
+}

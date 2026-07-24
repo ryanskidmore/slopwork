@@ -1,0 +1,44 @@
+{
+  "id": "ticket_01KYAPKSGB85E971TVHYZE54AP",
+  "name": "web: add Host-header allowlist to block DNS rebinding",
+  "slug": "web-add-host-header-allowlist",
+  "spec": {
+    "summary": "web: add Host-header allowlist to block DNS rebinding",
+    "details_md": "server.ts binds 127.0.0.1 but validates no Host/Origin; a malicious site can DNS-rebind to 127.0.0.1:4553 and scrape tickets+transcripts (which often contain secrets). One-line allowlist: localhost/127.0.0.1/[::1].",
+    "acceptance": [
+      "requests with a foreign Host header get 403",
+      "normal browsing unaffected"
+    ],
+    "context": [
+      "src/web/server.ts:55"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [
+    "area:web"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPKSGB85E971TVHYZE54AP",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T19:36:18.123Z",
+  "latest_note": "server.ts wraps every route (and the fetch fallback) in guardHost(): a request whose Host header isn't localhost/127.0.0.1/[::1] gets 403, blocking DNS rebinding against the loopback-bound server. New tests/acceptance/web-host-header-allowlist.test.ts uses node:http (fetch forbids overriding Host) to prove foreign hosts 403, the DNS-rebinding shape (foreign hostname + real port) 403s, and localhost/127.0.0.1/[::1] still work. Full verification suite green (one unrelated pre-existing flaky test filed as t-eqidx).",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:36:13.197Z",
+  "updated_at": "2026-07-24T19:36:18.123Z"
+}
