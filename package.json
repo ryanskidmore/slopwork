@@ -5,16 +5,17 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "slop": "./src/cli/index.ts"
+    "slop": "./bin/slop.mjs"
   },
   "files": [
-    "dist",
+    "bin",
     "src",
     "README.md",
     "LICENSE"
   ],
   "engines": {
-    "bun": ">=1.3.0"
+    "bun": ">=1.3.0",
+    "node": ">=18.0.0"
   },
   "scripts": {
     "build": "bun build ./src/cli/index.ts --compile --outfile dist/slop",
@@ -25,7 +26,8 @@
     "lint:fix": "biome lint --write .",
     "format": "biome format --write .",
     "format:check": "biome format .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck"
   },
   "dependencies": {
     "commander": "^15.0.0",
