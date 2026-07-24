@@ -6,12 +6,17 @@ How to cut a release of `slopwork` and publish it to npm.
 
 - **Bun ≥ 1.3 required at runtime.** The CLI is Bun-native (no pure-Node build), and CI/release
   pin `bun-version: "1.3.11"` in `.github/workflows/`.
-- **`NPM_TOKEN` repo secret.** An npm [automation or granular access token][npm-tokens] with
-  publish rights on the `slopwork` package, added at
-  Settings → Secrets and variables → Actions → `NPM_TOKEN`. This is a one-time human setup step —
-  it cannot be created from a workflow.
+- **npm trusted publisher configured on npmjs.com.** Publishing uses [npm trusted publishing via
+  OIDC][npm-trusted-publishers] — no npm token secret is stored in this repo. A maintainer with
+  publish access on the `slopwork` package must add a trusted publisher at
+  npmjs.com → package `slopwork` → Settings → Trusted Publisher, pointing at this GitHub repo,
+  the `.github/workflows/release.yml` workflow file, and (if used) the deploy environment. This is
+  a one-time human setup step — it cannot be created from a workflow. The workflow authenticates
+  by minting a short-lived OIDC token (via the `id-token: write` permission) that npm exchanges
+  for a publish credential at run time; this requires **npm CLI ≥ 11.5.1**, which the release
+  workflow installs explicitly before publishing since the Node LTS default npm can be older.
 
-[npm-tokens]: https://docs.npmjs.com/creating-and-viewing-access-tokens
+[npm-trusted-publishers]: https://docs.npmjs.com/trusted-publishers/
 
 ## Cutting a release
 
@@ -35,9 +40,10 @@ How to cut a release of `slopwork` and publish it to npm.
 
 3. **Watch the release run** (Actions tab → Release). It re-runs the full gate (lint,
    format:check, typecheck, test, build) plus a smoke test of the compiled binary, confirms the
-   pushed tag matches `package.json`'s `version`, then runs `npm publish --provenance
-   --access public` using `NPM_TOKEN`. Any gate failure aborts the release before anything is
-   published.
+   pushed tag matches `package.json`'s `version`, then runs `npm publish --access public`,
+   authenticating via OIDC trusted publishing (no token secret involved). Provenance attestation
+   is generated automatically as part of trusted publishing. Any gate failure aborts the release
+   before anything is published.
 
 4. **Verify** on [npmjs.com/package/slopwork](https://www.npmjs.com/package/slopwork) that the
    new version, and its provenance attestation, are live.
