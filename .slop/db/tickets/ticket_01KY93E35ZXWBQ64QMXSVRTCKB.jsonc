@@ -1,0 +1,48 @@
+{
+  "id": "ticket_01KY93E35ZXWBQ64QMXSVRTCKB",
+  "name": "test gap: exercise slop web against a real-CLI-produced repo, not just the hand-built fixture",
+  "slug": "test-gap-exercise-slop-web-against-a-real-cli-produced-repo",
+  "spec": {
+    "summary": "Every slop web test runs against tests/fixtures/web-db, hand-constructed via ticketSchema.parse + writeCanonical — never against a repo built by real init/new/start/plan/review/done. DECISIONS.md itself flags that D5’s transcript_ref convention is an assumption on the writing side. A shape drift between the write path and web’s reader would pass schema checks yet render wrong/crash, uncaught.",
+    "details_md": "",
+    "acceptance": [
+      "An acceptance test runs a real init + new/start/plan/review/done lifecycle, then spawns slop web against that same directory and asserts /tickets, a ticket detail, and the transcript view render the real data"
+    ],
+    "context": [
+      "tests/fixtures/generate-web-db.ts (hand-built fixture)",
+      "tests/acceptance/D5.test.ts (only web caller)",
+      "DECISIONS.md D5 entry (transcript_ref writing-side assumption)"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 1,
+  "labels": [
+    "audit:v0",
+    "area:testing",
+    "sev:high"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY8YC5ADXD0TJYWSC666V443"
+  ],
+  "root_id": "ticket_01KY93E35ZXWBQ64QMXSVRTCKB",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:12.923Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — 69d7de5 test(web): exercise slop web against a real-CLI-produced repo [HIGH]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T03:41:49.120Z",
+  "updated_at": "2026-07-24T13:11:12.923Z"
+}

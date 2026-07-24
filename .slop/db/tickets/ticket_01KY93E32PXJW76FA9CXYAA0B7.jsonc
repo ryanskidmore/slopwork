@@ -1,0 +1,48 @@
+{
+  "id": "ticket_01KY93E32PXJW76FA9CXYAA0B7",
+  "name": "start: do not exit non-zero after a session has already committed",
+  "slug": "start-do-not-exit-non-zero-after-a-session-has-already-commi",
+  "spec": {
+    "summary": "After the withLock mutation commits (session created, ticket in_progress) and prints started ..., start calls buildContextPackData which uses the fail-fast listTickets/listSessions that reject on the FIRST corrupt file anywhere in the db. One unrelated bad file makes start exit non-zero even though it succeeded; an agent retries and hits activeSessionConflict (exit 6) on the very session it just started.",
+    "details_md": "",
+    "acceptance": [
+      "The post-commit context-pack print reads via the tolerant path (listTicketsTolerant) or is wrapped so a render/read failure warns and still exits 0",
+      "A test corrupts an unrelated ticket file, runs start on a good ticket, and asserts exit 0 with the session created"
+    ],
+    "context": [
+      "src/cli/commands/start.ts:272 buildContextPackData after lock release",
+      "src/sessions/context-pack.ts:21,40 listTickets/listSessions (fail-fast)"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 1,
+  "labels": [
+    "audit:v0",
+    "area:sessions",
+    "sev:high"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY8YC5ADXD0TJYWSC666V443"
+  ],
+  "root_id": "ticket_01KY93E32PXJW76FA9CXYAA0B7",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:12.685Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — 50077ac fix(sessions): start must not fail after the session already committed [HIGH]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T03:41:49.016Z",
+  "updated_at": "2026-07-24T13:11:12.685Z"
+}

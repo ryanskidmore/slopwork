@@ -1,0 +1,51 @@
+{
+  "id": "ticket_01KY93E3CBDVRBMPNNAHH4Q2FN",
+  "name": "CLI input validation: reject truncated numerics, fix actor-fail exit code, bound --port",
+  "slug": "cli-input-validation-reject-truncated-numerics-fix-actor-fai",
+  "spec": {
+    "summary": "parseIntegerOption/parseBudgetFlag use parseInt and silently truncate leading-numeric garbage (--priority 2abc -> 2, --priority 1.9 -> 1, --budget 100abc -> 100), violating the exit-2 contract and (for priority) persisting a different value than typed. Actor-resolution failure exits GENERIC_ERROR(1) not USAGE_ERROR(2). --port accepts out-of-range values (99999, -1).",
+    "details_md": "",
+    "acceptance": [
+      "Numeric option parsers reject any value whose full trimmed string is not an integer (return USAGE_ERROR exit 2), in shared.ts parseIntegerOption and context.ts parseBudgetFlag",
+      "Actor-resolution failure throws SlopError with EXIT_CODES.USAGE_ERROR",
+      "--port is bound-checked to 0-65535 (0 keeps its pick-a-free-port meaning)"
+    ],
+    "context": [
+      "src/cli/commands/shared.ts:37-45 parseIntegerOption",
+      "src/cli/commands/context.ts:25-34 parseBudgetFlag",
+      "src/cli/actor.ts:171-176 (missing exit code arg)",
+      "src/cli/commands/web.ts:53-58 --port"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [
+    "audit:v0",
+    "area:cli",
+    "sev:medium"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY8YC5ADXD0TJYWSC666V443"
+  ],
+  "root_id": "ticket_01KY93E3CBDVRBMPNNAHH4Q2FN",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:13.413Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — 3e140fe fix(cli): reject truncated numeric flags; correct exit codes; bound --port [MEDIUM]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T03:41:49.324Z",
+  "updated_at": "2026-07-24T13:11:13.413Z"
+}

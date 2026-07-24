@@ -1,0 +1,42 @@
+{
+  "id": "ticket_01KY93E4013ACT0PZK9KHW7Z92",
+  "name": "Windows portability: fsyncDir/CRLF-gitignore/cwd-mangling/editor default (or declare POSIX-only)",
+  "slug": "windows-portability-fsyncdir-crlf-gitignore-cwd-mangling-edi",
+  "spec": {
+    "summary": "Windows portability: fsyncDir/CRLF-gitignore/cwd-mangling/editor default (or declare POSIX-only)",
+    "details_md": "{\n  \"summary\": \"No Windows branch exists anywhere (grep process.platform/win32 -> zero hits) yet several POSIX-only assumptions sit under core paths: fsyncDir opens a directory for read+sync (no Windows equivalent) under 100% of writes; gitignore upsert splits on \\\\n so a CRLF .gitignore never matches the managed markers and duplicates the section on re-init; Claude Code cwd-mangling ignores \\\\ and : so transcript auto-capture silently fails on Windows; slop edit falls back to vi. None documented as a scope boundary.\",\n  \"acceptance\": [\n    \"Either document Linux/macOS-only clearly (README + a clean startup check) OR guard fsyncDir/editor-default/cwd-mangling on process.platform and split gitignore on /\\\\r?\\\\n/\",\n    \"The chosen scope (POSIX-only vs Windows-supported) is stated in README/design\"\n  ],\n  \"context\": [\n    \"src/repo/atomic-write.ts:101-113 fsyncDir (self-described POSIX-only)\",\n    \"src/cli/init/gitignore.ts:42-49 split(\\\\n)\",\n    \"src/sessions/transcript.ts:253-256 encodeClaudeCwd\",\n    \"src/cli/commands/edit.ts:25-33 vi fallback\"\n  ]\n}",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [
+    "audit:v0",
+    "area:portability",
+    "sev:medium"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY8YC5ADXD0TJYWSC666V443"
+  ],
+  "root_id": "ticket_01KY93E4013ACT0PZK9KHW7Z92",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:14.890Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — f872dfa fix(portability): guard POSIX-only assumptions for Windows (best-effort) [MEDIUM]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T03:41:49.954Z",
+  "updated_at": "2026-07-24T13:11:14.890Z"
+}

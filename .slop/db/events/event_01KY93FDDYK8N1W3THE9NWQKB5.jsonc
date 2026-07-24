@@ -1,0 +1,17 @@
+{
+  "id": "event_01KY93FDDYK8N1W3THE9NWQKB5",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KY8YC5ADXD0TJYWSC666V443"
+  },
+  "payload": {
+    "progress": "Audit complete: 7 parallel deep-dive auditors across storage/concurrency, domain/state, CLI, web-security, sessions/transcripts, packaging/xplat, test-quality. Filed 18 findings as discovered-from tickets: 4 blockers, 6 high, 7 medium, 1 low-batch. Top blockers verified by coordinator: update/draft/undraft lock-free RMW, web XSS (javascript: URLs), web path-traversal, and broken npm/npx distribution."
+  },
+  "at": "2026-07-24T03:42:32.383Z"
+}

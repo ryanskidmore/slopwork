@@ -1,0 +1,50 @@
+{
+  "id": "ticket_01KY9RWFQAM94YNDQ1Z4SNJPFZ",
+  "name": "feat: short branch-style slugs (fix/..., feat/...), kept short",
+  "slug": "feat-short-branch-style-slugs-fix-feat-kept-short",
+  "spec": {
+    "summary": "Slugs as short branch-style handles: optional --slug/type-prefix on new (fix/ui-not-showing, feat/add-auth) + shorter word-boundary auto-slug (~3-5 words) instead of mid-word ~60-char truncation. Keep uniqueness + existing resolution. Sets up branch alignment; worktrees stay F15.",
+    "details_md": "",
+    "acceptance": [
+      "new supports explicit short --slug (optional type prefix); auto-slug short + word-boundary truncated",
+      "slug uniqueness preserved (collision -> disambiguation); / in slug resolves as a ref",
+      "existing id/prefix/slug resolution unchanged"
+    ],
+    "context": [
+      "src/core/slug.ts",
+      "src/tickets/new.ts",
+      "src/repo/refs.ts",
+      "design.md D12"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [
+    "backlog:post-audit",
+    "area:naming",
+    "kind:feature",
+    "origin:dogfood-feedback"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KY9RWFQAM94YNDQ1Z4SNJPFZ",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:17.639Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — eec0416 feat(slug): explicit --slug + shorter branch-style auto-slugs",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T09:56:40.831Z",
+  "updated_at": "2026-07-24T13:11:17.639Z"
+}

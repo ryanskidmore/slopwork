@@ -1,0 +1,48 @@
+{
+  "id": "ticket_01KY93E394ENRJ26HPZ668HGSF",
+  "name": "docs: README misrepresents v0 as an unimplemented scaffold and has no end-user install/usage",
+  "slug": "docs-readme-misrepresents-v0-as-an-unimplemented-scaffold-an",
+  "spec": {
+    "summary": "README intro says A1 (this scaffold) only registers the command surface and command bodies print not yet implemented ... exit code 3, and Source layout calls src/repo and src/web placeholders — none true; all 22 commands are implemented. There is no Installation/Usage section, only Development, so an end user cannot go from install to init->new->ready from the README.",
+    "details_md": "",
+    "acceptance": [
+      "README intro and Source layout reflect the shipped v0 (all 22 commands implemented; drop the exit-3 scaffold claim)",
+      "README has an Installation/Usage section with the real supported install command(s) and a minimal init->new->ready walkthrough (pending the distribution fix)"
+    ],
+    "context": [
+      "README.md:10-14 (A1 scaffold / exit 3 claim), :117-119 (placeholder claims)",
+      "src/cli/errors.ts notImplemented() is unused across src/cli/commands"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 1,
+  "labels": [
+    "audit:v0",
+    "area:docs",
+    "sev:high"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY8YC5ADXD0TJYWSC666V443"
+  ],
+  "root_id": "ticket_01KY93E394ENRJ26HPZ668HGSF",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:13.163Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — 031f412 docs(readme): correct the stale scaffold framing; add install + quickstart [HIGH]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T03:41:49.222Z",
+  "updated_at": "2026-07-24T13:11:13.163Z"
+}

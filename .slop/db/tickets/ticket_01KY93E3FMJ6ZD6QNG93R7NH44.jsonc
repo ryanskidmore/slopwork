@@ -1,0 +1,50 @@
+{
+  "id": "ticket_01KY93E3FMJ6ZD6QNG93R7NH44",
+  "name": "edit: enforce state-transition legality and state<->session coherence on hand-edits",
+  "slug": "edit-enforce-state-transition-legality-and-state-session-coh",
+  "spec": {
+    "summary": "slop edit validates schema+edges+ancestry+id-immutability but not state-transition legality or state/active_session coupling. A hand-edit can install an out-of-order state (open->done, skipping review and the done-cascade) or an incoherent pairing (state:done with active_session still set), and a later slop stop then resurrects the done ticket to open.",
+    "details_md": "",
+    "acceptance": [
+      "If the edited state differs from before, route it through the same legality checks the dedicated commands use (or reject entering/leaving in_progress/review/done/dropped via edit)",
+      "Add an active_session<->state coherence check (session-carrying states require a live active_session; open/draft/terminal require null)",
+      "Tests cover an out-of-order state edit and an incoherent state/session edit being rejected"
+    ],
+    "context": [
+      "src/cli/commands/edit.ts:127-182",
+      "src/tickets/edit.ts:29-43 validateEditedTicketText (schema+id only)",
+      "src/core/entities/ticket.ts:94 active_session independent of state"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [
+    "audit:v0",
+    "area:domain",
+    "sev:medium"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY8YC5ADXD0TJYWSC666V443"
+  ],
+  "root_id": "ticket_01KY93E3FMJ6ZD6QNG93R7NH44",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:13.657Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — 5928a81 fix(tickets): edit enforces state-transition legality + session coherence [MEDIUM]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T03:41:49.430Z",
+  "updated_at": "2026-07-24T13:11:13.657Z"
+}

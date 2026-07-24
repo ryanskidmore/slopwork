@@ -1,0 +1,50 @@
+{
+  "id": "ticket_01KY9RVF5PBVGEQG69H3AKDM6W",
+  "name": "chore: modern-tooling + code-quality + full coverage + sandboxed integration tests (FINAL pass)",
+  "slug": "chore-modern-tooling-code-quality-full-coverage-sandboxed-in",
+  "spec": {
+    "summary": "Final quality pass after all other work. Evaluate/adopt modern tooling as appropriate (oxlint, oxfmt, current TypeScript, up-to-date libraries) where genuinely better/stable; raise code quality to top-notch; add coverage tooling and drive toward full unit coverage; and ensure ALL integration/acceptance tests are fully sandboxed (temp dirs only) so they can never touch or delete the repo local .slop/db.",
+    "details_md": "",
+    "acceptance": [
+      "tooling evaluated: adopt oxlint/oxfmt (or justify keeping Biome), TS + all deps current, with a short rationale note",
+      "coverage tooling added (e.g. @vitest/coverage-v8) with a CI threshold; unit coverage raised substantially toward full",
+      "every integration/acceptance test provably runs in an isolated temp dir; a guard ensures no test can operate on the repo own .slop/ (auditied + enforced)",
+      "lint/format/typecheck/test/build all green with the chosen toolchain"
+    ],
+    "context": [
+      "package.json devDeps + scripts",
+      "biome.json / oxlint config",
+      "vitest.config.ts (coverage + isolation)",
+      "tests/acceptance/* (sandbox audit)"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [
+    "backlog:post-audit",
+    "area:tooling",
+    "kind:chore"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KY9RVF5PBVGEQG69H3AKDM6W",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:16.601Z",
+  "latest_note": "Modern-tooling pass complete, full gate green (typecheck/lint/format:check/test 116 files 1570 tests/test:coverage/build/smoke ./dist/slop --help), NOT committed (house rules: no git commands). oxlint adopted as sole JS/TS linter (.oxlintrc.json; replaces biome lint; biome.json linter.enabled=false; biome keeps format+JSON); 6 real findings fixed (new Array(n).fill ambiguity x4, useless spread-before-sort x2). oxfmt DEFERRED (pre-1.0, recent breaking changes, and a concrete non-cosmetic 11/238-file diff vs Biome verified via bunx --check) -- Biome stays the formatter, documented in DECISIONS.md. Deps: only @biomejs/biome 2.5.4->2.5.5 bumped; everything else (typescript/zod/commander/jsonc-parser/ulid/fast-check/vitest/coverage-v8/@types/bun) already at npm latest. jsonc-parser stays 3.3.1 (latest); jsonc.ts defensive hybrid-write logic untouched. Files touched: package.json, bun.lock, biome.json, .oxlintrc.json (new), README.md, DECISIONS.md, src/sessions/plan.ts, src/sessions/plan-diff.ts, src/repo/events.test.ts, tests/acceptance/B3.test.ts. tests/support/**, coverage thresholds, and the sandbox guard were NOT touched. Next step for whoever has git access: commit, open MR, then slop review --mr <url> && slop done.",
+  "resolution": "Fixed and merged to main — e54c782 chore(tooling): adopt oxlint as the linter; defer oxfmt; deps current",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T09:56:07.503Z",
+  "updated_at": "2026-07-24T13:11:16.601Z"
+}

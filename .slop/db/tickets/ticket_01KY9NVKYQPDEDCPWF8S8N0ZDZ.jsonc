@@ -1,0 +1,50 @@
+{
+  "id": "ticket_01KY9NVKYQPDEDCPWF8S8N0ZDZ",
+  "name": "config: default init (no --jira) writes null remotes that 500s slop web",
+  "slug": "config-default-init-no-jira-writes-null-remotes-that-500s-sl",
+  "spec": {
+    "summary": "slop init without --jira writes remotes: as YAML null, which fails config validation in the web data source and 500s every slop web page on the default (no-Jira) setup.",
+    "details_md": "Verified: `slop init --yes` (no --jira) emits a bare `remotes:` line (null). `slop status` tolerates it but `GET /tickets` returns HTTP 500. Root fix belongs in the config schema/parser so null/empty remotes coerces to {} and null repo/jira to undefined — covering both init output and hand-edited configs. (Web-side resilience is tracked separately.)",
+    "acceptance": [
+      "config parsing coerces a null/empty `remotes` to an empty object and null `repo`/`jira` to undefined, so a default `slop init` (no --jira) config validates",
+      "slop web serves 200 on all views against a repo created by a plain `slop init` with no jira remote",
+      "a test covers the null-remotes config parsing"
+    ],
+    "context": [
+      "src/core/entities/config.ts (configSchema)",
+      "src/cli/config-yaml.ts (parse)",
+      "repro: init --yes (no --jira) -> GET /tickets HTTP 500"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 1,
+  "labels": [
+    "audit:v0",
+    "area:config",
+    "sev:high"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY93E2FG20KF5RVW7HRK9M7X"
+  ],
+  "root_id": "ticket_01KY9NVKYQPDEDCPWF8S8N0ZDZ",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:15.388Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — 0cd8b86 fix(config): tolerate null/empty remotes so default init doesn't 500 web [HIGH]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T09:03:46.648Z",
+  "updated_at": "2026-07-24T13:11:15.388Z"
+}

@@ -1,0 +1,49 @@
+{
+  "id": "ticket_01KY93E3SKHQPVV6T0BBHH104X",
+  "name": "perf: bound event-log reads so cascade is not O(M x total events)",
+  "slug": "perf-bound-event-log-reads-so-cascade-is-not-o-m-x-total-eve",
+  "spec": {
+    "summary": "queryEvents/listEvents read+parse the ENTIRE event log every call, applying since/limit afterward, so --since/--limit give no relief; the done-cascade calls queryEvents per unblocked candidate, making a closure O(M x total_events) on a lock-held hot path in a log that only grows (no v0 compaction).",
+    "details_md": "",
+    "acceptance": [
+      "queryEvents skips listing/parsing files whose id <= since and stops after limit matches (event ids sort chronologically), bounding the read to the requested window",
+      "The done-cascade does not re-scan the whole log per candidate",
+      "A test asserts --since only parses events after the cursor"
+    ],
+    "context": [
+      "src/repo/events.ts:76-79, 215-229 (full read then filter)",
+      "src/tickets/cascade.ts:230 (queryEvents per candidate)"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [
+    "audit:v0",
+    "area:perf",
+    "sev:medium"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY8YC5ADXD0TJYWSC666V443"
+  ],
+  "root_id": "ticket_01KY93E3SKHQPVV6T0BBHH104X",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:14.392Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — 5ede52a perf(events): bound event-log reads so cascade isn't O(M x total) [MEDIUM]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T03:41:49.753Z",
+  "updated_at": "2026-07-24T13:11:14.392Z"
+}

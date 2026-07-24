@@ -1,0 +1,48 @@
+{
+  "id": "ticket_01KY93E3P4YWAA2WRWAYDRX3XK",
+  "name": "lock stale-break TOCTOU: break by atomic rename-away, not rm-then-recreate",
+  "slug": "lock-stale-break-toctou-break-by-atomic-rename-away-not-rm-t",
+  "spec": {
+    "summary": "tryBreakStaleLock rm()s the lock then the caller recreates it, so two contenders that both judge the same stale lock can both end up inside the critical section (the second rm deletes the first winner’s fresh lock). Fencing/assertHeld only rescues multi-write callers; a read-compute-write path like slop new’s slug allocation is not protected between read and write.",
+    "details_md": "",
+    "acceptance": [
+      "Stale-lock break is done by atomic rename-away (only the process whose rename succeeds recreates the lock), or the winner re-reads and confirms its own token immediately after a winning open(wx) before returning",
+      "A concurrency test with a pre-existing stale lock asserts only one contender enters the critical section"
+    ],
+    "context": [
+      "src/repo/lock.ts:238-243 (rm), :327-339 (retry open after break)",
+      "src/cli/commands/new.ts:49-51 (slug read+write inside withLock, no assertHeld between)"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [
+    "audit:v0",
+    "area:concurrency",
+    "sev:medium"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY8YC5ADXD0TJYWSC666V443"
+  ],
+  "root_id": "ticket_01KY93E3P4YWAA2WRWAYDRX3XK",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:14.152Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — c9aacdf fix(concurrency): break a stale lock by atomic rename-away, not rm [MEDIUM]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T03:41:49.637Z",
+  "updated_at": "2026-07-24T13:11:14.152Z"
+}

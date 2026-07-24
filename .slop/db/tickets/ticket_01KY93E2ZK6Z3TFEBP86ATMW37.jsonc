@@ -1,0 +1,50 @@
+{
+  "id": "ticket_01KY93E2ZK6Z3TFEBP86ATMW37",
+  "name": "transcript capture: move the copy outside the db lock and stream instead of buffering",
+  "slug": "transcript-capture-move-the-copy-outside-the-db-lock-and-str",
+  "spec": {
+    "summary": "captureTranscript does readFile(whole file)+atomicWriteFile INSIDE withLock before any assertHeld, so a large transcript (tens–hundreds of MB) holds the exclusive lock long enough to time out a different concurrent command (default 5s) into a CONFLICT — a lost state change for the neighbor. It also buffers the entire file as one string (size ceiling → silent transcript_ref:null).",
+    "details_md": "The never-block guarantee holds for the capturing command but is not transitively true for concurrent neighbors in the multi-agent-same-cwd scenario the design targets.",
+    "acceptance": [
+      "Transcript locate+copy runs OUTSIDE withLock (its result is only folded into the subsequent session write), or is bounded and guarded by assertHeld immediately before/after",
+      "The copy streams source->temp->rename instead of buffering the full file as a string (removing the memory spike and size ceiling)",
+      "A test with a large transcript asserts a concurrent command on another ticket is not starved into CONFLICT"
+    ],
+    "context": [
+      "src/sessions/transcript.ts:500-505 (readFile+atomicWriteFile, buffered)",
+      "callers: stop.ts:77-83, done.ts:120-126, review.ts:151-157, drop.ts:111-117 (inside withLock, before assertHeld)",
+      "src/repo/lock.ts:140 default 5s acquire timeout"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 1,
+  "labels": [
+    "audit:v0",
+    "area:sessions",
+    "sev:high"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY8YC5ADXD0TJYWSC666V443"
+  ],
+  "root_id": "ticket_01KY93E2ZK6Z3TFEBP86ATMW37",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:12.436Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — ea12076 fix(sessions): capture transcripts outside the lock; preserve on recapture [HIGH]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T03:41:48.916Z",
+  "updated_at": "2026-07-24T13:11:12.436Z"
+}

@@ -1,0 +1,48 @@
+{
+  "id": "ticket_01KY93E3JWQ0Y1R0DPER1G0XAP",
+  "name": "spec parser silently drops unknown top-level keys, losing content on --spec",
+  "slug": "spec-parser-silently-drops-unknown-top-level-keys-losing-con",
+  "spec": {
+    "summary": "slop new --spec {\"details\":\"...\"} (meant details_md) parses as an object, so specSchema strips the unknown key and succeeds with an empty details_md — the prose is silently gone, not in details_md, meta, or a warning. The intended object->markdown fallback is nearly unreachable because every spec field is optional/defaulted.",
+    "details_md": "",
+    "acceptance": [
+      "Parsing a spec JSON object with top-level keys outside specSchema either preserves them (meta/passthrough), rejects with a clear error, or falls to the markdown path — never silently drops content",
+      "A test asserts --spec with an unknown key does not lose the value"
+    ],
+    "context": [
+      "src/tickets/spec.ts:56-63",
+      "src/core/entities/spec.ts:13-20 (all fields optional/defaulted)"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [
+    "audit:v0",
+    "area:domain",
+    "sev:medium"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY8YC5ADXD0TJYWSC666V443"
+  ],
+  "root_id": "ticket_01KY93E3JWQ0Y1R0DPER1G0XAP",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:13.914Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — 85549d0 fix(tickets): spec parser must not silently drop unknown keys [MEDIUM]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T03:41:49.533Z",
+  "updated_at": "2026-07-24T13:11:13.914Z"
+}

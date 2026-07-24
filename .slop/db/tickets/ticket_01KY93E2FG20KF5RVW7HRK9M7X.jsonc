@@ -1,0 +1,51 @@
+{
+  "id": "ticket_01KY93E2FG20KF5RVW7HRK9M7X",
+  "name": "web: URL-scheme XSS via review.mr and markdown links (javascript:/data:)",
+  "slug": "web-url-scheme-xss-via-review-mr-and-markdown-links-javascri",
+  "spec": {
+    "summary": "z.url() accepts javascript:, data:, vbscript: — these reach href/src attributes in slop web (review.mr link, and markdown link/image URLs in spec.details_md and transcript text), executing attacker JS when a human opens the page.",
+    "details_md": "escapeHtml only escapes HTML metacharacters, never URL schemes. The MR link is accepted by the CLI too (slop review --mr javascript:...). Bun markdown escapes raw HTML but not link/image URL schemes. Reproduced end-to-end on ticket-detail, review, and transcript views.",
+    "acceptance": [
+      "mrUrlSchema (or a shared render-time guard) allowlists http/https only; unsafe schemes render as inert text, not a live href",
+      "Markdown link/image URLs are sanitized (strip/neutralize href/src whose scheme is not http/https/mailto or a relative/fragment ref) for details_md and transcript text/thinking blocks",
+      "A test asserts a ticket/transcript containing javascript: and data: URLs renders no live href/src with those schemes"
+    ],
+    "context": [
+      "src/core/entities/ticket.ts mrUrlSchema = z.url() (accepts javascript:/data:/vbscript: — verified)",
+      "src/web/views/ticket-detail.ts:188, src/web/views/review.ts:38 (mr href)",
+      "src/web/markdown.ts:21-34; ticket-detail.ts:160; transcript-view.ts:42,46,64",
+      "src/web/html.ts:29-32 escapeAttr is a no-op alias for escapeHtml"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 0,
+  "labels": [
+    "audit:v0",
+    "area:web-security",
+    "sev:blocker"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY8YC5ADXD0TJYWSC666V443"
+  ],
+  "root_id": "ticket_01KY93E2FG20KF5RVW7HRK9M7X",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:11.220Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — f4a7489 fix(web-security): reject javascript:/data: URLs in MR links and markdown [BLOCKER]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T03:41:48.401Z",
+  "updated_at": "2026-07-24T13:11:11.220Z"
+}

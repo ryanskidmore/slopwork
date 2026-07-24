@@ -1,0 +1,50 @@
+{
+  "id": "ticket_01KY9RWFGVDQNDH1XN43A0GH1M",
+  "name": "feat: first-class resolution/outcome field on tickets",
+  "slug": "feat-first-class-resolution-outcome-field-on-tickets",
+  "spec": {
+    "summary": "Add a durable resolution/outcome field (long text; done --outcome or --outcome - from stdin) rendered by show + web, so an investigation writeup is a real artifact not a one-line note.",
+    "details_md": "",
+    "acceptance": [
+      "ticket schema has an optional resolution field; done accepts --outcome (and - for stdin) and stores it",
+      "slop show and slop web render the resolution when present",
+      "tests cover storing + rendering a multi-line resolution"
+    ],
+    "context": [
+      "src/core/entities/ticket.ts",
+      "src/cli/commands/done.ts",
+      "src/tickets/detail.ts",
+      "src/web/views/ticket-detail.ts"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [
+    "backlog:post-audit",
+    "area:domain",
+    "kind:feature",
+    "origin:dogfood-feedback"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KY9RWFGVDQNDH1XN43A0GH1M",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:17.108Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — eaf8444 feat(tickets): first-class resolution/outcome field",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T09:56:40.628Z",
+  "updated_at": "2026-07-24T13:11:17.108Z"
+}

@@ -1,0 +1,50 @@
+{
+  "id": "ticket_01KY93E2BKH5JCMAV3JWPNN63G",
+  "name": "update/draft/undraft: lock-free read-modify-write can silently revert concurrent transitions",
+  "slug": "update-draft-undraft-lock-free-read-modify-write-can-silentl",
+  "spec": {
+    "summary": "update, draft, and undraft mutate without withLock and write a stale expectedAfter, silently reverting a concurrent start/done/stop — resurrecting terminal tickets and orphaning live sessions.",
+    "details_md": "They are the ONLY three mutating commands without withLock (new/split/edit/start/stop/done/drop/review/plan all lock and re-read inside). runUpdate reads the ticket outside any lock, computes the target from that stale snapshot, and updateTicket writes it; on any mismatch the JSONC layer falls back to writeCanonical(expectedAfter), overwriting a concurrent committed change. Reachable with no --state and no hand-edit, on the parallel-agent scenario v0 targets.",
+    "acceptance": [
+      "runUpdate, runDraft, runUndraft each acquire withLock(paths.lockFile) and RE-READ the ticket by resolved id inside the lock before buildUpdate and updateTicket",
+      "A regression test spawns two concurrent processes (update vs start, and update vs done) and asserts neither committed transition is reverted and no session is orphaned"
+    ],
+    "context": [
+      "src/cli/commands/update.ts:17-46 (no withLock; reads at :23, writes at :39)",
+      "src/cli/commands/draft.ts:13-38 and undraft.ts:13-39 (same pattern)",
+      "src/core/jsonc.ts:199-209 (writeCanonical(expectedAfter) fallback)",
+      "src/repo/tickets.ts:74 updateTicket (no internal lock)"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 0,
+  "labels": [
+    "audit:v0",
+    "area:concurrency",
+    "sev:blocker"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY8YC5ADXD0TJYWSC666V443"
+  ],
+  "root_id": "ticket_01KY93E2BKH5JCMAV3JWPNN63G",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:10.970Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — b554e12 fix(concurrency): lock update/draft/undraft read-modify-write [BLOCKER]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T03:41:48.279Z",
+  "updated_at": "2026-07-24T13:11:10.970Z"
+}

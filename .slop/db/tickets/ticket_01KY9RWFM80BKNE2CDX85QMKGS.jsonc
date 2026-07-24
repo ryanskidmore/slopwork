@@ -1,0 +1,51 @@
+{
+  "id": "ticket_01KY9RWFM80BKNE2CDX85QMKGS",
+  "name": "feat: event-source progress notes (lock-free concurrent updates)",
+  "slug": "feat-event-source-progress-notes-lock-free-concurrent-update",
+  "spec": {
+    "summary": "Make a progress note a pure immutable event (ULID file, no lock, conflict-free) and DERIVE latest_note/last_activity_at at read time instead of mutating the ticket. Removes lock contention for concurrent update --progress; lock kept only for state transitions + cascade. Pairs with parked derive-updated_at-from-events.",
+    "details_md": "",
+    "acceptance": [
+      "update --progress appends an event and does NOT lock or mutate the ticket file",
+      "latest_note/last_activity_at + staleness derived from events, matching prior behavior",
+      "N concurrent update --progress never contend/conflict (test proves it)",
+      "status/show/ready/staleness output unchanged for single-writer cases"
+    ],
+    "context": [
+      "src/tickets/update.ts",
+      "src/repo/events.ts",
+      "src/repo/db-index.ts",
+      "src/tickets/staleness.ts"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [
+    "backlog:post-audit",
+    "area:concurrency",
+    "kind:feature",
+    "origin:dogfood-feedback"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KY9RWFM80BKNE2CDX85QMKGS",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:17.358Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — ff43660 feat(events): lock-free progress notes via event-sourcing + derived activity",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T09:56:40.733Z",
+  "updated_at": "2026-07-24T13:11:17.358Z"
+}

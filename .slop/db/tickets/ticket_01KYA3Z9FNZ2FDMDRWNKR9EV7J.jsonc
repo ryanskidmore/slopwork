@@ -1,0 +1,47 @@
+{
+  "id": "ticket_01KYA3Z9FNZ2FDMDRWNKR9EV7J",
+  "name": "cli: expose relates-to edge (no flag sets it today)",
+  "slug": "cli-expose-relates-to-edge",
+  "spec": {
+    "summary": "The relates-to edge exists in the schema and renders in web, but no CLI flag sets it — new/update/edit never expose it, so it is only settable by hand-editing JSONC via slop edit. Add a way to set relates-to from the CLI (e.g. new/update --relates-to <ref>).",
+    "details_md": "",
+    "acceptance": [
+      "new and/or update accept --relates-to <ref> (repeatable) to add/remove a relates-to edge, validated like other edges",
+      "tests cover it"
+    ],
+    "context": [
+      "src/cli/commands/new.ts + update.ts",
+      "src/tickets/edges.ts",
+      "flagged by the web-detail pass"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 3,
+  "labels": [
+    "backlog:post-audit",
+    "area:cli",
+    "kind:feature",
+    "origin:web-detail"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYA3Z9FNZ2FDMDRWNKR9EV7J",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:10:27.088Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T13:10:27.088Z",
+  "updated_at": "2026-07-24T13:10:27.088Z"
+}

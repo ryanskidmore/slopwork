@@ -1,0 +1,50 @@
+{
+  "id": "ticket_01KY9RVES5F4FNS3W4WRKQWZ3E",
+  "name": "rename slopworks -> slopwork everywhere (incl npm package name)",
+  "slug": "rename-slopworks-slopwork-everywhere-incl-npm-package-name",
+  "spec": {
+    "summary": "Rename slopworks -> slopwork and Slopworks -> Slopwork across the whole repo: npm package name, all code/comment/doc strings, onboarding (AGENTS.md/SKILL.md/instructions), design.md, error messages, config project field, and slopworks.dev -> slopwork.dev. Binary `slop` and the .slop/ db dir are unaffected (no works suffix).",
+    "details_md": "",
+    "acceptance": [
+      "package.json name is slopwork; grep for slopworks (case-insensitive) across src, docs, onboarding returns only intentional history refs",
+      "full suite + build + lint/format/typecheck stay green after the rename",
+      "one dedicated commit (or a small set), run when no other agent is editing the tree"
+    ],
+    "context": [
+      "package.json name",
+      "src/** strings + comments",
+      "design.md, README.md, DECISIONS.md",
+      ".claude/skills/slopworks + .slop/AGENTS.md",
+      "slopworks.dev -> slopwork.dev"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [
+    "backlog:post-audit",
+    "area:rename",
+    "kind:chore"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KY9RVES5F4FNS3W4WRKQWZ3E",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:16.114Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — 030fb11 chore: rename slopworks -> slopwork everywhere (incl npm package name)",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T09:56:07.102Z",
+  "updated_at": "2026-07-24T13:11:16.114Z"
+}

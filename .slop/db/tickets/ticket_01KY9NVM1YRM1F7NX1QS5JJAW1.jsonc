@@ -1,0 +1,49 @@
+{
+  "id": "ticket_01KY9NVM1YRM1F7NX1QS5JJAW1",
+  "name": "transcript: recapture at done resets a review-captured transcript_ref to null",
+  "slug": "transcript-recapture-at-done-resets-a-review-captured-transc",
+  "spec": {
+    "summary": "review and done each independently re-run captureTranscript, so a transcript captured at review is silently reset to null at done when the harness is not auto-detected (e.g. other) and --transcript is not re-passed — losing the audit trail.",
+    "details_md": "Surfaced by the web-real-repo test: for harness `other`, `--transcript <path>` must be passed at BOTH review and done or the review-time transcript_ref is overwritten with null at done. A recapture that finds nothing should preserve an existing transcript_ref, not clear it. Fold into the transcript-capture hardening.",
+    "acceptance": [
+      "when a session already has a non-null transcript_ref and a later stop/review/done recapture finds no new transcript, transcript_ref is preserved (not reset to null)",
+      "a test covers review-then-done for harness other without re-passing --transcript keeping the captured transcript"
+    ],
+    "context": [
+      "src/sessions/transcript.ts captureTranscript",
+      "src/cli/commands/{review,done,stop,drop}.ts",
+      "found via tests/acceptance/web-real-repo.test.ts"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [
+    "audit:v0",
+    "area:sessions",
+    "sev:medium"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY93E35ZXWBQ64QMXSVRTCKB"
+  ],
+  "root_id": "ticket_01KY9NVM1YRM1F7NX1QS5JJAW1",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:15.632Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — ea12076 fix(sessions): capture transcripts outside the lock; preserve on recapture [HIGH]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T09:03:46.752Z",
+  "updated_at": "2026-07-24T13:11:15.632Z"
+}

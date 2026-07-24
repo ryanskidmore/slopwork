@@ -1,0 +1,21 @@
+{
+  "id": "session_01KYA40ND7421FTR6532MEX0XD",
+  "ticket": "ticket_01KY93E2W0398F54KZK9Y5CRVM",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "human"
+  },
+  "harness": {
+    "kind": "other",
+    "session_id": null
+  },
+  "git": {
+    "branch": "main",
+    "commit_at_start": "e54c7822301bd0062799d0893a1f1c818504233a"
+  },
+  "started_at": "2026-07-24T13:11:12.039Z",
+  "ended_at": "2026-07-24T13:11:12.177Z",
+  "plan": [],
+  "end_summary": null,
+  "transcript_ref": null
+}

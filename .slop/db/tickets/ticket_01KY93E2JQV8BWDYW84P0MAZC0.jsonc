@@ -1,0 +1,49 @@
+{
+  "id": "ticket_01KY93E2JQV8BWDYW84P0MAZC0",
+  "name": "web: path traversal — transcript_ref allows arbitrary local file read",
+  "slug": "web-path-traversal-transcript-ref-allows-arbitrary-local-fil",
+  "spec": {
+    "summary": "transcript_ref is an unconstrained string joined onto slopRoot with no containment check, so a tampered/merged session file with ../ segments turns the read-only viewer into an arbitrary-file-read primitive on the host.",
+    "details_md": "openTranscript does join(this.slopRoot, transcriptRef) and serves the file. transcript_ref is z.string().nullable() with no path constraint. A .slop/db is a git-mergeable, collaborator-editable store, so a malicious/buggy session file is a realistic input. Reproduced live reading a file two directories above .slop/.",
+    "acceptance": [
+      "transcript_ref is validated (reject leading /, .., and anything not normalizing under .slop root) at the schema and/or at openTranscript",
+      "openTranscript re-checks the resolved absolute path is a prefix of the resolved slop root before opening",
+      "A test asserts a session whose transcript_ref escapes the root yields null/404, not file contents"
+    ],
+    "context": [
+      "src/web/fixture-data-source.ts:177-186 openTranscript join(slopRoot, transcriptRef)",
+      "src/core/entities/session.ts:67 transcript_ref: z.string().nullable()"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 0,
+  "labels": [
+    "audit:v0",
+    "area:web-security",
+    "sev:blocker"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY8YC5ADXD0TJYWSC666V443"
+  ],
+  "root_id": "ticket_01KY93E2JQV8BWDYW84P0MAZC0",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:11.460Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — 06c88fe fix(web-security): contain transcript_ref to prevent arbitrary file read [BLOCKER]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T03:41:48.505Z",
+  "updated_at": "2026-07-24T13:11:11.460Z"
+}

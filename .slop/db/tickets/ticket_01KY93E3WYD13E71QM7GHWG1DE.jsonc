@@ -1,0 +1,49 @@
+{
+  "id": "ticket_01KY93E3WYD13E71QM7GHWG1DE",
+  "name": "session/transcript correctness: Codex wrong-transcript under concurrency; takeover fails-open on unreadable session",
+  "slug": "session-transcript-correctness-codex-wrong-transcript-under",
+  "spec": {
+    "summary": "Codex exposes no session id, so locateCodex resolves by newest-mtime among cwd-matching rollouts — two concurrent Codex sessions in one cwd can attach the WRONG transcript to a session (silently wrong audit data, worse than null). Separately, start’s takeover check does readSession(active).catch(()=>null), so an unreadable active-session file makes start proceed as if nothing is active, overwriting active_session and abandoning the prior session with no takeover event.",
+    "details_md": "",
+    "acceptance": [
+      "When two matching Codex rollouts are both newer than the session start, refuse to auto-attach and fall back to null+warning instead of guessing (and document the Codex limitation in --transcript guidance)",
+      "start treats an unreadable recorded active session as an active session (fail closed: require --takeover, warn naming the file) rather than silently proceeding",
+      "Tests cover both cases"
+    ],
+    "context": [
+      "src/sessions/transcript.ts:304-326 locateCodex (newest-mtime, unbounded scan inside lock)",
+      "src/cli/commands/start.ts:139 readSession(...).catch(()=>null)"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [
+    "audit:v0",
+    "area:sessions",
+    "sev:medium"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY8YC5ADXD0TJYWSC666V443"
+  ],
+  "root_id": "ticket_01KY93E3WYD13E71QM7GHWG1DE",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:14.654Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — 3e6baf7 fix(sessions): Codex ambiguity refusal + fail-closed takeover gate [MEDIUM]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T03:41:49.856Z",
+  "updated_at": "2026-07-24T13:11:14.654Z"
+}

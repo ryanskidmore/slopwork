@@ -10,7 +10,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "in_progress",
+  "state": "done",
   "priority": 2,
   "labels": [
     "kind:release"
@@ -21,9 +21,9 @@
   "discovered_from": [],
   "root_id": "ticket_01KY8NSSMRGSB30R7STMJKHB7C",
   "path": [],
-  "active_session": "session_01KY8VWQ7V5FMQYMM38G8TP8Z0",
-  "last_activity_at": "2026-07-24T01:29:59.819Z",
-  "latest_note": null,
+  "active_session": null,
+  "last_activity_at": "2026-07-24T02:14:32.143Z",
+  "latest_note": "Report delivered in-conversation; all 8 goal evidence items verified fresh.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -33,5 +33,5 @@
     }
   },
   "created_at": "2026-07-23T23:43:32.522Z",
-  "updated_at": "2026-07-24T01:29:59.819Z"
+  "updated_at": "2026-07-24T02:14:32.143Z"
 }

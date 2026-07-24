@@ -1,0 +1,49 @@
+{
+  "id": "ticket_01KY9RVF2DCG6TDQ8EBSGXQXT1",
+  "name": "feat: short ticket-name handles (t-<shorthash>) mapping to full ids",
+  "slug": "feat-short-ticket-name-handles-t-shorthash-mapping-to-full-i",
+  "spec": {
+    "summary": "Support a short, stable, typeable handle per ticket, e.g. t-3f9a, that resolves to the ticket (in addition to full id, prefix, slug). Either derive deterministically from the ULID (shortest unique base36, extend on collision) or allocate a stored short code at creation. Show it in new/status/show output so it is discoverable.",
+    "details_md": "",
+    "acceptance": [
+      "every ticket has a short t-<code> handle that resolves anywhere a ref is accepted",
+      "codes are unique (collision handling) and stable for the ticket lifetime",
+      "new/show/status surface the short handle; tests cover resolution + collision"
+    ],
+    "context": [
+      "src/repo/refs.ts (resolution)",
+      "src/core/ids.ts",
+      "src/tickets/new.ts",
+      "output in new/status/show"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [
+    "backlog:post-audit",
+    "area:naming",
+    "kind:feature"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KY9RVF2DCG6TDQ8EBSGXQXT1",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:16.360Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — 880366c feat(refs): short t-<code> ticket handles that resolve anywhere a ref is accepted",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T09:56:07.397Z",
+  "updated_at": "2026-07-24T13:11:16.360Z"
+}

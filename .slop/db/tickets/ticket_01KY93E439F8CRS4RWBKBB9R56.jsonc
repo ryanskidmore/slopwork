@@ -1,0 +1,51 @@
+{
+  "id": "ticket_01KY93E439F8CRS4RWBKBB9R56",
+  "name": "polish batch: same-state update no-op, escapeAttr rename, read-error mapping, new-dir parent fsync, coverage tooling, lock-test margin",
+  "slug": "polish-batch-same-state-update-no-op-escapeattr-rename-read",
+  "spec": {
+    "summary": "Low-severity cleanups gathered from the audit; each is small and independent.",
+    "details_md": "1) update --state <same> is a fake mutation (bumps updated_at, emits empty ticket.updated) — short-circuit like E1 did for draft/undraft. 2) html.ts escapeAttr is a misleading alias for escapeHtml with no scheme validation — rename or fold in real URL validation. 3) readEntityFile only maps ENOENT; wrap non-ENOENT (EACCES/EIO) in a SlopError naming the path. 4) atomicWriteFile fsyncs a newly-created dir but not its parent — fsync each new dir’s parent for full durability. 5) add @vitest/coverage-v8 + a CI threshold so untested code is flagged. 6) lock.test.ts renewal-timing test has a thin real-time margin (20ms vs 80ms) — widen or use a fake clock.",
+    "acceptance": [
+      "Each of the six items is either fixed or explicitly deferred with a note"
+    ],
+    "context": [
+      "src/tickets/update.ts:141,166-167",
+      "src/web/html.ts:29-32",
+      "src/repo/entity-file.ts:41-46,92-98",
+      "src/repo/atomic-write.ts:131-151",
+      "vitest.config.ts (no coverage)",
+      "src/repo/lock.test.ts:292-307"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 3,
+  "labels": [
+    "audit:v0",
+    "area:polish",
+    "sev:low"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY8YC5ADXD0TJYWSC666V443"
+  ],
+  "root_id": "ticket_01KY93E439F8CRS4RWBKBB9R56",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:15.146Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — 657d5de fix(polish): no-op update, read-error mapping, dir fsync, lock-test margin [LOW]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T03:41:50.058Z",
+  "updated_at": "2026-07-24T13:11:15.146Z"
+}

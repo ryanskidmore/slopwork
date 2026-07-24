@@ -1,0 +1,50 @@
+{
+  "id": "ticket_01KY93E2RZ7BQBE3YCM8VA13CJ",
+  "name": "gitignore .slop/db/.lock and .tmp-* so a crash+commit cannot poison merges or fresh clones",
+  "slug": "gitignore-slop-db-lock-and-tmp-so-a-crash-commit-cannot-pois",
+  "spec": {
+    "summary": "computeGitignoreLines only ignores index.jsonc and transcripts/. A kill -9 leaves .lock and .tmp-* on disk; git add -A commits them, so .lock round-trips through merge (conflict on an ephemeral file) and, on a fresh clone, its foreign pid can read as alive and stall every write for the full 5-min stale timeout.",
+    "details_md": "",
+    "acceptance": [
+      "slop init writes gitignore entries for .slop/db/.lock and a temp glob (.slop/db/.tmp-* and .slop/db/*/.tmp-*)",
+      "Optionally record hostname in LockInfo and treat a foreign-host lock as break-by-timeout only",
+      "A test asserts the generated gitignore ignores a stray .lock and .tmp- file"
+    ],
+    "context": [
+      "src/cli/init/gitignore.ts:22-28 computeGitignoreLines",
+      "src/repo/lock.ts:161-169 isProcessAlive (host-local pid assumption), :425-426 release only on clean exit",
+      "src/repo/atomic-write.ts temp file naming"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 1,
+  "labels": [
+    "audit:v0",
+    "area:concurrency",
+    "sev:high"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY8YC5ADXD0TJYWSC666V443"
+  ],
+  "root_id": "ticket_01KY93E2RZ7BQBE3YCM8VA13CJ",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:11.946Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — 14659da fix(init): gitignore .slop/db/.lock and .tmp-* files [HIGH]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T03:41:48.704Z",
+  "updated_at": "2026-07-24T13:11:11.946Z"
+}

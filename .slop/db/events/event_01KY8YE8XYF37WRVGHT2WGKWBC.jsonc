@@ -1,0 +1,18 @@
+{
+  "id": "event_01KY8YE8XYF37WRVGHT2WGKWBC",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": "session_01KY8VWQ7V5FMQYMM38G8TP8Z0",
+  "verb": "session.ended",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KY8VWQ7V5FMQYMM38G8TP8Z0"
+  },
+  "payload": {
+    "reason": "done",
+    "note": "Report delivered in-conversation; all 8 goal evidence items verified fresh."
+  },
+  "at": "2026-07-24T02:14:32.126Z"
+}

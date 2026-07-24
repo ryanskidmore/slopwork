@@ -1,0 +1,41 @@
+{
+  "id": "ticket_01KY9S0172V8AYCYV9KWS6RC9P",
+  "name": "web: surface all ticket detail (blockers, relationships, full plans/specs, everything)",
+  "slug": "web-surface-all-ticket-detail-blockers-relationships-full-pl",
+  "spec": {
+    "summary": "web: surface all ticket detail (blockers, relationships, full plans/specs, everything)",
+    "details_md": "{\n  \"summary\": \"Make the read-only web UI surface ALL available detail for a ticket and the graph: full spec (summary/details_md/acceptance/context/meta), every relationship (parent, children, blocks, blocked-by, relates-to, discovered-from) as navigable links, live blocked/stale overlays with the reasons, ALL plan versions with checked/unchecked steps, every session (actor/harness/git/started-ended/end-summary/transcript), the full progress/event timeline, review panel (MR + review-staleness), the resolution/outcome (once that field lands), and the short ticket handle. Nothing important should be visible only via the CLI.\",\n  \"details_md\": \"Do this LAST, after all other work, so it can render every field the other features add (resolution, short handles, event-sourced notes). Keep it read-only.\",\n  \"acceptance\": [\n    \"ticket detail page shows the full spec (all fields), all edges in both directions as clickable links, blocked/stale overlays with reasons, all plan versions + step states, all sessions with their metadata + transcript links, the full event/progress timeline, review + staleness, and resolution when present\",\n    \"the graph/tree and list views expose relationships and overlays consistently\",\n    \"still strictly read-only (GET-only, POST 405); no field rendered raw/unescaped (XSS-safe)\",\n    \"tests assert the key detail fields + relationships render for a real-CLI-produced repo\"\n  ],\n  \"context\": [\"src/web/views/ticket-detail.ts\", \"src/web/views/tree.ts\", \"src/web/views/tickets.ts\", \"src/web/data-source.ts + fixture-data-source.ts\", \"src/web/overlays.ts\"]\n}",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [
+    "backlog:post-audit",
+    "area:web",
+    "kind:feature",
+    "origin:user-request"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KY9S0172V8AYCYV9KWS6RC9P",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:17.894Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — 8a92243 feat(web): surface full ticket detail (relationships, overlays, plans, timeline)",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T09:58:37.033Z",
+  "updated_at": "2026-07-24T13:11:17.894Z"
+}

@@ -1,0 +1,49 @@
+{
+  "id": "ticket_01KY93E2W0398F54KZK9Y5CRVM",
+  "name": "web: one malformed db file 500s every page and leaks filesystem paths/stack traces",
+  "slug": "web-one-malformed-db-file-500s-every-page-and-leaks-filesyst",
+  "spec": {
+    "summary": "readJsoncDir throws on the first corrupt/schema-drifted file, and listTickets/findTicketByRef call it for every view — so one bad file breaks /tickets, /tree, /review, /stale, and even an unrelated ticket detail. Bun.serve runs in dev mode (no NODE_ENV) so the 500 body leaks the server filesystem path and a stack trace.",
+    "details_md": "",
+    "acceptance": [
+      "Per-file parse/validate errors are caught and the bad file is skipped+logged (or surfaced as an N failed to load banner) rather than failing the whole listing",
+      "slop web runs Bun.serve with development:false (or gated on an explicit flag) so local runs do not leak stack traces/paths",
+      "A test points one ticket file at invalid content and asserts other views still render 200"
+    ],
+    "context": [
+      "src/web/fixture-data-source.ts:50-69 readJsoncDir/parseEntity (uncaught throw)",
+      "src/cli/commands/web.ts (no NODE_ENV / development flag)"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 1,
+  "labels": [
+    "audit:v0",
+    "area:web",
+    "sev:high"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY8YC5ADXD0TJYWSC666V443"
+  ],
+  "root_id": "ticket_01KY93E2W0398F54KZK9Y5CRVM",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:12.196Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — 8f68e9d fix(web): tolerate one bad db file and stop leaking stack traces [HIGH]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T03:41:48.801Z",
+  "updated_at": "2026-07-24T13:11:12.196Z"
+}

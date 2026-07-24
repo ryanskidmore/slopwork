@@ -1,0 +1,51 @@
+{
+  "id": "ticket_01KY93E2NTZ7WK156HEQRVKCN1",
+  "name": "distribution broken: npm/npx slop cannot run without Bun; dist binary single-platform and unpublished",
+  "slug": "distribution-broken-npm-npx-slop-cannot-run-without-bun-dist",
+  "spec": {
+    "summary": "bin.slop points at raw src/cli/index.ts (shebang #!/usr/bin/env bun), so npm i -g / npx produces a slop that fails without a pre-existing Bun; Node cannot strip TS types under node_modules. dist/slop (the real artifact) is unused by bin, gitignored-but-in-files, un-built by any publish step, and a single-platform 100MB binary.",
+    "details_md": "Reproduced on Node v25.9.0: env: bun: No such file or directory (exit 127); node <path> -> ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING. engines only sets bun, so npm prints no warning. This is the npm package’s entire reason to exist (D2).",
+    "acceptance": [
+      "A user can install and run slop via the documented channel on macOS/Linux without separately installing Bun, OR the distribution is explicitly and truthfully scoped (e.g. Bun-only / curl installer) and npm metadata/README stop implying Node compatibility",
+      "If dist/slop is published, a prepublishOnly/prepack builds it and per-platform artifacts are selected at install; no dead-weight wrong-platform binary ships",
+      "A smoke check installs the package into a clean prefix and runs slop --version successfully"
+    ],
+    "context": [
+      "package.json:7-9 bin, :16-18 engines, :12-15 files",
+      "src/cli/index.ts:1 shebang",
+      ".gitignore dist/ vs files: [dist]",
+      "no prepublishOnly/prepack script; .github/workflows/ci.yml never publishes"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 0,
+  "labels": [
+    "audit:v0",
+    "area:packaging",
+    "sev:blocker"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY8YC5ADXD0TJYWSC666V443"
+  ],
+  "root_id": "ticket_01KY93E2NTZ7WK156HEQRVKCN1",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:11.710Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — 38d0f01 fix(packaging): make npm install runnable via a Node launcher [BLOCKER]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T03:41:48.604Z",
+  "updated_at": "2026-07-24T13:11:11.710Z"
+}

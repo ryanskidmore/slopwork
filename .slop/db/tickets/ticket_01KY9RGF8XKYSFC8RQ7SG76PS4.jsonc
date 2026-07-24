@@ -1,0 +1,51 @@
+{
+  "id": "ticket_01KY9RGF8XKYSFC8RQ7SG76PS4",
+  "name": "ci: release-to-npm workflow + harden main/PR CI",
+  "slug": "ci-release-to-npm-workflow-harden-main-pr-ci",
+  "spec": {
+    "summary": "Set up a GitHub Actions release workflow that publishes to npm on a tagged release, and harden the main/PR CI workflow to production standard.",
+    "details_md": "Two parts. (1) Release: a workflow (tag push or manual dispatch) that runs the gates, builds, and publishes the package to npm (NPM_TOKEN secret, prepublishOnly runs, provenance if feasible), with a clear version-bump/tag convention. Since v0 ships source (dist removed from npm files by the packaging fix), publish is a straight npm/bun publish. (2) Harden the existing .github/workflows/ci.yml: confirm it runs on PRs AND main, gates merges, has sensible caching + concurrency cancellation, and covers lint/format/typecheck/test/build/smoke (incl. the new packaging test). Depends on the slopworks->slopwork rename landing first (the release must publish the final package name).",
+    "acceptance": [
+      "A release workflow publishes the package to npm on a tagged release (or manual dispatch), using a repo NPM_TOKEN secret and running the full gate + build first; dry-run verified",
+      "A documented release procedure: how to bump the version and cut a release",
+      "The CI workflow runs on pull_request and push-to-main, gating merges, with lint+format+typecheck+test+build+smoke green, plus caching and concurrency-cancel",
+      "The published package name matches the post-rename name (slopwork)"
+    ],
+    "context": [
+      ".github/workflows/ci.yml (existing CI to harden)",
+      "package.json (prepublishOnly, files, bin — set by the packaging fix)",
+      "depends on the slopworks->slopwork rename",
+      "follow-on to ticket_01KY93E2NTZ7WK156HEQRVKCN1 (packaging/distribution)"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 1,
+  "labels": [
+    "area:ci",
+    "sev:high"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY93E2NTZ7WK156HEQRVKCN1"
+  ],
+  "root_id": "ticket_01KY9RGF8XKYSFC8RQ7SG76PS4",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:15.884Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — d88e0f7 ci: add release-to-npm workflow and harden the main/PR CI [HIGH]",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T09:50:07.136Z",
+  "updated_at": "2026-07-24T13:11:15.884Z"
+}

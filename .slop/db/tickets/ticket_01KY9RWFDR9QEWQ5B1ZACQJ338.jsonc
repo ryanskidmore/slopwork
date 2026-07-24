@@ -1,0 +1,50 @@
+{
+  "id": "ticket_01KY9RWFDR9QEWQ5B1ZACQJ338",
+  "name": "feat: make review optional (direct in_progress -> done) with a nag when not adhoc",
+  "slug": "feat-make-review-optional-direct-in-progress-done-with-a-nag",
+  "spec": {
+    "summary": "Allow in_progress -> done directly (no review); if the ticket is not adhoc and never went through review, print a soft warning (done without an MR/review — intended?). adhoc/investigation tickets skip the nag. Mirrors review --mr required-with-warning. Spec change to D15/S2.",
+    "details_md": "",
+    "acceptance": [
+      "checkDoneEntry allows in_progress -> done; non-adhoc + no-review prints a warning but still completes",
+      "adhoc tickets complete directly with no nag; review -> done unchanged",
+      "design.md D15/S2 updated for the optional-review edge",
+      "tests cover adhoc direct done (no nag), non-adhoc direct done (nag), review->done"
+    ],
+    "context": [
+      "src/tickets/state.ts checkDoneEntry",
+      "src/cli/commands/done.ts",
+      "design.md D15/S2"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [
+    "backlog:post-audit",
+    "area:domain",
+    "kind:feature",
+    "origin:dogfood-feedback"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KY9RWFDR9QEWQ5B1ZACQJ338",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T13:11:16.865Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — 852d268 feat(state): make review optional (direct in_progress -> done) with a nag",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T09:56:40.526Z",
+  "updated_at": "2026-07-24T13:11:16.865Z"
+}
