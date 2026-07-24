@@ -221,6 +221,29 @@
  * `--transcript <path>` remains the only reliable override once this
  * happens; there is no way to auto-disambiguate two truly concurrent
  * same-cwd Codex sessions without a session id Codex does not expose.
+ *
+ * ---------------------------------------------------------------------
+ * Fix 4 (ticket_01KYAPHGCPNMMSZNE5TEK65ERC) — claude-code's newest-mtime
+ * fallback gets the SAME ambiguity guard as Fix 3
+ * ---------------------------------------------------------------------
+ *
+ * Fix 3's own doc above says "unlike claude-code, Codex has no session id
+ * to prefer instead" — true whenever a session id WAS captured (the
+ * common case, and the one exact-path/glob steps 1-2 above already handle
+ * soundly). But `locateClaudeCode`'s step 3 (newest-mtime in the cwd's own
+ * project dir) is reached whenever no session id is available at all
+ * (`harness.session_id === null` — an env this module's own top-of-file
+ * doc documents as a real, if rarer, claude-code case) or a captured one
+ * missed both prior steps, and until this fix that fallback picked the
+ * newest `.jsonl` in the project dir unconditionally — exactly Fix 3's
+ * "known-unsound case" (findings.md §5), just for a different harness.
+ * `newestJsonlAmbiguityAware` (below, in the Claude Code section) applies
+ * the identical refusal rule Fix 3 already established for codex, scoped
+ * to a single project directory instead of a date-partitioned cwd-matching
+ * scan: MORE THAN ONE `.jsonl` newer than `started_at` refuses to guess
+ * (`path: null`); zero or one resolves exactly as before. `captureTranscript`
+ * builds the same kind of "refusing to guess" warning for this case as it
+ * already does for codex's — see its own inline comment.
  */
 import { randomUUID } from "node:crypto";
 import {
@@ -310,21 +333,6 @@ function mtimeMsSync(path: string): number | null {
   }
 }
 
-/** Newest `*.jsonl` directly inside `dir` by mtime, or `null` if `dir`
- * doesn't exist or contains none (findings.md §3.1's confirmed empty-dir
- * case) — never throws. */
-function newestJsonlIn(dir: string): string | null {
-  let best: { path: string; mtimeMs: number } | null = null;
-  for (const name of listDirSync(dir)) {
-    if (!name.endsWith(".jsonl")) continue;
-    const path = join(dir, name);
-    const mtimeMs = mtimeMsSync(path);
-    if (mtimeMs === null) continue;
-    if (best === null || mtimeMs > best.mtimeMs) best = { path, mtimeMs };
-  }
-  return best?.path ?? null;
-}
-
 /** First line of `path`, bounded to `maxBytes` (a `session_meta`/
  * first-record line is always well within this) — `null` if the file
  * can't be opened/read, or if no newline was found within the bound (a
@@ -390,10 +398,69 @@ function encodeClaudeCwd(cwd: string): string {
   return cwd.replace(/[/.]/g, "-");
 }
 
+/** {@link locateClaudeCode}'s step-3 (newest-mtime last-resort) result —
+ * `path` is what callers actually use; `ambiguous`/`newerThanSessionCount`
+ * exist purely so `captureTranscript` can build a specific warning (Fix 3,
+ * ticket_01KYAPHGCPNMMSZNE5TEK65ERC — the same seam `CodexLocateResult`
+ * below already established for codex) without `locateTranscript` itself
+ * having to change its own `string | null` return contract. */
+interface ClaudeCodeNewestResult {
+  path: string | null;
+  ambiguous: boolean;
+  /** Count of `.jsonl` files directly in `dir` strictly newer than
+   * `sessionStartedAtMs` — 0 when that wasn't provided/parseable. Only
+   * meaningful when `ambiguous` is true (>1); a caller diagnosing a
+   * `null` result should check `ambiguous` first. */
+  newerThanSessionCount: number;
+}
+
+/**
+ * Fix 3 (ticket_01KYAPHGCPNMMSZNE5TEK65ERC) — the SAME ambiguity refusal
+ * `locateCodex`'s own Fix 3 already applies (see this module's top-of-file
+ * Fix 3 doc), applied here to {@link locateClaudeCode}'s step-3 last
+ * resort: when no session id was captured (or a captured id missed both
+ * the exact-path check and the cross-project-dir glob, step 1/2 above),
+ * this used to unconditionally pick the newest `.jsonl` directly in `dir` —
+ * exactly the "known-unsound case" findings.md §5 calls out, and exactly
+ * what codex's own Fix 3 already closed: two concurrent claude-code
+ * sessions in the SAME cwd would otherwise silently resolve to whichever
+ * transcript file was touched most recently, not "mine". Refuses to pick
+ * (`path: null, ambiguous: true`) when MORE THAN ONE `.jsonl` directly in
+ * `dir` is strictly newer than `sessionStartedAtMs`; zero or exactly one is
+ * unambiguous and resolves exactly as before (newest-mtime overall).
+ * `sessionStartedAtMs === null` disables the check entirely (old
+ * newest-overall behaviour) — same opt-out `locateCodex` uses when
+ * `sessionStartedAt` wasn't supplied. Never throws — `dir` not existing or
+ * containing zero `.jsonl` files (findings.md §3.1's confirmed empty-dir
+ * case) both degrade to `path: null, ambiguous: false`.
+ */
+function newestJsonlAmbiguityAware(
+  dir: string,
+  sessionStartedAtMs: number | null,
+): ClaudeCodeNewestResult {
+  let best: { path: string; mtimeMs: number } | null = null;
+  let newerThanSessionCount = 0;
+  for (const name of listDirSync(dir)) {
+    if (!name.endsWith(".jsonl")) continue;
+    const path = join(dir, name);
+    const mtimeMs = mtimeMsSync(path);
+    if (mtimeMs === null) continue;
+    if (best === null || mtimeMs > best.mtimeMs) best = { path, mtimeMs };
+    if (sessionStartedAtMs !== null && mtimeMs > sessionStartedAtMs) {
+      newerThanSessionCount++;
+    }
+  }
+  if (sessionStartedAtMs !== null && newerThanSessionCount > 1) {
+    return { path: null, ambiguous: true, newerThanSessionCount };
+  }
+  return { path: best?.path ?? null, ambiguous: false, newerThanSessionCount };
+}
+
 function locateClaudeCode(
   claudeHome: string,
   cwd: string,
   sessionId: string | null,
+  sessionStartedAtMs: number | null,
 ): string | null {
   const projectsRoot = join(claudeHome, "projects");
   const projectDir = join(projectsRoot, encodeClaudeCwd(cwd));
@@ -415,8 +482,10 @@ function locateClaudeCode(
   // Step 3, LAST RESORT ONLY (findings.md §5's "known-unsound case"):
   // never preferred over a captured session id — two concurrent sessions
   // in the same cwd would otherwise silently resolve to whichever
-  // transcript was touched most recently, not "mine".
-  return newestJsonlIn(projectDir);
+  // transcript was touched most recently, not "mine". Now ambiguity-aware
+  // (Fix 3, ticket_01KYAPHGCPNMMSZNE5TEK65ERC) — see
+  // `newestJsonlAmbiguityAware`'s own doc.
+  return newestJsonlAmbiguityAware(projectDir, sessionStartedAtMs).path;
 }
 
 // ---------------------------------------------------------------------------
@@ -436,9 +505,10 @@ function rolloutMatchesCwd(path: string, cwd: string): boolean {
 }
 
 /** `session.started_at` (ISO 8601) -> epoch ms, or `null` if absent or
- * unparseable — feeds `locateCodex`'s ambiguity check (Fix 3) only; never
- * throws, and a `null` here simply disables that check (falls back to
- * the old newest-mtime-overall behaviour), same never-block posture as
+ * unparseable — feeds `locateCodex`'s AND `locateClaudeCode`'s ambiguity
+ * checks (Fix 3, both tickets) only; never throws, and a `null` here
+ * simply disables those checks (falls back to the old
+ * newest-mtime-overall behaviour), same never-block posture as
  * everything else in this module. */
 function parseStartedAtMs(startedAt: string | null | undefined): number | null {
   if (startedAt === null || startedAt === undefined) return null;
@@ -527,16 +597,17 @@ function locateCodex(
  *   2. Env-derived session id (claude-code only — opencode/codex never
  *      expose one, findings.md §1.2/§1.3, so this is an unconditional
  *      no-op for them).
- *   3. Newest-mtime heuristic, scoped per harness, LAST RESORT. For
- *      codex specifically, this now REFUSES to pick (falls to step 4)
- *      when more than one cwd-matching candidate is newer than
- *      `sessionStartedAt` — see Fix 3 in this module's top-of-file doc.
- *   4. Nothing found (or step 3's codex ambiguity refusal fired) → `null`.
+ *   3. Newest-mtime heuristic, scoped per harness, LAST RESORT. For codex
+ *      AND claude-code, this now REFUSES to pick (falls to step 4) when
+ *      more than one matching candidate is newer than `sessionStartedAt`
+ *      — see Fix 3 in this module's top-of-file doc (codex) and
+ *      `newestJsonlAmbiguityAware`'s own doc (claude-code).
+ *   4. Nothing found (or step 3's ambiguity refusal fired) → `null`.
  *
  * `sessionStartedAt` (ISO 8601, optional) is the session's own
  * `started_at` — pass it whenever it's known (every real caller has it;
  * `captureTranscript` below always supplies it). Omitting it disables
- * ONLY step 3's codex ambiguity check (falls back to the pre-Fix-3
+ * ONLY step 3's ambiguity checks (falls back to the pre-Fix-3
  * newest-mtime-overall behaviour) — every other harness/step is
  * unaffected either way.
  */
@@ -564,11 +635,12 @@ export function locateTranscript(
     // install with a customised CODEX_HOME with zero extra wiring.
     const codexHome = roots.codexHome ?? process.env.CODEX_HOME ?? join(homedir(), ".codex");
 
+    const sessionStartedAtMs = parseStartedAtMs(sessionStartedAt);
     switch (harness.kind) {
       case "claude-code":
-        return locateClaudeCode(claudeHome, cwd, harness.session_id);
+        return locateClaudeCode(claudeHome, cwd, harness.session_id, sessionStartedAtMs);
       case "codex":
-        return locateCodex(codexHome, cwd, parseStartedAtMs(sessionStartedAt)).path;
+        return locateCodex(codexHome, cwd, sessionStartedAtMs).path;
       case "opencode":
       case "other":
         // No auto-detection for either in v0 — see this module's doc.
@@ -753,14 +825,16 @@ export async function captureTranscript(
         ? ` (the given --transcript path "${explicitTranscriptPath}" does not exist or is not a readable file)`
         : "";
 
-      // Fix 3 (ticket_01KY93E3WYD13E71QM7GHWG1DE): `locateTranscript`'s
-      // codex branch above already refused to return a (possibly WRONG)
-      // guessed path when the cwd-matching-rollout scan was genuinely
-      // ambiguous — see this module's top-of-file Fix 3 doc. This
-      // re-runs that SAME cheap, bounded scan a second time, ONLY on
-      // this already-"nothing to copy" path, purely so the warning below
-      // can say *why* (ambiguity vs. genuinely nothing found) instead of
-      // both collapsing into the same generic message.
+      // Fix 3 (ticket_01KY93E3WYD13E71QM7GHWG1DE / ticket_01KYAPHGCPNMMSZNE5TEK65ERC):
+      // `locateTranscript`'s codex/claude-code branches above already
+      // refused to return a (possibly WRONG) guessed path when their own
+      // newest-mtime scan was genuinely ambiguous — see this module's
+      // top-of-file Fix 3 doc (codex) and `newestJsonlAmbiguityAware`'s
+      // own doc (claude-code). This re-runs that SAME cheap, bounded scan
+      // a second time, ONLY on this already-"nothing to copy" path,
+      // purely so the warning below can say *why* (ambiguity vs.
+      // genuinely nothing found) instead of both collapsing into the same
+      // generic message.
       let ambiguityNote = "";
       if (session.harness.kind === "codex") {
         const codexHome =
@@ -772,6 +846,18 @@ export async function captureTranscript(
             "newer than this session's own started_at (Codex exposes no session id, so mtime is " +
             "the only signal available); refusing to guess which one is this session's rather " +
             "than risk silently attaching another concurrent session's transcript";
+        }
+      } else if (session.harness.kind === "claude-code") {
+        const claudeHome = resolvedRoots.claudeHome ?? join(homedir(), ".claude");
+        const projectDir = join(claudeHome, "projects", encodeClaudeCwd(cwd));
+        const diag = newestJsonlAmbiguityAware(projectDir, parseStartedAtMs(session.started_at));
+        if (diag.ambiguous) {
+          ambiguityNote =
+            ` — ${diag.newerThanSessionCount} candidate claude-code transcript files in this ` +
+            "project dir are all newer than this session's own started_at (no session id was " +
+            "captured for this session, so mtime is the only signal available); refusing to " +
+            "guess which one is this session's rather than risk silently attaching another " +
+            "concurrent session's transcript";
         }
       }
 

@@ -1,0 +1,17 @@
+{
+  "id": "event_01KYATBWS8M09SDTWT6VA1174A",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYAPHGCPNMMSZNE5TEK65ERC"
+  },
+  "payload": {
+    "progress": "Implemented: newestJsonlAmbiguityAware() in transcript.ts (replaces newestJsonlIn), threaded sessionStartedAtMs through locateClaudeCode's step-3 fallback, mirrors locateCodex's Fix-3 refusal shape. captureTranscript's warning-building extended with a claude-code branch. 7 new tests added to transcript.test.ts (locator-level ambiguity suite + capture-level warning test). Full suite: 1742/1742 pass, lint/typecheck/format clean."
+  },
+  "at": "2026-07-24T19:41:48.712Z"
+}

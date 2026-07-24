@@ -299,6 +299,128 @@ describe("locateTranscript — claude-code cwd encoding on win32", () => {
 });
 
 // ---------------------------------------------------------------------------
+// locateTranscript — claude-code Fix 3/4 (ticket_01KYAPHGCPNMMSZNE5TEK65ERC):
+// the step-3 newest-mtime fallback refuses to guess under genuine
+// same-project-dir ambiguity, mirroring codex's own Fix 3 test suite below.
+// ---------------------------------------------------------------------------
+
+describe("locateTranscript — claude-code Fix 3/4: ambiguity refusal", () => {
+  async function fakeClaudeHome(): Promise<string> {
+    const claudeHome = join(scratch, "fake-claude-home-fix4");
+    await mkdir(claudeHome, { recursive: true });
+    return claudeHome;
+  }
+
+  it("returns null (refuses to guess) when TWO .jsonl files in the project dir are both newer than the session's started_at, instead of silently picking the newest one", async () => {
+    const claudeHome = await fakeClaudeHome();
+    const cwd = "/concurrent/claude-code/project";
+    const projectDir = join(claudeHome, "projects", "-concurrent-claude-code-project");
+    await mkdir(projectDir, { recursive: true });
+    // Both files below are given mtimes well after this — the exact shape
+    // of two genuinely concurrent claude-code sessions racing in the same
+    // cwd with no session id captured for either (findings.md §1.2's
+    // documented gap).
+    const sessionStartedAt = "2020-01-01T00:00:00.000Z";
+
+    const fileA = join(projectDir, "session-aaaa.jsonl");
+    await writeFile(fileA, "{}\n", "utf8");
+    // mtimes are forced deterministically via `utimes` rather than a real
+    // wall-clock gap between writes (same reasoning as the codex Fix 3
+    // suite below) so ordering can't flake on filesystems/CI runners with
+    // coarse or contended mtime resolution.
+    const fileATime = new Date("2026-06-01T01:00:00.000Z");
+    await utimes(fileA, fileATime, fileATime);
+    const fileB = join(projectDir, "session-bbbb.jsonl");
+    await writeFile(fileB, "{}\n", "utf8");
+    const fileBTime = new Date(fileATime.getTime() + 60_000);
+    await utimes(fileB, fileBTime, fileBTime);
+
+    const roots: LocateTranscriptRoots = { claudeHome };
+    // Sanity check first: without the ambiguity check (no started_at
+    // passed), this exact fixture WOULD resolve to fileB (newest) —
+    // proving the null below comes from the new refusal, not from the
+    // fixture failing to match at all.
+    expect(locateTranscript(harness("claude-code", null), cwd, undefined, roots)).toBe(fileB);
+    expect(
+      locateTranscript(harness("claude-code", null), cwd, undefined, roots, sessionStartedAt),
+    ).toBeNull();
+  });
+
+  it("a SINGLE .jsonl newer than started_at still attaches (unambiguous), even alongside older files in the same project dir", async () => {
+    const claudeHome = await fakeClaudeHome();
+    const cwd = "/single-match/claude-code/project";
+    const projectDir = join(claudeHome, "projects", "-single-match-claude-code-project");
+    await mkdir(projectDir, { recursive: true });
+
+    const baseTime = new Date("2026-05-01T00:00:00.000Z");
+    const older = join(projectDir, "older.jsonl");
+    await writeFile(older, "{}\n", "utf8");
+    await utimes(older, baseTime, baseTime);
+
+    // started_at sits strictly between the older file above and the newer
+    // one below, so exactly ONE candidate ends up newer.
+    const sessionStartedAt = new Date(baseTime.getTime() + 60_000).toISOString();
+
+    const newer = join(projectDir, "newer.jsonl");
+    await writeFile(newer, "{}\n", "utf8");
+    const newerTime = new Date(baseTime.getTime() + 120_000);
+    await utimes(newer, newerTime, newerTime);
+
+    const roots: LocateTranscriptRoots = { claudeHome };
+    expect(
+      locateTranscript(harness("claude-code", null), cwd, undefined, roots, sessionStartedAt),
+    ).toBe(newer);
+  });
+
+  it("omitting sessionStartedAt entirely preserves the pre-fix newest-mtime-overall behaviour — no ambiguity check performed", async () => {
+    const claudeHome = await fakeClaudeHome();
+    const cwd = "/no-started-at/claude-code/project";
+    const projectDir = join(claudeHome, "projects", "-no-started-at-claude-code-project");
+    await mkdir(projectDir, { recursive: true });
+
+    const fileA = join(projectDir, "aaa.jsonl");
+    await writeFile(fileA, "{}\n", "utf8");
+    const fileATime = new Date("2026-06-01T01:00:00.000Z");
+    await utimes(fileA, fileATime, fileATime);
+    const fileB = join(projectDir, "bbb.jsonl");
+    await writeFile(fileB, "{}\n", "utf8");
+    const fileBTime = new Date(fileATime.getTime() + 60_000);
+    await utimes(fileB, fileBTime, fileBTime);
+
+    const roots: LocateTranscriptRoots = { claudeHome };
+    expect(locateTranscript(harness("claude-code", null), cwd, undefined, roots)).toBe(fileB);
+  });
+
+  it("a captured session id that matches exactly (step 1) is never subject to the ambiguity check, even with other newer files in the same project dir", async () => {
+    const claudeHome = await fakeClaudeHome();
+    const cwd = "/exact-match/claude-code/project";
+    const projectDir = join(claudeHome, "projects", "-exact-match-claude-code-project");
+    await mkdir(projectDir, { recursive: true });
+    const mySessionId = "my-own-session-id";
+    const mine = join(projectDir, `${mySessionId}.jsonl`);
+    await writeFile(mine, "{}\n", "utf8");
+
+    // A newer, unrelated file in the SAME project dir — if the ambiguity
+    // check applied to step 1 (it must not), started_at below would make
+    // this look ambiguous and return null instead of `mine`.
+    const other = join(projectDir, "someone-elses-session.jsonl");
+    await writeFile(other, "{}\n", "utf8");
+    const sessionStartedAt = "2020-01-01T00:00:00.000Z"; // predates both files
+
+    const roots: LocateTranscriptRoots = { claudeHome };
+    expect(
+      locateTranscript(
+        harness("claude-code", mySessionId),
+        cwd,
+        undefined,
+        roots,
+        sessionStartedAt,
+      ),
+    ).toBe(mine);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // locateTranscript — codex
 // ---------------------------------------------------------------------------
 
@@ -628,6 +750,39 @@ describe("captureTranscript", () => {
     expect(result.warning).not.toBeNull();
     // Distinguishes the ambiguity refusal from the generic "could not
     // locate" wording exercised by the test above.
+    expect(result.warning).toMatch(/ambiguous|refus/i);
+    expect(result.warning).toContain("--transcript");
+  });
+
+  it("Fix 3/4 (ticket_01KYAPHGCPNMMSZNE5TEK65ERC): claude-code ambiguity refusal — null transcriptRef with a warning explaining WHY, suggesting --transcript", async () => {
+    const paths = repoPaths(scratch);
+    const claudeHome = join(scratch, "fake-claude-home-capture-fix4");
+    const cwd = "/concurrent/claude-code/capture-project";
+    const sessionStartedAt = "2020-01-01T00:00:00.000Z";
+    const session = makeSession({
+      harness: harness("claude-code", null),
+      started_at: sessionStartedAt,
+    });
+
+    const projectDir = join(claudeHome, "projects", "-concurrent-claude-code-capture-project");
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(projectDir, "aaa.jsonl"), "{}\n", "utf8");
+    await new Promise((r) => setTimeout(r, 5));
+    await writeFile(join(projectDir, "bbb.jsonl"), "{}\n", "utf8");
+
+    const result = await captureTranscript({
+      session,
+      paths,
+      cwd,
+      transcriptsMode: "local",
+      roots: { claudeHome },
+    });
+
+    expect(result.transcriptRef).toBeNull();
+    expect(result.sourcePath).toBeNull();
+    expect(result.warning).not.toBeNull();
+    // Distinguishes the ambiguity refusal from the generic "could not
+    // locate" wording exercised by the "not found" test above.
     expect(result.warning).toMatch(/ambiguous|refus/i);
     expect(result.warning).toContain("--transcript");
   });
