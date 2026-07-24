@@ -14,16 +14,38 @@ export const DEFAULT_STALE_AFTER = "60m";
 export const DEFAULT_REVIEW_STALE_AFTER = "24h";
 export const DEFAULT_TRANSCRIPTS_MODE: TranscriptsMode = "local";
 
-export const configRemotesSchema = z.object({
-  /** Autodetected from the git remote at `init` time (design.md §3); absent if detection failed. */
-  repo: z.url().optional(),
-  /**
-   * "prompted or blank" (design.md §3) — an explicit empty string is a
-   * legitimate "not configured yet", distinct from the key being absent
-   * entirely (never prompted).
-   */
-  jira: z.union([z.url(), z.literal("")]).optional(),
-});
+/**
+ * `null` -> `undefined` for a single field. A real YAML parser (e.g.
+ * `Bun.YAML`, used by the web data source) renders a bare `key:` with no
+ * value — as written by a default `slop init` for an undetected/unprompted
+ * remote, or by a human clearing a line by hand — as `null`, not as the
+ * key being absent. Both mean the same thing here ("not configured"), so
+ * fold `null` into `undefined` before the field's own schema (which never
+ * itself accepts `null`) sees it.
+ */
+function nullToUndefined<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess((val) => (val === null ? undefined : val), schema.optional());
+}
+
+export const configRemotesSchema = z.preprocess(
+  // A bare `remotes:` line with no indented children under it parses via
+  // real YAML as `null`; entirely missing from the object is `undefined`.
+  // Both mean "no remotes configured yet" — coerce either to `{}` so the
+  // object schema below (which never itself accepts `null`) always sees a
+  // plain object to validate.
+  (val) => (val === null || val === undefined ? {} : val),
+  z.object({
+    /** Autodetected from the git remote at `init` time (design.md §3); absent if detection failed. */
+    repo: nullToUndefined(z.url()),
+    /**
+     * "prompted or blank" (design.md §3) — an explicit empty string is a
+     * legitimate "not configured yet", distinct from the key being absent
+     * entirely (never prompted). A bare `jira:` line (real-YAML `null`) is
+     * folded into "absent" too, same as `repo`.
+     */
+    jira: nullToUndefined(z.union([z.url(), z.literal("")])),
+  }),
+);
 export type ConfigRemotes = z.infer<typeof configRemotesSchema>;
 
 export const configDefaultsSchema = z.object({

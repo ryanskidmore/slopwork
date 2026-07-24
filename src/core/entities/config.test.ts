@@ -87,4 +87,43 @@ describe("configSchema", () => {
       configSchema.safeParse({ project: "x", defaults: { stale_after: "soon" } }).success,
     ).toBe(false);
   });
+
+  it("coerces a null remotes (real-YAML shape of a bare `remotes:` line with no children, as written by `slop init` without --jira) to an empty object", () => {
+    const parsed = configSchema.parse({ project: "x", remotes: null });
+    expect(parsed.remotes).toEqual({});
+  });
+
+  it("coerces remotes.jira: null to absent, keeping a sibling repo intact", () => {
+    const parsed = configSchema.parse({
+      project: "x",
+      remotes: { repo: "https://github.com/ryan/slopworks", jira: null },
+    });
+    expect(parsed.remotes.jira).toBeUndefined();
+    expect(parsed.remotes.repo).toBe("https://github.com/ryan/slopworks");
+  });
+
+  it("coerces remotes.repo: null to absent", () => {
+    const parsed = configSchema.parse({ project: "x", remotes: { repo: null } });
+    expect(parsed.remotes.repo).toBeUndefined();
+  });
+
+  it("still fully parses a fully-specified remotes (repo + jira), preserving both — the jira badge URL path", () => {
+    const parsed = configSchema.parse({
+      project: "x",
+      remotes: {
+        repo: "https://github.com/ryan/slopworks",
+        jira: "https://yourorg.atlassian.net",
+      },
+    });
+    expect(parsed.remotes).toEqual({
+      repo: "https://github.com/ryan/slopworks",
+      jira: "https://yourorg.atlassian.net",
+    });
+  });
+
+  it("still rejects a non-URL, non-null, non-blank remotes.jira (null tolerance doesn't weaken real validation)", () => {
+    expect(configSchema.safeParse({ project: "x", remotes: { jira: "not a url" } }).success).toBe(
+      false,
+    );
+  });
 });
