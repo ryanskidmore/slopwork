@@ -76,7 +76,9 @@ export async function handleTicketList(
   const blockedIds = computeBlockedTicketIds(tickets);
 
   const allLabels = [...new Set(tickets.flatMap((t) => t.labels))].sort();
-  const allOwners = [...new Set(tickets.map((t) => t.owner?.name).filter((n): n is string => !!n))].sort();
+  const allOwners = [
+    ...new Set(tickets.map((t) => t.owner?.name).filter((n): n is string => !!n)),
+  ].sort();
 
   const filtered = tickets
     .filter((t) => matchesFilters(t, filters))

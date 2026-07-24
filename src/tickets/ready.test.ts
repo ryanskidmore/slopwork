@@ -76,7 +76,10 @@ describe("compareReadyOrder", () => {
       makeRow({ id: ids[4], priority: 3 }),
       makeRow({ id: ids[2], priority: 1 }),
     ];
-    const sorted = rows.slice().sort(compareReadyOrder).map((r) => r.id);
+    const sorted = rows
+      .slice()
+      .sort(compareReadyOrder)
+      .map((r) => r.id);
     expect(sorted).toEqual([ids[0], ids[1], ids[2], ids[3], ids[4], ids[5]]);
   });
 });
@@ -229,14 +232,20 @@ describe("buildReadyEntries", () => {
   it("puts every ready entry before every resumable entry", () => {
     const readyRow = makeRow({ priority: 3 }); // low priority ready ticket
     const resumableRow = makeRow({ priority: 0, state: "in_progress", active_session: null }); // urgent resumable
-    const entries = buildReadyEntries([readyRow], [{ row: resumableRow, reason: "in_progress_no_session" }]);
+    const entries = buildReadyEntries(
+      [readyRow],
+      [{ row: resumableRow, reason: "in_progress_no_session" }],
+    );
     expect(entries.map((e) => e.section)).toEqual(["ready", "resumable"]);
   });
 
   it("tags every entry with its `why`", () => {
     const readyRow = makeRow();
     const resumableRow = makeRow({ state: "review", active_session: null });
-    const entries = buildReadyEntries([readyRow], [{ row: resumableRow, reason: "review_no_session" }]);
+    const entries = buildReadyEntries(
+      [readyRow],
+      [{ row: resumableRow, reason: "review_no_session" }],
+    );
     expect(entries[0]?.why).toBe(READY_WHY);
     expect(entries[1]?.why).toBe(resumableReasonText("review_no_session"));
   });

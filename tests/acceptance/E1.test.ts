@@ -84,12 +84,18 @@ async function makeCliFixture(project: string): Promise<string> {
 
 const CREATED_LINE = /^created (ticket_[0-9A-Z]+)\s+\(slug: ([a-z0-9-]+)\)$/m;
 
-function newTicketCli(root: string, name: string, extraArgs: string[] = []): { id: string; slug: string } {
+function newTicketCli(
+  root: string,
+  name: string,
+  extraArgs: string[] = [],
+): { id: string; slug: string } {
   const result = runSlop(["new", name, ...extraArgs], root);
   expect(result.status, result.stderr).toBe(0);
   const m = CREATED_LINE.exec(result.stdout);
   if (!m?.[1] || !m[2]) {
-    throw new Error(`could not parse "created <id> (slug: <slug>)" out of stdout:\n${result.stdout}`);
+    throw new Error(
+      `could not parse "created <id> (slug: <slug>)" out of stdout:\n${result.stdout}`,
+    );
   }
   return { id: m[1], slug: m[2] };
 }
@@ -147,10 +153,12 @@ describe("E1: Polish", () => {
 
       expect(runSlop(["show", "no-such-ticket-anywhere"], root).status).toBe(4);
       expect(runSlop(["start", "no-such-ticket-anywhere"], root).status).toBe(4);
-      expect(runSlop(["update", "no-such-ticket-anywhere", "--progress", "x"], root).status).toBe(4);
-      expect(
-        runSlop(["events", "--since", "event_01ARZ3NDEKTSV4RRFFQ69G5FAV"], root).status,
-      ).toBe(4); // well-formed cursor shape, but no such event exists
+      expect(runSlop(["update", "no-such-ticket-anywhere", "--progress", "x"], root).status).toBe(
+        4,
+      );
+      expect(runSlop(["events", "--since", "event_01ARZ3NDEKTSV4RRFFQ69G5FAV"], root).status).toBe(
+        4,
+      ); // well-formed cursor shape, but no such event exists
 
       // A different NOT_FOUND path entirely: no .slop/ at all (repo-root
       // resolution, not ref resolution) — same code, different mechanism,
@@ -237,9 +245,9 @@ describe("E1: Polish", () => {
 
       // review -> stop is not a legal edge either (C3: `slop done`/`slop
       // start` are the only ways out of review).
-      expect(runSlop(["review", ticket.slug, "--mr", "https://example.com/mr/1"], root).status).toBe(
-        0,
-      );
+      expect(
+        runSlop(["review", ticket.slug, "--mr", "https://example.com/mr/1"], root).status,
+      ).toBe(0);
       expect(runSlop(["stop", ticket.slug], root).status).toBe(6);
     });
   });
@@ -255,7 +263,9 @@ describe("E1: Polish", () => {
      * several tickets (one with long prose, for context/show), a couple of
      * sessions (one stopped mid-way, one currently in progress), a
      * ticket in review with an MR, and the resulting events. */
-    async function makeBudgetFixture(project: string): Promise<{ root: string; ticket: { id: string; slug: string } }> {
+    async function makeBudgetFixture(
+      project: string,
+    ): Promise<{ root: string; ticket: { id: string; slug: string } }> {
       const root = await makeCliFixture(project);
       const ticket = newTicketCli(root, "budget matrix primary ticket", [
         "--spec",
@@ -264,9 +274,9 @@ describe("E1: Polish", () => {
       for (let i = 0; i < 4; i++) newTicketCli(root, `budget matrix candidate ${i}`);
 
       expect(runSlop(["start", ticket.slug], root).status).toBe(0);
-      expect(runSlop(["update", ticket.slug, "--progress", "made some progress"], root).status).toBe(
-        0,
-      );
+      expect(
+        runSlop(["update", ticket.slug, "--progress", "made some progress"], root).status,
+      ).toBe(0);
       expect(
         runSlop(["review", ticket.slug, "--mr", "https://example.com/mr/9"], root).status,
       ).toBe(0);

@@ -53,7 +53,10 @@
  * and passing it here.
  */
 import type { Session, Ticket } from "../core/index.js";
-import { BUDGET_UNIT as CONTEXT_PACK_BUDGET_UNIT, renderJsonBodyWithBudget } from "../core/budget.js";
+import {
+  BUDGET_UNIT as CONTEXT_PACK_BUDGET_UNIT,
+  renderJsonBodyWithBudget,
+} from "../core/budget.js";
 import type { ContextPackData } from "../tickets/context.js";
 import { renderContextPack } from "../tickets/context.js";
 import { jiraBrowseUrl } from "../tickets/jira.js";
@@ -262,7 +265,9 @@ export function buildContextPackJson(
     ancestry: data.ancestors.map(ticketRefJson),
     external_parent_ref: data.externalParentRef ?? null,
     jira_url:
-      data.externalParentRef !== undefined ? jiraBrowseUrl(data.config, data.externalParentRef) : null,
+      data.externalParentRef !== undefined
+        ? jiraBrowseUrl(data.config, data.externalParentRef)
+        : null,
     blockers: data.blockers.map(ticketRefJson),
     sessions: data.sessions.map(sessionJson),
     elided: [...elisions],
@@ -279,10 +284,7 @@ export function buildContextPackJson(
  * `core/budget.ts`'s module doc for why that's the correct behavior, not a
  * bug: valid-but-over-budget beats corrupt-but-under-budget).
  */
-function minimalContextPackJson(
-  ticket: Ticket,
-  elisions: readonly string[],
-): ContextPackJsonBody {
+function minimalContextPackJson(ticket: Ticket, elisions: readonly string[]): ContextPackJsonBody {
   return {
     ticket: {
       id: ticket.id,

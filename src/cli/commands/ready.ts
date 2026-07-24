@@ -241,7 +241,10 @@ export function registerReadyCommand(program: Command): void {
     .command("ready")
     .description("List ready tickets: open, no live blockers, no active session.")
     .option("--label <label>", "filter to tickets carrying this label")
-    .option("--resumable", "also include stopped or stale in_progress/review tickets worth resuming")
+    .option(
+      "--resumable",
+      "also include stopped or stale in_progress/review tickets worth resuming",
+    )
     .option("--json", "machine-readable output")
     .option(
       "--budget <n>",

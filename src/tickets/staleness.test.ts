@@ -12,15 +12,20 @@ const DAY_MS = 86_400_000;
 
 describe("computeStaleAt", () => {
   it("in_progress: last_activity_at + staleAfterMs", () => {
-    expect(computeStaleAt({ state: "in_progress", last_activity_at: "2026-07-23T10:00:00.000Z" }, HOUR_MS)).toBe(
-      "2026-07-23T11:00:00.000Z",
-    );
+    expect(
+      computeStaleAt(
+        { state: "in_progress", last_activity_at: "2026-07-23T10:00:00.000Z" },
+        HOUR_MS,
+      ),
+    ).toBe("2026-07-23T11:00:00.000Z");
   });
 
   it("every other state: null", () => {
     const states = ["draft", "open", "review", "done", "dropped"] as const;
     for (const state of states) {
-      expect(computeStaleAt({ state, last_activity_at: "2026-07-23T10:00:00.000Z" }, HOUR_MS)).toBeNull();
+      expect(
+        computeStaleAt({ state, last_activity_at: "2026-07-23T10:00:00.000Z" }, HOUR_MS),
+      ).toBeNull();
     }
   });
 });
@@ -51,7 +56,11 @@ describe("computeReviewStaleAt", () => {
     for (const state of states) {
       expect(
         computeReviewStaleAt(
-          { state, review: { requested_at: "2026-07-23T10:00:00.000Z" }, last_activity_at: "2026-07-23T10:00:00.000Z" },
+          {
+            state,
+            review: { requested_at: "2026-07-23T10:00:00.000Z" },
+            last_activity_at: "2026-07-23T10:00:00.000Z",
+          },
           DAY_MS,
         ),
       ).toBeNull();
@@ -118,15 +127,17 @@ describe("isReviewStale", () => {
   });
 
   it("1ms before: not stale; 1ms after: stale", () => {
-    expect(isReviewStale({ review_stale_at: reviewStaleAt }, new Date(Date.parse(reviewStaleAt) - 1))).toBe(
-      false,
-    );
-    expect(isReviewStale({ review_stale_at: reviewStaleAt }, new Date(Date.parse(reviewStaleAt) + 1))).toBe(
-      true,
-    );
+    expect(
+      isReviewStale({ review_stale_at: reviewStaleAt }, new Date(Date.parse(reviewStaleAt) - 1)),
+    ).toBe(false);
+    expect(
+      isReviewStale({ review_stale_at: reviewStaleAt }, new Date(Date.parse(reviewStaleAt) + 1)),
+    ).toBe(true);
   });
 
   it("review_stale_at: null is never review-stale", () => {
-    expect(isReviewStale({ review_stale_at: null }, new Date("2100-01-01T00:00:00.000Z"))).toBe(false);
+    expect(isReviewStale({ review_stale_at: null }, new Date("2100-01-01T00:00:00.000Z"))).toBe(
+      false,
+    );
   });
 });

@@ -12,9 +12,7 @@
   },
   "state": "in_progress",
   "priority": 0,
-  "labels": [
-    "billing"
-  ],
+  "labels": ["billing"],
   "adhoc": false,
   "parent": "jira:PROJ-123",
   "blocks": [],

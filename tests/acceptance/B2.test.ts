@@ -156,10 +156,7 @@ describe("B2: split + draft/undraft", () => {
       const fixture = await makeFixture();
       const source = await createTicketViaCli(fixture, "Big feature");
 
-      const result = runSlop(
-        ["split", source.slug, "Piece A", "Piece B", "Piece C"],
-        fixture.root,
-      );
+      const result = runSlop(["split", source.slug, "Piece A", "Piece B", "Piece C"], fixture.root);
       expect(result.status, result.stderr).toBe(0);
       const created = parseCreatedLines(result.stdout);
       expect(created).toHaveLength(3);

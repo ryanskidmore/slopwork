@@ -34,7 +34,9 @@ async function loadTreeFor(
   const rootTicket = all.find((t) => t.id === ticket.root_id) ?? ticket;
   const tree = buildTree(rootTicket.id, all);
   const externalParentRef =
-    rootTicket.parent !== undefined && !isTicketId(rootTicket.parent) ? rootTicket.parent : undefined;
+    rootTicket.parent !== undefined && !isTicketId(rootTicket.parent)
+      ? rootTicket.parent
+      : undefined;
   return { tree, externalParentRef };
 }
 

@@ -205,7 +205,7 @@ describe("C5: Staleness", () => {
   // -------------------------------------------------------------------------
 
   describe('"Clock-injected tests"', () => {
-    it("PROOF the index stores a stable DEADLINE, not a live boolean: rebuilding at two different \"now\"s leaves stale_at unchanged — only the read-time boolean, computed separately, differs", async () => {
+    it('PROOF the index stores a stable DEADLINE, not a live boolean: rebuilding at two different "now"s leaves stale_at unchanged — only the read-time boolean, computed separately, differs', async () => {
       const paths = await makeScratchRepo("slop-c5-stable-deadline-");
       const t = makeTicket({
         name: "in progress ticket",
@@ -216,8 +216,14 @@ describe("C5: Staleness", () => {
 
       // Two builds of the SAME on-disk ticket content, at two very
       // different "now"s (one well before the deadline, one well after).
-      const earlyIndex: DbIndex = await buildIndex(paths, fixedClock(new Date("2026-07-23T10:05:00.000Z")));
-      const lateIndex: DbIndex = await buildIndex(paths, fixedClock(new Date("2026-08-01T00:00:00.000Z")));
+      const earlyIndex: DbIndex = await buildIndex(
+        paths,
+        fixedClock(new Date("2026-07-23T10:05:00.000Z")),
+      );
+      const lateIndex: DbIndex = await buildIndex(
+        paths,
+        fixedClock(new Date("2026-08-01T00:00:00.000Z")),
+      );
 
       const earlyRow = earlyIndex.tickets.find((r) => r.id === t.id);
       const lateRow = lateIndex.tickets.find((r) => r.id === t.id);
@@ -443,7 +449,11 @@ describe("C5: Staleness", () => {
         name: "unwatched MR",
         state: "review",
         active_session: newSessionId(),
-        review: { requested_at: "2026-07-20T10:00:00.000Z", by: { name: "ryan", kind: "human" }, mr },
+        review: {
+          requested_at: "2026-07-20T10:00:00.000Z",
+          by: { name: "ryan", kind: "human" },
+          mr,
+        },
       });
       const fresh = makeTicket({
         name: "actively watched MR",

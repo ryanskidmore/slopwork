@@ -71,7 +71,10 @@ function renderNode(
 </li>`;
 }
 
-export async function handleTreeView(_req: BunRequest, dataSource: WebDataSource): Promise<Response> {
+export async function handleTreeView(
+  _req: BunRequest,
+  dataSource: WebDataSource,
+): Promise<Response> {
   const [tickets, config] = await Promise.all([dataSource.listTickets(), dataSource.getConfig()]);
   const blockedIds = computeBlockedTicketIds(tickets);
   const childIndex = buildChildIndex(tickets);

@@ -94,7 +94,9 @@ function spawnAndWaitForUrl(
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      reject(new Error(`process exited early (code ${code}) before printing a URL.\nstderr: ${stderr}`));
+      reject(
+        new Error(`process exited early (code ${code}) before printing a URL.\nstderr: ${stderr}`),
+      );
     });
     proc.once("error", (err) => {
       if (settled) return;
@@ -141,12 +143,16 @@ function readJsoncEntities<T>(dir: string, schema: { parse: (input: unknown) => 
 }
 
 const fixtureTickets: Ticket[] = readJsoncEntities(join(slopDir, "db", "tickets"), ticketSchema);
-const fixtureSessions: Session[] = readJsoncEntities(join(slopDir, "db", "sessions"), sessionSchema);
+const fixtureSessions: Session[] = readJsoncEntities(
+  join(slopDir, "db", "sessions"),
+  sessionSchema,
+);
 const fixtureEvents: Event[] = readJsoncEntities(join(slopDir, "db", "events"), eventSchema);
 
 function ticketBySlug(slug: string): Ticket {
   const found = fixtureTickets.find((t) => t.slug === slug);
-  if (!found) throw new Error(`fixture db has no ticket with slug "${slug}" — did the generator change?`);
+  if (!found)
+    throw new Error(`fixture db has no ticket with slug "${slug}" — did the generator change?`);
   return found;
 }
 function sessionsForTicket(ticketId: string): Session[] {
@@ -166,12 +172,10 @@ async function get(path: string, init?: RequestInit): Promise<Response> {
 }
 
 beforeAll(async () => {
-  server = await spawnAndWaitForUrl(
-    "bun",
-    [cliEntry, "web", "--port", "0"],
-    fixtureParentDir,
-    { ...process.env, SLOP_WEB_FAKE_NOW: FIXTURE_NOW_ISO },
-  );
+  server = await spawnAndWaitForUrl("bun", [cliEntry, "web", "--port", "0"], fixtureParentDir, {
+    ...process.env,
+    SLOP_WEB_FAKE_NOW: FIXTURE_NOW_ISO,
+  });
 }, 20_000);
 
 afterAll(async () => {
@@ -200,7 +204,14 @@ describe("D5: slop web", () => {
       // `remotes.jira`, the stale thresholds text) rendered correctly —
       // that would be impossible if config.yaml failed validation.
       const text = readFileSync(join(slopDir, "config.yaml"), "utf8");
-      for (const key of ["project:", "remotes:", "jira:", "defaults:", "stale_after:", "review_stale_after:"]) {
+      for (const key of [
+        "project:",
+        "remotes:",
+        "jira:",
+        "defaults:",
+        "stale_after:",
+        "review_stale_after:",
+      ]) {
         expect(text).toContain(key);
       }
     });
@@ -354,7 +365,9 @@ describe("D5: slop web", () => {
       expect(body).toContain("Updates timeline");
       expect(body).toContain("created");
       // At least two distinct timestamps show up in the timeline for this ticket.
-      const events = fixtureEvents.filter((e) => e.entity.kind === "ticket" && e.entity.id === root.id);
+      const events = fixtureEvents.filter(
+        (e) => e.entity.kind === "ticket" && e.entity.id === root.id,
+      );
       expect(events.length).toBeGreaterThanOrEqual(1);
     });
 
@@ -449,15 +462,25 @@ describe("D5: slop web", () => {
       const session = bigSession();
       const res = await get(`/tickets/${ticket.id}/sessions/${session.id}/transcript`);
       const body = await res.text();
-      for (const rawMarker of ['"parentUuid"', '"isSidechain"', '"userType"', '{"type":"assistant"', '{"type":"user"']) {
-        expect(body, `transcript view leaked raw JSONL marker ${rawMarker}`).not.toContain(rawMarker);
+      for (const rawMarker of [
+        '"parentUuid"',
+        '"isSidechain"',
+        '"userType"',
+        '{"type":"assistant"',
+        '{"type":"user"',
+      ]) {
+        expect(body, `transcript view leaked raw JSONL marker ${rawMarker}`).not.toContain(
+          rawMarker,
+        );
       }
     });
 
     it("skips non-conversational record types by default, and paginates rather than rendering everything at once", async () => {
       const ticket = implementOauth();
       const session = bigSession();
-      const page1 = await (await get(`/tickets/${ticket.id}/sessions/${session.id}/transcript`)).text();
+      const page1 = await (
+        await get(`/tickets/${ticket.id}/sessions/${session.id}/transcript`)
+      ).text();
       // Hidden-by-default types never show up as their own turns.
       expect(page1).not.toContain("— system");
       // The transcript has more than the default page size (40) worth of conversational records — pagination must kick in.
@@ -602,12 +625,10 @@ describe("D5: slop web — compiled binary", () => {
     if (!existsSync(binaryPath)) {
       throw new Error(`${binaryPath} is still missing after "bun run build".`);
     }
-    binServer = await spawnAndWaitForUrl(
-      binaryPath,
-      ["web", "--port", "0"],
-      fixtureParentDir,
-      { ...process.env, SLOP_WEB_FAKE_NOW: FIXTURE_NOW_ISO },
-    );
+    binServer = await spawnAndWaitForUrl(binaryPath, ["web", "--port", "0"], fixtureParentDir, {
+      ...process.env,
+      SLOP_WEB_FAKE_NOW: FIXTURE_NOW_ISO,
+    });
   }, 60_000);
 
   afterAll(async () => {

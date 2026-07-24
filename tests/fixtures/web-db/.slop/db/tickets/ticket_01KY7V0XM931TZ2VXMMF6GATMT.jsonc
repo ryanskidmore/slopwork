@@ -12,19 +12,14 @@
   },
   "state": "draft",
   "priority": 3,
-  "labels": [
-    "auth",
-    "docs"
-  ],
+  "labels": ["auth", "docs"],
   "adhoc": false,
   "parent": "ticket_01KY7V0XM33FSMA956ZXB6W7HG",
   "blocks": [],
   "relates_to": [],
   "discovered_from": [],
   "root_id": "ticket_01KY7V0XM33FSMA956ZXB6W7HG",
-  "path": [
-    "ticket_01KY7V0XM33FSMA956ZXB6W7HG"
-  ],
+  "path": ["ticket_01KY7V0XM33FSMA956ZXB6W7HG"],
   "active_session": null,
   "last_activity_at": "2026-07-21T12:00:00.000Z",
   "latest_note": null,

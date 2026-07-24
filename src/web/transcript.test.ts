@@ -44,10 +44,16 @@ describe("getTranscriptPage", () => {
   const records = [
     { type: "user", message: { role: "user", content: "hi" } },
     { type: "system", subtype: "compact" },
-    { type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "hello" }] } },
+    {
+      type: "assistant",
+      message: { role: "assistant", content: [{ type: "text", text: "hello" }] },
+    },
     { type: "last-prompt" },
     { type: "user", message: { role: "user", content: "again" } },
-    { type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "again reply" }] } },
+    {
+      type: "assistant",
+      message: { role: "assistant", content: [{ type: "text", text: "again reply" }] },
+    },
   ];
 
   it("filters to user/assistant by default, excluding system and always-hidden types", () => {
@@ -62,7 +68,13 @@ describe("getTranscriptPage", () => {
   it("includes system records when includeSystem is set", async () => {
     const source = sourceFromRecords(records);
     const page = await getTranscriptPage(source, { offset: 0, limit: 10, includeSystem: true });
-    expect(page.records.map((r) => r.type)).toEqual(["user", "system", "assistant", "user", "assistant"]);
+    expect(page.records.map((r) => r.type)).toEqual([
+      "user",
+      "system",
+      "assistant",
+      "user",
+      "assistant",
+    ]);
   });
 
   it("paginates with offset/limit and reports hasMore", async () => {
@@ -97,7 +109,12 @@ describe("toolResultText", () => {
   });
 
   it("joins text sub-blocks from an array", () => {
-    expect(toolResultText([{ type: "text", text: "a" }, { type: "text", text: "b" }])).toBe("a\nb");
+    expect(
+      toolResultText([
+        { type: "text", text: "a" },
+        { type: "text", text: "b" },
+      ]),
+    ).toBe("a\nb");
   });
 
   it("falls back to JSON for non-text content", () => {

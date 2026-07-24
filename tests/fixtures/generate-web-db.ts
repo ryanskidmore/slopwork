@@ -306,14 +306,9 @@ addEvent({ kind: "session", id: s1.id }, "plan.set", AGENT_1, s1.id, -3 * HOUR +
   version: 1,
   steps: 3,
 });
-addEvent(
-  { kind: "ticket", id: implementOauth.id },
-  "ticket.updated",
-  AGENT_1,
-  s1.id,
-  -2 * HOUR,
-  { progress: "openid-client wired up against the built-in provider's interface." },
-);
+addEvent({ kind: "ticket", id: implementOauth.id }, "ticket.updated", AGENT_1, s1.id, -2 * HOUR, {
+  progress: "openid-client wired up against the built-in provider's interface.",
+});
 addEvent({ kind: "session", id: s1.id }, "plan.revised", AGENT_1, s1.id, -45 * MIN, {
   version: 2,
   steps: 5,
@@ -323,14 +318,9 @@ addEvent({ kind: "session", id: s1.id }, "plan.step_checked", AGENT_1, s1.id, -4
   step: 2,
   checked: true,
 });
-addEvent(
-  { kind: "ticket", id: implementOauth.id },
-  "ticket.updated",
-  AGENT_1,
-  s1.id,
-  -5 * MIN,
-  { progress: "Token refresh works against a live test IdP; writing config validation next." },
-);
+addEvent({ kind: "ticket", id: implementOauth.id }, "ticket.updated", AGENT_1, s1.id, -5 * MIN, {
+  progress: "Token refresh works against a live test IdP; writing config validation next.",
+});
 
 // ---------------------------------------------------------------------------
 // Tree B: a local root whose *own* parent is external (jira:) — D1: the
@@ -519,7 +509,8 @@ const s5a: Session = sessionSchema.parse({
       created_at: at(-9 * DAY),
     },
   ],
-  end_summary: "Explored two interface shapes; handing off with a recommendation in the ticket notes.",
+  end_summary:
+    "Explored two interface shapes; handing off with a recommendation in the ticket notes.",
   transcript_ref: null,
 });
 sessions.push(s5a);
@@ -598,21 +589,10 @@ addEvent(
   -8 * DAY,
   { from: "open", to: "in_progress", re_entry: false },
 );
-addEvent(
-  { kind: "session", id: s5b.id },
-  "session.ended",
-  RYAN,
-  s5b.id,
-  -7 * DAY,
-  { reason: "done" },
-);
-addEvent(
-  { kind: "ticket", id: designAuthInterface.id },
-  "ticket.done",
-  RYAN,
-  s5b.id,
-  -7 * DAY,
-);
+addEvent({ kind: "session", id: s5b.id }, "session.ended", RYAN, s5b.id, -7 * DAY, {
+  reason: "done",
+});
+addEvent({ kind: "ticket", id: designAuthInterface.id }, "ticket.done", RYAN, s5b.id, -7 * DAY);
 
 const prototypeVectorSearch = makeTicket({
   name: "Prototype vector search for ticket search",
@@ -626,14 +606,9 @@ const prototypeVectorSearch = makeTicket({
   createdOffsetMs: -6 * DAY,
 });
 addEvent({ kind: "ticket", id: prototypeVectorSearch.id }, "ticket.created", RYAN, null, -6 * DAY);
-addEvent(
-  { kind: "ticket", id: prototypeVectorSearch.id },
-  "ticket.dropped",
-  RYAN,
-  null,
-  -5 * DAY,
-  { reason: "Superseded by SlopQL (F6) — real search covers this without an embeddings index." },
-);
+addEvent({ kind: "ticket", id: prototypeVectorSearch.id }, "ticket.dropped", RYAN, null, -5 * DAY, {
+  reason: "Superseded by SlopQL (F6) — real search covers this without an embeddings index.",
+});
 
 const refactorCliErrors = makeTicket({
   name: "Refactor CLI error reporting",
@@ -700,14 +675,9 @@ addEvent({ kind: "session", id: s6.id }, "plan.set", AGENT_1, s6.id, -2 * HOUR +
   version: 1,
   steps: 4,
 });
-addEvent(
-  { kind: "session", id: s6.id },
-  "session.ended",
-  AGENT_1,
-  s6.id,
-  -10 * MIN,
-  { reason: "review" },
-);
+addEvent({ kind: "session", id: s6.id }, "session.ended", AGENT_1, s6.id, -10 * MIN, {
+  reason: "review",
+});
 
 const darkModeWeb = makeTicket({
   name: "Add dark mode to slop web",
@@ -725,14 +695,9 @@ const darkModeWeb = makeTicket({
   },
 });
 addEvent({ kind: "ticket", id: darkModeWeb.id }, "ticket.created", RYAN, null, -5 * DAY);
-addEvent(
-  { kind: "ticket", id: darkModeWeb.id },
-  "review.requested",
-  AGENT_2,
-  null,
-  -3 * DAY,
-  { mr: "https://github.com/ryan/slopworks-fixture/pull/37" },
-);
+addEvent({ kind: "ticket", id: darkModeWeb.id }, "review.requested", AGENT_2, null, -3 * DAY, {
+  mr: "https://github.com/ryan/slopworks-fixture/pull/37",
+});
 
 const investigateMemLeak = makeTicket({
   name: "Investigate memory leak in event writer",
@@ -796,14 +761,9 @@ const oldSlackIdea = makeTicket({
   createdOffsetMs: -25 * DAY,
 });
 addEvent({ kind: "ticket", id: oldSlackIdea.id }, "ticket.created", RYAN, null, -25 * DAY);
-addEvent(
-  { kind: "ticket", id: oldSlackIdea.id },
-  "ticket.dropped",
-  RYAN,
-  null,
-  -20 * DAY,
-  { reason: "No fleet features (D11) — out of scope for v0 and beyond." },
-);
+addEvent({ kind: "ticket", id: oldSlackIdea.id }, "ticket.dropped", RYAN, null, -20 * DAY, {
+  reason: "No fleet features (D11) — out of scope for v0 and beyond.",
+});
 
 const staleIndexBuilder = makeTicket({
   name: "Rewrite index builder for incremental updates",
@@ -859,14 +819,9 @@ addEvent({ kind: "session", id: s4.id }, "plan.set", AGENT_2, s4.id, -2 * DAY + 
   version: 1,
   steps: 6,
 });
-addEvent(
-  { kind: "ticket", id: staleIndexBuilder.id },
-  "ticket.updated",
-  AGENT_2,
-  s4.id,
-  -2 * DAY,
-  { progress: "Confirmed: full rebuild scales linearly with total ticket count, not just deltas." },
-);
+addEvent({ kind: "ticket", id: staleIndexBuilder.id }, "ticket.updated", AGENT_2, s4.id, -2 * DAY, {
+  progress: "Confirmed: full rebuild scales linearly with total ticket count, not just deltas.",
+});
 
 // ---------------------------------------------------------------------------
 // Config
@@ -946,7 +901,12 @@ function buildBigTranscript(): RawRecord[] {
           thinking:
             "I should read src/auth/provider.ts first to see the interface shape before writing anything.",
         },
-        { type: "tool_use", id: "tu_01", name: "Read", input: { file_path: "src/auth/provider.ts" } },
+        {
+          type: "tool_use",
+          id: "tu_01",
+          name: "Read",
+          input: { file_path: "src/auth/provider.ts" },
+        },
       ],
       stop_reason: "tool_use",
       usage: { input_tokens: 1200, output_tokens: 80 },
@@ -998,7 +958,12 @@ function buildBigTranscript(): RawRecord[] {
             "for the OAuth flow and implement both methods against it. Let me check what's already " +
             "in the repo for OAuth-adjacent code.",
         },
-        { type: "tool_use", id: "tu_02", name: "Grep", input: { pattern: "openid-client", path: "src" } },
+        {
+          type: "tool_use",
+          id: "tu_02",
+          name: "Grep",
+          input: { pattern: "openid-client", path: "src" },
+        },
       ],
       stop_reason: "tool_use",
       usage: { input_tokens: 1400, output_tokens: 140 },
@@ -1057,12 +1022,19 @@ function buildBigTranscript(): RawRecord[] {
         role: "assistant",
         model: "claude-sonnet-5",
         content: [
-          { type: "text", text: `Working on ${topic} (iteration ${i + 1}). Applying the change now.` },
+          {
+            type: "text",
+            text: `Working on ${topic} (iteration ${i + 1}). Applying the change now.`,
+          },
           {
             type: "tool_use",
             id: `tu_loop_${i}`,
             name: "Edit",
-            input: { file_path: "src/auth/oauth/provider.ts", old_string: "// TODO", new_string: "// done" },
+            input: {
+              file_path: "src/auth/oauth/provider.ts",
+              old_string: "// TODO",
+              new_string: "// done",
+            },
           },
         ],
         stop_reason: "tool_use",
@@ -1075,7 +1047,13 @@ function buildBigTranscript(): RawRecord[] {
       ...baseFields(s1Id, branch, t),
       message: {
         role: "user",
-        content: [{ type: "tool_result", tool_use_id: `tu_loop_${i}`, content: "File updated successfully." }],
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: `tu_loop_${i}`,
+            content: "File updated successfully.",
+          },
+        ],
       },
     });
     t += step;
@@ -1119,7 +1097,10 @@ function buildSmallTranscript(sessionId: string, branch: string): RawRecord[] {
   records.push({
     type: "user",
     ...baseFields(sessionId, branch, t),
-    message: { role: "user", content: "The windows CI job is flaky in the cleanup step. Can you dig in?" },
+    message: {
+      role: "user",
+      content: "The windows CI job is flaky in the cleanup step. Can you dig in?",
+    },
   });
   t += step;
   records.push({
@@ -1132,7 +1113,12 @@ function buildSmallTranscript(sessionId: string, branch: string): RawRecord[] {
       model: "gpt-5-codex",
       content: [
         { type: "thinking", thinking: "Likely a race on a lock file during parallel job cleanup." },
-        { type: "tool_use", id: "tu_01", name: "Bash", input: { command: "grep -R cleanup .github/workflows" } },
+        {
+          type: "tool_use",
+          id: "tu_01",
+          name: "Bash",
+          input: { command: "grep -R cleanup .github/workflows" },
+        },
       ],
       stop_reason: "tool_use",
       usage: { input_tokens: 600, output_tokens: 70 },
@@ -1182,7 +1168,10 @@ function buildReviewTranscript(sessionId: string, branch: string): RawRecord[] {
   records.push({
     type: "user",
     ...baseFields(sessionId, branch, t),
-    message: { role: "user", content: "Consolidate every command's error reporting into SlopError." },
+    message: {
+      role: "user",
+      content: "Consolidate every command's error reporting into SlopError.",
+    },
   });
   t += step;
   records.push({
@@ -1195,7 +1184,12 @@ function buildReviewTranscript(sessionId: string, branch: string): RawRecord[] {
       model: "claude-sonnet-5",
       content: [
         { type: "text", text: "Auditing every command's current error path first." },
-        { type: "tool_use", id: "tu_01", name: "Grep", input: { pattern: "throw new Error", path: "src/cli" } },
+        {
+          type: "tool_use",
+          id: "tu_01",
+          name: "Grep",
+          input: { pattern: "throw new Error", path: "src/cli" },
+        },
       ],
       stop_reason: "tool_use",
       usage: { input_tokens: 700, output_tokens: 60 },
@@ -1207,7 +1201,9 @@ function buildReviewTranscript(sessionId: string, branch: string): RawRecord[] {
     ...baseFields(sessionId, branch, t),
     message: {
       role: "user",
-      content: [{ type: "tool_result", tool_use_id: "tu_01", content: "3 matches across 3 files." }],
+      content: [
+        { type: "tool_result", tool_use_id: "tu_01", content: "3 matches across 3 files." },
+      ],
     },
   });
   t += step;
@@ -1219,7 +1215,12 @@ function buildReviewTranscript(sessionId: string, branch: string): RawRecord[] {
       type: "message",
       role: "assistant",
       model: "claude-sonnet-5",
-      content: [{ type: "text", text: "All three now throw SlopError with the right exit code. Opening the MR." }],
+      content: [
+        {
+          type: "text",
+          text: "All three now throw SlopError with the right exit code. Opening the MR.",
+        },
+      ],
       stop_reason: "end_turn",
       usage: { input_tokens: 250, output_tokens: 40 },
     },
@@ -1269,13 +1270,18 @@ async function main(): Promise<void> {
   );
 
   await writeJsonl(join(transcriptsDir, `${s1Id}.jsonl`), buildBigTranscript());
-  await writeJsonl(join(transcriptsDir, `${s3Id}.jsonl`), buildSmallTranscript(s3Id, "fix/ci-flaky-windows"));
+  await writeJsonl(
+    join(transcriptsDir, `${s3Id}.jsonl`),
+    buildSmallTranscript(s3Id, "fix/ci-flaky-windows"),
+  );
   await writeJsonl(
     join(transcriptsDir, `${s6Id}.jsonl`),
     buildReviewTranscript(s6Id, "refactor/cli-error-reporting"),
   );
 
-  console.log(`Wrote ${tickets.length} tickets, ${sessions.length} sessions, ${events.length} events`);
+  console.log(
+    `Wrote ${tickets.length} tickets, ${sessions.length} sessions, ${events.length} events`,
+  );
   console.log(`Fixture db: ${fixtureRoot}`);
 }
 

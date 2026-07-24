@@ -567,7 +567,10 @@ describe("D1: init + agent onboarding", () => {
 
     /** Same idea as {@link assertAppearsInOrder}, over an already-tokenised
      * sequence (`slop events`' verb list) rather than raw prose. */
-    function assertVerbsInOrder(actual: readonly string[], expectedInOrder: readonly string[]): void {
+    function assertVerbsInOrder(
+      actual: readonly string[],
+      expectedInOrder: readonly string[],
+    ): void {
       let from = 0;
       for (const verb of expectedInOrder) {
         const idx = actual.indexOf(verb, from);
@@ -599,7 +602,11 @@ describe("D1: init + agent onboarding", () => {
     }
 
     interface EventsJson {
-      events: { verb: string; entity: { kind: string; id: string }; payload: Record<string, unknown> }[];
+      events: {
+        verb: string;
+        entity: { kind: string; id: string };
+        payload: Record<string, unknown>;
+      }[];
     }
 
     it(
@@ -610,13 +617,21 @@ describe("D1: init + agent onboarding", () => {
         const init = runSlop(["init", "--yes"], dir, { CLAUDECODE: "1" });
         expect(init.status, init.stderr).toBe(0);
 
-        const skillMd = readFileSync(join(dir, ".claude", "skills", "slopworks", "SKILL.md"), "utf8");
+        const skillMd = readFileSync(
+          join(dir, ".claude", "skills", "slopworks", "SKILL.md"),
+          "utf8",
+        );
 
         // "Told 'pick up the next thing'" row: this is where the skill
         // documents `ready` at all — as the way an agent FINDS work
         // before `start`ing it (§3's criterion opens with "ready").
-        const readyRow = skillMd.split("\n").find((line) => line.includes("pick up the next thing"));
-        expect(readyRow, "expected a 'pick up the next thing' row documenting `ready`").toBeDefined();
+        const readyRow = skillMd
+          .split("\n")
+          .find((line) => line.includes("pick up the next thing"));
+        expect(
+          readyRow,
+          "expected a 'pick up the next thing' row documenting `ready`",
+        ).toBeDefined();
         assertAppearsInOrder(
           readyRow as string,
           ["slop ready", "slop start"],
@@ -646,146 +661,145 @@ describe("D1: init + agent onboarding", () => {
       },
     );
 
-    it(
-      "a scripted stand-in drives `dist/slop`, unaided, through exactly the loop the skill documents " +
-        "— new → ready → start → plan → plan --check → update --progress → review --mr → done — with " +
-        "every step's outcome observable in CLI output and `.slop/db` state, including the done-cascade " +
-        "unblocking a ticket this one blocks",
-      async () => {
-        const dir = await makeScratchRepo("slop-d1-loop-");
-        const paths: RepoPaths = repoPaths(dir);
+    it("a scripted stand-in drives `dist/slop`, unaided, through exactly the loop the skill documents " +
+      "— new → ready → start → plan → plan --check → update --progress → review --mr → done — with " +
+      "every step's outcome observable in CLI output and `.slop/db` state, including the done-cascade " +
+      "unblocking a ticket this one blocks", async () => {
+      const dir = await makeScratchRepo("slop-d1-loop-");
+      const paths: RepoPaths = repoPaths(dir);
 
-        // Fresh init (--yes: non-interactive), skill installed for real.
-        const init = runSlop(["init", "--yes"], dir, { CLAUDECODE: "1" });
-        expect(init.status, init.stderr).toBe(0);
-        expect(existsSync(join(dir, ".claude", "skills", "slopworks", "SKILL.md"))).toBe(true);
-        expect(existsSync(join(dir, ".slop", "AGENTS.md"))).toBe(true);
+      // Fresh init (--yes: non-interactive), skill installed for real.
+      const init = runSlop(["init", "--yes"], dir, { CLAUDECODE: "1" });
+      expect(init.status, init.stderr).toBe(0);
+      expect(existsSync(join(dir, ".claude", "skills", "slopworks", "SKILL.md"))).toBe(true);
+      expect(existsSync(join(dir, ".slop", "AGENTS.md"))).toBe(true);
 
-        // A dependent ticket, filed BEFORE the loop starts and blocked by
-        // the loop ticket — proves the done-cascade closes the graph
-        // (§4.7 item 1/3), not just that `done` flips one ticket's state.
-        const dependent = parseJson<NewJson>(
-          runLoopStep(["new", "Depends on the D1 loop ticket", "--json"], dir),
-        );
-        expect(dependent.state).toBe("open");
+      // A dependent ticket, filed BEFORE the loop starts and blocked by
+      // the loop ticket — proves the done-cascade closes the graph
+      // (§4.7 item 1/3), not just that `done` flips one ticket's state.
+      const dependent = parseJson<NewJson>(
+        runLoopStep(["new", "Depends on the D1 loop ticket", "--json"], dir),
+      );
+      expect(dependent.state).toBe("open");
 
-        // --- `slop new` ---
-        const ticket = parseJson<NewJson>(
-          runLoopStep(["new", "D1 loop ticket", "--blocks", dependent.slug, "--json"], dir),
-        );
-        expect(ticket.state).toBe("open");
-        expect((await readTicket(paths, ticket.id as TicketId)).state).toBe("open");
+      // --- `slop new` ---
+      const ticket = parseJson<NewJson>(
+        runLoopStep(["new", "D1 loop ticket", "--blocks", dependent.slug, "--json"], dir),
+      );
+      expect(ticket.state).toBe("open");
+      expect((await readTicket(paths, ticket.id as TicketId)).state).toBe("open");
 
-        // --- `slop ready` — the new ticket is ready; the one it blocks is not ---
-        const readyBefore = parseJson<ReadyJson>(runLoopStep(["ready", "--json"], dir));
-        expect(readyBefore.ready.map((r) => r.id)).toContain(ticket.id);
-        expect(readyBefore.ready.map((r) => r.id)).not.toContain(dependent.id);
+      // --- `slop ready` — the new ticket is ready; the one it blocks is not ---
+      const readyBefore = parseJson<ReadyJson>(runLoopStep(["ready", "--json"], dir));
+      expect(readyBefore.ready.map((r) => r.id)).toContain(ticket.id);
+      expect(readyBefore.ready.map((r) => r.id)).not.toContain(dependent.id);
 
-        // --- `slop start <ref>` ---
-        const startResult = runLoopStep(["start", ticket.slug], dir);
-        expect(startResult.status, startResult.stderr).toBe(0);
-        expect(startResult.stdout).toMatch(/^started session_/m);
-        expect(startResult.stdout).toContain(`# Context: ${ticket.name}`); // context pack printed
-        const startedTicket = await readTicket(paths, ticket.id as TicketId);
-        expect(startedTicket.state).toBe("in_progress");
-        const sessionId = startedTicket.active_session as SessionId;
-        expect(sessionId).not.toBeNull();
-        const startedSession = await readSession(paths, sessionId);
-        expect(startedSession.ticket).toBe(ticket.id);
-        expect(startedSession.ended_at).toBeNull();
+      // --- `slop start <ref>` ---
+      const startResult = runLoopStep(["start", ticket.slug], dir);
+      expect(startResult.status, startResult.stderr).toBe(0);
+      expect(startResult.stdout).toMatch(/^started session_/m);
+      expect(startResult.stdout).toContain(`# Context: ${ticket.name}`); // context pack printed
+      const startedTicket = await readTicket(paths, ticket.id as TicketId);
+      expect(startedTicket.state).toBe("in_progress");
+      const sessionId = startedTicket.active_session as SessionId;
+      expect(sessionId).not.toBeNull();
+      const startedSession = await readSession(paths, sessionId);
+      expect(startedSession.ticket).toBe(ticket.id);
+      expect(startedSession.ended_at).toBeNull();
 
-        // --- `slop plan <ref> "step 1" "step 2"` then `--check 1` ---
-        const planSetResult = runLoopStep(["plan", ticket.slug, "step one", "step two"], dir);
-        expect(planSetResult.status, planSetResult.stderr).toBe(0);
-        const planCheckResult = runLoopStep(["plan", ticket.slug, "--check", "1"], dir);
-        expect(planCheckResult.status, planCheckResult.stderr).toBe(0);
+      // --- `slop plan <ref> "step 1" "step 2"` then `--check 1` ---
+      const planSetResult = runLoopStep(["plan", ticket.slug, "step one", "step two"], dir);
+      expect(planSetResult.status, planSetResult.stderr).toBe(0);
+      const planCheckResult = runLoopStep(["plan", ticket.slug, "--check", "1"], dir);
+      expect(planCheckResult.status, planCheckResult.stderr).toBe(0);
 
-        const plannedSession = await readSession(paths, sessionId);
-        expect(plannedSession.plan).toHaveLength(1);
-        expect(plannedSession.plan[0]?.steps.map((s) => s.text)).toEqual(["step one", "step two"]);
-        expect(plannedSession.plan[0]?.steps[0]?.checked).toBe(true);
-        expect(plannedSession.plan[0]?.steps[1]?.checked).toBe(false);
+      const plannedSession = await readSession(paths, sessionId);
+      expect(plannedSession.plan).toHaveLength(1);
+      expect(plannedSession.plan[0]?.steps.map((s) => s.text)).toEqual(["step one", "step two"]);
+      expect(plannedSession.plan[0]?.steps[0]?.checked).toBe(true);
+      expect(plannedSession.plan[0]?.steps[1]?.checked).toBe(false);
 
-        // Visible via `show --context` too (§5.2: "one command to full
-        // context"), not just via reads of the raw session file.
-        const showContext = runLoopStep(["show", ticket.slug, "--context"], dir);
-        expect(showContext.status, showContext.stderr).toBe(0);
-        expect(showContext.stdout).toContain("1. [x] step one");
-        expect(showContext.stdout).toContain("2. [ ] step two");
+      // Visible via `show --context` too (§5.2: "one command to full
+      // context"), not just via reads of the raw session file.
+      const showContext = runLoopStep(["show", ticket.slug, "--context"], dir);
+      expect(showContext.status, showContext.stderr).toBe(0);
+      expect(showContext.stdout).toContain("1. [x] step one");
+      expect(showContext.stdout).toContain("2. [ ] step two");
 
-        // --- `slop update <ref> --progress "..."` ---
-        const beforeUpdate = await readTicket(paths, ticket.id as TicketId);
-        const updateResult = runLoopStep(
-          ["update", ticket.slug, "--progress", "made good progress on step one"],
-          dir,
-        );
-        expect(updateResult.status, updateResult.stderr).toBe(0);
-        const afterUpdate = await readTicket(paths, ticket.id as TicketId);
-        expect(afterUpdate.latest_note).toBe("made good progress on step one");
-        expect(Date.parse(afterUpdate.last_activity_at)).toBeGreaterThanOrEqual(
-          Date.parse(beforeUpdate.last_activity_at),
-        );
+      // --- `slop update <ref> --progress "..."` ---
+      const beforeUpdate = await readTicket(paths, ticket.id as TicketId);
+      const updateResult = runLoopStep(
+        ["update", ticket.slug, "--progress", "made good progress on step one"],
+        dir,
+      );
+      expect(updateResult.status, updateResult.stderr).toBe(0);
+      const afterUpdate = await readTicket(paths, ticket.id as TicketId);
+      expect(afterUpdate.latest_note).toBe("made good progress on step one");
+      expect(Date.parse(afterUpdate.last_activity_at)).toBeGreaterThanOrEqual(
+        Date.parse(beforeUpdate.last_activity_at),
+      );
 
-        // --- `slop review <ref> --mr <url>` ---
-        const mrUrl = "https://example.com/widgets/pull/42";
-        const reviewResult = runLoopStep(["review", ticket.slug, "--mr", mrUrl], dir);
-        expect(reviewResult.status, reviewResult.stderr).toBe(0);
-        const reviewedTicket = await readTicket(paths, ticket.id as TicketId);
-        expect(reviewedTicket.state).toBe("review");
-        expect(reviewedTicket.review?.mr).toBe(mrUrl);
-        // Visible via `show`/`status`, per the brief — not just internal state.
-        const showJson = parseJson<ShowJson>(runLoopStep(["show", ticket.slug, "--json"], dir));
-        expect(showJson.ticket.review?.mr).toBe(mrUrl);
-        const statusJson = parseJson<StatusJson>(runLoopStep(["status", "--json"], dir));
-        expect(statusJson.review.find((r) => r.id === ticket.id)?.mr).toBe(mrUrl);
+      // --- `slop review <ref> --mr <url>` ---
+      const mrUrl = "https://example.com/widgets/pull/42";
+      const reviewResult = runLoopStep(["review", ticket.slug, "--mr", mrUrl], dir);
+      expect(reviewResult.status, reviewResult.stderr).toBe(0);
+      const reviewedTicket = await readTicket(paths, ticket.id as TicketId);
+      expect(reviewedTicket.state).toBe("review");
+      expect(reviewedTicket.review?.mr).toBe(mrUrl);
+      // Visible via `show`/`status`, per the brief — not just internal state.
+      const showJson = parseJson<ShowJson>(runLoopStep(["show", ticket.slug, "--json"], dir));
+      expect(showJson.ticket.review?.mr).toBe(mrUrl);
+      const statusJson = parseJson<StatusJson>(runLoopStep(["status", "--json"], dir));
+      expect(statusJson.review.find((r) => r.id === ticket.id)?.mr).toBe(mrUrl);
 
-        // --- `slop done <ref>` ---
-        const doneResult = runLoopStep(["done", ticket.slug, "--note", "shipped and merged"], dir);
-        expect(doneResult.status, doneResult.stderr).toBe(0);
-        const doneTicket = await readTicket(paths, ticket.id as TicketId);
-        expect(doneTicket.state).toBe("done");
-        expect(doneTicket.active_session).toBeNull();
-        const finalizedSession = await readSession(paths, sessionId);
-        expect(finalizedSession.ended_at).not.toBeNull();
-        expect(finalizedSession.end_summary).toBe("shipped and merged");
+      // --- `slop done <ref>` ---
+      const doneResult = runLoopStep(["done", ticket.slug, "--note", "shipped and merged"], dir);
+      expect(doneResult.status, doneResult.stderr).toBe(0);
+      const doneTicket = await readTicket(paths, ticket.id as TicketId);
+      expect(doneTicket.state).toBe("done");
+      expect(doneTicket.active_session).toBeNull();
+      const finalizedSession = await readSession(paths, sessionId);
+      expect(finalizedSession.ended_at).not.toBeNull();
+      expect(finalizedSession.end_summary).toBe("shipped and merged");
 
-        // --- audit trail: `slop events` shows the full ordered sequence ---
-        // (D3's `--ticket` widening pulls in the session's own lifecycle/
-        // plan events too, not just the ticket entity's — see events.ts.)
-        const loopEvents = parseJson<EventsJson>(
-          runLoopStep(["events", "--ticket", ticket.slug, "--json"], dir),
-        );
-        assertVerbsInOrder(
-          loopEvents.events.map((e) => e.verb),
-          [
-            "ticket.created",
-            "session.started",
-            "ticket.state_changed", // start: open -> in_progress
-            "plan.set",
-            "plan.step_checked",
-            "ticket.updated", // update --progress
-            "review.requested",
-            "session.ended",
-            "ticket.done",
-          ],
-        );
+      // --- audit trail: `slop events` shows the full ordered sequence ---
+      // (D3's `--ticket` widening pulls in the session's own lifecycle/
+      // plan events too, not just the ticket entity's — see events.ts.)
+      const loopEvents = parseJson<EventsJson>(
+        runLoopStep(["events", "--ticket", ticket.slug, "--json"], dir),
+      );
+      assertVerbsInOrder(
+        loopEvents.events.map((e) => e.verb),
+        [
+          "ticket.created",
+          "session.started",
+          "ticket.state_changed", // start: open -> in_progress
+          "plan.set",
+          "plan.step_checked",
+          "ticket.updated", // update --progress
+          "review.requested",
+          "session.ended",
+          "ticket.done",
+        ],
+      );
 
-        // --- done-cascade: the ticket this one was blocking flips ready ---
-        const dependentAfter = await readTicket(paths, dependent.id as TicketId);
-        expect(dependentAfter.state).toBe("open");
-        const readyAfter = parseJson<ReadyJson>(runLoopStep(["ready", "--json"], dir));
-        expect(readyAfter.ready.map((r) => r.id)).toContain(dependent.id);
-        expect(doneResult.stdout).toContain(dependent.id); // `done`'s own "unblocked: ..." line
+      // --- done-cascade: the ticket this one was blocking flips ready ---
+      const dependentAfter = await readTicket(paths, dependent.id as TicketId);
+      expect(dependentAfter.state).toBe("open");
+      const readyAfter = parseJson<ReadyJson>(runLoopStep(["ready", "--json"], dir));
+      expect(readyAfter.ready.map((r) => r.id)).toContain(dependent.id);
+      expect(doneResult.stdout).toContain(dependent.id); // `done`'s own "unblocked: ..." line
 
-        const dependentEvents = parseJson<EventsJson>(
-          runLoopStep(["events", "--ticket", dependent.slug, "--json"], dir),
-        );
-        const readyEvent = dependentEvents.events.find((e) => e.verb === "ticket.ready");
-        expect(readyEvent, "expected a ticket.ready event on the dependent after `done`").toBeDefined();
-        expect(readyEvent?.payload.unblocked_by).toBe(ticket.id);
-      },
-      30_000,
-    );
+      const dependentEvents = parseJson<EventsJson>(
+        runLoopStep(["events", "--ticket", dependent.slug, "--json"], dir),
+      );
+      const readyEvent = dependentEvents.events.find((e) => e.verb === "ticket.ready");
+      expect(
+        readyEvent,
+        "expected a ticket.ready event on the dependent after `done`",
+      ).toBeDefined();
+      expect(readyEvent?.payload.unblocked_by).toBe(ticket.id);
+    }, 30_000);
 
     it(
       'house rule the skill teaches ("Only `slop done` after merge/verification — done means done"): ' +

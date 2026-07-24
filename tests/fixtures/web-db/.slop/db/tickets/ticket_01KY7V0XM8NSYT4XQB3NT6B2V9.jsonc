@@ -12,18 +12,14 @@
   },
   "state": "done",
   "priority": 1,
-  "labels": [
-    "auth"
-  ],
+  "labels": ["auth"],
   "adhoc": false,
   "parent": "ticket_01KY7V0XM33FSMA956ZXB6W7HG",
   "blocks": [],
   "relates_to": [],
   "discovered_from": [],
   "root_id": "ticket_01KY7V0XM33FSMA956ZXB6W7HG",
-  "path": [
-    "ticket_01KY7V0XM33FSMA956ZXB6W7HG"
-  ],
+  "path": ["ticket_01KY7V0XM33FSMA956ZXB6W7HG"],
   "active_session": null,
   "last_activity_at": "2026-07-14T16:00:00.000Z",
   "latest_note": null,

@@ -60,7 +60,8 @@ export function createWebServer(
         GET: () => new Response(null, { status: 302, headers: { location: "/tickets" } }),
       },
       "/assets/style.css": {
-        GET: () => new Response(styleCss, { headers: { "content-type": "text/css; charset=utf-8" } }),
+        GET: () =>
+          new Response(styleCss, { headers: { "content-type": "text/css; charset=utf-8" } }),
       },
       "/assets/app.js": {
         GET: () =>

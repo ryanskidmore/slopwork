@@ -12,9 +12,7 @@
   },
   "state": "open",
   "priority": 2,
-  "labels": [
-    "docs"
-  ],
+  "labels": ["docs"],
   "adhoc": false,
   "blocks": [],
   "relates_to": [],

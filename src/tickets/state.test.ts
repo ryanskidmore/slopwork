@@ -35,7 +35,7 @@ describe("checkStateTransition (design.md §2's state diagram)", () => {
     expect(result.reason).toMatch(/slop done|slop start/);
   });
 
-  it('rejects "-> dropped" from every non-terminal state: finalizing the session + B4\'s cascade is `slop drop`\'s job, not update\'s (the resurrection hole)', () => {
+  it("rejects \"-> dropped\" from every non-terminal state: finalizing the session + B4's cascade is `slop drop`'s job, not update's (the resurrection hole)", () => {
     for (const s of ["draft", "open", "in_progress", "review"] as const) {
       const result = checkStateTransition(s, "dropped");
       expect(result.ok, s).toBe(false);
@@ -82,12 +82,15 @@ describe("checkStateTransition (design.md §2's state diagram)", () => {
   // that implies the dedicated command would succeed from this state (it
   // wouldn't — checkReviewEntry/checkDoneEntry reject `done`/`dropped` too).
   describe("terminal-state check runs before the dedicated-command messages (ordering fix)", () => {
-    it.each(["done", "dropped"] as const)("update <%s-ticket> --state review names the terminal state, not \"use slop review\"", (s) => {
-      const result = checkStateTransition(s, "review");
-      expect(result.ok).toBe(false);
-      expect(result.reason).toMatch(/terminal state/);
-      expect(result.reason).not.toMatch(/slop review/);
-    });
+    it.each(["done", "dropped"] as const)(
+      'update <%s-ticket> --state review names the terminal state, not "use slop review"',
+      (s) => {
+        const result = checkStateTransition(s, "review");
+        expect(result.ok).toBe(false);
+        expect(result.reason).toMatch(/terminal state/);
+        expect(result.reason).not.toMatch(/slop review/);
+      },
+    );
 
     // Only "dropped" -> "done" here (NOT "done" -> "done" — that's the
     // legal same-state no-op, a different case entirely, already covered
@@ -107,12 +110,15 @@ describe("checkStateTransition (design.md §2's state diagram)", () => {
       expect(result.reason).not.toMatch(/slop drop/);
     });
 
-    it.each(["done", "dropped"] as const)("update <%s-ticket> --state in_progress names the terminal state, not \"use slop start\"", (s) => {
-      const result = checkStateTransition(s, "in_progress");
-      expect(result.ok).toBe(false);
-      expect(result.reason).toMatch(/terminal state/);
-      expect(result.reason).not.toMatch(/slop start/);
-    });
+    it.each(["done", "dropped"] as const)(
+      'update <%s-ticket> --state in_progress names the terminal state, not "use slop start"',
+      (s) => {
+        const result = checkStateTransition(s, "in_progress");
+        expect(result.ok).toBe(false);
+        expect(result.reason).toMatch(/terminal state/);
+        expect(result.reason).not.toMatch(/slop start/);
+      },
+    );
   });
 });
 

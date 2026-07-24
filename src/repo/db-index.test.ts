@@ -3,7 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixedClock } from "../core/clock.js";
-import { type Ticket, newSessionId, newTicketId, ticketSchema, writeCanonical } from "../core/index.js";
+import {
+  type Ticket,
+  newSessionId,
+  newTicketId,
+  ticketSchema,
+  writeCanonical,
+} from "../core/index.js";
 import {
   INDEX_SCHEMA_VERSION,
   buildIndex,
@@ -590,7 +596,11 @@ describe("computeContentFingerprint", () => {
       expect(afterCreate.config?.count).toBe(1);
 
       await sleep(20);
-      await writeFile(join(paths.slopDir, "config.yaml"), "project: x\ndefaults:\n  stale_after: 5m\n", "utf8");
+      await writeFile(
+        join(paths.slopDir, "config.yaml"),
+        "project: x\ndefaults:\n  stale_after: 5m\n",
+        "utf8",
+      );
       const afterEdit = await computeContentFingerprint(paths);
       expect(afterEdit.config?.digest).not.toBe(afterCreate.config?.digest);
     });
@@ -724,7 +734,11 @@ describe("loadIndex — content staleness (coordinator ruling: healing from stal
   // otherwise a changed stale_after/review_stale_after would silently do
   // nothing until some unrelated ticket file also happened to change.
   it("C5: detects a config.yaml hand-edit and recomputes stale_at against the NEW threshold", async () => {
-    await writeFile(join(paths.slopDir, "config.yaml"), "project: x\ndefaults:\n  stale_after: 60m\n", "utf8");
+    await writeFile(
+      join(paths.slopDir, "config.yaml"),
+      "project: x\ndefaults:\n  stale_after: 60m\n",
+      "utf8",
+    );
     const t = makeTicket({ state: "in_progress", last_activity_at: "2026-07-23T10:00:00.000Z" });
     await createTicket(paths, t, ctx, createdEvent);
 
@@ -732,7 +746,11 @@ describe("loadIndex — content staleness (coordinator ruling: healing from stal
     expect(first.index.tickets[0]?.stale_at).toBe("2026-07-23T11:00:00.000Z");
 
     await sleep(20);
-    await writeFile(join(paths.slopDir, "config.yaml"), "project: x\ndefaults:\n  stale_after: 5m\n", "utf8");
+    await writeFile(
+      join(paths.slopDir, "config.yaml"),
+      "project: x\ndefaults:\n  stale_after: 5m\n",
+      "utf8",
+    );
 
     const second = await loadIndex(paths, clock);
     expect(second.rebuilt).toBe(true);

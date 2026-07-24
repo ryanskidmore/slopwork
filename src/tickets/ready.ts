@@ -111,7 +111,8 @@ export interface ResumableRow {
 }
 
 function resumableReasonFor(state: TicketState, hasActiveSession: boolean): ResumableReason | null {
-  if (state === "in_progress") return hasActiveSession ? "in_progress_stale" : "in_progress_no_session";
+  if (state === "in_progress")
+    return hasActiveSession ? "in_progress_stale" : "in_progress_no_session";
   if (state === "review") return hasActiveSession ? "review_stale" : "review_no_session";
   return null;
 }

@@ -68,14 +68,9 @@ function fakeLock(): LockHandle {
 async function closeTicket(id: TicketId, toState: "done" | "dropped"): Promise<void> {
   const before = await readTicket(paths, id);
   const after: Ticket = { ...before, state: toState, active_session: null };
-  await updateTicket(
-    paths,
-    id,
-    diffTicketPatch(before, after, TICKET_FIELDS),
-    after,
-    ctx,
-    { verb: toState === "done" ? "ticket.done" : "ticket.dropped" },
-  );
+  await updateTicket(paths, id, diffTicketPatch(before, after, TICKET_FIELDS), after, ctx, {
+    verb: toState === "done" ? "ticket.done" : "ticket.dropped",
+  });
 }
 
 describe("cascadeOnClose", () => {

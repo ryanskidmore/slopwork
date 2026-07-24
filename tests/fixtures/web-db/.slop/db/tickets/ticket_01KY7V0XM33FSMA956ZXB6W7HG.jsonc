@@ -5,13 +5,8 @@
   "spec": {
     "summary": "Support pluggable auth providers so self-hosters aren't stuck with the built-in one.",
     "details_md": "## Why\n\nSeveral self-hosters have asked for OAuth/SSO support. This is the umbrella ticket for that work.\n\n- Keep the built-in provider as the default\n- New providers register through one interface\n",
-    "acceptance": [
-      "At least one OAuth provider works end to end",
-      "Existing auth is unaffected"
-    ],
-    "context": [
-      "https://github.com/ryan/slopworks-fixture/discussions/12"
-    ],
+    "acceptance": ["At least one OAuth provider works end to end", "Existing auth is unaffected"],
+    "context": ["https://github.com/ryan/slopworks-fixture/discussions/12"],
     "meta": {
       "estimated_days": 5,
       "epic": "auth-2026"
@@ -20,9 +15,7 @@
   },
   "state": "open",
   "priority": 1,
-  "labels": [
-    "auth"
-  ],
+  "labels": ["auth"],
   "adhoc": false,
   "blocks": [],
   "relates_to": [],

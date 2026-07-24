@@ -50,7 +50,12 @@ export function registerWebCommand(program: Command): void {
       "Serve the read-only local web explorer: ticket list/filters, tree view, " +
         "ticket detail, transcript viewer, review panel, stale panel.",
     )
-    .option("--port <n>", "port to listen on (0 = pick a free port)", parseIntegerOption("--port"), 4553)
+    .option(
+      "--port <n>",
+      "port to listen on (0 = pick a free port)",
+      parseIntegerOption("--port"),
+      4553,
+    )
     .action((opts: { port: number }) => {
       const slopRoot = findSlopRoot(process.cwd());
       if (!slopRoot) {

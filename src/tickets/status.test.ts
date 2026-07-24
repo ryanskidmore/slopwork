@@ -228,8 +228,26 @@ describe("sortInProgressRows — oldest session first", () => {
 describe("sortReviewRows — longest-waiting first", () => {
   it("sorts descending by age", () => {
     const rows = [
-      { id: "a", slug: "a", name: "a", mr: null, requestedAt: "t", by: "x", ageMs: 1000, reviewStale: false },
-      { id: "b", slug: "b", name: "b", mr: null, requestedAt: "t", by: "x", ageMs: 9000, reviewStale: false },
+      {
+        id: "a",
+        slug: "a",
+        name: "a",
+        mr: null,
+        requestedAt: "t",
+        by: "x",
+        ageMs: 1000,
+        reviewStale: false,
+      },
+      {
+        id: "b",
+        slug: "b",
+        name: "b",
+        mr: null,
+        requestedAt: "t",
+        by: "x",
+        ageMs: 9000,
+        reviewStale: false,
+      },
     ];
     expect(sortReviewRows(rows).map((r) => r.id)).toEqual(["b", "a"]);
   });

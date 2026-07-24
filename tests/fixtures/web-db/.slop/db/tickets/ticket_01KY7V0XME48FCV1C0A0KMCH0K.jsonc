@@ -12,9 +12,7 @@
   },
   "state": "draft",
   "priority": 3,
-  "labels": [
-    "research"
-  ],
+  "labels": ["research"],
   "adhoc": false,
   "blocks": [],
   "relates_to": [],

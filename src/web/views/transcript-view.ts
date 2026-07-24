@@ -79,7 +79,9 @@ function renderRecord(record: TranscriptRecord): RawHtml {
     return html``;
   }
   const role = record.message.role === "assistant" ? "assistant" : "user";
-  const model = record.message.model ? html`<span class="model">${record.message.model}</span>` : "";
+  const model = record.message.model
+    ? html`<span class="model">${record.message.model}</span>`
+    : "";
   return html`<div class="turn role-${role}">
   <div class="role">${role === "assistant" ? "Assistant" : "User"} ${model} ${record.timestamp ? html`<span class="ts">${record.timestamp}</span>` : ""}</div>
   ${renderMessageContent(record.message.content)}
@@ -91,7 +93,10 @@ export async function handleTranscriptView(
   dataSource: WebDataSource,
 ): Promise<Response> {
   const { ref, sessionId } = req.params;
-  const [ticket, config] = await Promise.all([dataSource.findTicketByRef(ref), dataSource.getConfig()]);
+  const [ticket, config] = await Promise.all([
+    dataSource.findTicketByRef(ref),
+    dataSource.getConfig(),
+  ]);
   if (!ticket) return notFoundPage(null, `No ticket matches "${ref}".`);
 
   if (!isSessionId(sessionId)) return notFoundPage(null, "Not a valid session id.");
@@ -163,5 +168,10 @@ ${
 }
 ${pager}`;
 
-  return pageResponse({ title: `Transcript — ${ticket.name}`, nav: null, project: config.project, body });
+  return pageResponse({
+    title: `Transcript — ${ticket.name}`,
+    nav: null,
+    project: config.project,
+    body,
+  });
 }

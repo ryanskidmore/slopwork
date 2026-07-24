@@ -12,16 +12,11 @@
   },
   "state": "open",
   "priority": 0,
-  "labels": [
-    "bug",
-    "perf"
-  ],
+  "labels": ["bug", "perf"],
   "adhoc": true,
   "blocks": [],
   "relates_to": [],
-  "discovered_from": [
-    "ticket_01KY7V0XM8NSYT4XQB3NT6B2VB"
-  ],
+  "discovered_from": ["ticket_01KY7V0XM8NSYT4XQB3NT6B2VB"],
   "root_id": "ticket_01KY7V0XME48FCV1C0A0KMCH0H",
   "path": [],
   "active_session": null,

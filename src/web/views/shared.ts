@@ -16,7 +16,12 @@ const NAV_ITEMS: Array<{ key: NavKey; href: string; label: string }> = [
   { key: "stale", href: "/stale", label: "Stale" },
 ];
 
-export function renderPage(opts: { title: string; nav: NavKey; project?: string; body: RawHtml }): string {
+export function renderPage(opts: {
+  title: string;
+  nav: NavKey;
+  project?: string;
+  body: RawHtml;
+}): string {
   const projectLabel = opts.project ? ` — ${opts.project}` : "";
   const navHtml = joinHtml(
     NAV_ITEMS.map(
@@ -52,7 +57,10 @@ export function htmlResponse(bodyHtml: string, status = 200): Response {
   });
 }
 
-export function pageResponse(opts: { title: string; nav: NavKey; project?: string; body: RawHtml }, status = 200): Response {
+export function pageResponse(
+  opts: { title: string; nav: NavKey; project?: string; body: RawHtml },
+  status = 200,
+): Response {
   return htmlResponse(renderPage(opts), status);
 }
 

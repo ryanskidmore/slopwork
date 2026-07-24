@@ -155,7 +155,9 @@ function runGit(args: readonly string[], cwd: string): RunResult {
 
 function must(r: RunResult, label: string): RunResult {
   if (r.status !== 0) {
-    throw new Error(`${label} failed (exit ${r.status}):\nSTDOUT:\n${r.stdout}\nSTDERR:\n${r.stderr}`);
+    throw new Error(
+      `${label} failed (exit ${r.status}):\nSTDOUT:\n${r.stdout}\nSTDERR:\n${r.stderr}`,
+    );
   }
   return r;
 }
@@ -195,7 +197,10 @@ function newTicket(cwd: string, actor: string, name: string, extraArgs: string[]
  * graph. */
 function workFullLoop(cwd: string, actor: string, slug: string, mrUrl: string, note: string): void {
   must(runSlop(["start", slug], cwd, actor), `slop start ${slug}`);
-  must(runSlop(["plan", slug, "investigate", "implement", "verify"], cwd, actor), `slop plan ${slug}`);
+  must(
+    runSlop(["plan", slug, "investigate", "implement", "verify"], cwd, actor),
+    `slop plan ${slug}`,
+  );
   must(
     runSlop(["update", slug, "--progress", `progress from ${actor}`], cwd, actor),
     `slop update --progress ${slug}`,
@@ -363,7 +368,11 @@ export async function runMergeSimulation(
     await mkdir(originRoot, { recursive: true });
     await initGitRepo(originRoot, "Origin", "origin@example.com");
     must(
-      runSlop(["init", "--yes", "--project", "e2-merge-sim", "--user", "origin-bot"], originRoot, "origin-bot"),
+      runSlop(
+        ["init", "--yes", "--project", "e2-merge-sim", "--user", "origin-bot"],
+        originRoot,
+        "origin-bot",
+      ),
       "slop init (origin)",
     );
 
@@ -384,7 +393,10 @@ export async function runMergeSimulation(
     );
 
     must(runGit(["add", "-A"], originRoot), "git add (origin)");
-    must(runGit(["commit", "-q", "-m", "origin: init + baseline tickets"], originRoot), "git commit (origin)");
+    must(
+      runGit(["commit", "-q", "-m", "origin: init + baseline tickets"], originRoot),
+      "git commit (origin)",
+    );
 
     // --- 2. Clone twice ----------------------------------------------------
     must(runGit(["clone", "-q", originRoot, cloneARoot], scratchDir), "git clone A");
@@ -424,7 +436,13 @@ export async function runMergeSimulation(
       "slop update --priority (A, same-field conflict side)",
     );
     const blockerA = newTicket(cloneARoot, "agent-a", "Blocker on A", ["--blocks", dependent.slug]);
-    workFullLoop(cloneARoot, "agent-a", blockerA.slug, "https://example.com/pr/A", "shipped from clone A");
+    workFullLoop(
+      cloneARoot,
+      "agent-a",
+      blockerA.slug,
+      "https://example.com/pr/A",
+      "shipped from clone A",
+    );
 
     // Force clone A's own (gitignored) index to exist and reflect ONLY
     // clone A's view of the world, before it ever sees clone B's changes —
@@ -439,11 +457,7 @@ export async function runMergeSimulation(
     // --- 3b. Diverge on clone B (independently, after A has committed) -----
     const newB = newTicket(cloneBRoot, "agent-b", "New ticket created on clone B");
     must(
-      runSlop(
-        ["update", sharedDiffFields.slug, "--priority", "1"],
-        cloneBRoot,
-        "agent-b",
-      ),
+      runSlop(["update", sharedDiffFields.slug, "--priority", "1"], cloneBRoot, "agent-b"),
       "slop update --priority (B, different-field side)",
     );
     must(
@@ -451,7 +465,13 @@ export async function runMergeSimulation(
       "slop update --priority (B, same-field conflict side)",
     );
     const blockerB = newTicket(cloneBRoot, "agent-b", "Blocker on B", ["--blocks", dependent.slug]);
-    workFullLoop(cloneBRoot, "agent-b", blockerB.slug, "https://example.com/pr/B", "shipped from clone B");
+    workFullLoop(
+      cloneBRoot,
+      "agent-b",
+      blockerB.slug,
+      "https://example.com/pr/B",
+      "shipped from clone B",
+    );
 
     must(runSlop(["reindex"], cloneBRoot, "agent-b"), "slop reindex (B, pre-merge)");
 
@@ -483,7 +503,10 @@ export async function runMergeSimulation(
     // --- 4. Merge B into A --------------------------------------------------
     must(runGit(["remote", "add", "peer", cloneBRoot], cloneARoot), "git remote add");
     must(runGit(["fetch", "-q", "peer"], cloneARoot), "git fetch peer");
-    const mergeAttempt = runGit(["merge", "peer/main", "--no-ff", "-m", "merge clone B into clone A"], cloneARoot);
+    const mergeAttempt = runGit(
+      ["merge", "peer/main", "--no-ff", "-m", "merge clone B into clone A"],
+      cloneARoot,
+    );
 
     const conflictedRelPaths = runGit(["diff", "--name-only", "--diff-filter=U"], cloneARoot)
       .stdout.split("\n")
@@ -500,7 +523,11 @@ export async function runMergeSimulation(
       must(runGit(["add", relPath], cloneARoot), `git add ${relPath}`);
     }
 
-    let resolveAndCommit: RunResult = { status: 0, stdout: "(no conflicts to resolve)", stderr: "" };
+    let resolveAndCommit: RunResult = {
+      status: 0,
+      stdout: "(no conflicts to resolve)",
+      stderr: "",
+    };
     if (conflictedRelPaths.length > 0) {
       resolveAndCommit = runGit(["commit", "--no-edit", "-q"], cloneARoot);
     }
@@ -550,7 +577,9 @@ export async function runMergeSimulation(
         isTicketId(event.entity.id) &&
         !ticketIds.has(event.entity.id)
       ) {
-        danglingRefs.push(`event ${event.id} (${event.verb}) references missing ticket ${event.entity.id}`);
+        danglingRefs.push(
+          `event ${event.id} (${event.verb}) references missing ticket ${event.entity.id}`,
+        );
       }
     }
 
@@ -566,7 +595,10 @@ export async function runMergeSimulation(
     const blockerARow = tickets.find((t) => t.id === blockerA.id) ?? null;
     const blockerBRow = tickets.find((t) => t.id === blockerB.id) ?? null;
 
-    const trackedFilesAfterMerge = must(runGit(["ls-files"], cloneARoot), "git ls-files (A, post-merge)")
+    const trackedFilesAfterMerge = must(
+      runGit(["ls-files"], cloneARoot),
+      "git ls-files (A, post-merge)",
+    )
       .stdout.split("\n")
       .filter((l) => l.length > 0);
 
@@ -629,37 +661,57 @@ export async function runMergeSimulation(
 export function checkHardInvariants(report: MergeSimReport): string[] {
   const problems: string[] = [];
 
-  if (report.trackedFilesA.some((f) => f.endsWith("index.jsonc") || f.includes(".slop/transcripts/"))) {
-    problems.push("clone A tracked index.jsonc or a transcript file in git before the merge (D14/D16 violated)");
+  if (
+    report.trackedFilesA.some((f) => f.endsWith("index.jsonc") || f.includes(".slop/transcripts/"))
+  ) {
+    problems.push(
+      "clone A tracked index.jsonc or a transcript file in git before the merge (D14/D16 violated)",
+    );
   }
-  if (report.trackedFilesB.some((f) => f.endsWith("index.jsonc") || f.includes(".slop/transcripts/"))) {
-    problems.push("clone B tracked index.jsonc or a transcript file in git before the merge (D14/D16 violated)");
+  if (
+    report.trackedFilesB.some((f) => f.endsWith("index.jsonc") || f.includes(".slop/transcripts/"))
+  ) {
+    problems.push(
+      "clone B tracked index.jsonc or a transcript file in git before the merge (D14/D16 violated)",
+    );
   }
   if (report.graph.indexFileTrackedByGitPostMerge) {
     problems.push("index.jsonc is tracked by git after the merge (D14 violated)");
   }
   if (!report.sameFieldConflict) {
-    problems.push('the intentional same-field ("priority" on sharedSameField) edit did NOT conflict — the test can no longer prove git is discriminating, not just rubber-stamping everything');
+    problems.push(
+      'the intentional same-field ("priority" on sharedSameField) edit did NOT conflict — the test can no longer prove git is discriminating, not just rubber-stamping everything',
+    );
   } else {
-    const text = report.sameFieldConflict.hunks.map((h) => [...h.ours, ...h.theirs].join("\n")).join("\n");
+    const text = report.sameFieldConflict.hunks
+      .map((h) => [...h.ours, ...h.theirs].join("\n"))
+      .join("\n");
     if (!text.includes('"priority": 3') || !text.includes('"priority": 0')) {
-      problems.push("the same-field conflict did not contain both sides' priority values (3 and 0)");
+      problems.push(
+        "the same-field conflict did not contain both sides' priority values (3 and 0)",
+      );
     }
   }
   const unexpectedConflicts = report.conflictedRelPaths.filter(
     (p) => !p.includes(report.sharedSameField.id) && !p.includes(report.sharedDiffFields.id),
   );
   if (unexpectedConflicts.length > 0) {
-    problems.push(`unexpected conflicted file(s) beyond the two shared tickets: ${unexpectedConflicts.join(", ")}`);
+    problems.push(
+      `unexpected conflicted file(s) beyond the two shared tickets: ${unexpectedConflicts.join(", ")}`,
+    );
   }
   if (report.resolveAndCommit.status !== 0) {
     problems.push(`committing the resolved merge failed (exit ${report.resolveAndCommit.status})`);
   }
   if (report.graph.reindexStatus !== 0) {
-    problems.push(`\`slop reindex\` did not exit 0 after the merge (exit ${report.graph.reindexStatus})`);
+    problems.push(
+      `\`slop reindex\` did not exit 0 after the merge (exit ${report.graph.reindexStatus})`,
+    );
   }
   if (report.graph.reindexProblemCount !== 0) {
-    problems.push(`\`slop reindex\` reported ${report.graph.reindexProblemCount} problem(s) after the merge`);
+    problems.push(
+      `\`slop reindex\` reported ${report.graph.reindexProblemCount} problem(s) after the merge`,
+    );
   }
   if (report.graph.danglingRefs.length > 0) {
     problems.push(`dangling ref(s) found after merge: ${report.graph.danglingRefs.join("; ")}`);
@@ -671,10 +723,14 @@ export function checkHardInvariants(report: MergeSimReport): string[] {
     problems.push("the shared dependent ticket is missing from the post-merge index");
   } else {
     if (report.graph.dependentRow.blocked_count !== 0) {
-      problems.push(`dependent ticket's blocked_count is ${report.graph.dependentRow.blocked_count}, expected 0 (both blockers are done)`);
+      problems.push(
+        `dependent ticket's blocked_count is ${report.graph.dependentRow.blocked_count}, expected 0 (both blockers are done)`,
+      );
     }
     if (report.graph.dependentRow.ready !== true) {
-      problems.push("dependent ticket is not `ready` after both blockers closed and the merge completed");
+      problems.push(
+        "dependent ticket is not `ready` after both blockers closed and the merge completed",
+      );
     }
   }
   if (report.graph.blockerAState !== "done") {
@@ -699,8 +755,12 @@ export function formatReport(report: MergeSimReport): string[] {
   push("Divergence:");
   push(`  clone A created ${report.newA.id}  (${report.newA.slug})`);
   push(`  clone B created ${report.newB.id}  (${report.newB.slug})`);
-  push(`  clone A ran ${report.blockerA.slug} through start->plan->update->review->done (--blocks dependent)`);
-  push(`  clone B ran ${report.blockerB.slug} through start->plan->update->review->done (--blocks dependent)`);
+  push(
+    `  clone A ran ${report.blockerA.slug} through start->plan->update->review->done (--blocks dependent)`,
+  );
+  push(
+    `  clone B ran ${report.blockerB.slug} through start->plan->update->review->done (--blocks dependent)`,
+  );
   push(`  both blocked the shared ticket ${report.dependent.id} (${report.dependent.slug})`);
   push(
     `  each clone's own gitignored index.jsonc genuinely diverged before the merge: ${
@@ -709,7 +769,9 @@ export function formatReport(report: MergeSimReport): string[] {
   );
   push();
 
-  push("PASS  new tickets/sessions/events on both sides: distinct ULID filenames, zero create-conflicts");
+  push(
+    "PASS  new tickets/sessions/events on both sides: distinct ULID filenames, zero create-conflicts",
+  );
   push(
     `PASS  .slop/db/index.jsonc and .slop/transcripts/ were never tracked by git on either clone (D14/D16) — ` +
       `${report.trackedFilesA.length} file(s) tracked on A, ${report.trackedFilesB.length} on B, none of them derived/transcript files`,
@@ -717,11 +779,15 @@ export function formatReport(report: MergeSimReport): string[] {
   push();
 
   push(`git merge exit code: ${report.mergeAttempt.status}`);
-  push(`conflicted file(s): ${report.conflictedRelPaths.length === 0 ? "(none)" : report.conflictedRelPaths.join(", ")}`);
+  push(
+    `conflicted file(s): ${report.conflictedRelPaths.length === 0 ? "(none)" : report.conflictedRelPaths.join(", ")}`,
+  );
   push();
 
   if (report.sameFieldConflict) {
-    push('PASS  the ONE intentional conflict fired as expected: both clones set "priority" on the same shared ticket to different values (3 vs 0) — git correctly refused to auto-merge it.');
+    push(
+      'PASS  the ONE intentional conflict fired as expected: both clones set "priority" on the same shared ticket to different values (3 vs 0) — git correctly refused to auto-merge it.',
+    );
   } else {
     push("FAIL  the intentional same-field conflict did NOT occur — see checkHardInvariants().");
   }
@@ -730,11 +796,12 @@ export function formatReport(report: MergeSimReport): string[] {
   if (report.diffFieldConflict) {
     const combined = report.diffFieldConflict.hunks.flatMap((h) => [...h.ours, ...h.theirs]);
     const onlyUpdatedAt =
-      report.diffFieldConflict.hunks.length === 1 &&
-      combined.every((l) => /"updated_at":/.test(l));
-    push("KNOWN BEHAVIOR (documented, accepted for v0 — Fix 5/DECISIONS.md's E2 entry, NOT a defect):");
+      report.diffFieldConflict.hunks.length === 1 && combined.every((l) => /"updated_at":/.test(l));
+    push(
+      "KNOWN BEHAVIOR (documented, accepted for v0 — Fix 5/DECISIONS.md's E2 entry, NOT a defect):",
+    );
     push('  clone A and clone B edited DIFFERENT fields of the shared "sharedDiffFields" ticket');
-    push('  (A renamed it, B reprioritised it) — a SAME-ticket edit, so the goal condition\'s own');
+    push("  (A renamed it, B reprioritised it) — a SAME-ticket edit, so the goal condition's own");
     push('  "except same-ticket edits" carve-out applies. git reported one conflict, as expected.');
     push(
       `  Root cause: every \`slop update\` unconditionally bumps \`updated_at\` to "now" ` +
@@ -746,22 +813,32 @@ export function formatReport(report: MergeSimReport): string[] {
     push(
       `  Precisely scoped: ${onlyUpdatedAt ? "YES" : "NO"} — the conflict is confined to exactly ` +
         `${report.diffFieldConflict.hunks.length} hunk(s), and ${
-          onlyUpdatedAt ? "it is ONLY the updated_at line" : "it is NOT confined to updated_at alone (worse than expected)"
+          onlyUpdatedAt
+            ? "it is ONLY the updated_at line"
+            : "it is NOT confined to updated_at alone (worse than expected)"
         }. Both clones' real intended edits (the rename, the priority change) are present in the file ` +
         "UNCONFLICTED, proving the diff-minimal JSONC write strategy itself works exactly as designed — " +
         "only the timestamp bookkeeping field collides, and a human resolves it in seconds without " +
         "touching either clone's real edit.",
     );
   } else {
-    push('PASS (better than expected)  the "different fields of the same shared ticket" edit merged with ZERO conflicts — even the documented `updated_at` same-ticket conflict didn\'t occur this run.');
+    push(
+      'PASS (better than expected)  the "different fields of the same shared ticket" edit merged with ZERO conflicts — even the documented `updated_at` same-ticket conflict didn\'t occur this run.',
+    );
   }
   push();
 
   push(`After resolving conflict(s) and committing: exit ${report.resolveAndCommit.status}`);
-  push(`\`slop reindex\` after merge: exit ${report.graph.reindexStatus}, ${report.graph.reindexProblemCount} problem(s)`);
+  push(
+    `\`slop reindex\` after merge: exit ${report.graph.reindexStatus}, ${report.graph.reindexProblemCount} problem(s)`,
+  );
   push(`  total tickets: ${report.graph.totalTickets}   total events: ${report.graph.totalEvents}`);
-  push(`  event stream totally ordered by ULID: ${report.graph.eventsSortedByIdAscending ? "YES" : "NO"}`);
-  push(`  dangling refs found: ${report.graph.danglingRefs.length === 0 ? "none" : report.graph.danglingRefs.join("; ")}`);
+  push(
+    `  event stream totally ordered by ULID: ${report.graph.eventsSortedByIdAscending ? "YES" : "NO"}`,
+  );
+  push(
+    `  dangling refs found: ${report.graph.danglingRefs.length === 0 ? "none" : report.graph.danglingRefs.join("; ")}`,
+  );
   if (report.graph.dependentRow) {
     push(
       `  dependent ticket ${report.dependent.id}: state=${report.graph.dependentRow.state} ` +
@@ -770,15 +847,23 @@ export function formatReport(report: MergeSimReport): string[] {
         "one per clone's own partial view at the moment it closed its blocker, both legitimate)",
     );
   }
-  push(`  blockerA state: ${report.graph.blockerAState}   blockerB state: ${report.graph.blockerBState}`);
-  push(`  index.jsonc tracked by git after merge: ${report.graph.indexFileTrackedByGitPostMerge ? "YES (BAD)" : "no"}`);
+  push(
+    `  blockerA state: ${report.graph.blockerAState}   blockerB state: ${report.graph.blockerBState}`,
+  );
+  push(
+    `  index.jsonc tracked by git after merge: ${report.graph.indexFileTrackedByGitPostMerge ? "YES (BAD)" : "no"}`,
+  );
   push();
 
   const problems = checkHardInvariants(report);
   if (problems.length === 0) {
-    push("RESULT: merge design holds (including the one documented, narrowly-scoped `updated_at` same-ticket conflict above — within the goal condition's own allowance, not a gap in it).");
+    push(
+      "RESULT: merge design holds (including the one documented, narrowly-scoped `updated_at` same-ticket conflict above — within the goal condition's own allowance, not a gap in it).",
+    );
   } else {
-    push(`RESULT: ${problems.length} unexpected problem(s) found beyond the documented same-ticket conflict:`);
+    push(
+      `RESULT: ${problems.length} unexpected problem(s) found beyond the documented same-ticket conflict:`,
+    );
     for (const p of problems) push(`  - ${p}`);
   }
   push("=".repeat(78));
@@ -799,7 +884,9 @@ if (import.meta.main) {
       process.exit(problems.length === 0 ? 0 : 1);
     })
     .catch((err: unknown) => {
-      process.stderr.write(`merge simulation crashed: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`);
+      process.stderr.write(
+        `merge simulation crashed: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
+      );
       process.exit(1);
     });
 }

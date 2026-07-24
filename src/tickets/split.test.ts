@@ -48,11 +48,15 @@ afterEach(async () => {
 });
 
 describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
-  it('sets parent = the split target, AND a discovered-from edge back to it (this work item\'s acceptance criterion)', async () => {
+  it("sets parent = the split target, AND a discovered-from edge back to it (this work item's acceptance criterion)", async () => {
     const target = makeTicket({ slug: "target", name: "Target ticket" });
     await createTicket(paths, target, ctx, createdEvent);
 
-    const { ticket: child } = await buildSplitChild(paths, { name: "Sub 1", parent: target, actor }, clock);
+    const { ticket: child } = await buildSplitChild(
+      paths,
+      { name: "Sub 1", parent: target, actor },
+      clock,
+    );
 
     expect(child.parent).toBe(target.id);
     expect(child.discovered_from).toEqual([target.id]);
@@ -62,7 +66,11 @@ describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
     const target = makeTicket({ slug: "target-root", name: "Target root" });
     await createTicket(paths, target, ctx, createdEvent);
 
-    const { ticket: child } = await buildSplitChild(paths, { name: "Sub", parent: target, actor }, clock);
+    const { ticket: child } = await buildSplitChild(
+      paths,
+      { name: "Sub", parent: target, actor },
+      clock,
+    );
 
     expect(child.root_id).toBe(target.id);
     expect(child.path).toEqual([target.id]);
@@ -72,7 +80,11 @@ describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
     const target = makeTicket({ slug: "prov-target" });
     await createTicket(paths, target, ctx, createdEvent);
 
-    const { ticket: child } = await buildSplitChild(paths, { name: "Sub", parent: target, actor }, clock);
+    const { ticket: child } = await buildSplitChild(
+      paths,
+      { name: "Sub", parent: target, actor },
+      clock,
+    );
 
     expect(child.provenance).toEqual({
       method: "split",
@@ -87,7 +99,11 @@ describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
     const mid = makeTicket({ slug: "gp-mid", parent: root.id, root_id: root.id, path: [root.id] });
     await createTicket(paths, mid, ctx, createdEvent);
 
-    const { ticket: leaf } = await buildSplitChild(paths, { name: "Leaf", parent: mid, actor }, clock);
+    const { ticket: leaf } = await buildSplitChild(
+      paths,
+      { name: "Leaf", parent: mid, actor },
+      clock,
+    );
 
     expect(leaf.parent).toBe(mid.id);
     expect(leaf.root_id).toBe(root.id);
@@ -114,10 +130,18 @@ describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
   });
 
   it("inherits labels and priority from the split target", async () => {
-    const target = makeTicket({ slug: "inherit-target", labels: ["team:core", "type:bug"], priority: 0 });
+    const target = makeTicket({
+      slug: "inherit-target",
+      labels: ["team:core", "type:bug"],
+      priority: 0,
+    });
     await createTicket(paths, target, ctx, createdEvent);
 
-    const { ticket: child } = await buildSplitChild(paths, { name: "Sub", parent: target, actor }, clock);
+    const { ticket: child } = await buildSplitChild(
+      paths,
+      { name: "Sub", parent: target, actor },
+      clock,
+    );
 
     expect(child.labels).toEqual(["team:core", "type:bug"]);
     expect(child.priority).toBe(0);
@@ -129,11 +153,22 @@ describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
       owner: { name: "ryan", kind: "human" },
       adhoc: true,
       state: "in_progress",
-      spec: { summary: "Target summary", details_md: "target details", acceptance: [], context: [], meta: {}, v: 1 },
+      spec: {
+        summary: "Target summary",
+        details_md: "target details",
+        acceptance: [],
+        context: [],
+        meta: {},
+        v: 1,
+      },
     });
     await createTicket(paths, target, ctx, createdEvent);
 
-    const { ticket: child } = await buildSplitChild(paths, { name: "Fresh child", parent: target, actor }, clock);
+    const { ticket: child } = await buildSplitChild(
+      paths,
+      { name: "Fresh child", parent: target, actor },
+      clock,
+    );
 
     expect(child.owner).toBeNull();
     expect(child.adhoc).toBe(false);
@@ -146,9 +181,17 @@ describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
     const target = makeTicket({ slug: "slug-target" });
     await createTicket(paths, target, ctx, createdEvent);
 
-    const { ticket: first } = await buildSplitChild(paths, { name: "Same name", parent: target, actor }, clock);
+    const { ticket: first } = await buildSplitChild(
+      paths,
+      { name: "Same name", parent: target, actor },
+      clock,
+    );
     await createTicket(paths, first, ctx, createdEvent);
-    const { ticket: second } = await buildSplitChild(paths, { name: "Same name", parent: target, actor }, clock);
+    const { ticket: second } = await buildSplitChild(
+      paths,
+      { name: "Same name", parent: target, actor },
+      clock,
+    );
 
     expect(first.slug).toBe("same-name");
     expect(second.slug).toBe("same-name-2");
@@ -167,7 +210,11 @@ describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
     const target = makeTicket({ slug: "empty-edges-target" });
     await createTicket(paths, target, ctx, createdEvent);
 
-    const { ticket: child } = await buildSplitChild(paths, { name: "Sub", parent: target, actor }, clock);
+    const { ticket: child } = await buildSplitChild(
+      paths,
+      { name: "Sub", parent: target, actor },
+      clock,
+    );
 
     expect(child.blocks).toEqual([]);
     expect(child.relates_to).toEqual([]);

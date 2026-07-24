@@ -12,9 +12,7 @@
   },
   "state": "in_progress",
   "priority": 1,
-  "labels": [
-    "perf"
-  ],
+  "labels": ["perf"],
   "adhoc": false,
   "blocks": [],
   "relates_to": [],

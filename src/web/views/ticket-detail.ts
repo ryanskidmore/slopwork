@@ -150,7 +150,8 @@ export async function handleTicketDetail(
   const blocked = computeBlockedTicketIds(allTickets).has(ticket.id);
 
   const byId = new Map<TicketId, Ticket>(allTickets.map((t) => [t.id, t]));
-  const localParent = ticket.parent !== undefined && isTicketId(ticket.parent) ? byId.get(ticket.parent) : undefined;
+  const localParent =
+    ticket.parent !== undefined && isTicketId(ticket.parent) ? byId.get(ticket.parent) : undefined;
   const children = allTickets.filter((t) => t.parent === ticket.id);
 
   const specSection = html`<section class="section">
@@ -171,7 +172,8 @@ export async function handleTicketDetail(
     Object.keys(ticket.spec.meta).length > 0
       ? html`<h3>Meta</h3><dl class="meta-grid">${joinHtml(
           Object.entries(ticket.spec.meta).map(
-            ([k, v]) => html`<dt>${k}</dt><dd>${typeof v === "string" ? v : JSON.stringify(v)}</dd>`,
+            ([k, v]) =>
+              html`<dt>${k}</dt><dd>${typeof v === "string" ? v : JSON.stringify(v)}</dd>`,
           ),
         )}</dl>`
       : ""

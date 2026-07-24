@@ -111,7 +111,11 @@ function slopEnv(
 }
 
 function runSlop(args: string[], cwd: string, actor: string) {
-  return spawnSync(binaryPath, args, { cwd, encoding: "utf8", env: slopEnv({ SLOP_ACTOR: actor }) });
+  return spawnSync(binaryPath, args, {
+    cwd,
+    encoding: "utf8",
+    env: slopEnv({ SLOP_ACTOR: actor }),
+  });
 }
 
 function mustRunSlop(args: string[], cwd: string, actor: string) {
@@ -203,7 +207,11 @@ async function makeRepo(): Promise<{ dir: string; paths: RepoPaths }> {
 async function makeCliRepo(): Promise<{ dir: string; paths: RepoPaths }> {
   const dir = await mkdtemp(join(tmpdir(), "slop-e2-cli-"));
   scratchDirs.push(dir);
-  const init = mustRunSlop(["init", "--yes", "--project", "e2-cli-fixture", "--user", "ryan"], dir, "ryan");
+  const init = mustRunSlop(
+    ["init", "--yes", "--project", "e2-cli-fixture", "--user", "ryan"],
+    dir,
+    "ryan",
+  );
   expect(init.status, init.stderr).toBe(0);
   return { dir, paths: repoPaths(dir) };
 }
@@ -257,7 +265,7 @@ describe("E2: Concurrency + merge hardening", () => {
       expect(report.conflictedRelPaths.every((p) => !p.includes("/sessions/"))).toBe(true);
     });
 
-    it('the SAME-field edit on the shared ticket produces the one legitimate, expected conflict — proving git is discriminating, not rubber-stamping everything', () => {
+    it("the SAME-field edit on the shared ticket produces the one legitimate, expected conflict — proving git is discriminating, not rubber-stamping everything", () => {
       expect(report.mergeAttempt.status).not.toBe(0);
       expect(report.sameFieldConflict).not.toBeNull();
       const text = (report.sameFieldConflict?.hunks ?? [])
@@ -511,15 +519,21 @@ describe("E2: Concurrency + merge hardening", () => {
         // A3's synthetic fencing test with genuine concurrent CLI usage.
         const events = await listEvents(paths);
         const readyEvents = events.filter(
-          (e) => e.verb === "ticket.ready" && e.entity.kind === "ticket" && e.entity.id === dependent.id,
+          (e) =>
+            e.verb === "ticket.ready" && e.entity.kind === "ticket" && e.entity.id === dependent.id,
         );
         expect(readyEvents).toHaveLength(1);
 
         // Every worker's own done-session/done/review events are present
         // — no mutation was silently dropped under contention.
         for (const w of workers) {
-          const workerEvents = events.filter((e) => e.entity.kind === "ticket" && e.entity.id === w.id);
-          expect(workerEvents.some((e) => e.verb === "ticket.done"), w.slug).toBe(true);
+          const workerEvents = events.filter(
+            (e) => e.entity.kind === "ticket" && e.entity.id === w.id,
+          );
+          expect(
+            workerEvents.some((e) => e.verb === "ticket.done"),
+            w.slug,
+          ).toBe(true);
         }
       }, 30_000);
     });
@@ -546,7 +560,11 @@ describe("E2: Concurrency + merge hardening", () => {
       execFileSync("git", ["config", "user.email", "origin@example.com"], { cwd: origin });
       execFileSync("git", ["config", "user.name", "Origin"], { cwd: origin });
 
-      const init = mustRunSlop(["init", "--yes", "--project", "emptydir-repro", "--user", "origin"], origin, "origin");
+      const init = mustRunSlop(
+        ["init", "--yes", "--project", "emptydir-repro", "--user", "origin"],
+        origin,
+        "origin",
+      );
       expect(init.status).toBe(0);
 
       // A single ticket -> tickets/ and events/ both get a real file;
@@ -561,7 +579,9 @@ describe("E2: Concurrency + merge hardening", () => {
       const only = newTicketCli(origin, "origin", "Only ticket, no session ever started");
 
       execFileSync("git", ["add", "-A"], { cwd: origin });
-      execFileSync("git", ["commit", "-q", "-m", "init + one ticket, no sessions yet"], { cwd: origin });
+      execFileSync("git", ["commit", "-q", "-m", "init + one ticket, no sessions yet"], {
+        cwd: origin,
+      });
 
       const cloneDir = join(await mkdtemp(join(tmpdir(), "slop-e2-emptydir-clone-")), "repo");
       scratchDirs.push(dirname(cloneDir));
@@ -610,7 +630,10 @@ describe("E2: Concurrency + merge hardening", () => {
         { cwd: origin },
       );
 
-      const cloneDir = join(await mkdtemp(join(tmpdir(), "slop-e2-emptydir-nogitkeep-clone-")), "repo");
+      const cloneDir = join(
+        await mkdtemp(join(tmpdir(), "slop-e2-emptydir-nogitkeep-clone-")),
+        "repo",
+      );
       scratchDirs.push(dirname(cloneDir));
       execFileSync("git", ["clone", "-q", origin, cloneDir]);
 

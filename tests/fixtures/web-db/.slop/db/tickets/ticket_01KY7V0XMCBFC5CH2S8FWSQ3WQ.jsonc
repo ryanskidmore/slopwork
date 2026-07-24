@@ -12,19 +12,14 @@
   },
   "state": "open",
   "priority": 1,
-  "labels": [
-    "billing",
-    "docs"
-  ],
+  "labels": ["billing", "docs"],
   "adhoc": false,
   "parent": "ticket_01KY7V0XMCBFC5CH2S8FWSQ3WN",
   "blocks": [],
   "relates_to": [],
   "discovered_from": [],
   "root_id": "ticket_01KY7V0XMCBFC5CH2S8FWSQ3WN",
-  "path": [
-    "ticket_01KY7V0XMCBFC5CH2S8FWSQ3WN"
-  ],
+  "path": ["ticket_01KY7V0XMCBFC5CH2S8FWSQ3WN"],
   "active_session": null,
   "last_activity_at": "2026-07-19T12:00:00.000Z",
   "latest_note": null,

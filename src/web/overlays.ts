@@ -29,7 +29,12 @@
  * ground rules (only `overlays.ts` itself is in scope).
  */
 import { type Config, type Ticket, type TicketId, parseDurationMs } from "../core/index.js";
-import { computeReviewStaleAt, computeStaleAt, isReviewStale, isStale } from "../tickets/staleness.js";
+import {
+  computeReviewStaleAt,
+  computeStaleAt,
+  isReviewStale,
+  isStale,
+} from "../tickets/staleness.js";
 
 export interface StaleThresholds {
   staleAfterMs: number;
@@ -77,7 +82,9 @@ export function isTicketStale(ticket: Ticket, thresholds: StaleThresholds, nowMs
   const staleAt = computeStaleAt(ticket, thresholds.staleAfterMs);
   const reviewStaleAt = computeReviewStaleAt(ticket, thresholds.reviewStaleAfterMs);
   const now = new Date(nowMs);
-  return isStale({ stale_at: staleAt }, now) || isReviewStale({ review_stale_at: reviewStaleAt }, now);
+  return (
+    isStale({ stale_at: staleAt }, now) || isReviewStale({ review_stale_at: reviewStaleAt }, now)
+  );
 }
 
 /** Milliseconds since an ISO timestamp, floored at 0 (clock skew / future timestamps never go negative in the UI). */

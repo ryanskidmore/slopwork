@@ -7,7 +7,12 @@
 import type { BunRequest } from "bun";
 import type { WebDataSource } from "../data-source.js";
 import { html } from "../html.js";
-import { formatDurationShort, isTicketStale, msSince, staleThresholdsFromConfig } from "../overlays.js";
+import {
+  formatDurationShort,
+  isTicketStale,
+  msSince,
+  staleThresholdsFromConfig,
+} from "../overlays.js";
 import { pageResponse, priorityBadge, staleBadge, ticketLink } from "./shared.js";
 
 export async function handleReviewPanel(

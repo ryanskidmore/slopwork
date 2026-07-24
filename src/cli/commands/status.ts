@@ -94,7 +94,14 @@
  * `search`/`events` use).
  */
 import type { Command } from "commander";
-import type { Clock, RenderFormat, Session, SessionId, Ticket, TicketId } from "../../core/index.js";
+import type {
+  Clock,
+  RenderFormat,
+  Session,
+  SessionId,
+  Ticket,
+  TicketId,
+} from "../../core/index.js";
 import {
   fixedClock,
   renderEntriesWithBudget,

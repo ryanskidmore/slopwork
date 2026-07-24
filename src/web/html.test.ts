@@ -11,7 +11,7 @@ describe("escapeHtml", () => {
 
 describe("html tagged template", () => {
   it("auto-escapes interpolated string values", () => {
-    const name = '<script>alert(1)</script>';
+    const name = "<script>alert(1)</script>";
     const out = html`<div>${name}</div>`;
     expect(out.raw).toBe("<div>&lt;script&gt;alert(1)&lt;/script&gt;</div>");
   });

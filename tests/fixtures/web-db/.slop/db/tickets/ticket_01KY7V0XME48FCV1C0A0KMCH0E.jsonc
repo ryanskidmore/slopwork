@@ -20,9 +20,7 @@
     }
   },
   "priority": 2,
-  "labels": [
-    "web"
-  ],
+  "labels": ["web"],
   "adhoc": false,
   "blocks": [],
   "relates_to": [],

@@ -12,9 +12,7 @@
   },
   "state": "dropped",
   "priority": 3,
-  "labels": [
-    "idea"
-  ],
+  "labels": ["idea"],
   "adhoc": false,
   "blocks": [],
   "relates_to": [],
