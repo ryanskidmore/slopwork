@@ -285,7 +285,7 @@ export async function handleTicketDetail(
   now: number,
 ): Promise<Response> {
   const ref = req.params.ref;
-  const [ticket, config, allTickets] = await Promise.all([
+  const [ticket, { config, warning: configWarning }, allTickets] = await Promise.all([
     dataSource.findTicketByRef(ref),
     dataSource.getConfig(),
     dataSource.listTickets(),
@@ -417,5 +417,11 @@ ${relationshipsSection}
   ${sessions.length > 0 ? joinHtml(sessions.map((s) => renderSession(s, ticket))) : html`<p class="muted">No sessions yet.</p>`}
 </section>`;
 
-  return pageResponse({ title: ticket.name, nav: null, project: config.project, body });
+  return pageResponse({
+    title: ticket.name,
+    nav: null,
+    project: config.project,
+    configWarning,
+    body,
+  });
 }

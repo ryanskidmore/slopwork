@@ -20,7 +20,7 @@ export async function handleStalePanel(
   dataSource: WebDataSource,
   now: number,
 ): Promise<Response> {
-  const [rawTickets, config, events] = await Promise.all([
+  const [rawTickets, { config, warning: configWarning }, events] = await Promise.all([
     dataSource.listTickets(),
     dataSource.getConfig(),
     dataSource.listEvents(),
@@ -55,5 +55,11 @@ export async function handleStalePanel(
 </table>
 </div>`;
 
-  return pageResponse({ title: "Stale", nav: "stale", project: config.project, body });
+  return pageResponse({
+    title: "Stale",
+    nav: "stale",
+    project: config.project,
+    configWarning,
+    body,
+  });
 }

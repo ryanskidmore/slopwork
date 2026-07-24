@@ -87,7 +87,7 @@ export async function handleTreeView(
   dataSource: WebDataSource,
   now: number,
 ): Promise<Response> {
-  const [rawTickets, config, events] = await Promise.all([
+  const [rawTickets, { config, warning: configWarning }, events] = await Promise.all([
     dataSource.listTickets(),
     dataSource.getConfig(),
     dataSource.listEvents(),
@@ -121,5 +121,5 @@ ${
     : html`<div class="empty-state">No tickets yet.</div>`
 }`;
 
-  return pageResponse({ title: "Tree", nav: "tree", project: config.project, body });
+  return pageResponse({ title: "Tree", nav: "tree", project: config.project, configWarning, body });
 }

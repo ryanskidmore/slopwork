@@ -35,12 +35,33 @@ export interface TranscriptHandle {
 }
 
 /**
+ * {@link WebDataSource.getConfig}'s return shape — web-corrupt-or-missing-config:
+ * `config.yaml` is a git-mergeable, collaborator-editable file, so ENOENT
+ * (never written yet) and a bad merge/hand-edit (invalid YAML, or YAML that
+ * fails `configSchema`) are both realistic, not just theoretical. Every
+ * §4.4 view calls `getConfig()`, so a throw there used to take the ENTIRE
+ * web UI down with an opaque 500 on every single page — the same class of
+ * fragility `readJsoncDir` (fixture-data-source.ts) already fixed for the
+ * tickets/sessions/events listings. `getConfig()` now never throws: `warning`
+ * is non-null (and `config` is a synthesized default) whenever the real
+ * file couldn't be read/parsed/validated, so callers can render the rest of
+ * the page normally and just surface `warning` to the human instead of
+ * 500ing.
+ */
+export interface ConfigResult {
+  /** The real parsed+validated config.yaml, or a synthesized default when `warning` is set. */
+  config: Config;
+  /** Human-readable explanation of what went wrong reading config.yaml, or `null` when it loaded cleanly. */
+  warning: string | null;
+}
+
+/**
  * The read operations every §4.4 view needs. Nothing here writes, matching
  * design.md §4.6: "web mutations are explicitly out of scope" for v0.
  */
 export interface WebDataSource {
-  /** `.slop/config.yaml`, validated against configSchema. */
-  getConfig(): Promise<Config>;
+  /** `.slop/config.yaml`, validated against configSchema — never throws, see {@link ConfigResult}. */
+  getConfig(): Promise<ConfigResult>;
 
   /** Every ticket in the db (every state, including draft/dropped) — views filter/sort/paginate in memory. */
   listTickets(): Promise<Ticket[]>;

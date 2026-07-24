@@ -20,6 +20,14 @@ export function renderPage(opts: {
   title: string;
   nav: NavKey;
   project?: string;
+  /**
+   * web-corrupt-or-missing-config: set (non-null) when `getConfig()`
+   * couldn't read/parse/validate `config.yaml` and fell back to defaults —
+   * rendered as a visible banner at the top of `<main>` so the human sees
+   * the page is degraded rather than silently trusting stale/default
+   * values. Absent/`null` on every normal page load.
+   */
+  configWarning?: string | null;
   body: RawHtml;
 }): string {
   const projectLabel = opts.project ? ` — ${opts.project}` : "";
@@ -29,6 +37,9 @@ export function renderPage(opts: {
         html`<a href="${item.href}" class="navlink${item.key === opts.nav ? " active" : ""}">${item.label}</a>`,
     ),
   );
+  const warningBanner = opts.configWarning
+    ? html`<div class="banner-warning">⚠ ${opts.configWarning}</div>`
+    : "";
   const page = html`<!doctype html>
 <html lang="en">
 <head>
@@ -43,6 +54,7 @@ export function renderPage(opts: {
   <nav>${navHtml}</nav>
 </header>
 <main>
+${warningBanner}
 ${opts.body}
 </main>
 </body>
@@ -58,7 +70,13 @@ export function htmlResponse(bodyHtml: string, status = 200): Response {
 }
 
 export function pageResponse(
-  opts: { title: string; nav: NavKey; project?: string; body: RawHtml },
+  opts: {
+    title: string;
+    nav: NavKey;
+    project?: string;
+    configWarning?: string | null;
+    body: RawHtml;
+  },
   status = 200,
 ): Response {
   return htmlResponse(renderPage(opts), status);

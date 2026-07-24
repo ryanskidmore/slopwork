@@ -1,0 +1,19 @@
+{
+  "id": "event_01KYASANN0MYRSJS7DM7JX2BE5",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": "session_01KYARQJZ916V6Y0NWGJ31Q1K9",
+  "verb": "session.ended",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KYARQJZ916V6Y0NWGJ31Q1K9"
+  },
+  "payload": {
+    "reason": "done",
+    "note": "getConfig() never throws now; degrades to defaults + a visible banner (config.yaml missing/corrupt/schema-invalid). Wired through all 6 views via a new ConfigResult return shape + pageResponse's configWarning option. Regression tests in tests/acceptance/web-config-fault-tolerance.test.ts. Full verification suite green.",
+    "transcript_ref": "transcripts/session_01KYARQJZ916V6Y0NWGJ31Q1K9.jsonl"
+  },
+  "at": "2026-07-24T19:23:40.064Z"
+}

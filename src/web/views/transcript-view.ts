@@ -93,7 +93,7 @@ export async function handleTranscriptView(
   dataSource: WebDataSource,
 ): Promise<Response> {
   const { ref, sessionId } = req.params;
-  const [ticket, config] = await Promise.all([
+  const [ticket, { config, warning: configWarning }] = await Promise.all([
     dataSource.findTicketByRef(ref),
     dataSource.getConfig(),
   ]);
@@ -124,6 +124,7 @@ export async function handleTranscriptView(
       title: `Transcript — ${ticket.name}`,
       nav: null,
       project: config.project,
+      configWarning,
       body: html`${heading}<div class="empty-state">No transcript was captured for this session (D16: this is expected when the harness's transcript couldn't be located — the session's state change was never blocked on it).</div>`,
     });
   }
@@ -134,6 +135,7 @@ export async function handleTranscriptView(
       title: `Transcript — ${ticket.name}`,
       nav: null,
       project: config.project,
+      configWarning,
       body: html`${heading}<div class="empty-state">This session recorded a transcript reference (<code>${session.transcript_ref}</code>) but the file is no longer readable.</div>`,
     });
   }
@@ -172,6 +174,7 @@ ${pager}`;
     title: `Transcript — ${ticket.name}`,
     nav: null,
     project: config.project,
+    configWarning,
     body,
   });
 }
