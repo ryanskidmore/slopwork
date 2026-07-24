@@ -49,6 +49,35 @@ describe("sessionSchema", () => {
     const input = { ...baseSession(), harness: { kind: "cursor", session_id: null } };
     expect(sessionSchema.safeParse(input).success).toBe(false);
   });
+
+  // web-path-traversal-transcript-ref-allows-arbitrary-local-fil: a
+  // tampered/merged session file with a `../`-escaping or absolute
+  // transcript_ref must never survive validation as something
+  // src/web/fixture-data-source.ts's openTranscript would treat as a real
+  // relative path.
+  describe("transcript_ref path-traversal guard", () => {
+    it("keeps a legitimate transcripts/-relative ref untouched", () => {
+      const input = { ...baseSession(), transcript_ref: "transcripts/session_x.jsonl" };
+      const parsed = sessionSchema.parse(input);
+      expect(parsed.transcript_ref).toBe("transcripts/session_x.jsonl");
+    });
+
+    it.each([
+      ["a plain ../ escape", "../../escape.jsonl"],
+      ["an absolute path", "/etc/passwd"],
+      ["a .. segment buried mid-path", "transcripts/../../escape.jsonl"],
+      ["a bare ..", ".."],
+    ])("sanitises %s to null instead of failing the whole session", (_label, ref) => {
+      const input = { ...baseSession(), transcript_ref: ref };
+      const result = sessionSchema.safeParse(input);
+      // Never fails the parse (see transcriptRefSchema's doc comment for
+      // why: throwing here would take down every session in the same
+      // directory listing, not just this one file) — but the unsafe value
+      // must not survive.
+      expect(result.success).toBe(true);
+      expect(result.success && result.data.transcript_ref).toBeNull();
+    });
+  });
 });
 
 describe("plan versioning (C2: plan v2 diffable from v1)", () => {

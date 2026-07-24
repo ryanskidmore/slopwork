@@ -29,7 +29,7 @@
  * called out explicitly in this work item's report.
  */
 import { readdir } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import {
   type Config,
   type Event,
@@ -79,6 +79,30 @@ function parseEntity<T>(schema: { parse: (input: unknown) => T }, text: string, 
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(`${path}: failed schema validation — ${message}`);
   }
+}
+
+/**
+ * True iff resolved absolute path `candidate` is `root` itself or lives
+ * strictly inside it — i.e. `path.relative(root, candidate)` doesn't
+ * escape upward (`..`) and isn't itself an absolute path (which
+ * `path.relative` returns when `candidate` is on an unrelated path, e.g.
+ * a different drive on Windows).
+ *
+ * The one and only guard against a `transcript_ref` path-traversal
+ * (`../../etc/passwd` and friends) reading arbitrary files off the host —
+ * see this module's final doc comment and `openTranscript` below, which
+ * is the sole caller. `.slop/db` is a git-mergeable, collaborator-editable
+ * store, so a tampered or buggy `transcript_ref` is a realistic input,
+ * not just a theoretical one. Exported for direct unit testing of the
+ * predicate itself, independent of the filesystem.
+ */
+export function isContainedPath(root: string, candidate: string): boolean {
+  if (candidate === root) return true;
+  const rel = relative(root, candidate);
+  // path.relative() returns a string starting with ".." when `candidate`
+  // is outside `root`, and an absolute path when the two share no common
+  // root at all (e.g. different drives on Windows) — both mean "escaped".
+  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
 }
 
 /** Streaming line reader over a file on disk — see src/web/transcript.ts's module doc for why this matters for large transcripts. */
@@ -177,7 +201,19 @@ export class FixtureDataSource implements WebDataSource {
   async openTranscript(transcriptRef: string): Promise<TranscriptHandle | null> {
     // Convention this work item defines (see D5 report): transcript_ref is
     // a path relative to the `.slop` root, e.g. "transcripts/session_….jsonl".
-    const path = join(this.slopRoot, transcriptRef);
+    //
+    // transcript_ref comes from a session file in `.slop/db` — a
+    // git-mergeable, collaborator-editable store — so it cannot be
+    // trusted to actually be that shape. sessionSchema (src/core/entities
+    // /session.ts) rejects the obvious bad forms up front, but this is the
+    // load-bearing check: resolve the joined path and confirm it's still
+    // inside the resolved `.slop` root before ever touching the
+    // filesystem. A ref that escapes (`../`, an absolute path that slips
+    // past the schema, a symlink-free `..` segment buried mid-path, etc.)
+    // is treated exactly like "file not found" — never opened.
+    const root = resolve(this.slopRoot);
+    const path = resolve(join(this.slopRoot, transcriptRef));
+    if (!isContainedPath(root, path)) return null;
     const file = Bun.file(path);
     if (!(await file.exists())) return null;
     return {

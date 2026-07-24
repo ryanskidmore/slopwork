@@ -49,6 +49,43 @@ export const planVersionSchema = z.object({
 });
 export type PlanVersion = z.infer<typeof planVersionSchema>;
 
+/**
+ * §4.3: "warn, record `transcript_ref: null`, never block the state
+ * change" — `null` is load-bearing and stays valid here. When non-null,
+ * the real writer always produces a path relative to the `.slop` root,
+ * e.g. `"transcripts/session_….jsonl"` (D5's convention — see
+ * `openTranscript` in src/web/fixture-data-source.ts).
+ *
+ * A value that couldn't possibly be that shape — a leading `/` (absolute
+ * path) or any `..` segment — is *sanitised to `null`* rather than
+ * failing the parse. That's deliberate, not a shortcut: `sessionSchema`
+ * is parsed one file at a time by `readJsoncDir` (src/web/fixture-data
+ * -source.ts), which aborts an entire directory listing on the first
+ * file that fails validation. Throwing here would let one tampered
+ * `transcript_ref` in `.slop/db` (a git-mergeable, collaborator-editable
+ * store — a realistic way for a bad value to show up) take down every
+ * ticket/session view that touches that directory, trading a path-
+ * traversal bug for a denial-of-service one. Falling back to `null`
+ * instead reuses the exact "couldn't find the transcript" path §4.3
+ * already treats as expected and non-fatal — same as this field's normal
+ * degraded case, not a special error path.
+ *
+ * This is still only the first line of defense, not the only one:
+ * `openTranscript` independently re-checks the *resolved* path stays
+ * inside the `.slop` root before ever opening a file, so even a
+ * hypothetical bypass of this sanitisation (or a caller that never runs
+ * it) can't read outside the root.
+ */
+export const transcriptRefSchema = z
+  .string()
+  .nullable()
+  .transform((ref) => (ref !== null && isUnsafeTranscriptRef(ref) ? null : ref))
+  .default(null);
+
+function isUnsafeTranscriptRef(ref: string): boolean {
+  return ref.startsWith("/") || ref.split("/").includes("..");
+}
+
 export const sessionSchema = z.object({
   id: sessionIdSchema,
   ticket: ticketIdSchema,
@@ -59,11 +96,7 @@ export const sessionSchema = z.object({
   ended_at: isoTimestampSchema.nullable().default(null),
   plan: z.array(planVersionSchema).default([]),
   end_summary: z.string().nullable().default(null),
-  /**
-   * §4.3: "If the transcript can't be found: warn, record
-   * `transcript_ref: null`, never block the state change." Nullable is
-   * load-bearing here, not incidental.
-   */
-  transcript_ref: z.string().nullable().default(null),
+  // See transcriptRefSchema above for the full contract and rationale.
+  transcript_ref: transcriptRefSchema,
 });
 export type Session = z.infer<typeof sessionSchema>;
