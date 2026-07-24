@@ -14,8 +14,8 @@
     "commit_at_start": "128cf2a6702d9665ba25ac6579c7bc833d0630f3"
   },
   "started_at": "2026-07-24T21:49:38.546Z",
-  "ended_at": null,
+  "ended_at": "2026-07-24T21:53:52.560Z",
   "plan": [],
-  "end_summary": null,
-  "transcript_ref": null
+  "end_summary": "Both paths capture; refuses to guess without a harness session id (misattribution risk). 1952 tests green.",
+  "transcript_ref": "transcripts/session_01KYB1NYVJ0V2ZCNWC11YD4M9V.jsonl"
 }

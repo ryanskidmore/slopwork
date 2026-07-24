@@ -909,3 +909,20 @@ Final "modern tooling" pass. Version survey (`bun outdated` + `npm view` against
 This also retroactively vindicates the deferred entry's instinct: the `html\`\`` reflow it flagged as "not cosmetic" was in fact *output-changing*, not merely ugly. The reversal stands, but scoped around that hazard rather than through it.
 
 `@biomejs/biome` is removed from `devDependencies` and `biome.json` deleted, so Biome is now entirely absent rather than lingering half-configured. `package.json`'s `format`/`format:check` run `oxfmt .` / `oxfmt --check .`; `.github/workflows/ci.yml` needed no change (it calls `bun run format:check` by name). Full gate verified green after the reformat.
+
+## start — the residual new-session orphan window stays detect-and-repair; NO write-ahead journal (ticket start-takeover-eliminate-the-residual)
+
+`slop start` performs several writes under one lock, and the crash-window ticket already fixed the part that was genuinely dangerous: the superseded session is now closed BEFORE the ticket write (the point of no return), and `slop reindex --heal` detects and repairs orphaned `ended_at: null` sessions. One window is left, and it is **structural**: the brand-new session file must exist before the ticket write that references it, because the ticket stores that session's freshly-minted id. A crash in between leaves a session file no ticket points at.
+
+**Decision: leave it. Do not add a write-ahead journal or two-phase commit.** The ticket's own acceptance criterion sanctions either implementing a mechanism or recording a considered decision not to; this is the latter, and it is based on measuring the blast radius rather than assuming it.
+
+**What the failure actually costs, tested by simulating the crash exactly** (planting an `ended_at: null` session no ticket references):
+
+- `slop status` — fine, exit 0.
+- `slop start <ref>` — **fine, and needs no `--takeover`**. The ticket never moved to `in_progress`, so its `active_session` is still `null`; the user simply runs the command again and it works. There is no wedged state and no manual surgery.
+- `slop reindex` — **detects it and names the remedy**: "1 orphaned active session(s) found (run `slop reindex --heal` to close them out)".
+- `slop reindex --heal` — repairs it.
+
+So the worst case is a stray session file that changes no ticket's state, blocks nothing, is reported by the tool itself, and is fixed by one documented command. Weigh that against what a journal costs: an extra durable write (and fsync) on the hot path of **every** `slop start`, recovery logic that must run before other commands, plus a new class of failure to handle (a corrupt or half-written journal) — more moving parts, and more ways to break, than the narrow window it closes. For a local, single-user-per-repo flatfile CLI whose whole storage bet is "plain files, no daemon, no transaction log" (design.md §3), a journal is also a genuine architectural departure, not a tweak.
+
+Revisit if either premise changes: if the shared/HTTP-backed mode (F8) arrives, its backend brings real transactions and this becomes free; or if dogfooding ever shows these orphans occurring often enough that "run `reindex --heal`" is real friction rather than a rarity. Neither is true today — the window requires a crash inside the microseconds between two adjacent writes.

@@ -1,0 +1,21 @@
+{
+  "id": "session_01KYB1YS6JJ7NXNNX7TPAYJSJ1",
+  "ticket": "ticket_01KYAW7DSFYVNM7NP12J9CYJDZ",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "main",
+    "commit_at_start": "4a15ee362c66803a41c21cda977531b89005ad6e"
+  },
+  "started_at": "2026-07-24T21:54:27.666Z",
+  "ended_at": null,
+  "plan": [],
+  "end_summary": null,
+  "transcript_ref": null
+}
