@@ -47,6 +47,13 @@ const REVIEW_SESSION_FIELDS = ["transcript_ref"] as const satisfies readonly (ke
  * enforces legality before this is ever called), `review` set to
  * `{mr, requested_at, by}` with `mr` present iff `--mr` was given
  * (§8.1 item 3: required-with-warning, never required-with-block).
+ *
+ * Also used, unchanged, for the `review -> review` MR attach/replace call
+ * (review-no-mr-nag-advises, `checkReviewEntry`'s `hasMr` branch): `state`
+ * is set to `"review"` regardless of whether `current.state` was already
+ * `"review"`, and `review`/`requested_at`/`by` are simply overwritten with
+ * the fresh values — an idempotent "this is the MR now" write, not a new
+ * review round (no session change, no `re_entry`).
  */
 export function buildReviewedTicket(
   current: Ticket,
@@ -111,13 +118,22 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
   // -block — nag on stderr, but still let the transition through (below).
   // Printed early, unconditionally, mirroring stop.ts's --note nag — see
   // that command for the identical rationale.
+  //
+  // review-no-mr-nag-advises: the "re-run once the MR exists" advice below
+  // now actually works — `slop review <ref> --mr <url>` is legal even when
+  // `<ref>` is already in review (`checkReviewEntry`'s `hasMr` branch,
+  // state.ts), an idempotent attach/replace of the MR link. Before that
+  // fix, this nag advised an action `checkReviewEntry` unconditionally
+  // rejected (`review -> review`, exit 6) — the wording here is kept in
+  // sync with what the state machine actually allows.
   if (mr === undefined) {
     printWarning(
       `no --mr given — "${ref}" is entering review with no merge/pull request link attached. This ` +
         "still works (D15), but a human reviewer has nothing to open. Pass --mr <url> when you have " +
         "one, e.g. `slop review " +
         ref +
-        " --mr <url>` (or re-run once the MR exists).",
+        " --mr <url>` — that also works to attach/replace the link later, even once " +
+        `"${ref}" is already in review.`,
     );
   }
 
@@ -127,17 +143,18 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
   // this same `initialTicket` read — same `checkReviewEntry` the lock
   // below authoritatively enforces, run a second time, early, purely so a
   // `review` that's clearly going to fail (e.g. the ticket is ALREADY in
-  // review — `checkReviewEntry` rejects `review -> review`, and a
-  // review-state ticket still carries an active session per D15) never
-  // reaches the speculative capture below at all. See stop.ts's identical
-  // pre-check for the full rationale (the speculative capture physically
-  // mutates `.slop/transcripts/<session.id>.jsonl` on disk, so running it
+  // review AND no --mr was given — `checkReviewEntry` rejects a bare
+  // `review -> review`, though `--mr` given DOES succeed there per
+  // review-no-mr-nag-advises, see that function's doc) never reaches the
+  // speculative capture below at all. See stop.ts's identical pre-check
+  // for the full rationale (the speculative capture physically mutates
+  // `.slop/transcripts/<session.id>.jsonl` on disk, so running it
   // unconditionally before any validation left a doomed `review` mutating
   // that file with no event ever describing the change). The
   // AUTHORITATIVE check inside `withLock` below is unchanged and is what
   // actually guards correctness against the narrow race this pre-check
   // can't close on its own.
-  const initialCheck = checkReviewEntry(initialTicket.state);
+  const initialCheck = checkReviewEntry(initialTicket.state, mr !== undefined);
   if (!initialCheck.ok) {
     throw new SlopError(initialCheck.reason ?? "illegal state transition", EXIT_CODES.CONFLICT);
   }
@@ -161,7 +178,7 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
   const result = await withLock(paths.lockFile, async (lock) => {
     const current = await readTicket(paths, initialTicket.id);
 
-    const check = checkReviewEntry(current.state);
+    const check = checkReviewEntry(current.state, mr !== undefined);
     if (!check.ok) {
       throw new SlopError(check.reason ?? "illegal state transition", EXIT_CODES.CONFLICT);
     }
@@ -232,8 +249,19 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
   // could fail (same convention as stop.ts/done.ts).
   if (result.transcriptWarning !== null) printWarning(result.transcriptWarning);
 
+  // review-no-mr-nag-advises: "moved to review" is only accurate for the
+  // in_progress -> review edge — the MR attach/replace call (`review
+  // -> review`, `checkReviewEntry`'s `hasMr` branch) leaves state
+  // unchanged, so its own headline says so instead of implying a
+  // transition that didn't happen. `initialTicket` (read before the lock,
+  // above) still reflects the PRE-write state here.
+  const headline =
+    initialTicket.state === "review"
+      ? `${result.ticket.id} (${result.ticket.slug}) MR link updated (already in review)`
+      : `${result.ticket.id} (${result.ticket.slug}) moved to review`;
+
   process.stdout.write(
-    `${result.ticket.id} (${result.ticket.slug}) moved to review\n` +
+    `${headline}\n` +
       `  ${result.ticket.name}\n` +
       `  mr: ${result.ticket.review?.mr ?? "(none)"}\n` +
       `  requested_at: ${result.ticket.review?.requested_at ?? "(unknown)"}\n` +
@@ -246,12 +274,17 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
  * Moves `in_progress -> review` (see `buildReviewedTicket`'s doc). `--mr`
  * is required-with-warning (D15/§8.1 item 3): omitting it nags on stderr
  * but still lets the transition through, with `review.mr` left absent.
+ *
+ * Also legal — and the ONLY other legal call — from `review` itself, but
+ * only when `--mr` is given: an idempotent attach/replace of the MR link
+ * (review-no-mr-nag-advises), not a new review round.
  */
 export function registerReviewCommand(program: Command): void {
   program
     .command("review")
     .description(
-      "Move <ref> from in_progress to review, recording the MR link (--mr is recommended, not required).",
+      "Move <ref> from in_progress to review, recording the MR link (--mr is recommended, not " +
+        "required). Also works on a ticket already in review, given --mr, to attach/replace its MR link.",
     )
     .argument("<ref>", "ticket to move into review")
     .option("--mr <url>", "merge/pull request URL (strongly recommended, see D15)")

@@ -185,7 +185,7 @@ describe("runReview (in-process)", () => {
     expect((await readTicket(paths, id)).state).toBe("in_progress");
   });
 
-  it("ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC: a SECOND review on an already-review-state ticket is rejected (CONFLICT) WITHOUT overwriting the transcript the FIRST review already captured", async () => {
+  it("ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC: a SECOND bare review (no --mr) on an already-review-state ticket is rejected (CONFLICT) WITHOUT overwriting the transcript the FIRST review already captured", async () => {
     const root = await makeTempRepo("slop-review-inproc-double-no-mutate-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });
     const id = await jsonNewTicket(root, "Double-review ticket, must not mutate transcript");
@@ -211,22 +211,19 @@ describe("runReview (in-process)", () => {
     const contentAfterFirst = await readFile(transcriptPath, "utf8");
     expect(contentAfterFirst).toBe('{"round":"first"}\n');
 
-    // A SECOND review on the SAME (now review-state) ticket — checkReviewEntry
-    // rejects `review -> review` (D15: v0 stores one MR per review round).
-    // A real, findable "transcript" that the OLD (pre-fix) code would have
-    // unconditionally copied over the FIRST review's file before ever
-    // validating that a second review call is illegal here.
+    // A SECOND, BARE review (no --mr) on the SAME (now review-state) ticket
+    // — checkReviewEntry rejects a bare `review -> review` (D15: nothing to
+    // update without a link to attach; review-no-mr-nag-advises made `--mr`
+    // given legal here instead, covered by the next test). A real, findable
+    // "transcript" that the OLD (pre-fix) code would have unconditionally
+    // copied over the FIRST review's file before ever validating that this
+    // second review call is illegal.
     const secondTranscript = join(root, "second-review-transcript.jsonl");
     await writeFile(secondTranscript, '{"round":"second-should-never-land"}\n', "utf8");
     const secondOut = captureOutput();
     try {
       await expect(
-        withCwd(root, () =>
-          runReview(id, {
-            mr: "https://example.com/org/repo/pull/2",
-            transcript: secondTranscript,
-          }),
-        ),
+        withCwd(root, () => runReview(id, { transcript: secondTranscript })),
       ).rejects.toMatchObject({ exitCode: EXIT_CODES.CONFLICT });
     } finally {
       secondOut.restore();
@@ -239,6 +236,54 @@ describe("runReview (in-process)", () => {
     expect(contentAfterSecond).toBe('{"round":"first"}\n');
     const ticketAfterSecond = await readTicket(paths, id);
     expect(ticketAfterSecond.review?.mr).toBe("https://example.com/org/repo/pull/1");
+  });
+
+  // review-no-mr-nag-advises: the no-mr nag (above) advises "re-run once
+  // the MR exists" — this proves that advice actually works: a SECOND
+  // `review --mr` call on an already-review-state ticket attaches/replaces
+  // the MR link instead of hitting checkReviewEntry's CONFLICT rejection.
+  it("a SECOND review WITH --mr on an already-review-state ticket updates the MR link (idempotent attach/replace)", async () => {
+    const root = await makeTempRepo("slop-review-inproc-mr-attach-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Review ticket getting its MR attached later");
+    await startTicket(root, id);
+
+    // First round: enters review with no --mr at all (the exact scenario
+    // the nag fires for).
+    const firstOut = captureOutput();
+    try {
+      await withCwd(root, () => runReview(id, {}));
+      expect(firstOut.stderr()).toMatch(/no --mr given/);
+    } finally {
+      firstOut.restore();
+    }
+    const paths = repoPaths(root);
+    expect((await readTicket(paths, id)).review?.mr).toBeUndefined();
+
+    // Second round: attach the MR now that it exists — exactly what the
+    // nag advised, and now legal.
+    const secondOut = captureOutput();
+    try {
+      await withCwd(root, () => runReview(id, { mr: "https://example.com/org/repo/pull/9" }));
+      expect(secondOut.stdout()).toContain("MR link updated (already in review)");
+      expect(secondOut.stderr()).not.toMatch(/no --mr given/);
+    } finally {
+      secondOut.restore();
+    }
+
+    const ticketAfterSecond = await readTicket(paths, id);
+    expect(ticketAfterSecond.state).toBe("review");
+    expect(ticketAfterSecond.review?.mr).toBe("https://example.com/org/repo/pull/9");
+
+    // A THIRD call, replacing the link again, also succeeds (idempotent,
+    // not one-shot).
+    const thirdOut = captureOutput();
+    try {
+      await withCwd(root, () => runReview(id, { mr: "https://example.com/org/repo/pull/10" }));
+    } finally {
+      thirdOut.restore();
+    }
+    expect((await readTicket(paths, id)).review?.mr).toBe("https://example.com/org/repo/pull/10");
   });
 
   it("refuses to review an open (never-started) ticket (CONFLICT, exit 6)", async () => {

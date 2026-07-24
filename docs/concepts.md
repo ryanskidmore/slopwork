@@ -144,6 +144,7 @@ Plus `dropped` (wontdo), reachable from any non-terminal state via
 | `open → in_progress` | `slop start` | Creates a session; captures harness + git. |
 | `in_progress → open` | `slop stop --note "…"` | Ends the session, hands the ticket back, no cascade. |
 | `in_progress → review` | `slop review --mr <url>` | `--mr` is **recommended, not required** — omit it and the ticket still moves, but the command nags on stderr and `review.mr` is left absent (never `null`). The session stays **active** across this move. |
+| `review → review` | `slop review --mr <url>` | The **one** legal same-state case: idempotent attach/replace of the MR link on a ticket already in review — exactly the recovery path the no-`--mr` nag above advises. A **bare** `review <ref>` (no `--mr`) on an already-review ticket is still rejected (`CONFLICT`, exit `6`) — nothing to update without a link. |
 | `review → in_progress` | `slop start` again | Changes-requested re-entry: no `--takeover` needed, a fresh session is created, logged with `re_entry: true`. |
 | `review → done` | `slop done` | The "went through review" path — never nags. |
 | `in_progress → done` | `slop done` | **Also legal directly** — review is optional, not mandatory. A non-`adhoc` ticket that skips review this way still succeeds but nags on stderr; `adhoc` tickets and the `review → done` path never nag. |
@@ -154,9 +155,12 @@ edge needs a dedicated command because it has a real side effect (session
 creation/finalization, an MR link, the done-cascade) that a generic field
 setter can't perform coherently. Same-state is always a legal no-op
 (`update --state open` on an already-open ticket does nothing), except for
-`review`/`done`/`drop`, which are one-way, side-effecting actions where
-re-running them on a ticket already at that state is a rejected usage
-mistake, not a no-op — v0 stores exactly one MR per review round.
+`done`/`drop`, which are one-way, side-effecting actions where re-running
+them on a ticket already at that state is a rejected usage mistake, not a
+no-op. `review` is the one partial exception: re-running `slop review` on
+an already-review ticket is legal **only** given `--mr` (an MR
+attach/replace, not a new review round — see the `review → review` row
+above); a bare re-run is still rejected the same way `done`/`drop` are.
 
 `src/tickets/state.ts` is the single source of truth for transition
 legality.

@@ -355,12 +355,20 @@ position, nothing partially applied.
 ```sh
 slop review <ref> --mr https://github.com/org/repo/pull/42
 slop review <ref>                       # legal, but nags on stderr
+slop review <ref> --mr <url>            # also legal AGAIN once <ref> is already in review — attaches/replaces the link
 ```
 
 Moves `in_progress → review`. `--mr` is recommended, not required (D15):
 omitting it still moves the ticket, but nags on stderr and leaves
 `review.mr` absent. `--transcript <path>` overrides transcript
 auto-detection for this call.
+
+Re-running `review <ref> --mr <url>` on a ticket **already** in review is
+also legal — an idempotent attach/replace of the MR link, not a new
+review round (no new session, state stays `review`). This is the exact
+recovery path the no-`--mr` nag advises; a bare `review <ref>` (no `--mr`)
+on an already-review ticket is still rejected (`CONFLICT`, exit `6`) —
+there's nothing to update without a link to attach.
 
 ### `stop`
 

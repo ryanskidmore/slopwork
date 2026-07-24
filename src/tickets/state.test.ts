@@ -127,7 +127,7 @@ describe("checkReviewEntry (C3: in_progress -> review, D15)", () => {
     expect(checkReviewEntry("in_progress")).toEqual({ ok: true });
   });
 
-  it("rejects every other state, including review itself (no self-loop)", () => {
+  it("rejects every other state (default hasMr=false), including a bare review -> review (no self-loop)", () => {
     for (const s of ["draft", "open", "review", "done", "dropped"] as const) {
       const result = checkReviewEntry(s);
       expect(result.ok, s).toBe(false);
@@ -135,13 +135,29 @@ describe("checkReviewEntry (C3: in_progress -> review, D15)", () => {
     }
   });
 
-  it("review -> review names the no-self-loop rationale, not the generic terminal/illegal wording", () => {
-    expect(checkReviewEntry("review").reason).toMatch(/already in "review"/);
+  it('bare review -> review (hasMr=false) names "nothing to update", not the generic terminal/illegal wording', () => {
+    expect(checkReviewEntry("review").reason).toMatch(/nothing to update/);
   });
 
-  it("terminal states (done/dropped) name themselves as terminal", () => {
+  // review-no-mr-nag-advises: review -> review IS legal, but only to
+  // attach/replace the MR link (--mr given, i.e. hasMr=true) — the exact
+  // recovery path review.ts's no-mr nag advises.
+  it("review -> review is legal when hasMr=true (MR attach/replace)", () => {
+    expect(checkReviewEntry("review", true)).toEqual({ ok: true });
+  });
+
+  it("hasMr=true does not relax any OTHER illegal edge — only review -> review", () => {
+    for (const s of ["draft", "open", "done", "dropped"] as const) {
+      const result = checkReviewEntry(s, true);
+      expect(result.ok, s).toBe(false);
+    }
+  });
+
+  it("terminal states (done/dropped) name themselves as terminal, regardless of hasMr", () => {
     expect(checkReviewEntry("done").reason).toMatch(/terminal state/);
     expect(checkReviewEntry("dropped").reason).toMatch(/terminal state/);
+    expect(checkReviewEntry("done", true).reason).toMatch(/terminal state/);
+    expect(checkReviewEntry("dropped", true).reason).toMatch(/terminal state/);
   });
 });
 
