@@ -1,6 +1,6 @@
 {
   "name": "slopwork",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Free OSS work tracker built for agents — a dependency graph of tickets, worked through sessions with an auditable trail.",
   "license": "MIT",
   "type": "module",
