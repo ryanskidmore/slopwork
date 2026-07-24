@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { newTicketId } from "../ids.js";
-import { TICKET_STATES, ticketSchema } from "./ticket.js";
+import { mrUrlSchema, TICKET_STATES, ticketSchema } from "./ticket.js";
 
 function baseTicket() {
   const id = newTicketId();
@@ -129,5 +129,35 @@ describe("ticketSchema — parent (D1: local id or external ref)", () => {
 describe("ticketSchema — slug", () => {
   it("rejects an uppercase or space-containing slug", () => {
     expect(ticketSchema.safeParse({ ...baseTicket(), slug: "Not A Slug" }).success).toBe(false);
+  });
+});
+
+// Stored-XSS regression (ticket_01KY93E2FG20KF5RVW7HRK9M7X): bare `z.url()`
+// accepts javascript:/data:/vbscript: URLs — confirmed pre-fix by parsing
+// each directly against `z.url()` (no `.refine` in the pipeline), which
+// returns `success: true` for all three. `slop web`'s review views then
+// rendered `review.mr` straight into a live `href`, so any of those schemes
+// reaching a persisted ticket ran attacker JS the moment a human opened the
+// review page — this is the schema-level half of the fix (the CLI's
+// `review --mr` and the persisted-ticket schema share `mrUrlSchema`, per
+// this schema's doc comment).
+describe("mrUrlSchema — http(s)-only scheme allowlist", () => {
+  it("rejects javascript:, data:, and vbscript: URLs", () => {
+    expect(mrUrlSchema.safeParse("javascript:alert(1)").success).toBe(false);
+    expect(mrUrlSchema.safeParse("data:text/html;base64,QQ==").success).toBe(false);
+    expect(mrUrlSchema.safeParse("vbscript:msgbox(1)").success).toBe(false);
+  });
+
+  it("rejects those schemes case-insensitively", () => {
+    expect(mrUrlSchema.safeParse("JavaScript:alert(1)").success).toBe(false);
+  });
+
+  it("still accepts http/https MR URLs (no regression on legitimate use)", () => {
+    expect(mrUrlSchema.safeParse("https://github.com/org/repo/pull/123").success).toBe(true);
+    expect(mrUrlSchema.safeParse("http://example.com/mr/1").success).toBe(true);
+  });
+
+  it("rejects a non-URL string (still delegates the base URL shape check to z.url())", () => {
+    expect(mrUrlSchema.safeParse("not a url").success).toBe(false);
   });
 });

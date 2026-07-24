@@ -57,4 +57,20 @@ describe("buildReviewedTicket", () => {
     const reviewed = buildReviewedTicket(ticket, undefined, actor, clock);
     expect(reviewed.active_session).toBe(ticket.active_session);
   });
+
+  // Stored-XSS regression (ticket_01KY93E2FG20KF5RVW7HRK9M7X): before
+  // mrUrlSchema gained its http(s)-only refine, `slop review --mr
+  // javascript:alert(1)` passed straight through — bare `z.url()` accepts
+  // it — and got persisted into `review.mr`, which `slop web`'s review
+  // views then rendered into a live `href`. `buildReviewedTicket` re-parses
+  // the candidate ticket through `ticketSchema` (which nests `mrUrlSchema`
+  // for `review.mr`), so this is the same guard the CLI's own up-front
+  // `--mr` validation in `runReview` uses — proving the fix closes the
+  // vector at the CLI layer, not just in the web renderer.
+  it("rejects an unsafe MR URL scheme (javascript:/data:/vbscript:)", () => {
+    const ticket = makeTicket();
+    expect(() => buildReviewedTicket(ticket, "javascript:alert(1)", actor, clock)).toThrow();
+    expect(() => buildReviewedTicket(ticket, "data:text/html;base64,QQ==", actor, clock)).toThrow();
+    expect(() => buildReviewedTicket(ticket, "vbscript:msgbox(1)", actor, clock)).toThrow();
+  });
 });

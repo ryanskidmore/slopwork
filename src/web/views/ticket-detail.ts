@@ -18,7 +18,7 @@ import type { BunRequest } from "bun";
 import type { Event, EventVerb, Session, Ticket, TicketId } from "../../core/index.js";
 import { isTicketId } from "../../core/index.js";
 import type { WebDataSource } from "../data-source.js";
-import { type RawHtml, html, joinHtml, raw } from "../html.js";
+import { type RawHtml, html, joinHtml, raw, safeUrl } from "../html.js";
 import {
   computeBlockedTicketIds,
   formatDurationShort,
@@ -60,6 +60,22 @@ const VERB_LABELS: Record<EventVerb, string> = {
 
 function eventLabel(event: Event): string {
   return VERB_LABELS[event.verb] ?? event.verb;
+}
+
+/**
+ * The review MR link, scheme-guarded. `mrUrlSchema` (core/entities/ticket.ts)
+ * already rejects non-http(s) MR URLs at write time, but this is the
+ * render-time backstop for anything already in the db from before that
+ * guard existed — mirrors `externalParentBadge`'s (shared.ts) fallback to
+ * inert text rather than ever emitting a `javascript:`/`data:` `href`.
+ * Exported (only) so `ticket-detail.test.ts` can exercise it directly.
+ */
+export function renderMrLink(mr: string | undefined): RawHtml {
+  if (!mr) return html`<span class="muted">No MR link yet</span>`;
+  const safe = safeUrl(mr);
+  return safe
+    ? html`<a href="${safe}" target="_blank" rel="noopener noreferrer">${mr}</a>`
+    : html`<span class="muted" title="Unsafe URL scheme — shown as text, not a link">${mr}</span>`;
 }
 
 function renderPayload(payload: Record<string, unknown>): RawHtml {
@@ -185,7 +201,7 @@ export async function handleTicketDetail(
       ? html`<section class="section">
   <h2>Review</h2>
   <p>
-    ${ticket.review.mr ? html`<a href="${ticket.review.mr}" target="_blank" rel="noopener noreferrer">${ticket.review.mr}</a>` : html`<span class="muted">No MR link yet</span>`}
+    ${renderMrLink(ticket.review.mr)}
   </p>
   <p class="muted">Requested by ${ticket.review.by.name} at ${ticket.review.requested_at} — awaiting review for ${formatDurationShort(msSince(ticket.review.requested_at, now))}${stale ? html` ${staleBadge()}` : ""}</p>
 </section>`

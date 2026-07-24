@@ -6,7 +6,7 @@
  */
 import type { BunRequest } from "bun";
 import type { WebDataSource } from "../data-source.js";
-import { html } from "../html.js";
+import { html, safeUrl } from "../html.js";
 import {
   formatDurationShort,
   isTicketStale,
@@ -14,6 +14,20 @@ import {
   staleThresholdsFromConfig,
 } from "../overlays.js";
 import { pageResponse, priorityBadge, staleBadge, ticketLink } from "./shared.js";
+
+/**
+ * The review MR link, scheme-guarded — same rationale/fallback as
+ * `ticket-detail.ts`'s `renderMrLink` (kept duplicated rather than shared
+ * since this task's file allowlist doesn't include shared.ts). Exported
+ * (only) so `review.test.ts` can exercise it directly.
+ */
+export function renderMrLink(mr: string | undefined) {
+  if (!mr) return html`<span class="muted">no MR link</span>`;
+  const safe = safeUrl(mr);
+  return safe
+    ? html`<a href="${safe}" target="_blank" rel="noopener noreferrer">${mr}</a>`
+    : html`<span class="muted" title="Unsafe URL scheme — shown as text, not a link">${mr}</span>`;
+}
 
 export async function handleReviewPanel(
   _req: BunRequest,
@@ -35,7 +49,7 @@ export async function handleReviewPanel(
     return html`<tr>
       <td>${priorityBadge(ticket.priority)}</td>
       <td>${ticketLink(ticket)}</td>
-      <td>${review.mr ? html`<a href="${review.mr}" target="_blank" rel="noopener noreferrer">${review.mr}</a>` : html`<span class="muted">no MR link</span>`}</td>
+      <td>${renderMrLink(review.mr)}</td>
       <td>${review.by.name}</td>
       <td title="${review.requested_at}">${formatDurationShort(awaitingMs)}${stale ? html` ${staleBadge()}` : ""}</td>
     </tr>`;

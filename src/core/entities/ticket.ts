@@ -48,8 +48,20 @@ export type Provenance = z.infer<typeof provenanceSchema>;
  * <invalid-url>` must fail before any side effect, not after the session
  * write — see that file's module doc), so the two never drift on what
  * counts as a valid MR URL.
+ *
+ * Restricted to http(s): bare `z.url()` happily accepts `javascript:`,
+ * `data:`, and `vbscript:` URLs, which `slop web` would otherwise render
+ * as a live `href` (stored XSS — a human clicking a review's MR link runs
+ * attacker-controlled script). MR links are always a web page a human
+ * opens in a browser, so http(s)-only is not a real restriction on
+ * legitimate use, just a closed allowlist instead of an open denylist.
+ * `src/web/html.ts`'s `safeUrl` enforces the equivalent scheme allowlist
+ * at render time, for content (e.g. markdown links) this schema never
+ * sees.
  */
-export const mrUrlSchema = z.url();
+export const mrUrlSchema = z
+  .url()
+  .refine((value) => /^https?:\/\//i.test(value), { message: "MR URL must be http(s)" });
 
 /**
  * `{mr, requested_at, by}`, present if and only if `state === "review"`
