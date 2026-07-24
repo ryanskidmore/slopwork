@@ -17,7 +17,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "done",
   "priority": 3,
   "labels": [
     "backlog:post-audit",
@@ -32,8 +32,9 @@
   "root_id": "ticket_01KYA3Z9FNZ2FDMDRWNKR9EV7J",
   "path": [],
   "active_session": null,
-  "last_activity_at": "2026-07-24T13:10:27.088Z",
+  "last_activity_at": "2026-07-24T14:52:44.732Z",
   "latest_note": null,
+  "resolution": "Implemented --relates-to on new/update — a7db131",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -43,5 +44,5 @@
     }
   },
   "created_at": "2026-07-24T13:10:27.088Z",
-  "updated_at": "2026-07-24T13:10:27.088Z"
+  "updated_at": "2026-07-24T14:52:44.732Z"
 }
