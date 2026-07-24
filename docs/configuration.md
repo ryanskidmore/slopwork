@@ -111,15 +111,20 @@ Controlled by `transcripts:` in `config.yaml`:
   on `stop`/`done`/`drop`, and also, as a snapshot, on `review` (which does
   *not* end the session — see
   [Concepts → Session](concepts.md#session)); gitignored by `slop init`.
-  **Not every session end captures a transcript**, though: `slop start
-  --takeover` and D15's "changes requested" re-entry (a plain `slop start`
-  on a `review`-state ticket) both end the *previous* session (`ended_at`
-  set) as a side effect, but neither one attempts a capture for it — that
-  session's `transcript_ref` is left exactly as it was (usually `null`,
-  unless an earlier `review` call on it already snapshotted one). This is a
-  known gap, not a deliberate behavior; there's no snapshot precisely for
-  the cases where a session's work was ended out from under it rather than
-  wrapped up normally.
+  `slop start --takeover` and D15's "changes requested" re-entry (a plain
+  `slop start` on a `review`-state ticket) also end the *previous* session as
+  a side effect, and they capture a snapshot for it too — those are often the
+  transcripts most worth reading, since that work was ended out from under
+  someone rather than wrapped up normally.
+
+  **One deliberate exception:** if the superseded session recorded no harness
+  session id, no capture is attempted and `slop start` says so on stderr.
+  Locating a transcript without that id means picking the most recently
+  modified one for this project — which, during a takeover, is most likely
+  the *taking* session's own transcript. Filing that under the seized session
+  would be silently wrong audit data, which is worse than an honest `null`.
+  Use `--transcript <path>` on that session's own `stop`/`done` if you still
+  have the file.
 - **`commit`** — same capture, but `slop init` does **not** add
   `.slop/transcripts/` to `.gitignore`, so transcripts land in git history.
   Only turn this on if you've thought about what might be in a transcript

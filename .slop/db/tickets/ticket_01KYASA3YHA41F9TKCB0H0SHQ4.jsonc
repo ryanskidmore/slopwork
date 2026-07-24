@@ -19,7 +19,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "in_progress",
   "priority": 3,
   "labels": [
     "area:sessions"
@@ -32,8 +32,8 @@
   ],
   "root_id": "ticket_01KYASA3YHA41F9TKCB0H0SHQ4",
   "path": [],
-  "active_session": null,
-  "last_activity_at": "2026-07-24T19:23:21.939Z",
+  "active_session": "session_01KYB1NYVJ0V2ZCNWC11YD4M9V",
+  "last_activity_at": "2026-07-24T21:49:38.563Z",
   "latest_note": null,
   "owner": null,
   "provenance": {
@@ -44,5 +44,5 @@
     }
   },
   "created_at": "2026-07-24T19:23:21.939Z",
-  "updated_at": "2026-07-24T19:25:04.974Z"
+  "updated_at": "2026-07-24T21:49:38.563Z"
 }
