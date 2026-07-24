@@ -4,7 +4,13 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { shortTicketCode } from "../../core/index.js";
+import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
+import { makeTempRepo } from "../../../tests/support/temp-repo.js";
+import { EXIT_CODES } from "../../core/exit-codes.js";
+import { type TicketId, shortTicketCode } from "../../core/index.js";
+import { readTicket, repoPaths } from "../../repo/index.js";
+import { SlopError } from "../errors.js";
+import { runNew } from "./new.js";
 
 // ticket_01KY9RVF2DCG6TDQ8EBSGXQXT1: `new` surfaces the short, stable
 // t-<code> handle (core/ids.ts's shortTicketCode) so a human/agent can
@@ -175,5 +181,136 @@ describe("new --relates-to <ref>: sets a relates-to edge (ticket_01KYA3Z9FNZ2FDM
     const result = runSlop(["new", "Bad relates-to", "--relates-to", "no-such-ticket"], root);
     expect(result.status).toBe(4);
     expect(result.stderr).toMatch(/no-such-ticket/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// In-process coverage of `runNew` (real v8 coverage, no subprocess) —
+// tests/support/cli-harness.ts's withCwd/bootstrapRepo/captureOutput.
+// ---------------------------------------------------------------------------
+
+function baseOpts(overrides: Partial<Parameters<typeof runNew>[1]> = {}) {
+  return {
+    blocks: [] as string[],
+    relatesTo: [] as string[],
+    label: [] as string[],
+    ...overrides,
+  };
+}
+
+describe("runNew (in-process)", () => {
+  it("creates a ticket with sensible defaults and prints the created line + handle", async () => {
+    const root = await makeTempRepo("slop-new-inproc-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runNew("A plain ticket", baseOpts()));
+    } finally {
+      out.restore();
+    }
+    expect(out.stdout()).toMatch(/^created ticket_[0-9A-Z]+ {2}\(slug: a-plain-ticket\)/m);
+    expect(out.stdout()).toMatch(/^\s*handle: t-[0-9a-z]{5}$/m);
+
+    const paths = repoPaths(root);
+    const created = await readTicket(
+      paths,
+      (out.stdout().match(/created (ticket_[0-9A-Z]+)/)?.[1] ?? "") as TicketId,
+    );
+    expect(created.name).toBe("A plain ticket");
+    expect(created.state).toBe("open");
+    expect(created.priority).toBe(2);
+  });
+
+  it("--json prints id/slug/handle/name/state/priority/parent", async () => {
+    const root = await makeTempRepo("slop-new-inproc-json-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runNew("A json ticket", baseOpts({ json: true })));
+    } finally {
+      out.restore();
+    }
+    const body = JSON.parse(out.stdout()) as {
+      id: string;
+      slug: string;
+      handle: string;
+      name: string;
+      state: string;
+      priority: number;
+      parent: string | null;
+    };
+    expect(body.name).toBe("A json ticket");
+    expect(body.handle).toBe(shortTicketCode(body.id));
+    expect(body.parent).toBeNull();
+  });
+
+  it("--draft creates a draft-state ticket", async () => {
+    const root = await makeTempRepo("slop-new-inproc-draft-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runNew("Draft ticket", baseOpts({ draft: true, json: true })));
+    } finally {
+      out.restore();
+    }
+    const body = JSON.parse(out.stdout()) as { state: string };
+    expect(body.state).toBe("draft");
+  });
+
+  it("--parent links to an existing ticket, and an unknown --parent ref throws NOT_FOUND", async () => {
+    const root = await makeTempRepo("slop-new-inproc-parent-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+
+    const out1 = captureOutput();
+    let parentId: string;
+    try {
+      await withCwd(root, () => runNew("Parent ticket", baseOpts({ json: true })));
+      parentId = (JSON.parse(out1.stdout()) as { id: string }).id;
+    } finally {
+      out1.restore();
+    }
+
+    const out2 = captureOutput();
+    try {
+      await withCwd(root, () => runNew("Child ticket", baseOpts({ parent: parentId, json: true })));
+      const body = JSON.parse(out2.stdout()) as { parent: string | null };
+      expect(body.parent).toBe(parentId);
+    } finally {
+      out2.restore();
+    }
+
+    const out3 = captureOutput();
+    try {
+      await expect(
+        withCwd(root, () => runNew("Orphan ticket", baseOpts({ parent: "no-such-ticket" }))),
+      ).rejects.toMatchObject({ exitCode: EXIT_CODES.NOT_FOUND });
+    } finally {
+      out3.restore();
+    }
+  });
+
+  it("throws NOT_FOUND for an unresolvable --blocks ref, without creating the ticket", async () => {
+    const root = await makeTempRepo("slop-new-inproc-blocks-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+
+    const out = captureOutput();
+    try {
+      const err: unknown = await withCwd(root, () =>
+        runNew("Never created", baseOpts({ blocks: ["no-such-ticket"] })),
+      ).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(SlopError);
+      expect((err as SlopError).exitCode).toBe(EXIT_CODES.NOT_FOUND);
+    } finally {
+      out.restore();
+    }
+  });
+
+  it("throws NOT_FOUND (via requireRepoRoot) outside any .slop repo", async () => {
+    const root = await makeTempRepo("slop-new-inproc-norepo-");
+    // No bootstrapRepo call — no .slop/ at all.
+    await expect(withCwd(root, () => runNew("x", baseOpts()))).rejects.toThrow();
   });
 });

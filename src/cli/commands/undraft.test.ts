@@ -4,8 +4,15 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
+import { makeTempRepo } from "../../../tests/support/temp-repo.js";
+import { EXIT_CODES } from "../../core/exit-codes.js";
 import type { TicketId } from "../../core/index.js";
 import { readTicket, repoPaths } from "../../repo/index.js";
+import { runDraft } from "./draft.js";
+import { runNew } from "./new.js";
+import { runStart } from "./start.js";
+import { runUndraft } from "./undraft.js";
 
 // Regression test for ticket_01KY93E2BKH5JCMAV3JWPNN63G — see
 // update.test.ts's module doc for the full bug description. This file
@@ -182,4 +189,107 @@ describe("undraft: race against a concurrent lock-holding mutator (regression, t
       "no attempt's undraft/update pair overlapped in wall-clock time — this run could pass vacuously off accidental serialisation",
     ).toBe(true);
   }, 60_000);
+});
+
+// ---------------------------------------------------------------------------
+// In-process coverage of `runUndraft` (real v8 coverage, no subprocess).
+// ---------------------------------------------------------------------------
+
+async function jsonNewTicket(
+  root: string,
+  name: string,
+  extra: { draft?: boolean } = {},
+): Promise<TicketId> {
+  const out = captureOutput();
+  try {
+    await withCwd(root, () =>
+      runNew(name, { blocks: [], relatesTo: [], label: [], json: true, ...extra }),
+    );
+    return (JSON.parse(out.stdout()) as { id: TicketId }).id;
+  } finally {
+    out.restore();
+  }
+}
+
+describe("runUndraft (in-process)", () => {
+  it("moves a draft ticket to open", async () => {
+    const root = await makeTempRepo("slop-undraft-inproc-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Draft ticket to undraft", { draft: true });
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runUndraft(id));
+      expect(out.stdout()).toContain(`undrafted ${id}`);
+    } finally {
+      out.restore();
+    }
+    const paths = repoPaths(root);
+    expect((await readTicket(paths, id)).state).toBe("open");
+  });
+
+  it("an already-open ticket is an idempotent no-op", async () => {
+    const root = await makeTempRepo("slop-undraft-inproc-idempotent-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Already-open ticket");
+    const paths = repoPaths(root);
+    const before = await readTicket(paths, id);
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runUndraft(id));
+      expect(out.stdout()).toContain("already open — no changes made");
+    } finally {
+      out.restore();
+    }
+    const after = await readTicket(paths, id);
+    expect(after.updated_at).toBe(before.updated_at);
+  });
+
+  it("refuses to undraft an in_progress ticket (CONFLICT, exit 6)", async () => {
+    const root = await makeTempRepo("slop-undraft-inproc-conflict-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "In-progress ticket");
+    const startOut = captureOutput();
+    try {
+      await withCwd(root, () => runStart(id, {}));
+    } finally {
+      startOut.restore();
+    }
+
+    await expect(withCwd(root, () => runUndraft(id))).rejects.toMatchObject({
+      exitCode: EXIT_CODES.CONFLICT,
+    });
+  });
+
+  it("round-trips draft -> undraft -> draft", async () => {
+    const root = await makeTempRepo("slop-undraft-inproc-roundtrip-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Round trip ticket");
+    const paths = repoPaths(root);
+
+    const out1 = captureOutput();
+    try {
+      await withCwd(root, () => runDraft(id));
+    } finally {
+      out1.restore();
+    }
+    expect((await readTicket(paths, id)).state).toBe("draft");
+
+    const out2 = captureOutput();
+    try {
+      await withCwd(root, () => runUndraft(id));
+    } finally {
+      out2.restore();
+    }
+    expect((await readTicket(paths, id)).state).toBe("open");
+  });
+
+  it("throws NOT_FOUND for an unresolvable ref", async () => {
+    const root = await makeTempRepo("slop-undraft-inproc-notfound-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    await expect(withCwd(root, () => runUndraft("no-such-ticket"))).rejects.toMatchObject({
+      exitCode: EXIT_CODES.NOT_FOUND,
+    });
+  });
 });

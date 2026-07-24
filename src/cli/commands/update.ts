@@ -57,7 +57,7 @@ function printUpdated(ticket: Pick<Ticket, "id" | "slug" | "name" | "state" | "p
   );
 }
 
-async function runUpdate(ref: string, opts: UpdateCommandOptions): Promise<void> {
+export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
   const config = await loadConfig(paths);

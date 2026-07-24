@@ -4,7 +4,14 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
+import { makeTempRepo } from "../../../tests/support/temp-repo.js";
+import { EXIT_CODES } from "../../core/exit-codes.js";
 import { shortTicketCode } from "../../core/index.js";
+import type { TicketId } from "../../core/index.js";
+import { runNew } from "./new.js";
+import { runShow } from "./show.js";
+import { runUpdate } from "./update.js";
 
 // ticket_01KY9RVF2DCG6TDQ8EBSGXQXT1: `show` surfaces the short t-<code>
 // handle, AND resolves a ref given in that exact form back to the same
@@ -136,5 +143,137 @@ describe("show: surfaces the t-<code> short handle (ticket_01KY9RVF2DCG6TDQ8EBSG
     const result = mustRunSlop(["show", id, "--context"], root);
     expect(result.stdout).not.toContain("handle:");
     expect(result.stdout).toContain(`# Context: Context budget ticket`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// In-process coverage of `runShow` (real v8 coverage, no subprocess).
+// ---------------------------------------------------------------------------
+
+async function jsonNewTicket(root: string, name: string): Promise<TicketId> {
+  const out = captureOutput();
+  try {
+    await withCwd(root, () => runNew(name, { blocks: [], relatesTo: [], label: [], json: true }));
+    return (JSON.parse(out.stdout()) as { id: TicketId }).id;
+  } finally {
+    out.restore();
+  }
+}
+
+describe("runShow (in-process)", () => {
+  it("plain view: prints the handle line and the formatted ticket detail", async () => {
+    const root = await makeTempRepo("slop-show-inproc-plain-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Plain view ticket");
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runShow(id, {}));
+      expect(out.stdout()).toMatch(/^handle: t-[0-9a-z]{5}$/m);
+      expect(out.stdout()).toContain("Plain view ticket");
+    } finally {
+      out.restore();
+    }
+  });
+
+  it("--json includes ticket, handle, and jira_url:null when no external parent", async () => {
+    const root = await makeTempRepo("slop-show-inproc-json-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Json view ticket");
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runShow(id, { json: true }));
+    } finally {
+      out.restore();
+    }
+    const body = JSON.parse(out.stdout()) as {
+      ticket: { id: string };
+      handle: string;
+      jira_url: string | null;
+    };
+    expect(body.ticket.id).toBe(id);
+    expect(body.jira_url).toBeNull();
+  });
+
+  it("--tree renders an ancestry/descendant tree", async () => {
+    const root = await makeTempRepo("slop-show-inproc-tree-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Tree root ticket");
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runShow(id, { tree: true }));
+      expect(out.stdout()).toContain("Tree root ticket");
+    } finally {
+      out.restore();
+    }
+  });
+
+  it("--tree --json includes a tree.root node", async () => {
+    const root = await makeTempRepo("slop-show-inproc-tree-json-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Tree json ticket");
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runShow(id, { tree: true, json: true }));
+    } finally {
+      out.restore();
+    }
+    const body = JSON.parse(out.stdout()) as { tree: { root: { id: string } } };
+    expect(body.tree.root.id).toBe(id);
+  });
+
+  it("--context includes the context pack, bounded by --budget without corrupting --json", async () => {
+    const root = await makeTempRepo("slop-show-inproc-context-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Context ticket");
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runShow(id, { context: true, json: true, budget: 5 }));
+    } finally {
+      out.restore();
+    }
+    expect(() => JSON.parse(out.stdout())).not.toThrow();
+    const body = JSON.parse(out.stdout()) as { context: unknown };
+    expect(body.context).toBeDefined();
+  });
+
+  it("reflects a lock-free --progress update via the effective overlay (ticket_01KY9RWFM80BKNE2CDX85QMKGS)", async () => {
+    const root = await makeTempRepo("slop-show-inproc-effective-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Effective note ticket");
+
+    const updateOut = captureOutput();
+    try {
+      await withCwd(root, () =>
+        runUpdate(id, { label: [], relatesTo: [], progress: "fresh progress note" }),
+      );
+    } finally {
+      updateOut.restore();
+    }
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runShow(id, {}));
+      expect(out.stdout()).toContain("fresh progress note");
+    } finally {
+      out.restore();
+    }
+  });
+
+  it("throws NOT_FOUND for an unresolvable ref", async () => {
+    const root = await makeTempRepo("slop-show-inproc-notfound-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const out = captureOutput();
+    try {
+      await expect(withCwd(root, () => runShow("no-such-ticket", {}))).rejects.toMatchObject({
+        exitCode: EXIT_CODES.NOT_FOUND,
+      });
+    } finally {
+      out.restore();
+    }
   });
 });

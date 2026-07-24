@@ -59,7 +59,11 @@ function assertValidInvocation(steps: string[], opts: PlanCommandOptions): void 
   }
 }
 
-async function runPlan(ref: string, steps: string[], opts: PlanCommandOptions): Promise<void> {
+export async function runPlan(
+  ref: string,
+  steps: string[],
+  opts: PlanCommandOptions,
+): Promise<void> {
   assertValidInvocation(steps, opts);
 
   const root = requireRepoRoot(process.cwd());

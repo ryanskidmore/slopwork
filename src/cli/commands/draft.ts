@@ -11,7 +11,7 @@ import { assertDraftable } from "../../tickets/draft.js";
 import { buildUpdate } from "../../tickets/update.js";
 import { loadConfig, resolveActor } from "../actor.js";
 
-async function runDraft(ref: string): Promise<void> {
+export async function runDraft(ref: string): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
   const config = await loadConfig(paths);

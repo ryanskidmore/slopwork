@@ -331,7 +331,7 @@ function report(args: {
 // Orchestration
 // ---------------------------------------------------------------------------
 
-async function runInit(opts: InitOptions): Promise<void> {
+export async function runInit(opts: InitOptions): Promise<void> {
   const { root, alreadyInitialized } = determineRoot(process.cwd());
 
   const paths = await ensureDbDirs(root);

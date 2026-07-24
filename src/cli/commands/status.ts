@@ -491,7 +491,7 @@ function filterStatusData(data: StatusData, kept: readonly StatusEntry[]): Statu
   };
 }
 
-async function runStatus(opts: StatusCommandOptions): Promise<void> {
+export async function runStatus(opts: StatusCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
   const clock = resolveClock();

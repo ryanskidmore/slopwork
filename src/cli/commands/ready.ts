@@ -205,7 +205,7 @@ function hintFor(entryCount: number, resumableRequested: boolean): string | null
   );
 }
 
-async function runReady(opts: ReadyCommandOptions): Promise<void> {
+export async function runReady(opts: ReadyCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
   const clock = resolveClock();

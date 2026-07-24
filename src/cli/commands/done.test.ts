@@ -4,12 +4,19 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
+import { makeTempRepo } from "../../../tests/support/temp-repo.js";
 import { fixedClock } from "../../core/clock.js";
+import { EXIT_CODES } from "../../core/exit-codes.js";
 import type { Ticket, TicketId } from "../../core/index.js";
 import { newSessionId, newTicketId, ticketSchema } from "../../core/index.js";
 import type { RepoPaths } from "../../repo/index.js";
 import { readSession, readTicket, repoPaths } from "../../repo/index.js";
-import { buildDoneTicket } from "./done.js";
+import { buildDoneTicket, runDone } from "./done.js";
+import { runDrop } from "./drop.js";
+import { runNew } from "./new.js";
+import { runReview } from "./review.js";
+import { runStart } from "./start.js";
 
 const actor = { name: "ryan", kind: "human" } as const;
 
@@ -464,5 +471,152 @@ describe("done — resolution (ticket_01KY9RWFGVDQNDH1XN43A0GH1M): --outcome <te
     expect(ticketAfterDone.resolution).toBe("closed out the investigation");
     const dependentAfter = await readTicket(paths, dependent.id);
     expect(dependentAfter.state).toBe("open");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// In-process coverage of `runDone` (real v8 coverage, no subprocess).
+// ---------------------------------------------------------------------------
+
+async function jsonNewTicket(
+  root: string,
+  name: string,
+  extra: { blocks?: string[]; adhoc?: boolean } = {},
+): Promise<TicketId> {
+  const out = captureOutput();
+  try {
+    await withCwd(root, () =>
+      runNew(name, { blocks: [], relatesTo: [], label: [], json: true, ...extra }),
+    );
+    return (JSON.parse(out.stdout()) as { id: TicketId }).id;
+  } finally {
+    out.restore();
+  }
+}
+
+async function startTicket(root: string, id: TicketId): Promise<void> {
+  const out = captureOutput();
+  try {
+    await withCwd(root, () => runStart(id, {}));
+  } finally {
+    out.restore();
+  }
+}
+
+describe("runDone (in-process)", () => {
+  it("completes review -> done with no nag, cascading an unblock", async () => {
+    const root = await makeTempRepo("slop-done-inproc-review-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const dependent = await jsonNewTicket(root, "Dependent ticket");
+    const id = await jsonNewTicket(root, "Blocking ticket", { blocks: [dependent] });
+    await startTicket(root, id);
+    const reviewOut = captureOutput();
+    try {
+      await withCwd(root, () => runReview(id, { mr: "https://example.com/pr/1" }));
+    } finally {
+      reviewOut.restore();
+    }
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runDone(id, { note: "shipped via review" }));
+      expect(out.stderr()).not.toMatch(/review\/MR/i);
+      expect(out.stdout()).toContain(dependent);
+    } finally {
+      out.restore();
+    }
+    const paths = repoPaths(root);
+    const ticket = await readTicket(paths, id);
+    expect(ticket.state).toBe("done");
+    expect(ticket.active_session).toBeNull();
+    const dependentTicket = await readTicket(paths, dependent);
+    expect(dependentTicket.state).toBe("open");
+  });
+
+  it("completes in_progress -> done directly for a non-adhoc ticket, nagging on stderr", async () => {
+    const root = await makeTempRepo("slop-done-inproc-nag-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Non-adhoc direct-done ticket");
+    await startTicket(root, id);
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runDone(id, { note: "shipped, skipped review" }));
+      expect(out.stderr()).toMatch(/done without a review\/MR/i);
+    } finally {
+      out.restore();
+    }
+    const paths = repoPaths(root);
+    expect((await readTicket(paths, id)).state).toBe("done");
+  });
+
+  it("completes in_progress -> done directly for an adhoc ticket silently (no nag)", async () => {
+    const root = await makeTempRepo("slop-done-inproc-adhoc-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Adhoc direct-done ticket", { adhoc: true });
+    await startTicket(root, id);
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runDone(id, { note: "adhoc, shipped" }));
+      expect(out.stderr()).not.toMatch(/review\/MR/i);
+    } finally {
+      out.restore();
+    }
+    const paths = repoPaths(root);
+    expect((await readTicket(paths, id)).state).toBe("done");
+  });
+
+  it("--outcome stores a resolution writeup on the ticket", async () => {
+    const root = await makeTempRepo("slop-done-inproc-outcome-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Outcome ticket", { adhoc: true });
+    await startTicket(root, id);
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () =>
+        runDone(id, { note: "done", outcome: "Root cause: X. Fixed by Y." }),
+      );
+      expect(out.stdout()).toContain("resolution: (set)");
+    } finally {
+      out.restore();
+    }
+    const paths = repoPaths(root);
+    expect((await readTicket(paths, id)).resolution).toBe("Root cause: X. Fixed by Y.");
+  });
+
+  it("refuses to complete an already-dropped ticket (CONFLICT, exit 6)", async () => {
+    const root = await makeTempRepo("slop-done-inproc-conflict-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Dropped ticket");
+    const dropOut = captureOutput();
+    try {
+      await withCwd(root, () => runDrop(id, { reason: "wontdo" }));
+    } finally {
+      dropOut.restore();
+    }
+
+    const out = captureOutput();
+    try {
+      await expect(withCwd(root, () => runDone(id, {}))).rejects.toMatchObject({
+        exitCode: EXIT_CODES.CONFLICT,
+      });
+    } finally {
+      out.restore();
+    }
+  });
+
+  it("throws NOT_FOUND for an unresolvable ref", async () => {
+    const root = await makeTempRepo("slop-done-inproc-notfound-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const out = captureOutput();
+    try {
+      await expect(withCwd(root, () => runDone("no-such-ticket", {}))).rejects.toMatchObject({
+        exitCode: EXIT_CODES.NOT_FOUND,
+      });
+    } finally {
+      out.restore();
+    }
   });
 });

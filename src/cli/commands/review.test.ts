@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
+import { makeTempRepo } from "../../../tests/support/temp-repo.js";
 import { fixedClock } from "../../core/clock.js";
+import { EXIT_CODES } from "../../core/exit-codes.js";
 import { newSessionId, newTicketId, ticketSchema } from "../../core/index.js";
-import type { Ticket } from "../../core/index.js";
-import { buildReviewedTicket } from "./review.js";
+import type { Ticket, TicketId } from "../../core/index.js";
+import { readTicket, repoPaths } from "../../repo/index.js";
+import { buildReviewedTicket, runReview } from "./review.js";
+import { runNew } from "./new.js";
+import { runStart } from "./start.js";
 
 const actor = { name: "ryan", kind: "human" } as const;
 
@@ -72,5 +78,111 @@ describe("buildReviewedTicket", () => {
     expect(() => buildReviewedTicket(ticket, "javascript:alert(1)", actor, clock)).toThrow();
     expect(() => buildReviewedTicket(ticket, "data:text/html;base64,QQ==", actor, clock)).toThrow();
     expect(() => buildReviewedTicket(ticket, "vbscript:msgbox(1)", actor, clock)).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// In-process coverage of `runReview` (real v8 coverage, no subprocess).
+// ---------------------------------------------------------------------------
+
+async function jsonNewTicket(root: string, name: string): Promise<TicketId> {
+  const out = captureOutput();
+  try {
+    await withCwd(root, () => runNew(name, { blocks: [], relatesTo: [], label: [], json: true }));
+    return (JSON.parse(out.stdout()) as { id: TicketId }).id;
+  } finally {
+    out.restore();
+  }
+}
+
+async function startTicket(root: string, id: TicketId): Promise<void> {
+  const out = captureOutput();
+  try {
+    await withCwd(root, () => runStart(id, {}));
+  } finally {
+    out.restore();
+  }
+}
+
+describe("runReview (in-process)", () => {
+  it("moves an in_progress ticket to review with an --mr link", async () => {
+    const root = await makeTempRepo("slop-review-inproc-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "In-progress ticket to review");
+    await startTicket(root, id);
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runReview(id, { mr: "https://example.com/org/repo/pull/1" }));
+      expect(out.stdout()).toContain("moved to review");
+      expect(out.stdout()).toContain("mr: https://example.com/org/repo/pull/1");
+      expect(out.stderr()).toBe("");
+    } finally {
+      out.restore();
+    }
+    const paths = repoPaths(root);
+    const ticket = await readTicket(paths, id);
+    expect(ticket.state).toBe("review");
+    expect(ticket.review?.mr).toBe("https://example.com/org/repo/pull/1");
+  });
+
+  it("nags on stderr (but still succeeds) when --mr is omitted", async () => {
+    const root = await makeTempRepo("slop-review-inproc-nomr-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "No-mr review ticket");
+    await startTicket(root, id);
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runReview(id, {}));
+      expect(out.stderr()).toMatch(/no --mr given/);
+    } finally {
+      out.restore();
+    }
+    const paths = repoPaths(root);
+    expect((await readTicket(paths, id)).state).toBe("review");
+  });
+
+  it("rejects a malformed --mr URL up front (USAGE_ERROR, exit 2), with zero side effects", async () => {
+    const root = await makeTempRepo("slop-review-inproc-badmr-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Bad mr review ticket");
+    await startTicket(root, id);
+
+    await expect(
+      withCwd(root, () => runReview(id, { mr: "javascript:alert(1)" })),
+    ).rejects.toMatchObject({ exitCode: EXIT_CODES.USAGE_ERROR });
+
+    const paths = repoPaths(root);
+    // Zero side effects: the ticket is untouched (still in_progress).
+    expect((await readTicket(paths, id)).state).toBe("in_progress");
+  });
+
+  it("refuses to review an open (never-started) ticket (CONFLICT, exit 6)", async () => {
+    const root = await makeTempRepo("slop-review-inproc-conflict-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Open ticket, never started");
+
+    const out = captureOutput();
+    try {
+      await expect(withCwd(root, () => runReview(id, {}))).rejects.toMatchObject({
+        exitCode: EXIT_CODES.CONFLICT,
+      });
+    } finally {
+      out.restore();
+    }
+  });
+
+  it("throws NOT_FOUND for an unresolvable ref", async () => {
+    const root = await makeTempRepo("slop-review-inproc-notfound-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const out = captureOutput();
+    try {
+      await expect(withCwd(root, () => runReview("no-such-ticket", {}))).rejects.toMatchObject({
+        exitCode: EXIT_CODES.NOT_FOUND,
+      });
+    } finally {
+      out.restore();
+    }
   });
 });

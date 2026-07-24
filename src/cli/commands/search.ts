@@ -225,7 +225,7 @@ function buildJson(
   return `${JSON.stringify(body, null, 2)}\n`;
 }
 
-async function runSearch(text: string, opts: SearchCommandOptions): Promise<void> {
+export async function runSearch(text: string, opts: SearchCommandOptions): Promise<void> {
   const terms = searchTerms(text);
   if (terms.length === 0) {
     throw new SlopError(

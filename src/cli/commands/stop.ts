@@ -36,7 +36,7 @@ interface StopCommandOptions {
  */
 const STOP_SESSION_FIELDS = [...SESSION_END_FIELDS, "transcript_ref"] as const;
 
-async function runStop(ref: string, opts: StopCommandOptions): Promise<void> {
+export async function runStop(ref: string, opts: StopCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
   const config = await loadConfig(paths);

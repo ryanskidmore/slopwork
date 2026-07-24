@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { Readable } from "node:stream";
+import { describe, expect, it, vi } from "vitest";
 import { EXIT_CODES } from "../../core/index.js";
 import { SlopError } from "../errors.js";
-import { parseIntegerOption, parsePriority } from "./shared.js";
+import { collect, parseIntegerOption, parsePriority, printWarning, readStdin } from "./shared.js";
 
 // cli-input-validation-reject-truncated-numerics-fix-actor-fai:
 //
@@ -78,5 +79,71 @@ describe('parsePriority (parseIntegerOption("--priority"))', () => {
 
   it("rejects '1.9' rather than silently truncating to priority 1", () => {
     expect(() => parsePriority("1.9")).toThrow(SlopError);
+  });
+});
+
+describe("collect", () => {
+  it("appends to and returns the same accumulator array (Commander's 'repeatable option' reducer shape)", () => {
+    const acc: string[] = [];
+    const first = collect("a", acc);
+    expect(first).toBe(acc); // same array instance, mutated in place
+    expect(first).toEqual(["a"]);
+    const second = collect("b", first);
+    expect(second).toEqual(["a", "b"]);
+  });
+
+  it("starting from a fresh [] default, each call accumulates in order", () => {
+    let acc: string[] = [];
+    acc = collect("x", acc);
+    acc = collect("y", acc);
+    acc = collect("z", acc);
+    expect(acc).toEqual(["x", "y", "z"]);
+  });
+});
+
+describe("printWarning", () => {
+  it("writes 'warning: <message>' to stderr", () => {
+    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      printWarning("something worth flagging");
+      expect(spy).toHaveBeenCalledWith("warning: something worth flagging\n");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+describe("readStdin", () => {
+  it("reads all of stdin as UTF-8 text", async () => {
+    const fake = Readable.from(["hello ", "world"]);
+    const originalStdin = process.stdin;
+    Object.defineProperty(process, "stdin", { value: fake, configurable: true });
+    try {
+      await expect(readStdin()).resolves.toBe("hello world");
+    } finally {
+      Object.defineProperty(process, "stdin", { value: originalStdin, configurable: true });
+    }
+  });
+
+  it("returns an empty string for empty stdin", async () => {
+    const fake = Readable.from([]);
+    const originalStdin = process.stdin;
+    Object.defineProperty(process, "stdin", { value: fake, configurable: true });
+    try {
+      await expect(readStdin()).resolves.toBe("");
+    } finally {
+      Object.defineProperty(process, "stdin", { value: originalStdin, configurable: true });
+    }
+  });
+
+  it("concatenates Buffer chunks correctly (multi-byte content)", async () => {
+    const fake = Readable.from([Buffer.from("multi"), Buffer.from("-byte"), Buffer.from(" text")]);
+    const originalStdin = process.stdin;
+    Object.defineProperty(process, "stdin", { value: fake, configurable: true });
+    try {
+      await expect(readStdin()).resolves.toBe("multi-byte text");
+    } finally {
+      Object.defineProperty(process, "stdin", { value: originalStdin, configurable: true });
+    }
   });
 });

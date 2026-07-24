@@ -90,7 +90,7 @@ function buildReenteredSession(previous: Session, clock: Clock = systemClock): S
   });
 }
 
-async function runStart(ref: string, opts: StartCommandOptions): Promise<void> {
+export async function runStart(ref: string, opts: StartCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
   const config = await loadConfig(paths);

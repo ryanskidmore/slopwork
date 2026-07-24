@@ -85,7 +85,7 @@ export function buildDoneTicket(
   return parsed.data;
 }
 
-async function runDone(ref: string, opts: DoneCommandOptions): Promise<void> {
+export async function runDone(ref: string, opts: DoneCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
   const config = await loadConfig(paths);

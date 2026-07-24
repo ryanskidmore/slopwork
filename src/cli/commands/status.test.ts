@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
+import { makeTempRepo } from "../../../tests/support/temp-repo.js";
 import type { Session, Ticket, TicketId } from "../../core/index.js";
 import {
   newSessionId,
@@ -20,6 +22,10 @@ import {
   sessionFilePath,
   ticketFilePath,
 } from "../../repo/index.js";
+import { runNew } from "./new.js";
+import { runReview } from "./review.js";
+import { runStart } from "./start.js";
+import { runStatus } from "./status.js";
 
 // ticket_01KY9RVF2DCG6TDQ8EBSGXQXT1: `status` surfaces the short t-<code>
 // handle (core/ids.ts's shortTicketCode) on its in_progress/review/stale
@@ -212,5 +218,155 @@ describe("status: surfaces the t-<code> short handle (ticket_01KY9RVF2DCG6TDQ8EB
     const result = runSlop(["status"], paths.root);
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout.toLowerCase()).toContain("no tickets yet");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// In-process coverage of `runStatus` (real v8 coverage, no subprocess).
+// ---------------------------------------------------------------------------
+
+async function jsonNewTicket(root: string, name: string): Promise<TicketId> {
+  const out = captureOutput();
+  try {
+    await withCwd(root, () => runNew(name, { blocks: [], relatesTo: [], label: [], json: true }));
+    return (JSON.parse(out.stdout()) as { id: TicketId }).id;
+  } finally {
+    out.restore();
+  }
+}
+
+const originalFakeNow = process.env.SLOP_STATUS_FAKE_NOW;
+afterEach(() => {
+  if (originalFakeNow === undefined) delete process.env.SLOP_STATUS_FAKE_NOW;
+  else process.env.SLOP_STATUS_FAKE_NOW = originalFakeNow;
+});
+
+describe("runStatus (in-process)", () => {
+  it("empty repo: prints the no-tickets hint", async () => {
+    const root = await makeTempRepo("slop-status-inproc-empty-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runStatus({}));
+      expect(out.stdout().toLowerCase()).toContain("no tickets yet");
+    } finally {
+      out.restore();
+    }
+  });
+
+  it("counts by state, and an in_progress ticket's session/actor/harness", async () => {
+    const root = await makeTempRepo("slop-status-inproc-counts-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "In-progress status ticket");
+    const startOut = captureOutput();
+    try {
+      await withCwd(root, () => runStart(id, {}));
+    } finally {
+      startOut.restore();
+    }
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runStatus({ json: true }));
+    } finally {
+      out.restore();
+    }
+    const body = JSON.parse(out.stdout()) as {
+      counts: { in_progress: number; total: number };
+      in_progress: { id: string; session: { actor: string } | null }[];
+    };
+    expect(body.counts.total).toBe(1);
+    expect(body.counts.in_progress).toBe(1);
+    expect(body.in_progress[0]?.id).toBe(id);
+    expect(body.in_progress[0]?.session?.actor).toBe("ryan");
+  });
+
+  it("a review-state ticket surfaces its MR link", async () => {
+    const root = await makeTempRepo("slop-status-inproc-review-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Review status ticket");
+    const startOut = captureOutput();
+    try {
+      await withCwd(root, () => runStart(id, {}));
+    } finally {
+      startOut.restore();
+    }
+    const reviewOut = captureOutput();
+    try {
+      await withCwd(root, () => runReview(id, { mr: "https://example.com/pr/9" }));
+    } finally {
+      reviewOut.restore();
+    }
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runStatus({ json: true }));
+    } finally {
+      out.restore();
+    }
+    const body = JSON.parse(out.stdout()) as {
+      review: { id: string; mr: string | null }[];
+    };
+    expect(body.review).toHaveLength(1);
+    expect(body.review[0]?.mr).toBe("https://example.com/pr/9");
+  });
+
+  it("SLOP_STATUS_FAKE_NOW pins the clock: a session started long ago reads as stale", async () => {
+    const root = await makeTempRepo("slop-status-inproc-stale-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Soon-to-be-stale ticket");
+    const startOut = captureOutput();
+    try {
+      await withCwd(root, () => runStart(id, {}));
+    } finally {
+      startOut.restore();
+    }
+
+    // Default stale_after is 60m (DEFAULT_STALE_AFTER) — pin "now" far
+    // enough past session start that the ticket must read as stale.
+    process.env.SLOP_STATUS_FAKE_NOW = new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString();
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runStatus({ json: true }));
+    } finally {
+      out.restore();
+    }
+    const body = JSON.parse(out.stdout()) as { stale: { id: string; state: string }[] };
+    expect(body.stale).toEqual([
+      { id, slug: expect.any(String), name: expect.any(String), state: "in_progress" },
+    ]);
+  });
+
+  it("--budget bounds output without corrupting --json", async () => {
+    const root = await makeTempRepo("slop-status-inproc-budget-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    await jsonNewTicket(root, "Budgeted status ticket 1");
+    await jsonNewTicket(root, "Budgeted status ticket 2");
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runStatus({ json: true, budget: 1 }));
+    } finally {
+      out.restore();
+    }
+    expect(() => JSON.parse(out.stdout())).not.toThrow();
+  });
+
+  it("human view renders counts/in-progress/review/stale sections", async () => {
+    const root = await makeTempRepo("slop-status-inproc-human-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    await jsonNewTicket(root, "Human view ticket");
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runStatus({}));
+      expect(out.stdout()).toContain("Slopwork status");
+      expect(out.stdout()).toContain("In progress (0");
+      expect(out.stdout()).toContain("Awaiting review (0");
+      expect(out.stdout()).toContain("Stale (0)");
+    } finally {
+      out.restore();
+    }
   });
 });

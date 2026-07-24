@@ -21,7 +21,7 @@ interface NewCommandOptions {
   json?: boolean;
 }
 
-async function runNew(name: string, opts: NewCommandOptions): Promise<void> {
+export async function runNew(name: string, opts: NewCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
   const config = await loadConfig(paths);

@@ -74,7 +74,7 @@ async function rescueAndRollback(
   );
 }
 
-async function runEdit(ref: string): Promise<void> {
+export async function runEdit(ref: string): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
   const config = await loadConfig(paths);

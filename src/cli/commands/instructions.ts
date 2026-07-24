@@ -17,7 +17,7 @@ import { parseConfigYamlText } from "../config-yaml.js";
 import { renderInstructions } from "../onboarding/render.js";
 import { SlopError } from "../errors.js";
 
-async function runInstructions(): Promise<void> {
+export async function runInstructions(): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
   const configPath = join(paths.slopDir, "config.yaml");

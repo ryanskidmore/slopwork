@@ -1,5 +1,5 @@
 import { type SpawnSyncReturns, spawnSync } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,6 +8,8 @@ import { type Ticket, newTicketId, ticketSchema } from "../../core/index.js";
 import type { EventContext, MutationEventSpec } from "../../repo/events.js";
 import { createTicket, ensureDbDirs, ticketFilePath } from "../../repo/index.js";
 import type { RepoPaths } from "../../repo/index.js";
+import { captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
+import { runReindex } from "./reindex.js";
 
 // A4: createTicket requires an EventContext + a MutationEventSpec —
 // these fixtures don't exercise event behavior.
@@ -34,7 +36,7 @@ function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
   });
 }
 
-function runReindex(cwd: string, args: string[] = []): SpawnSyncReturns<string> {
+function spawnReindex(cwd: string, args: string[] = []): SpawnSyncReturns<string> {
   return spawnSync("bun", [cliEntry, "reindex", ...args], { cwd, encoding: "utf8" });
 }
 
@@ -62,7 +64,7 @@ describe("slop reindex — fault tolerance (adversarial-review Finding 3)", () =
     const t = makeTicket();
     await createTicket(paths, t, ctx, createdEvent);
 
-    const { status, stdout, stderr } = runReindex(scratch);
+    const { status, stdout, stderr } = spawnReindex(scratch);
     expect(status).toBe(0);
     expect(stdout).toContain("reindexed: 1 ticket(s)");
     expect(stderr).toBe("");
@@ -77,7 +79,7 @@ describe("slop reindex — fault tolerance (adversarial-review Finding 3)", () =
     const badPath = ticketFilePath(paths, badId);
     await writeFile(badPath, '{ "id": "not even close to valid" }');
 
-    const { status, stdout, stderr } = runReindex(scratch);
+    const { status, stdout, stderr } = spawnReindex(scratch);
 
     expect(status).toBe(1);
     expect(stdout).toContain("2 ticket(s) rebuilt");
@@ -109,7 +111,7 @@ describe("slop reindex — fault tolerance (adversarial-review Finding 3)", () =
     await writeFile(ticketFilePath(paths, bad1), "{ not even valid jsonc {{{");
     await writeFile(ticketFilePath(paths, bad2), '{ "id": "still not valid" }');
 
-    const { status, stdout, stderr } = runReindex(scratch);
+    const { status, stdout, stderr } = spawnReindex(scratch);
 
     expect(status).toBe(1);
     expect(stderr).toContain(ticketFilePath(paths, bad1));
@@ -126,7 +128,7 @@ describe("slop reindex — fault tolerance (adversarial-review Finding 3)", () =
     const before = await readFile(paths.indexFile, "utf8").catch(() => null);
     expect(before).toBeNull(); // never built yet
 
-    const { status, stderr } = runReindex(scratch, ["--strict"]);
+    const { status, stderr } = spawnReindex(scratch, ["--strict"]);
 
     expect(status).not.toBe(0);
     expect(stderr).toContain(ticketFilePath(paths, badId));
@@ -140,8 +142,88 @@ describe("slop reindex — fault tolerance (adversarial-review Finding 3)", () =
     const t = makeTicket();
     await createTicket(paths, t, ctx, createdEvent);
 
-    const { status, stdout } = runReindex(scratch, ["--strict"]);
+    const { status, stdout } = spawnReindex(scratch, ["--strict"]);
     expect(status).toBe(0);
     expect(stdout).toContain("reindexed: 1 ticket(s)");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// In-process coverage of `runReindex` itself (real v8 coverage, no
+// subprocess) — same scenarios as the spawned suite above, driven directly
+// against a temp repo via withCwd/captureOutput (tests/support/cli-harness.ts).
+// ---------------------------------------------------------------------------
+describe("runReindex (in-process)", () => {
+  it("rebuilds cleanly and prints a summary when nothing is corrupt", async () => {
+    const t = makeTicket();
+    await createTicket(paths, t, ctx, createdEvent);
+
+    const out = captureOutput();
+    try {
+      await withCwd(scratch, () => runReindex({}));
+      expect(out.stdout()).toContain("reindexed: 1 ticket(s)");
+      expect(out.stderr()).toBe("");
+    } finally {
+      out.restore();
+    }
+  });
+
+  it("throws a SlopError (GENERIC_ERROR) and still rebuilds the good tickets when one is corrupt", async () => {
+    const good = makeTicket();
+    await createTicket(paths, good, ctx, createdEvent);
+    const badId = newTicketId();
+    const badPath = ticketFilePath(paths, badId);
+    await writeFile(badPath, '{ "id": "not even close to valid" }');
+
+    const out = captureOutput();
+    try {
+      await expect(withCwd(scratch, () => runReindex({}))).rejects.toThrow(/unreadable ticket/i);
+      expect(out.stdout()).toContain("1 ticket(s) rebuilt");
+      expect(out.stdout()).toContain("1 skipped due to errors");
+      expect(out.stderr()).toContain(badPath);
+    } finally {
+      out.restore();
+    }
+
+    const onDiskIndex = JSON.parse(await readFile(paths.indexFile, "utf8")) as {
+      tickets: { id: string }[];
+    };
+    expect(onDiskIndex.tickets.map((t) => t.id)).toEqual([good.id]);
+  });
+
+  it("--strict (options.strict) fails fast and never writes index.jsonc", async () => {
+    const badId = newTicketId();
+    await writeFile(ticketFilePath(paths, badId), "{ not even valid jsonc {{{");
+
+    const out = captureOutput();
+    try {
+      await expect(withCwd(scratch, () => runReindex({ strict: true }))).rejects.toThrow();
+    } finally {
+      out.restore();
+    }
+
+    const after = await readFile(paths.indexFile, "utf8").catch(() => null);
+    expect(after).toBeNull();
+  });
+
+  it("reports swept stale temp files in the summary line", async () => {
+    const t = makeTicket();
+    await createTicket(paths, t, ctx, createdEvent);
+    // A leftover temp file matching atomic-write.ts's naming convention
+    // (`.tmp-<random>-<target-basename>`), backdated well past
+    // DEFAULT_SWEEP_MIN_AGE_MS (60s) so sweepStaleTempFiles treats it as
+    // stale rather than "another process might still be writing this".
+    const staleTemp = join(paths.ticketsDir, `.tmp-deadbeef-${t.id}.jsonc`);
+    await writeFile(staleTemp, "leftover");
+    const old = new Date(Date.now() - 120_000);
+    await utimes(staleTemp, old, old);
+
+    const out = captureOutput();
+    try {
+      await withCwd(scratch, () => runReindex({}));
+      expect(out.stdout()).toMatch(/swept 1 stale temp file/);
+    } finally {
+      out.restore();
+    }
   });
 });

@@ -92,7 +92,11 @@ interface SplitCommandOptions {
   json?: boolean;
 }
 
-async function runSplit(ref: string, names: string[], opts: SplitCommandOptions): Promise<void> {
+export async function runSplit(
+  ref: string,
+  names: string[],
+  opts: SplitCommandOptions,
+): Promise<void> {
   validateNames(names);
 
   const root = requireRepoRoot(process.cwd());

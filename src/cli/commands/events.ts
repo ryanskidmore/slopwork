@@ -274,6 +274,40 @@ function buildJson(
   return `${JSON.stringify(body, null, 2)}\n`;
 }
 
+export async function runEvents(opts: EventsOptions): Promise<void> {
+  const root = requireRepoRoot(process.cwd());
+  const paths = repoPaths(root);
+
+  let since: EventId | undefined;
+  if (opts.since !== undefined) {
+    since = parseSinceCursor(opts.since);
+    await verifyCursorExists(paths, since);
+  }
+
+  const limit = opts.limit !== undefined ? parseLimit(opts.limit) : undefined;
+
+  let predicate: ((event: Event) => boolean) | undefined;
+  let ticketId: TicketId | undefined;
+  if (opts.ticket !== undefined) {
+    const ticket = await resolveTicketRef(paths, opts.ticket);
+    ticketId = ticket.id;
+    predicate = await ticketEventPredicate(paths, ticket.id);
+  }
+
+  const page = await fetchPage(paths, since, predicate, limit);
+
+  const rendered = renderEntriesWithBudget(
+    page.events,
+    (kept, elisions) =>
+      opts.json
+        ? buildJson(pageFor(page, kept, since), since, ticketId, limit, elisions)
+        : buildHuman(pageFor(page, kept, since), kept, elisions),
+    opts.budget,
+    { format: opts.json ? "json" : "text", noun: "event" },
+  );
+  process.stdout.write(rendered.text);
+}
+
 /** `slop events` — design.md §3, §4.2; work item D3. */
 export function registerEventsCommand(program: Command): void {
   program
@@ -289,37 +323,5 @@ export function registerEventsCommand(program: Command): void {
         "adjusting next_cursor/has_more to match what's actually returned)",
       parseIntegerOption("--budget"),
     )
-    .action(async (opts: EventsOptions) => {
-      const root = requireRepoRoot(process.cwd());
-      const paths = repoPaths(root);
-
-      let since: EventId | undefined;
-      if (opts.since !== undefined) {
-        since = parseSinceCursor(opts.since);
-        await verifyCursorExists(paths, since);
-      }
-
-      const limit = opts.limit !== undefined ? parseLimit(opts.limit) : undefined;
-
-      let predicate: ((event: Event) => boolean) | undefined;
-      let ticketId: TicketId | undefined;
-      if (opts.ticket !== undefined) {
-        const ticket = await resolveTicketRef(paths, opts.ticket);
-        ticketId = ticket.id;
-        predicate = await ticketEventPredicate(paths, ticket.id);
-      }
-
-      const page = await fetchPage(paths, since, predicate, limit);
-
-      const rendered = renderEntriesWithBudget(
-        page.events,
-        (kept, elisions) =>
-          opts.json
-            ? buildJson(pageFor(page, kept, since), since, ticketId, limit, elisions)
-            : buildHuman(pageFor(page, kept, since), kept, elisions),
-        opts.budget,
-        { format: opts.json ? "json" : "text", noun: "event" },
-      );
-      process.stdout.write(rendered.text);
-    });
+    .action(runEvents);
 }

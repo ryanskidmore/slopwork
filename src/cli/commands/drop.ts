@@ -73,7 +73,7 @@ export function buildDroppedTicket(
   return parsed.data;
 }
 
-async function runDrop(ref: string, opts: DropCommandOptions): Promise<void> {
+export async function runDrop(ref: string, opts: DropCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
   const config = await loadConfig(paths);

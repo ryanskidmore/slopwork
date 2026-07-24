@@ -4,8 +4,13 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
+import { makeTempRepo } from "../../../tests/support/temp-repo.js";
+import { EXIT_CODES } from "../../core/exit-codes.js";
 import type { TicketId } from "../../core/index.js";
 import { listSessions, queryEvents, readTicket, repoPaths } from "../../repo/index.js";
+import { runNew } from "./new.js";
+import { runUpdate } from "./update.js";
 
 // Regression test for ticket_01KY93E2BKH5JCMAV3JWPNN63G: `update` (and
 // `draft`/`undraft`, see draft.test.ts/undraft.test.ts) used to read the
@@ -448,5 +453,148 @@ describe("update --relates-to <±ref>: add/remove a relates-to edge (ticket_01KY
     expect(after).toEqual(before);
     const eventsAfter = await queryEvents(paths, { ticket: main.id });
     expect(eventsAfter.map((e) => e.id)).toEqual(eventsBefore.map((e) => e.id));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// In-process coverage of `runUpdate` (real v8 coverage, no subprocess).
+// ---------------------------------------------------------------------------
+
+function baseOpts(overrides: Partial<Parameters<typeof runUpdate>[1]> = {}) {
+  return { label: [] as string[], relatesTo: [] as string[], ...overrides };
+}
+
+async function jsonNewTicket(root: string, name: string): Promise<TicketId> {
+  const out = captureOutput();
+  try {
+    await withCwd(root, () => runNew(name, { blocks: [], relatesTo: [], label: [], json: true }));
+    return (JSON.parse(out.stdout()) as { id: TicketId }).id;
+  } finally {
+    out.restore();
+  }
+}
+
+describe("runUpdate (in-process)", () => {
+  it("a pure --progress call appends a note event without taking the lock or rewriting the ticket file", async () => {
+    const root = await makeTempRepo("slop-update-inproc-progress-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Progress-only ticket");
+    const paths = repoPaths(root);
+    const before = await readTicket(paths, id);
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runUpdate(id, baseOpts({ progress: "made some headway" })));
+      expect(out.stdout()).toContain(`updated ${id}`);
+    } finally {
+      out.restore();
+    }
+    const after = await readTicket(paths, id);
+    expect(after).toEqual(before); // never rewritten — pure progress is event-only
+    const events = await queryEvents(paths, { ticket: id });
+    expect(events.some((e) => e.payload.progress === "made some headway")).toBe(true);
+  });
+
+  it("--priority changes the stored priority", async () => {
+    const root = await makeTempRepo("slop-update-inproc-priority-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Priority ticket");
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runUpdate(id, baseOpts({ priority: 0 })));
+    } finally {
+      out.restore();
+    }
+    const paths = repoPaths(root);
+    expect((await readTicket(paths, id)).priority).toBe(0);
+  });
+
+  it("--label +x adds a label; a later --label -x removes it", async () => {
+    const root = await makeTempRepo("slop-update-inproc-label-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Label ticket");
+    const paths = repoPaths(root);
+
+    const out1 = captureOutput();
+    try {
+      await withCwd(root, () => runUpdate(id, baseOpts({ label: ["+urgent"] })));
+    } finally {
+      out1.restore();
+    }
+    expect((await readTicket(paths, id)).labels).toContain("urgent");
+
+    const out2 = captureOutput();
+    try {
+      await withCwd(root, () => runUpdate(id, baseOpts({ label: ["-urgent"] })));
+    } finally {
+      out2.restore();
+    }
+    expect((await readTicket(paths, id)).labels).not.toContain("urgent");
+  });
+
+  it("--relates-to +<ref> adds a symmetric relates-to edge, validated via validateTicketEdges", async () => {
+    const root = await makeTempRepo("slop-update-inproc-relates-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Main ticket");
+    const target = await jsonNewTicket(root, "Related target");
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runUpdate(id, baseOpts({ relatesTo: [`+${target}`] })));
+    } finally {
+      out.restore();
+    }
+    const paths = repoPaths(root);
+    expect((await readTicket(paths, id)).relates_to).toContain(target);
+  });
+
+  it("a fully redundant patch (no-op) writes nothing: no lock write, no event", async () => {
+    const root = await makeTempRepo("slop-update-inproc-noop-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "No-op update ticket");
+    const paths = repoPaths(root);
+    const before = await readTicket(paths, id);
+    const eventsBefore = await queryEvents(paths, { ticket: id });
+
+    const out = captureOutput();
+    try {
+      // Same priority the ticket already has (default 2) — nothing changes.
+      await withCwd(root, () => runUpdate(id, baseOpts({ priority: 2 })));
+    } finally {
+      out.restore();
+    }
+    const after = await readTicket(paths, id);
+    expect(after).toEqual(before);
+    const eventsAfter = await queryEvents(paths, { ticket: id });
+    expect(eventsAfter).toHaveLength(eventsBefore.length);
+  });
+
+  it("throws NOT_FOUND for an unresolvable --relates-to target", async () => {
+    const root = await makeTempRepo("slop-update-inproc-badrelates-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Ticket with bad relates-to");
+
+    const out = captureOutput();
+    try {
+      await expect(
+        withCwd(root, () => runUpdate(id, baseOpts({ relatesTo: ["+no-such-ticket"] }))),
+      ).rejects.toMatchObject({ exitCode: EXIT_CODES.NOT_FOUND });
+    } finally {
+      out.restore();
+    }
+  });
+
+  it("throws NOT_FOUND for an unresolvable <ref>", async () => {
+    const root = await makeTempRepo("slop-update-inproc-notfound-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const out = captureOutput();
+    try {
+      await expect(
+        withCwd(root, () => runUpdate("no-such-ticket", baseOpts({ priority: 1 }))),
+      ).rejects.toMatchObject({ exitCode: EXIT_CODES.NOT_FOUND });
+    } finally {
+      out.restore();
+    }
   });
 });

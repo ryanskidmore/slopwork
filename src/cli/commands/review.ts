@@ -72,7 +72,7 @@ export function buildReviewedTicket(
   return parsed.data;
 }
 
-async function runReview(ref: string, opts: ReviewCommandOptions): Promise<void> {
+export async function runReview(ref: string, opts: ReviewCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
   const config = await loadConfig(paths);

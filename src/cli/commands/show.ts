@@ -166,7 +166,7 @@ async function runShowJson(
   process.stdout.write(`${JSON.stringify(body, null, 2)}\n`);
 }
 
-async function runShow(ref: string, opts: ShowCommandOptions): Promise<void> {
+export async function runShow(ref: string, opts: ShowCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
   const config = await loadConfig(paths);

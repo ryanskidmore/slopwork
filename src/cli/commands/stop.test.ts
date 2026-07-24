@@ -4,9 +4,15 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
+import { makeTempRepo } from "../../../tests/support/temp-repo.js";
+import { EXIT_CODES } from "../../core/exit-codes.js";
 import type { TicketId } from "../../core/index.js";
 import type { RepoPaths } from "../../repo/index.js";
 import { readTicket, repoPaths } from "../../repo/index.js";
+import { runNew } from "./new.js";
+import { runStart } from "./start.js";
+import { runStop } from "./stop.js";
 
 // Fix 1 (ticket_01KY93E2ZK6Z3TFEBP86ATMW37): captureTranscript's
 // locate+copy must run OUTSIDE the db lock (`.slop/db/.lock`, ONE file
@@ -194,4 +200,94 @@ describe("stop — Fix 1 (ticket_01KY93E2ZK6Z3TFEBP86ATMW37): transcript capture
     expect(ticketBRead.state).toBe("open");
     expect(stoppedA.stdout).toContain("transcripts/");
   }, 15_000);
+});
+
+// ---------------------------------------------------------------------------
+// In-process coverage of `runStop` (real v8 coverage, no subprocess).
+// ---------------------------------------------------------------------------
+
+async function jsonNewTicket(root: string, name: string): Promise<TicketId> {
+  const out = captureOutput();
+  try {
+    await withCwd(root, () => runNew(name, { blocks: [], relatesTo: [], label: [], json: true }));
+    return (JSON.parse(out.stdout()) as { id: TicketId }).id;
+  } finally {
+    out.restore();
+  }
+}
+
+describe("runStop (in-process)", () => {
+  it("stops an in_progress session, returning the ticket to open with a handoff note", async () => {
+    const root = await makeTempRepo("slop-stop-inproc-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "In-progress ticket to stop");
+    const startOut = captureOutput();
+    try {
+      await withCwd(root, () => runStart(id, {}));
+    } finally {
+      startOut.restore();
+    }
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runStop(id, { note: "handing off, see notes" }));
+      expect(out.stdout()).toContain("handoff note: handing off, see notes");
+    } finally {
+      out.restore();
+    }
+    const paths = repoPaths(root);
+    const ticket = await readTicket(paths, id);
+    expect(ticket.state).toBe("open");
+    expect(ticket.active_session).toBeNull();
+  });
+
+  it("warns on stderr when --note is omitted, but still succeeds", async () => {
+    const root = await makeTempRepo("slop-stop-inproc-nonote-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "No-note stop ticket");
+    const startOut = captureOutput();
+    try {
+      await withCwd(root, () => runStart(id, {}));
+    } finally {
+      startOut.restore();
+    }
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runStop(id, {}));
+      expect(out.stderr()).toMatch(/no --note handoff given/);
+    } finally {
+      out.restore();
+    }
+    const paths = repoPaths(root);
+    expect((await readTicket(paths, id)).state).toBe("open");
+  });
+
+  it("refuses to stop a ticket with no active session (CONFLICT-shaped assertStoppable failure)", async () => {
+    const root = await makeTempRepo("slop-stop-inproc-noactive-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Never started ticket");
+
+    const out = captureOutput();
+    try {
+      await expect(withCwd(root, () => runStop(id, {}))).rejects.toThrow();
+    } finally {
+      out.restore();
+    }
+    const paths = repoPaths(root);
+    expect((await readTicket(paths, id)).state).toBe("open");
+  });
+
+  it("throws NOT_FOUND for an unresolvable ref", async () => {
+    const root = await makeTempRepo("slop-stop-inproc-notfound-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const out = captureOutput();
+    try {
+      await expect(withCwd(root, () => runStop("no-such-ticket", {}))).rejects.toMatchObject({
+        exitCode: EXIT_CODES.NOT_FOUND,
+      });
+    } finally {
+      out.restore();
+    }
+  });
 });

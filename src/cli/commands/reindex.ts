@@ -28,6 +28,49 @@ interface ReindexOptions {
  * -tolerance all-or-nothing behavior for anyone who explicitly wants a
  * hard fail on the first bad file instead.
  */
+export async function runReindex(options: ReindexOptions): Promise<void> {
+  const root = requireRepoRoot(process.cwd());
+  const paths = repoPaths(root);
+
+  if (options.strict) {
+    // Fail fast, exactly like any other direct-by-id read: the first
+    // unreadable ticket file throws its full, actionable error and
+    // nothing else runs — index.jsonc is left untouched. `buildIndex`
+    // itself is always fault-tolerant now; --strict is implemented as
+    // this up-front gate specifically so `reindex` alone can opt back
+    // into the old all-or-nothing behavior.
+    await listTickets(paths);
+  }
+
+  const index = await rebuildIndex(paths);
+
+  const swept = await sweepStaleTempFiles([
+    paths.dbDir,
+    paths.ticketsDir,
+    paths.sessionsDir,
+    paths.eventsDir,
+  ]);
+
+  const slugCount = Object.keys(index.slugs).length;
+  const sweptNote = swept.length > 0 ? `; swept ${swept.length} stale temp file(s)` : "";
+
+  if (index.problems.length > 0) {
+    process.stderr.write(`${formatIndexProblems(index.problems)}\n`);
+    process.stdout.write(
+      `reindexed: ${index.tickets.length} ticket(s) rebuilt, ${index.problems.length} skipped due to errors, ${slugCount} slug(s)${sweptNote}\n`,
+    );
+    throw new SlopError(
+      `reindex finished with ${index.problems.length} unreadable ticket file(s) (see the errors above); ` +
+        "fix them and re-run `slop reindex` — everything else was rebuilt and saved successfully",
+      EXIT_CODES.GENERIC_ERROR,
+    );
+  }
+
+  process.stdout.write(
+    `reindexed: ${index.tickets.length} ticket(s), ${slugCount} slug(s)${sweptNote}\n`,
+  );
+}
+
 export function registerReindexCommand(program: Command): void {
   program
     .command("reindex")
@@ -39,46 +82,5 @@ export function registerReindexCommand(program: Command): void {
       "--strict",
       "fail fast on the first unreadable ticket file instead of skipping it and rebuilding the rest (pre-fault-tolerance behavior)",
     )
-    .action(async (options: ReindexOptions) => {
-      const root = requireRepoRoot(process.cwd());
-      const paths = repoPaths(root);
-
-      if (options.strict) {
-        // Fail fast, exactly like any other direct-by-id read: the first
-        // unreadable ticket file throws its full, actionable error and
-        // nothing else runs — index.jsonc is left untouched. `buildIndex`
-        // itself is always fault-tolerant now; --strict is implemented as
-        // this up-front gate specifically so `reindex` alone can opt back
-        // into the old all-or-nothing behavior.
-        await listTickets(paths);
-      }
-
-      const index = await rebuildIndex(paths);
-
-      const swept = await sweepStaleTempFiles([
-        paths.dbDir,
-        paths.ticketsDir,
-        paths.sessionsDir,
-        paths.eventsDir,
-      ]);
-
-      const slugCount = Object.keys(index.slugs).length;
-      const sweptNote = swept.length > 0 ? `; swept ${swept.length} stale temp file(s)` : "";
-
-      if (index.problems.length > 0) {
-        process.stderr.write(`${formatIndexProblems(index.problems)}\n`);
-        process.stdout.write(
-          `reindexed: ${index.tickets.length} ticket(s) rebuilt, ${index.problems.length} skipped due to errors, ${slugCount} slug(s)${sweptNote}\n`,
-        );
-        throw new SlopError(
-          `reindex finished with ${index.problems.length} unreadable ticket file(s) (see the errors above); ` +
-            "fix them and re-run `slop reindex` — everything else was rebuilt and saved successfully",
-          EXIT_CODES.GENERIC_ERROR,
-        );
-      }
-
-      process.stdout.write(
-        `reindexed: ${index.tickets.length} ticket(s), ${slugCount} slug(s)${sweptNote}\n`,
-      );
-    });
+    .action(runReindex);
 }

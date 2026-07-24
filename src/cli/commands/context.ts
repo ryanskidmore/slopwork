@@ -40,7 +40,7 @@ export function parseBudgetFlag(value: string): number {
   return parsed;
 }
 
-async function runContext(ref: string, opts: ContextCommandOptions): Promise<void> {
+export async function runContext(ref: string, opts: ContextCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
   const config = await loadConfig(paths);
