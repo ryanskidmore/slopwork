@@ -14,8 +14,8 @@
     "commit_at_start": "4a15ee362c66803a41c21cda977531b89005ad6e"
   },
   "started_at": "2026-07-24T21:54:27.666Z",
-  "ended_at": null,
+  "ended_at": "2026-07-24T21:54:59.137Z",
   "plan": [],
-  "end_summary": null,
-  "transcript_ref": null
+  "end_summary": "Decision recorded in DECISIONS.md: detect+repair is sufficient; journal rejected on measured cost/benefit. Revisit conditions documented.",
+  "transcript_ref": "transcripts/session_01KYB1YS6JJ7NXNNX7TPAYJSJ1.jsonl"
 }

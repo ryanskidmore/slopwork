@@ -1,0 +1,43 @@
+{
+  "id": "ticket_01KYB241N9MVKZ633P4YBSK64Q",
+  "name": "JSON shapes are inconsistent across the loop: start nests, stop/done/update are flat",
+  "slug": "json-shapes-are-inconsistent-across",
+  "spec": {
+    "summary": "An agent reads ticket.id from start --json but id from done --json",
+    "details_md": "Verified against the packaged binary:\n- `start --json` -> {session:{...}, ticket:{...}, git:{...}, takeover, re_entry, warnings}\n- `stop --json`  -> {id, slug, handle, name, state, note, session_id, transcript}   (FLAT)\n- `done --json`  -> {id, slug, handle, name, state, note, transcript, unblocked, problems, skipped_review, resolution_set} (FLAT)\n- `update --json`-> {id, slug, handle, name, state, priority, reparented_descendants} (FLAT)\n- `new --json`   -> {id, slug, handle, name, state, priority, parent} (FLAT)\n\nSo the ticket identity lives at `ticket.id` in one command and `id` in the next, and the session-lifecycle commands additionally mix ticket fields and session fields at the same level (`id` is the TICKET, but `session_id` is the session).\n\nProposed rule (coherent and documentable): commands that report ONLY a ticket stay flat (new/update/draft/undraft); commands that report a ticket AND a session nest as {ticket:{...}, session:{...}} plus command-specific extras (unblocked, problems, warnings) at top level — i.e. stop/done/drop/review adopt `start`'s existing shape. Breaking, but the unreleased line already carries breaking JSON/CLI changes and v0 is pre-1.0.\n\nNOT done during the fix waves because the shapes were only comparable once every command had --json; deliberately deferred rather than churned mid-flight.",
+    "acceptance": [
+      "One documented rule for --json shapes across every command",
+      "Session-lifecycle commands (start/stop/done/drop/review) agree on ticket/session nesting",
+      "docs/cli-reference.md documents the rule; CHANGELOG notes the break"
+    ],
+    "context": [
+      "src/cli/commands/{start,stop,done,drop,review,update,new}.ts"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "area:cli"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYB241N9MVKZ633P4YBSK64Q",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T21:57:20.212Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T21:57:20.212Z",
+  "updated_at": "2026-07-24T21:57:20.212Z"
+}

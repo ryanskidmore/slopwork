@@ -17,7 +17,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "in_progress",
+  "state": "done",
   "priority": 2,
   "labels": [],
   "adhoc": false,
@@ -28,9 +28,9 @@
   ],
   "root_id": "ticket_01KYAW7DSFYVNM7NP12J9CYJDZ",
   "path": [],
-  "active_session": "session_01KYB1YS6JJ7NXNNX7TPAYJSJ1",
-  "last_activity_at": "2026-07-24T21:54:27.684Z",
-  "latest_note": null,
+  "active_session": null,
+  "last_activity_at": "2026-07-24T21:54:59.153Z",
+  "latest_note": "Decision recorded in DECISIONS.md: detect+repair is sufficient; journal rejected on measured cost/benefit. Revisit conditions documented.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -40,5 +40,5 @@
     }
   },
   "created_at": "2026-07-24T20:14:19.441Z",
-  "updated_at": "2026-07-24T21:54:27.684Z"
+  "updated_at": "2026-07-24T21:54:59.153Z"
 }

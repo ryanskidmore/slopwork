@@ -36,6 +36,10 @@ npm-debug.log*
 # agent worktrees (temporary, isolated)
 .claude/worktrees/
 
+
+# benchmark fixtures (bench/run.ts --dir)
+.bench-work/
+
 # --- slopwork (managed by `slop init`) ---
 .slop/db/index.jsonc
 .slop/db/.lock
@@ -44,6 +48,3 @@ npm-debug.log*
 .slop/db/*/.tmp-*
 .slop/transcripts/
 # --- end slopwork ---
-
-# benchmark fixtures (bench/run.ts --dir)
-.bench-work/
