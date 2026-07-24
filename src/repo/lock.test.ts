@@ -1,11 +1,78 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SlopError } from "../cli/errors.js";
 import { fixedClock } from "../core/clock.js";
 import { EXIT_CODES } from "../core/exit-codes.js";
 import { acquireLock, releaseLock, withLock } from "./lock.js";
+
+/**
+ * Deterministic interleaving control for the stale-break TOCTOU test below
+ * (lock-stale-break-toctou). We need to force a specific race, not just
+ * hope `Promise.all` schedules it: whichever contender's destructive
+ * break call (`rm` pre-fix / `rename` post-fix) targeting `lockPath`
+ * itself reaches the filesystem FIRST runs straight through; the SECOND
+ * such call is paused — *before* it touches the filesystem — until the
+ * test explicitly releases it, by which point the first contender has
+ * fully finished recreating the lock. Calls targeting any other path
+ * (e.g. a sentinel path used by the post-fix implementation) pass through
+ * untouched, and outside of the one test that calls `gate.arm()`, this is
+ * a no-op passthrough for every other test in this file.
+ */
+const gate = vi.hoisted(() => {
+  let targetPath: string | null = null;
+  let seen = 0;
+  let heldResolve: (() => void) | null = null;
+  let heldPromise: Promise<void> = Promise.resolve();
+  let releaseResolve: (() => void) | null = null;
+  let releasePromise: Promise<void> = Promise.resolve();
+
+  return {
+    arm(path: string) {
+      targetPath = path;
+      seen = 0;
+      heldPromise = new Promise<void>((resolve) => {
+        heldResolve = resolve;
+      });
+      releasePromise = new Promise<void>((resolve) => {
+        releaseResolve = resolve;
+      });
+    },
+    disarm() {
+      targetPath = null;
+    },
+    /** Resolves once the second contender's destructive call has arrived and is being held. */
+    held(): Promise<void> {
+      return heldPromise;
+    },
+    /** Lets the held second contender's destructive call proceed. */
+    release() {
+      releaseResolve?.();
+    },
+    async beforeDestructive(path: string): Promise<void> {
+      if (targetPath === null || path !== targetPath) return;
+      seen += 1;
+      if (seen === 2) {
+        heldResolve?.();
+        await releasePromise;
+      }
+    },
+  };
+});
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  const rm: typeof actual.rm = async (path, options) => {
+    await gate.beforeDestructive(String(path));
+    return actual.rm(path, options);
+  };
+  const rename: typeof actual.rename = async (oldPath, newPath) => {
+    await gate.beforeDestructive(String(oldPath));
+    return actual.rename(oldPath, newPath);
+  };
+  return { ...actual, rm, rename };
+});
 
 let scratch: string;
 let lockPath: string;
@@ -193,6 +260,73 @@ describe("stale-lock recovery", () => {
     await expect(
       acquireLock(lockPath, { timeoutMs: 100, retryDelayMs: 10, staleTimeoutMs: 60_000 }),
     ).rejects.toBeInstanceOf(SlopError);
+  });
+});
+
+describe("stale-break TOCTOU: concurrent breakers never produce two holders (lock-stale-break-toctou)", () => {
+  afterEach(() => {
+    gate.disarm();
+  });
+
+  it("with a pre-existing stale lock, two concurrent acquireLock calls never both come away believing they hold it", async () => {
+    // Plant an already-stale lock — backdated well past staleTimeoutMs —
+    // that both contenders will independently read and judge breakable.
+    await writeFile(
+      lockPath,
+      `${JSON.stringify(
+        {
+          pid: process.pid,
+          acquired_at: new Date(Date.now() - 5_000).toISOString(),
+          token: "stale-token",
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    gate.arm(lockPath);
+
+    const attempt = (label: "first" | "second") =>
+      acquireLock(lockPath, { timeoutMs: 300, retryDelayMs: 10, staleTimeoutMs: 2_000 }).then(
+        (handle) => ({ label, ok: true as const, handle }),
+        (error: unknown) => ({ label, ok: false as const, error }),
+      );
+
+    const pFirst = attempt("first");
+    const pSecond = attempt("second");
+
+    // Wait until exactly one contender's destructive break call is being
+    // held — the other one is free to run straight through to a full
+    // acquisition.
+    await gate.held();
+    const winner = await Promise.race([pFirst, pSecond]);
+    if (!winner.ok) {
+      throw new Error(`expected the unheld contender to win cleanly, got: ${String(winner.error)}`);
+    }
+
+    // Before releasing the held contender: the winner's handle really is
+    // what's on disk right now.
+    const midRaw = JSON.parse(await readFile(lockPath, "utf8")) as { token: string };
+    expect(midRaw.token).toBe(winner.handle.token);
+
+    gate.release();
+    const loser = winner.label === "first" ? await pSecond : await pFirst;
+
+    // The crux of the fix: a contender that read the same stale lock but
+    // arrived second must NEVER come away believing it also holds the
+    // lock — it must be rejected, not silently dispossess the winner.
+    expect(loser.ok).toBe(false);
+    if (loser.ok) throw new Error("unreachable");
+    expect(loser.error).toBeInstanceOf(SlopError);
+    expect((loser.error as SlopError).exitCode).toBe(EXIT_CODES.CONFLICT);
+
+    // And the winner's lock is still genuinely, un-clobbered held — the
+    // loser's break attempt never got to delete or steal it.
+    await expect(winner.handle.assertHeld()).resolves.toBeUndefined();
+    const finalRaw = JSON.parse(await readFile(lockPath, "utf8")) as { token: string };
+    expect(finalRaw.token).toBe(winner.handle.token);
+
+    await releaseLock(lockPath, winner.handle.token);
   });
 });
 

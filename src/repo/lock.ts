@@ -17,7 +17,7 @@
  *     diagnosable by reading it, and so a dispossessed holder can tell it
  *     no longer legitimately holds the lock (see "Fencing" below).
  *   - **Stale-lock recovery**: if creation fails with `EEXIST`, read the
- *     existing lock. It is breakable (unlinked, then creation retried) if
+ *     existing lock. It is breakable (relocated, then creation retried) if
  *     either: its recorded pid is no longer alive (`process.kill(pid, 0)`
  *     raises `ESRCH`), or it is older than `staleTimeoutMs`. A lock file
  *     that can't even be parsed is treated as breakable once it's older
@@ -25,6 +25,11 @@
  *     from bricking the repo permanently — a dead holder's lock is always
  *     eventually recoverable, either instantly (dead pid) or after the
  *     generous timeout (hung-but-alive holder).
+ *
+ *     Breaking is done by **atomic rename-away**, not a blind `rm` — see
+ *     {@link tryBreakStaleLock} for why a plain `rm` is a TOCTOU race
+ *     between two contenders that both judge the same stale lock breakable
+ *     (lock-stale-break-toctou).
  *   - Acquisition is bounded: retries with capped exponential backoff
  *     until `timeoutMs` elapses, then throws a {@link SlopError} with the
  *     CONFLICT exit code (6) naming what's blocking it.
@@ -83,7 +88,7 @@
  *     its release would delete the *new* rightful holder's lock instead
  *     of its own (already-gone) one.
  */
-import { open, readFile, rm, stat } from "node:fs/promises";
+import { open, readFile, rename, rm, stat } from "node:fs/promises";
 import { ulid } from "ulid";
 import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
@@ -192,16 +197,54 @@ function lockInfoText(info: LockInfo): string {
 
 /**
  * If the lock at `lockPath` is stale (dead holder, or older than
- * `staleTimeoutMs`), unlink it and return `true` so the caller retries
+ * `staleTimeoutMs`), break it and return `true` so the caller retries
  * acquisition immediately. Returns `false` if the lock is live and not
- * stale. Returns `true` (nothing to break) if the lock already
- * disappeared between the failed `open` and this check — a normal race
- * with whoever held it finishing up, not an error.
+ * stale (including: it turned out to be live after all — see below).
+ * Returns `true` (nothing to break) if the lock already disappeared
+ * between the failed `open` and this check — a normal race with whoever
+ * held it finishing up, not an error.
+ *
+ * **Why breaking is an atomic rename-away, not a plain `rm`**
+ * (lock-stale-break-toctou): two contenders can both read the exact same
+ * stale lock and both judge it breakable. A plain `rm(lockPath)` doesn't
+ * check *what* it's deleting — if contender A breaks the lock and
+ * recreates it (now legitimately holding a fresh, live lock) before
+ * contender B's own `rm` call runs, B's `rm` silently deletes A's live
+ * lock (not the stale one B actually inspected), and B then recreates its
+ * own lock in the newly-empty slot. Both A and B now believe they hold
+ * the lock — A was silently dispossessed without ever being told, which
+ * is exactly the two-holders failure the fencing mechanism exists to
+ * prevent, except here it happens *before* A ever gets a chance to call
+ * `assertHeld()`.
+ *
+ * The fix: relocate the lock file via `rename` to a sentinel path unique
+ * to this breaker (`${lockPath}.stale-${breakerToken}`) instead of
+ * deleting it outright, then verify — by exact content match — that what
+ * landed at the sentinel is the *same* stale lock this call inspected a
+ * moment ago:
+ *   - If `rename` itself fails with `ENOENT`, `lockPath` was already
+ *     relocated (or released) by someone else between our read and this
+ *     rename — we broke nothing; the caller just retries `open(wx)` and
+ *     contends normally against whatever's there now.
+ *   - If `rename` succeeds but the relocated content doesn't match what
+ *     we read (some other contender's winning `open(wx)` recreated
+ *     `lockPath` in the gap between our read and this rename — the exact
+ *     race described above, just with `rename` in place of `rm`), we put
+ *     it back immediately (`rename` it back to `lockPath`) rather than
+ *     delete it, and report "not broken" — we never destroy a lock we
+ *     can't prove is the stale one we inspected.
+ *   - Only when the content matches do we clean up the sentinel and
+ *     report success. This is what makes the operation safe against an
+ *     arbitrary number of concurrent breakers: at most one of them can
+ *     ever end up owning a sentinel whose content matches its own read,
+ *     because a fresh acquisition always writes a fresh (different)
+ *     token/timestamp.
  */
 async function tryBreakStaleLock(
   lockPath: string,
   staleTimeoutMs: number,
   now: number,
+  breakerToken: string,
 ): Promise<boolean> {
   let raw: string;
   try {
@@ -235,8 +278,46 @@ async function tryBreakStaleLock(
 
   if (!stale) return false;
 
+  const sentinelPath = `${lockPath}.stale-${breakerToken}`;
   try {
-    await rm(lockPath, { force: true });
+    await rename(lockPath, sentinelPath);
+  } catch (err) {
+    if (isEnoent(err)) return true; // someone else already broke/released it
+    throw err;
+  }
+
+  let sentinelRaw: string;
+  try {
+    sentinelRaw = await readFile(sentinelPath, "utf8");
+  } catch (err) {
+    // We just created this path via `rename` — an ENOENT here would mean
+    // someone else deleted it from under us, which nothing in this module
+    // ever does to a sentinel path. Treat defensively as "not our win"
+    // rather than throw.
+    if (isEnoent(err)) return false;
+    throw err;
+  }
+
+  if (sentinelRaw !== raw) {
+    // We relocated a DIFFERENT (live) lock than the one we inspected —
+    // someone else's winning `open(wx)` recreated `lockPath` in the gap
+    // between our read above and the `rename`. Put it back and report
+    // "not broken"; the caller will recontend fairly via normal EEXIST
+    // retry/backoff, exactly as if our rename had never happened.
+    try {
+      await rename(sentinelPath, lockPath);
+    } catch (err) {
+      // Best effort: if `lockPath` is occupied again by the time we try
+      // to restore (yet another acquisition landed), there's nothing
+      // sane to restore into. The rightful holder's content is still
+      // preserved verbatim at `sentinelPath` either way.
+      if (!isEexist(err)) throw err;
+    }
+    return false;
+  }
+
+  try {
+    await rm(sentinelPath, { force: true });
   } catch (err) {
     if (!isEnoent(err)) throw err;
   }
@@ -324,7 +405,16 @@ export async function acquireLock(
     } catch (err) {
       if (!isEexist(err)) throw err;
 
-      const broke = await tryBreakStaleLock(lockPath, staleTimeoutMs, clock.now().getTime());
+      // Just an identifier for this attempt's break-sentinel filename
+      // (see tryBreakStaleLock) — unrelated to the token this iteration
+      // would use if its own `open(wx)` above had succeeded.
+      const breakerToken = ulid();
+      const broke = await tryBreakStaleLock(
+        lockPath,
+        staleTimeoutMs,
+        clock.now().getTime(),
+        breakerToken,
+      );
       if (broke) {
         // Retry acquisition immediately, no backoff needed — but still
         // respect the deadline, so a pathological case (something else
