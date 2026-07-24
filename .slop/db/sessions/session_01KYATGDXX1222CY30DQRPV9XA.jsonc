@@ -14,7 +14,7 @@
     "commit_at_start": "b2047342fece90bf79bd41d306632b89ff9e8bb9"
   },
   "started_at": "2026-07-24T19:44:17.341Z",
-  "ended_at": null,
+  "ended_at": "2026-07-24T20:31:36.149Z",
   "plan": [
     {
       "version": 1,
@@ -39,6 +39,6 @@
       "created_at": "2026-07-24T19:45:22.447Z"
     }
   ],
-  "end_summary": null,
+  "end_summary": "Merged to main + full suite (1892 tests) green",
   "transcript_ref": "transcripts/session_01KYATGDXX1222CY30DQRPV9XA.jsonl"
 }

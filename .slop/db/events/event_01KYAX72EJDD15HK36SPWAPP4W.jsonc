@@ -1,0 +1,19 @@
+{
+  "id": "event_01KYAX72EJDD15HK36SPWAPP4W",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": "session_01KYASVNDTPT6FW10A7R27FF7Z",
+  "verb": "session.ended",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KYASVNDTPT6FW10A7R27FF7Z"
+  },
+  "payload": {
+    "reason": "done",
+    "note": "Merged to main + full suite (1892 tests) green",
+    "transcript_ref": "transcripts/session_01KYASVNDTPT6FW10A7R27FF7Z.jsonl"
+  },
+  "at": "2026-07-24T20:31:36.402Z"
+}
