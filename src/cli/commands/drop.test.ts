@@ -3,7 +3,12 @@ import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cl
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
 import { fixedClock } from "../../core/clock.js";
 import { EXIT_CODES } from "../../core/exit-codes.js";
-import { newSessionId, newTicketId, ticketSchema } from "../../core/index.js";
+import {
+  END_SUMMARY_MAX_LENGTH,
+  newSessionId,
+  newTicketId,
+  ticketSchema,
+} from "../../core/index.js";
 import type { Ticket, TicketId } from "../../core/index.js";
 import { readTicket, repoPaths } from "../../repo/index.js";
 import { buildDroppedTicket, runDrop } from "./drop.js";
@@ -140,6 +145,38 @@ describe("runDrop (in-process)", () => {
     await expect(withCwd(root, () => runDrop(id, { reason: "   " }))).rejects.toMatchObject({
       exitCode: EXIT_CODES.USAGE_ERROR,
     });
+  });
+
+  it("rejects a --reason over the max length with USAGE_ERROR (exit 2), never reaching the write (regression: ticket housekeeping-gitignore-lock-stale)", async () => {
+    const root = await makeTempRepo("slop-drop-inproc-toolong-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Ticket, absurdly long reason");
+
+    const tooLong = "x".repeat(END_SUMMARY_MAX_LENGTH + 1);
+    await expect(withCwd(root, () => runDrop(id, { reason: tooLong }))).rejects.toMatchObject({
+      exitCode: EXIT_CODES.USAGE_ERROR,
+    });
+
+    const paths = repoPaths(root);
+    const ticket = await readTicket(paths, id);
+    expect(ticket.state).toBe("open"); // untouched — rejected before any write
+  });
+
+  it("accepts a --reason right at the max length", async () => {
+    const root = await makeTempRepo("slop-drop-inproc-atlimit-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Ticket, reason right at the limit");
+
+    const atLimit = "x".repeat(END_SUMMARY_MAX_LENGTH);
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runDrop(id, { reason: atLimit }));
+    } finally {
+      out.restore();
+    }
+    const paths = repoPaths(root);
+    const ticket = await readTicket(paths, id);
+    expect(ticket.state).toBe("dropped");
   });
 
   it("refuses to drop an already-done ticket (CONFLICT, exit 6)", async () => {

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { newSessionId, newTicketId } from "../ids.js";
-import { HARNESS_KINDS, planVersionSchema, sessionSchema } from "./session.js";
+import {
+  END_SUMMARY_MAX_LENGTH,
+  HARNESS_KINDS,
+  planVersionSchema,
+  sessionSchema,
+} from "./session.js";
 
 function baseSession() {
   return {
@@ -77,6 +82,20 @@ describe("sessionSchema", () => {
       expect(result.success).toBe(true);
       expect(result.success && result.data.transcript_ref).toBeNull();
     });
+  });
+});
+
+describe("sessionSchema — end_summary max length (regression: ticket housekeeping-gitignore-lock-stale)", () => {
+  it("accepts end_summary right at the max length", () => {
+    const atLimit = "x".repeat(END_SUMMARY_MAX_LENGTH);
+    const input = { ...baseSession(), end_summary: atLimit };
+    expect(sessionSchema.safeParse(input).success).toBe(true);
+  });
+
+  it("rejects end_summary over the max length", () => {
+    const tooLong = "x".repeat(END_SUMMARY_MAX_LENGTH + 1);
+    const input = { ...baseSession(), end_summary: tooLong };
+    expect(sessionSchema.safeParse(input).success).toBe(false);
   });
 });
 

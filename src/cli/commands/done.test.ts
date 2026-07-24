@@ -9,7 +9,13 @@ import { makeTempRepo } from "../../../tests/support/temp-repo.js";
 import { fixedClock } from "../../core/clock.js";
 import { EXIT_CODES } from "../../core/exit-codes.js";
 import type { Ticket, TicketId } from "../../core/index.js";
-import { newSessionId, newTicketId, ticketSchema } from "../../core/index.js";
+import {
+  END_SUMMARY_MAX_LENGTH,
+  newSessionId,
+  newTicketId,
+  RESOLUTION_MAX_LENGTH,
+  ticketSchema,
+} from "../../core/index.js";
 import type { RepoPaths } from "../../repo/index.js";
 import { readSession, readTicket, repoPaths } from "../../repo/index.js";
 import { buildDoneTicket, runDone } from "./done.js";
@@ -592,6 +598,58 @@ describe("runDone (in-process)", () => {
     }
     const paths = repoPaths(root);
     expect((await readTicket(paths, id)).resolution).toBe("Root cause: X. Fixed by Y.");
+  });
+
+  it("rejects a --note over the max length with USAGE_ERROR (exit 2), never touching the ticket (regression: ticket housekeeping-gitignore-lock-stale)", async () => {
+    const root = await makeTempRepo("slop-done-inproc-note-toolong-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Note too long", { adhoc: true });
+    await startTicket(root, id);
+
+    const tooLong = "x".repeat(END_SUMMARY_MAX_LENGTH + 1);
+    await expect(withCwd(root, () => runDone(id, { note: tooLong }))).rejects.toMatchObject({
+      exitCode: EXIT_CODES.USAGE_ERROR,
+    });
+
+    const paths = repoPaths(root);
+    expect((await readTicket(paths, id)).state).toBe("in_progress"); // untouched
+  });
+
+  it("rejects an --outcome over the max length with USAGE_ERROR (exit 2), never touching the ticket", async () => {
+    const root = await makeTempRepo("slop-done-inproc-outcome-toolong-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Outcome too long", { adhoc: true });
+    await startTicket(root, id);
+
+    const tooLong = "x".repeat(RESOLUTION_MAX_LENGTH + 1);
+    await expect(
+      withCwd(root, () => runDone(id, { note: "done", outcome: tooLong })),
+    ).rejects.toMatchObject({ exitCode: EXIT_CODES.USAGE_ERROR });
+
+    const paths = repoPaths(root);
+    const ticket = await readTicket(paths, id);
+    expect(ticket.state).toBe("in_progress"); // untouched
+    expect(ticket.resolution).toBeUndefined();
+  });
+
+  it("accepts a --note and --outcome each right at their max length", async () => {
+    const root = await makeTempRepo("slop-done-inproc-atlimit-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Note and outcome at the limit", { adhoc: true });
+    await startTicket(root, id);
+
+    const noteAtLimit = "x".repeat(END_SUMMARY_MAX_LENGTH);
+    const outcomeAtLimit = "y".repeat(RESOLUTION_MAX_LENGTH);
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runDone(id, { note: noteAtLimit, outcome: outcomeAtLimit }));
+    } finally {
+      out.restore();
+    }
+    const paths = repoPaths(root);
+    const ticket = await readTicket(paths, id);
+    expect(ticket.state).toBe("done");
+    expect(ticket.resolution).toBe(outcomeAtLimit);
   });
 
   it("refuses to complete an already-dropped ticket (CONFLICT, exit 6)", async () => {

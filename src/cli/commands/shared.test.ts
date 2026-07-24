@@ -2,7 +2,14 @@ import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import { EXIT_CODES } from "../../core/index.js";
 import { SlopError } from "../errors.js";
-import { collect, parseIntegerOption, parsePriority, printWarning, readStdin } from "./shared.js";
+import {
+  assertMaxLength,
+  collect,
+  parseIntegerOption,
+  parsePriority,
+  printWarning,
+  readStdin,
+} from "./shared.js";
 
 // cli-input-validation-reject-truncated-numerics-fix-actor-fai:
 //
@@ -98,6 +105,33 @@ describe("collect", () => {
     acc = collect("y", acc);
     acc = collect("z", acc);
     expect(acc).toEqual(["x", "y", "z"]);
+  });
+});
+
+describe("assertMaxLength (regression: ticket housekeeping-gitignore-lock-stale)", () => {
+  it("does not throw for a value at or under the limit", () => {
+    expect(() => assertMaxLength("--note", "x".repeat(10), 10)).not.toThrow();
+    expect(() => assertMaxLength("--note", "short", 10)).not.toThrow();
+  });
+
+  it("throws a USAGE_ERROR (exit 2) naming the flag and the overage", () => {
+    let thrown: unknown;
+    try {
+      assertMaxLength("--note", "x".repeat(11), 10);
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(SlopError);
+    expect((thrown as SlopError).exitCode).toBe(EXIT_CODES.USAGE_ERROR);
+    expect((thrown as Error).message).toContain("--note");
+    expect((thrown as Error).message).toContain("11");
+    expect((thrown as Error).message).toContain("10");
+  });
+
+  it("measures the value exactly as given — no implicit trimming (callers trim first when their schema field does)", () => {
+    const padded = `  ${"x".repeat(10)}  `; // 14 chars raw, 10 trimmed
+    expect(() => assertMaxLength("--note", padded, 10)).toThrow(SlopError);
+    expect(() => assertMaxLength("--note", padded.trim(), 10)).not.toThrow();
   });
 });
 

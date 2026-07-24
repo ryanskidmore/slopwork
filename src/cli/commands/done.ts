@@ -2,7 +2,14 @@ import type { Command } from "commander";
 import type { Clock } from "../../core/clock.js";
 import { systemClock } from "../../core/clock.js";
 import type { Session, Ticket } from "../../core/index.js";
-import { EXIT_CODES, nowIso, sessionSchema, ticketSchema } from "../../core/index.js";
+import {
+  END_SUMMARY_MAX_LENGTH,
+  EXIT_CODES,
+  nowIso,
+  RESOLUTION_MAX_LENGTH,
+  sessionSchema,
+  ticketSchema,
+} from "../../core/index.js";
 import {
   formatIndexProblems,
   readSession,
@@ -26,7 +33,7 @@ import { checkDoneEntry } from "../../tickets/state.js";
 import { formatZodIssuesForUsage } from "../../tickets/validate.js";
 import { loadConfig, resolveActor } from "../actor.js";
 import { SlopError } from "../errors.js";
-import { printWarning, readStdin } from "./shared.js";
+import { assertMaxLength, printWarning, readStdin } from "./shared.js";
 
 interface DoneCommandOptions {
   note?: string;
@@ -91,6 +98,10 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
   const config = await loadConfig(paths);
   const actor = resolveActor({ config, cwd: root });
 
+  if (opts.note !== undefined) {
+    assertMaxLength("--note", opts.note, END_SUMMARY_MAX_LENGTH);
+  }
+
   const initialTicket = await resolveTicketRef(paths, ref);
 
   // `--outcome -` reads stdin, mirroring `--spec -` (new/update — see
@@ -103,6 +114,16 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
       : opts.outcome === "-"
         ? await readStdin()
         : opts.outcome;
+  // housekeeping-gitignore-lock-stale: `--outcome -` can read an arbitrary
+  // amount of stdin (readStdin has no size cap) — checked here, right
+  // after the read completes, rather than only much later when it fails
+  // `resolutionSchema`'s own max deep inside `buildDoneTicket`. Trimmed
+  // first, matching `resolutionSchema`'s own `.trim()` before its `.max()`
+  // (see that schema's doc comment) — so this can never reject (or
+  // accept) a length the schema itself would disagree with.
+  if (outcomeRaw !== undefined) {
+    assertMaxLength("--outcome", outcomeRaw.trim(), RESOLUTION_MAX_LENGTH);
+  }
 
   // Fix 1 (ticket_01KY93E2ZK6Z3TFEBP86ATMW37): locate + copy the harness
   // transcript BEFORE acquiring the db lock — see transcript.ts's

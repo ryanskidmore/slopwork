@@ -1,0 +1,17 @@
+{
+  "id": "event_01KYATK69GQVZ38D640V9WEC8N",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYAPN9G0K6AX3408QWRKHMHD"
+  },
+  "payload": {
+    "progress": "All 5 sub-items done: (1) gitignore .lock.stale-* in gitignore.ts, (2) bin/slop.mjs drops the bun --version pre-check, maps spawn ENOENT to friendly message (regression test: fake-bun spawn-count check in packaging.test.ts), (3) docs/configuration.md's Transcripts section corrected re: takeover/D15-re-entry not capturing a transcript; follow-up ticket sessions-capture-transcript-on-takeover filed for the actual fix, (4) END_SUMMARY_MAX_LENGTH(10k)/RESOLUTION_MAX_LENGTH(64k, was 20k) enforced via new shared.ts assertMaxLength -> USAGE_ERROR at the CLI layer in stop/drop/done, backed by schema-level max()s, (5) slop events defaults --limit to 100 (DEFAULT_EVENTS_LIMIT), and has_more is now only ever true alongside a next_cursor that genuinely differs from --since (fixed the stuck-cursor bug where budget-elide-everything reported has_more:true with next_cursor:null). Updated two pre-existing acceptance tests (D3, E1) that had encoded the old behavior. Full suite/lint/typecheck/format:check green (1768 tests)."
+  },
+  "at": "2026-07-24T19:45:47.824Z"
+}

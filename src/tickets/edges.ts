@@ -294,6 +294,52 @@ export function assertDegreeCap(candidate: Ticket): void {
   assertOneDegreeCap(candidate, "discovered-from", candidate.discovered_from);
 }
 
+/**
+ * edges-self-relates-to-is: reject a self-edge in `candidate.relates_to`/
+ * `candidate.discovered_from`. Unlike `blocks`/`parent` (rejected via the
+ * cycle checks above — a direct self-edge IS a length-2 cycle, so
+ * `detectCycle` already catches it with a clear "cannot block itself"/
+ * "cannot be its own ancestor" message), `relates-to` and
+ * `discovered-from` are deliberately NOT cycle-checked (see this module's
+ * doc, "Which edge kinds are cycle-checked") — a symmetric/provenance edge
+ * has no cycle for a graph walk to find. Without this explicit check, a
+ * self-edge in either would silently pass `checkTargetsExist`'s
+ * deliberate "a target naming candidate itself always exists" allowance
+ * (see the comment there) and be persisted — `slop update X --relates-to
+ * +X` reproduced this before this check existed. A ticket "relating to"
+ * or having been "discovered from" itself is meaningless the same way
+ * self-blocking is, just not structurally harmful to any graph walk, so
+ * it needs its own direct check rather than a cycle check.
+ */
+const SELF_EDGE_DESCRIPTION: Record<"relates-to" | "discovered-from", string> = {
+  "relates-to": "a ticket cannot relate to itself",
+  "discovered-from": "a ticket cannot be discovered from itself",
+};
+
+function assertNoSelfEdge(
+  candidate: Pick<Ticket, "id" | "slug" | "name">,
+  kind: "relates-to" | "discovered-from",
+  targets: readonly TicketId[],
+): void {
+  if (!targets.includes(candidate.id)) return;
+  throw new SlopError(
+    `cannot add a "${kind}" edge from ${describeTicketRef(candidate)} to itself — ${SELF_EDGE_DESCRIPTION[kind]}`,
+    EXIT_CODES.CONFLICT,
+  );
+}
+
+/**
+ * Reject a self-edge in `candidate.relates_to` or `candidate.discovered_from`
+ * — see {@link assertNoSelfEdge}. `blocks`/`parent` self-edges are already
+ * rejected by {@link assertNoBlocksCycle}/{@link assertNoParentCycle} and
+ * are intentionally NOT re-checked here (that would just produce a second,
+ * less specific error for the same write).
+ */
+export function assertNoSelfEdges(candidate: Ticket): void {
+  assertNoSelfEdge(candidate, "relates-to", candidate.relates_to);
+  assertNoSelfEdge(candidate, "discovered-from", candidate.discovered_from);
+}
+
 function danglingEdgeError(
   candidate: Pick<Ticket, "slug" | "name">,
   kind: string,
@@ -352,13 +398,15 @@ export function assertEdgeTargetsExist(candidate: Ticket, others: readonly Ticke
  * (the candidate's own on-disk prior version, if any, must NOT be
  * included — its new fields are exactly what's being validated).
  *
- * Order: degree cap (cheapest, purely local) -> target existence (needs
- * `others` but no graph walk) -> parent-cycle -> blocks-cycle (the two
- * bounded BFS checks, most expensive, run last).
+ * Order: degree cap (cheapest, purely local) -> self-edges on the two
+ * uncycled kinds (also purely local — see {@link assertNoSelfEdges}) ->
+ * target existence (needs `others` but no graph walk) -> parent-cycle ->
+ * blocks-cycle (the two bounded BFS checks, most expensive, run last).
  */
 export function validateTicketEdges(candidate: Ticket, others: readonly Ticket[]): void {
   const rest = others.filter((t) => t.id !== candidate.id);
   assertDegreeCap(candidate);
+  assertNoSelfEdges(candidate);
   assertEdgeTargetsExist(candidate, rest);
   assertNoParentCycle(candidate, rest);
   assertNoBlocksCycle(candidate, rest);

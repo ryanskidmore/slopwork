@@ -57,6 +57,33 @@ export function parseIntegerOption(flag: string): (value: string) => number {
  * work item's concern (B1); this only turns CLI text into a number. */
 export const parsePriority = parseIntegerOption("--priority");
 
+/**
+ * Reject a free-form CLI text option once it exceeds `max` characters —
+ * housekeeping-gitignore-lock-stale: `--note`/`--reason`/`--outcome` were
+ * unbounded at the CLI layer, so an absurdly large value (e.g. `--outcome
+ * -` piping in an arbitrary file) would only be caught, far less
+ * actionably, when the resulting ticket/session candidate failed schema
+ * validation deep inside `build*Ticket`/`build*Session` — a
+ * `GENERIC_ERROR` zod dump instead of a clean, specific `USAGE_ERROR`
+ * naming the offending flag up front, before any I/O for this command even
+ * starts.
+ *
+ * Measures `value` exactly as given — callers pass whatever the
+ * downstream schema field itself measures (e.g. `resolutionSchema` trims
+ * before its own `.max()`, so `done.ts` passes an already-`.trim()`med
+ * `--outcome`; `end_summary` does not trim, so `stop.ts`/`drop.ts`/
+ * `done.ts` pass `--note`/`--reason` as-is), so this can never reject (or
+ * accept) a value the schema would later disagree with.
+ */
+export function assertMaxLength(flag: string, value: string, max: number): void {
+  if (value.length > max) {
+    throw new SlopError(
+      `${flag} is ${value.length} characters, exceeding the ${max}-character limit`,
+      EXIT_CODES.USAGE_ERROR,
+    );
+  }
+}
+
 /** Print a non-fatal `warning: <message>` line to stderr — e.g. B1's
  * malformed-`jira:`-ref format check (§8.2 item 5: "warn on format
  * mismatch, don't block"), which must never prevent the command from

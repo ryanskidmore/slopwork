@@ -28,6 +28,23 @@ describe("computeStaleAt", () => {
       ).toBeNull();
     }
   });
+
+  it("an absurdly huge staleAfterMs clamps to null instead of throwing (regression: ticket duration-huge-stale-after-overflows)", () => {
+    // What `parseDurationMs("99999999999d")` produces — overflows a Date.
+    const hugeMs = 99_999_999_999 * 86_400_000;
+    expect(() =>
+      computeStaleAt(
+        { state: "in_progress", last_activity_at: "2026-07-23T10:00:00.000Z" },
+        hugeMs,
+      ),
+    ).not.toThrow();
+    expect(
+      computeStaleAt(
+        { state: "in_progress", last_activity_at: "2026-07-23T10:00:00.000Z" },
+        hugeMs,
+      ),
+    ).toBeNull();
+  });
 });
 
 describe("computeReviewStaleAt", () => {
@@ -66,6 +83,30 @@ describe("computeReviewStaleAt", () => {
       ).toBeNull();
     }
   });
+
+  it("an absurdly huge reviewStaleAfterMs clamps to null instead of throwing (regression: ticket duration-huge-stale-after-overflows)", () => {
+    const hugeMs = 99_999_999_999 * 86_400_000;
+    expect(() =>
+      computeReviewStaleAt(
+        {
+          state: "review",
+          review: { requested_at: "2026-07-22T10:00:00.000Z" },
+          last_activity_at: "2026-07-23T10:00:00.000Z",
+        },
+        hugeMs,
+      ),
+    ).not.toThrow();
+    expect(
+      computeReviewStaleAt(
+        {
+          state: "review",
+          review: { requested_at: "2026-07-22T10:00:00.000Z" },
+          last_activity_at: "2026-07-23T10:00:00.000Z",
+        },
+        hugeMs,
+      ),
+    ).toBeNull();
+  });
 });
 
 describe("computeStalenessDeadlines", () => {
@@ -85,6 +126,20 @@ describe("computeStalenessDeadlines", () => {
       { stale_after: "60m", review_stale_after: "24h" },
     );
     expect(review).toEqual({ stale_at: null, review_stale_at: "2026-07-23T10:00:00.000Z" });
+  });
+
+  it("an absurd duration STRING (e.g. config.yaml's stale_after: 99999999999d) never throws end to end (regression: ticket duration-huge-stale-after-overflows)", () => {
+    expect(() =>
+      computeStalenessDeadlines(
+        { state: "in_progress", last_activity_at: "2026-07-23T10:00:00.000Z", review: undefined },
+        { stale_after: "99999999999d", review_stale_after: "99999999999d" },
+      ),
+    ).not.toThrow();
+    const deadlines = computeStalenessDeadlines(
+      { state: "in_progress", last_activity_at: "2026-07-23T10:00:00.000Z", review: undefined },
+      { stale_after: "99999999999d", review_stale_after: "24h" },
+    );
+    expect(deadlines.stale_at).toBeNull();
   });
 });
 

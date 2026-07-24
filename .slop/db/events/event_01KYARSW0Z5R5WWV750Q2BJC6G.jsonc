@@ -1,0 +1,17 @@
+{
+  "id": "event_01KYARSW0Z5R5WWV750Q2BJC6G",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": "session_01KYARFZ5CJTCZ0FJ1AGNYB0QR",
+  "verb": "review.requested",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KYARFZ5CJTCZ0FJ1AGNYB0QR"
+  },
+  "payload": {
+    "transcript_ref": "transcripts/session_01KYARFZ5CJTCZ0FJ1AGNYB0QR.jsonl"
+  },
+  "at": "2026-07-24T19:14:29.535Z"
+}

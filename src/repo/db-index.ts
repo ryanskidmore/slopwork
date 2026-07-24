@@ -238,7 +238,7 @@ import type { Event, SessionId, Ticket, TicketId, TicketState } from "../core/in
 import { isoTimestampSchema } from "../core/timestamp.js";
 import { slugSchema } from "../core/slug.js";
 import { parseJsonc, writeCanonical } from "../core/jsonc.js";
-import { parseDurationMs } from "../core/duration.js";
+import { isRepresentableDurationMs, parseDurationMs } from "../core/duration.js";
 // C5: pure staleness-deadline formulas — see this module's "C5:
 // stale_at/review_stale_at" doc section above for why importing from
 // tickets/ (normally the reverse dependency direction — tickets/*.ts
@@ -646,6 +646,15 @@ function warnAboutIndexProblems(problems: TicketReadProblem[]): void {
   process.stderr.write(`warning: ${formatIndexProblems(problems)}\n`);
 }
 
+/** duration-huge-stale-after-overflows: see `buildIndex`'s call sites. */
+function warnAboutUnrepresentableDuration(field: string, configured: string, ms: number): void {
+  if (isRepresentableDurationMs(ms)) return;
+  process.stderr.write(
+    `warning: config.yaml's defaults.${field} ("${configured}") is too large to represent as a date offset; ` +
+      `staleness is disabled for it (the deadline is always null) until it's set to something smaller.\n`,
+  );
+}
+
 /** Build the index from scratch by scanning every ticket on disk. Pure
  * function of the tickets directory's contents (plus `clock` for the
  * `built_at` stamp) — no reads of any previous index. Never throws on a
@@ -680,6 +689,21 @@ export async function buildIndex(paths: RepoPaths, clock: Clock = systemClock): 
   ]);
   const staleAfterMs = parseDurationMs(configDefaults.stale_after);
   const reviewStaleAfterMs = parseDurationMs(configDefaults.review_stale_after);
+  // duration-huge-stale-after-overflows: an absurdly large stale_after/
+  // review_stale_after (config.yaml has no schema-level magnitude cap —
+  // core/entities/config.ts) overflows what a Date can represent;
+  // staleness.ts's computeStaleAt/computeReviewStaleAt already handle this
+  // by returning null (staleness disabled) instead of throwing, but that
+  // must not be silent — warn once per build so a repo owner who typoed a
+  // few too many digits (rather than deliberately meaning "never") finds
+  // out, same "loud, never silent" spirit as this module's ticket-problems
+  // warning above.
+  warnAboutUnrepresentableDuration("stale_after", configDefaults.stale_after, staleAfterMs);
+  warnAboutUnrepresentableDuration(
+    "review_stale_after",
+    configDefaults.review_stale_after,
+    reviewStaleAfterMs,
+  );
 
   // ticket_01KY9RWFM80BKNE2CDX85QMKGS: group once, up front — O(events),
   // not O(tickets × events) — then {@link deriveEffectiveOverlay} looks up

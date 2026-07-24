@@ -1,0 +1,17 @@
+{
+  "id": "event_01KYARQMTNWK51EBVD3F3JRMPA",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYAPKS46GG5F5Y5R214XVB7W"
+  },
+  "payload": {
+    "progress": "Fixed: isRepresentableDurationMs guard (core/duration.ts) + staleness.ts addMs returns null on overflow instead of throwing + buildIndex warns on stderr when configured stale_after/review_stale_after is unrepresentable. Regression tests added in duration.test.ts, staleness.test.ts, db-index.test.ts. Full test/lint/typecheck/format:check all pass."
+  },
+  "at": "2026-07-24T19:13:16.629Z"
+}

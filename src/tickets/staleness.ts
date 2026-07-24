@@ -68,7 +68,7 @@
  * is an E1 polish opportunity, not C5's job.)
  */
 import type { ConfigDefaults, TicketState } from "../core/index.js";
-import { parseDurationMs } from "../core/index.js";
+import { isRepresentableDurationMs, parseDurationMs } from "../core/index.js";
 import type { IsoTimestamp } from "../core/timestamp.js";
 
 /** The minimal ticket-shaped input {@link computeStaleAt} needs. */
@@ -85,8 +85,25 @@ export interface ReviewStaleAtSource {
   last_activity_at: string;
 }
 
-function addMs(iso: string, ms: number): IsoTimestamp {
-  return new Date(Date.parse(iso) + ms).toISOString() as IsoTimestamp;
+/**
+ * `null` (rather than a throw) for a duration whose magnitude overflows
+ * what a `Date` can represent (`core/duration.ts`'s
+ * `isRepresentableDurationMs` — e.g. a `stale_after: 99999999999d` in
+ * config.yaml) — `computeStaleAt`/`computeReviewStaleAt` already return
+ * `IsoTimestamp | null`, so this reads as "no deadline", i.e. staleness
+ * disabled for that ticket, exactly the behavior a user setting an absurd
+ * duration to mean "never" would want, instead of `Date#toISOString`
+ * throwing `RangeError: Invalid time value` and taking down the whole
+ * index build (every `status`/`ready`/`reindex` call).
+ */
+function addMs(iso: string, ms: number): IsoTimestamp | null {
+  if (!isRepresentableDurationMs(ms)) return null;
+  const date = new Date(Date.parse(iso) + ms);
+  // Defensive: a representable ms combined with a malformed iso could
+  // still, in principle, produce an Invalid Date — never let
+  // toISOString throw regardless of how we got here.
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString() as IsoTimestamp;
 }
 
 /**

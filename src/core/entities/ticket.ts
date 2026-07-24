@@ -80,9 +80,17 @@ export type Review = z.infer<typeof reviewSchema>;
 /**
  * Reasonable ceiling for a `resolution` writeup — generous enough for a
  * genuine investigation/adhoc-ticket report (multi-paragraph, multi-line)
- * without leaving the field unbounded.
+ * without leaving the field unbounded. housekeeping-gitignore-lock-stale:
+ * raised 20k -> 64k — `--outcome` is meant to hold a durable, potentially
+ * long-form writeup (unlike the shorter handoff text behind `--note`/
+ * `--reason`, see `session.ts`'s `END_SUMMARY_MAX_LENGTH`), so it gets a
+ * proportionally larger ceiling. `src/cli/commands/shared.ts`'s
+ * `assertMaxLength` enforces this same bound up front, at the CLI layer,
+ * for a clean `USAGE_ERROR` (exit 2) instead of a schema-validation error
+ * surfacing several calls deeper — relevant since `--outcome -` reads
+ * arbitrary stdin (done.ts).
  */
-export const RESOLUTION_MAX_LENGTH = 20_000;
+export const RESOLUTION_MAX_LENGTH = 64_000;
 
 /**
  * The durable outcome/resolution writeup (design.md-adjacent: a place for

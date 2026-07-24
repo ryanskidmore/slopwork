@@ -166,6 +166,48 @@ describe("buildIndex", () => {
       expect(row?.stale_at).toBe("2026-07-23T10:30:00.000Z"); // +30m, not the 60m default
     });
 
+    it("an absurdly huge stale_after doesn't crash buildIndex, clamps to null, and warns on stderr (regression: ticket duration-huge-stale-after-overflows)", async () => {
+      await writeFile(
+        join(paths.slopDir, "config.yaml"),
+        "project: x\ndefaults:\n  stale_after: 99999999999d\n  review_stale_after: 24h\n",
+        "utf8",
+      );
+      const t = makeTicket({ state: "in_progress", last_activity_at: "2026-07-23T10:00:00.000Z" });
+      await createTicket(paths, t, ctx, createdEvent);
+
+      const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      try {
+        const index = await buildIndex(paths, clock);
+        const row = index.tickets.find((r) => r.id === t.id);
+        // Staleness disabled, not a crash.
+        expect(row?.stale_at).toBeNull();
+        // But not silent — the absurd config value gets flagged.
+        const warned = stderrSpy.mock.calls.some((call) =>
+          String(call[0]).includes("defaults.stale_after"),
+        );
+        expect(warned).toBe(true);
+      } finally {
+        stderrSpy.mockRestore();
+      }
+    });
+
+    it("a huge review_stale_after doesn't crash buildIndex and clamps to null for a review ticket", async () => {
+      await writeFile(
+        join(paths.slopDir, "config.yaml"),
+        "project: x\ndefaults:\n  stale_after: 60m\n  review_stale_after: 99999999999d\n",
+        "utf8",
+      );
+      const t = makeTicket({
+        state: "review",
+        review: { requested_at: "2026-07-22T10:00:00.000Z", by: { name: "ryan", kind: "human" } },
+      });
+      await createTicket(paths, t, ctx, createdEvent);
+
+      const index = await buildIndex(paths, clock);
+      const row = index.tickets.find((r) => r.id === t.id);
+      expect(row?.review_stale_at).toBeNull();
+    });
+
     it("open/draft/done/dropped tickets never carry a deadline", async () => {
       const states = ["draft", "open", "done", "dropped"] as const;
       for (const state of states) {

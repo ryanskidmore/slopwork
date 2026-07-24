@@ -108,9 +108,18 @@ agents, and overriding a misdetection.
 Controlled by `transcripts:` in `config.yaml`:
 
 - **`local`** (default) — captured to `.slop/transcripts/session_<ulid>.jsonl`
-  whenever a session ends (`stop`/`done`/`drop`) and also, as a snapshot,
-  on `review` (which does *not* end the session — see
+  on `stop`/`done`/`drop`, and also, as a snapshot, on `review` (which does
+  *not* end the session — see
   [Concepts → Session](concepts.md#session)); gitignored by `slop init`.
+  **Not every session end captures a transcript**, though: `slop start
+  --takeover` and D15's "changes requested" re-entry (a plain `slop start`
+  on a `review`-state ticket) both end the *previous* session (`ended_at`
+  set) as a side effect, but neither one attempts a capture for it — that
+  session's `transcript_ref` is left exactly as it was (usually `null`,
+  unless an earlier `review` call on it already snapshotted one). This is a
+  known gap, not a deliberate behavior; there's no snapshot precisely for
+  the cases where a session's work was ended out from under it rather than
+  wrapped up normally.
 - **`commit`** — same capture, but `slop init` does **not** add
   `.slop/transcripts/` to `.gitignore`, so transcripts land in git history.
   Only turn this on if you've thought about what might be in a transcript

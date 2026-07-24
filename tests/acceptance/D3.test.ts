@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { DEFAULT_EVENTS_LIMIT } from "../../src/cli/commands/events.js";
 import {
   type Session,
   type Ticket,
@@ -561,7 +562,10 @@ describe("D3: events command", () => {
       expect(resp.count).toBe(0);
       expect(resp.next_cursor).toBeNull();
       expect(resp.has_more).toBe(false);
-      expect(resp.query).toEqual({ since: null, ticket: null, limit: null });
+      // housekeeping-gitignore-lock-stale: `--limit` now always has an
+      // EFFECTIVE value in the response — DEFAULT_EVENTS_LIMIT when the
+      // flag was omitted, never `null` (see events.ts's module doc).
+      expect(resp.query).toEqual({ since: null, ticket: null, limit: DEFAULT_EVENTS_LIMIT });
     });
   });
 

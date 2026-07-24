@@ -30,9 +30,23 @@ const SECTION_END = "# --- end slopwork ---";
  * db/ (e.g. index.jsonc's own atomic write); the other covers one
  * written in a subdirectory (tickets/, sessions/, events/) next to its
  * target, per atomic-write.ts's same-directory-as-target rule.
+ *
+ * housekeeping-gitignore-lock-stale: also ignores the `.lock.stale-<token>`
+ * sentinel `lock.ts`'s `tryBreakStaleLock` renames a dead/expired lock to
+ * mid-break (see that function): the happy path `rm`s it again a moment
+ * later, but a crash between the `rename` and that `rm` can leave it on
+ * disk — same "ephemeral, never meant to be committed" hazard as the bare
+ * `.lock`/`.tmp-*` entries above, just one glob widened to catch the
+ * `.stale-*` suffix too.
  */
 export function computeGitignoreLines(transcriptsMode: TranscriptsMode): string[] {
-  const lines = [".slop/db/index.jsonc", ".slop/db/.lock", ".slop/db/.tmp-*", ".slop/db/*/.tmp-*"];
+  const lines = [
+    ".slop/db/index.jsonc",
+    ".slop/db/.lock",
+    ".slop/db/.lock.stale-*",
+    ".slop/db/.tmp-*",
+    ".slop/db/*/.tmp-*",
+  ];
   if (transcriptsMode !== "commit") {
     lines.push(".slop/transcripts/");
   }

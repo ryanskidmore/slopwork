@@ -15,6 +15,17 @@
  *     stderr instead of the cryptic `env: bun: No such file or directory`
  *     / `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` a raw shebang or
  *     bare `node src/cli/index.ts` produces.
+ *
+ * housekeeping-gitignore-lock-stale: this used to run `bun --version` as a
+ * separate pre-check before every real invocation, purely to decide which
+ * of the two messages above to print — a full extra process spawn (and,
+ * under `spawnSync`, a full extra blocking wait) paid on EVERY single
+ * `slop` command, including the overwhelming common case where Bun is
+ * right there on PATH and the check always passes. There's no need for a
+ * separate probe: `spawnSync`'s own `result.error` already tells us
+ * whether the real spawn below found `bun` at all (`ENOENT` = not on
+ * PATH, mapped straight to the same friendly message) — one spawn instead
+ * of two, on every run.
  */
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
@@ -26,26 +37,21 @@ const entry = join(pkgRoot, "src", "cli", "index.ts");
 
 const NO_BUN_MESSAGE = "Slopwork requires Bun >= 1.3 — install from https://bun.sh\n";
 
-function bunIsAvailable() {
-  const check = spawnSync("bun", ["--version"], { stdio: "ignore" });
-  return !check.error && check.status === 0;
-}
-
 function main() {
-  if (!bunIsAvailable()) {
-    process.stderr.write(NO_BUN_MESSAGE);
-    process.exit(1);
-  }
-
   const result = spawnSync("bun", [entry, ...process.argv.slice(2)], {
     stdio: "inherit",
   });
 
   if (result.error) {
-    // bun disappeared between the version check and now (race, PATH
-    // mutation mid-run, ...) — still a "no usable bun" outcome from the
-    // caller's point of view, not a silent crash.
-    process.stderr.write(NO_BUN_MESSAGE);
+    if (result.error.code === "ENOENT") {
+      // The one outcome this launcher exists to give a friendly message
+      // for: no `bun` executable found on PATH at all.
+      process.stderr.write(NO_BUN_MESSAGE);
+      process.exit(1);
+    }
+    // Some other failure to even spawn bun (EACCES, ...) — rare, and not
+    // the "no bun" case, but still not a silent crash: report it plainly.
+    process.stderr.write(`slop: failed to run bun: ${result.error.message}\n`);
     process.exit(1);
   }
 
