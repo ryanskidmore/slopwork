@@ -1,0 +1,51 @@
+{
+  "id": "ticket_01KYAY563XSEE9C0AEZ7MH23HG",
+  "name": "Rewrite slop web as a React + Tailwind + shadcn/ui SPA, bundled offline into the binary",
+  "slug": "rewrite-slop-web-as-a",
+  "spec": {
+    "summary": "Replace the server-rendered HTML web UI with a real shadcn/ui SPA (user-chosen direction)",
+    "details_md": "Rewrite `slop web`'s frontend as a React + Tailwind + shadcn/ui single-page app, generated with the shadcn CLI, served by the existing Bun.serve over a NEW read-only JSON API built on the current data-source layer. The whole SPA (JS/CSS/fonts) must be bundled into the `slop` binary so it still runs fully offline, same-origin, with NO CDN or external fetch — preserving the strict no-external-request posture. This re-opens a read-only \"web v2\" (distinct from F9's mutation scope: still read-only). Must carry forward ALL the wave-1 web security/robustness fixes into the new server wiring: Host-header allowlist (DNS-rebinding), jira URL scheme safety, config.yaml fault-tolerance (warn not 500), HEAD support, reusePort:false. Dark mode required. Keep feature parity with every current view.",
+    "acceptance": [
+      "slop web serves a React+Tailwind+shadcn SPA; all assets bundled into the binary; zero external/CDN requests (offline works)",
+      "Read-only preserved: SPA only GETs; server exposes a read-only JSON API over the existing WebDataSource",
+      "Feature parity: ticket list+filters, tree (jira badges), ticket detail (spec/timeline/sessions/plans), transcript viewer, review panel, stale panel",
+      "Wave-1 web fixes carried forward: Host allowlist, safe jira URL, config fault-tolerance, HEAD, reusePort:false",
+      "bun run build still emits the single self-contained binary with the SPA embedded; server + API have tests; a build-artifact smoke test passes"
+    ],
+    "context": [
+      "src/web/ (server.ts, data-source.ts, views/*, assets/*)",
+      "docs/web-ui.md",
+      "docs/design.md D5/F9 (read-only hard line; web v2 scope)"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "area:web",
+    "type:enhancement"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYAY563XSEE9C0AEZ7MH23HG",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T20:48:03.207Z",
+  "latest_note": null,
+  "owner": {
+    "name": "ryan",
+    "kind": "human"
+  },
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T20:48:03.207Z",
+  "updated_at": "2026-07-24T20:48:03.207Z"
+}
