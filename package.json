@@ -2,14 +2,38 @@
   "name": "slopwork",
   "version": "0.1.1",
   "description": "Free OSS work tracker built for agents — a dependency graph of tickets, worked through sessions with an auditable trail.",
+  "keywords": [
+    "agents",
+    "ai-agents",
+    "bun",
+    "claude-code",
+    "cli",
+    "coding-agents",
+    "issue-tracker",
+    "local-first",
+    "project-management",
+    "task-tracker",
+    "work-tracker"
+  ],
+  "homepage": "https://github.com/ryanskidmore/slopwork#readme",
+  "bugs": {
+    "url": "https://github.com/ryanskidmore/slopwork/issues"
+  },
   "license": "MIT",
+  "author": "Ryan Skidmore",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ryanskidmore/slopwork.git"
+  },
   "bin": {
     "slop": "./bin/slop.mjs"
   },
   "files": [
     "bin",
     "src",
+    "!src/**/*.test.ts",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "type": "module",

@@ -1,0 +1,54 @@
+{
+  "id": "ticket_01KYB1H2WMF9DZ7JMSCQQPR0EA",
+  "name": "Release polish: npm package metadata + CHANGELOG for a presentable v0",
+  "slug": "release-polish-npm-package-metadata",
+  "spec": {
+    "summary": "package.json is missing repository/author/keywords/homepage/bugs; no CHANGELOG",
+    "details_md": "Ahead of showing this to other people, the npm package is thin on metadata: no `repository` (so npmjs.com shows no source link and no provenance), no `author`, `keywords` (discoverability), `homepage`, or `bugs`. There is also no CHANGELOG, which a v0 with a tagged v0.1.1 already warrants. Repo URL is https://github.com/ryanskidmore/slopwork (already autodetected into .slop/config.yaml).",
+    "acceptance": [
+      "package.json has repository, author, homepage, bugs, keywords",
+      "CHANGELOG.md exists covering v0.1.x and the post-review hardening",
+      "npm pack contents verified: ships what is needed to run, nothing stray"
+    ],
+    "context": [
+      "package.json",
+      "RELEASE.md"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "review",
+  "review": {
+    "requested_at": "2026-07-24T21:49:12.946Z",
+    "by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "priority": 2,
+  "labels": [
+    "area:release"
+  ],
+  "adhoc": true,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYB1H2WMF9DZ7JMSCQQPR0EA",
+  "path": [],
+  "active_session": "session_01KYB1HBYE54Y2GAB7671BTC10",
+  "last_activity_at": "2026-07-24T21:49:12.946Z",
+  "latest_note": null,
+  "owner": {
+    "name": "ryan",
+    "kind": "human"
+  },
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T21:46:58.881Z",
+  "updated_at": "2026-07-24T21:49:12.946Z"
+}

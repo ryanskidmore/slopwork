@@ -57,6 +57,9 @@ against the shipped CLI:
 - [`docs/concurrency-and-merging.md`](docs/concurrency-and-merging.md) — the git-merge story, the
   db lock, and lock-free progress updates
 
+[`CHANGELOG.md`](CHANGELOG.md) records what changed in each release, including the breaking
+changes in the current unreleased line.
+
 The same directory's [History & internals](docs/README.md#history--internals) section holds the
 original spec, decision log, and implementation plan this doc set distills from — read those for
 the *why* behind a design choice, the docs above for how to actually use the tool.
