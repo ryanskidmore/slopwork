@@ -16,7 +16,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "done",
   "priority": 2,
   "labels": [
     "area:cli"
@@ -28,8 +28,8 @@
   "root_id": "ticket_01KYB241N9MVKZ633P4YBSK64Q",
   "path": [],
   "active_session": null,
-  "last_activity_at": "2026-07-24T21:57:20.212Z",
-  "latest_note": null,
+  "last_activity_at": "2026-07-24T22:19:59.450Z",
+  "latest_note": "One documented rule (flat for ticket-only commands, nested ticket/session for session commands); shared ticketJson helper prevents drift; verified against the real binary; docs + CHANGELOG updated. 1952 tests green.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -39,5 +39,5 @@
     }
   },
   "created_at": "2026-07-24T21:57:20.212Z",
-  "updated_at": "2026-07-24T21:57:20.212Z"
+  "updated_at": "2026-07-24T22:19:59.450Z"
 }
