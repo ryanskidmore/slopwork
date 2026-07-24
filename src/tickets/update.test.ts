@@ -220,6 +220,60 @@ describe("buildUpdate", () => {
       expect(result.ticket.state).toBe("open");
       expect(result.verb).toBe("ticket.updated");
     });
+
+    // Polish batch item 1: a same-state call with no other real field
+    // change is a fake mutation and must do NOTHING — no bumped
+    // updated_at/last_activity_at, no patch, an empty payload (so a
+    // caller can tell there's nothing worth writing or emitting an event
+    // for) — mirroring draft.ts/undraft.ts's E1 same-state no-op.
+    it("--state <same>, nothing else given: no updated_at/last_activity_at bump, empty patch, empty payload", () => {
+      const before = makeTicket({
+        state: "open",
+        updated_at: "2026-07-23T10:00:00.000Z",
+        last_activity_at: "2026-07-23T10:00:00.000Z",
+      });
+      const result = buildUpdate(before, baseInput({ state: "open" }), clock);
+      expect(result.ticket.state).toBe("open");
+      expect(result.ticket.updated_at).toBe("2026-07-23T10:00:00.000Z");
+      expect(result.ticket.last_activity_at).toBe("2026-07-23T10:00:00.000Z");
+      expect(result.patch).toEqual([]);
+      expect(result.verb).toBe("ticket.updated");
+      expect(result.payload).toEqual({});
+    });
+
+    it("--state <same> combined with a real change (--priority) still bumps updated_at and produces a patch for the real change only", () => {
+      const before = makeTicket({
+        state: "open",
+        priority: 2,
+        updated_at: "2026-07-23T10:00:00.000Z",
+      });
+      const result = buildUpdate(before, baseInput({ state: "open", priority: 0 }), clock);
+      expect(result.ticket.state).toBe("open");
+      expect(result.ticket.priority).toBe(0);
+      expect(result.ticket.updated_at).toBe("2026-07-23T12:00:00.000Z");
+      const paths = result.patch.map((p) => p.path[0]);
+      expect(paths).toContain("priority");
+      expect(paths).toContain("updated_at");
+      expect(paths).not.toContain("state");
+    });
+  });
+
+  // Polish batch item 1, general case: a redundant --label add (already
+  // present, so applyLabelOps produces no actual change) with nothing
+  // else given is the same kind of fake mutation as a same-state --state
+  // call — must not bump timestamps or produce a patch either.
+  it("a fully redundant --label +already-present with nothing else given is also a no-op: no bump, empty patch", () => {
+    const before = makeTicket({
+      labels: ["dup"],
+      updated_at: "2026-07-23T10:00:00.000Z",
+      last_activity_at: "2026-07-23T10:00:00.000Z",
+    });
+    const result = buildUpdate(before, baseInput({ labelOps: ["+dup"] }), clock);
+    expect(result.ticket.labels).toEqual(["dup"]);
+    expect(result.ticket.updated_at).toBe("2026-07-23T10:00:00.000Z");
+    expect(result.ticket.last_activity_at).toBe("2026-07-23T10:00:00.000Z");
+    expect(result.patch).toEqual([]);
+    expect(result.payload).toEqual({});
   });
 
   it("combining multiple flags in one call", () => {

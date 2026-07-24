@@ -28,22 +28,36 @@ function formatZodIssues(error: z.ZodError): string[] {
 }
 
 /**
- * Read, JSONC-parse, and zod-validate a single entity file. Throws a
- * {@link SlopError} naming `path` and the exact location/issue on any
- * failure: missing file (NOT_FOUND, exit 4), JSONC syntax errors, or
- * schema validation failures (both GENERIC_ERROR, exit 1 — a corrupt db
- * file is a real problem, not a usage mistake).
+ * Shared `readFile` wrapper for both {@link readEntityFile} and {@link
+ * updateEntityFile}'s own read: maps ENOENT to a clean NOT_FOUND {@link
+ * SlopError} naming `path`, and — the fix here — maps every OTHER read
+ * failure (EACCES/EIO/etc.) to a GENERIC_ERROR `SlopError` naming both
+ * `path` and the underlying cause, rather than letting Node's raw `Error`
+ * (no path, no actionable guidance, and not a `SlopError` at all) escape
+ * to the CLI's generic top-level handler uncaught.
  */
-export async function readEntityFile<T>(path: string, schema: z.ZodType<T>): Promise<T> {
-  let raw: string;
+async function readEntityText(path: string): Promise<string> {
   try {
-    raw = await readFile(path, "utf8");
+    return await readFile(path, "utf8");
   } catch (err) {
     if (isEnoent(err)) {
       throw new SlopError(`no such file: ${path}`, EXIT_CODES.NOT_FOUND);
     }
-    throw err;
+    const cause = err instanceof Error ? err.message : String(err);
+    throw new SlopError(`${path}: failed to read: ${cause}`, EXIT_CODES.GENERIC_ERROR);
   }
+}
+
+/**
+ * Read, JSONC-parse, and zod-validate a single entity file. Throws a
+ * {@link SlopError} naming `path` and the exact location/issue on any
+ * failure: missing file (NOT_FOUND, exit 4), JSONC syntax errors, schema
+ * validation failures, or any other read failure (both GENERIC_ERROR,
+ * exit 1 — a corrupt db file or an unreadable one is a real problem, not
+ * a usage mistake) — see {@link readEntityText}.
+ */
+export async function readEntityFile<T>(path: string, schema: z.ZodType<T>): Promise<T> {
+  const raw = await readEntityText(path);
 
   const { value, errors } = parseJsonc<unknown>(raw);
   if (errors.length > 0) {
@@ -87,15 +101,7 @@ export async function updateEntityFile<T>(
   patch: JsoncPatchEntry[],
   expectedAfter: T,
 ): Promise<void> {
-  let existingText: string;
-  try {
-    existingText = await readFile(path, "utf8");
-  } catch (err) {
-    if (isEnoent(err)) {
-      throw new SlopError(`no such file: ${path}`, EXIT_CODES.NOT_FOUND);
-    }
-    throw err;
-  }
+  const existingText = await readEntityText(path);
   const newText = writeUpdate(existingText, patch, expectedAfter);
   await atomicWriteFile(path, newText);
 }

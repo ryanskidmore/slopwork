@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -91,6 +91,31 @@ describe("readEntityFile", () => {
     await writeFile(path, '{ "id": "a", "count": 3 }\n');
     await expect(readEntityFile(path, widgetSchema)).resolves.toEqual({ id: "a", count: 3 });
   });
+
+  // Polish batch item 3: a non-ENOENT read failure (EACCES here — a file
+  // that exists but this process can't read; EIO would hit the same
+  // catch branch) used to escape as Node's raw, path-less `Error` instead
+  // of a clean, actionable SlopError naming the file.
+  it("wraps a non-ENOENT read failure (EACCES) in a SlopError naming the path and the underlying cause, not a raw Error", async () => {
+    const path = join(scratch, "unreadable.jsonc");
+    await writeFile(path, '{ "id": "a", "count": 1 }\n');
+    await chmod(path, 0o000);
+    try {
+      let threw: unknown;
+      try {
+        await readEntityFile(path, widgetSchema);
+      } catch (err) {
+        threw = err;
+      }
+      expect(threw).toBeInstanceOf(SlopError);
+      expect((threw as SlopError).exitCode).toBe(EXIT_CODES.GENERIC_ERROR);
+      expect((threw as SlopError).message).toContain(path);
+      expect((threw as SlopError).message.toLowerCase()).toMatch(/eacces|permission/);
+    } finally {
+      // Restore so afterEach's `rm(scratch, { recursive: true, force: true })` can remove it.
+      await chmod(path, 0o644);
+    }
+  });
 });
 
 describe("createEntityFileCanonical / updateEntityFile", () => {
@@ -116,6 +141,24 @@ describe("createEntityFileCanonical / updateEntityFile", () => {
     await expect(
       updateEntityFile(path, [{ path: ["count"], value: 2 }], { id: "a", count: 2 }),
     ).rejects.toMatchObject({ exitCode: EXIT_CODES.NOT_FOUND });
+  });
+
+  // Polish batch item 3, updateEntityFile's own read (it shares
+  // readEntityFile's read-mapping helper, not a second hand-rolled copy).
+  it("updateEntityFile wraps a non-ENOENT read failure (EACCES) in a SlopError naming the path, not a raw Error", async () => {
+    const path = join(scratch, "unreadable.jsonc");
+    await writeFile(path, '{ "id": "a", "count": 1 }\n');
+    await chmod(path, 0o000);
+    try {
+      await expect(
+        updateEntityFile(path, [{ path: ["count"], value: 2 }], { id: "a", count: 2 }),
+      ).rejects.toMatchObject({
+        exitCode: EXIT_CODES.GENERIC_ERROR,
+        message: expect.stringContaining(path),
+      });
+    } finally {
+      await chmod(path, 0o644);
+    }
   });
 });
 

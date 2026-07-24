@@ -33,6 +33,22 @@ const UPDATE_TOUCHABLE_FIELDS = [
   "updated_at",
 ] as const satisfies readonly (keyof Ticket)[];
 
+/**
+ * `UPDATE_TOUCHABLE_FIELDS` minus the two derived timestamps — this is the
+ * "did anything REAL change" set a same-state (or otherwise fully
+ * redundant) `update` call is judged against, below. Timestamps are never
+ * part of this: they're an effect of a real change, not evidence of one.
+ */
+const UPDATE_CONTENT_FIELDS = [
+  "name",
+  "spec",
+  "state",
+  "review",
+  "priority",
+  "labels",
+  "latest_note",
+] as const satisfies readonly (keyof Ticket)[];
+
 export interface LabelOp {
   op: "+" | "-";
   label: string;
@@ -139,9 +155,8 @@ export function buildUpdate(
   }
 
   const stateChanged = targetState !== undefined && targetState !== current.state;
-  const now = nowIso(clock);
 
-  const next: Ticket = {
+  const contentNext: Ticket = {
     ...current,
     name: input.name ?? current.name,
     spec:
@@ -163,8 +178,33 @@ export function buildUpdate(
     priority: input.priority ?? current.priority,
     labels: applyLabelOps(current.labels, labelOps),
     latest_note: input.progress ?? current.latest_note,
-    last_activity_at: input.progress !== undefined || stateChanged ? now : current.last_activity_at,
-    updated_at: now,
+  };
+
+  // Fix (polish batch): a call whose resulting content is identical to
+  // `current` in every field that actually matters — most visibly `update
+  // --state open` on an already-open ticket, with no other flag changing
+  // anything either — used to still be treated as a real mutation: it
+  // bumped `updated_at` (sometimes `last_activity_at` too) and produced a
+  // `ticket.updated` event with an empty payload describing nothing.
+  // Mirrors draft.ts/undraft.ts's E1 same-state no-op, but generalised to
+  // every `UPDATE_CONTENT_FIELDS` field rather than `state` alone (e.g. a
+  // redundant `--label +already-present` with nothing else given is the
+  // same kind of fake mutation) — reusing `diffTicketPatch` itself (rather
+  // than a second, hand-rolled equality check) so "did anything real
+  // change" can never disagree with what the patch below actually
+  // contains. A genuine no-op call still succeeds (it's not a usage
+  // error — `hasAnyInput` above only requires a flag be PASSED, not that
+  // it change anything), it just does nothing further.
+  const hasRealChange = diffTicketPatch(current, contentNext, UPDATE_CONTENT_FIELDS).length > 0;
+  const now = nowIso(clock);
+
+  const next: Ticket = {
+    ...contentNext,
+    last_activity_at:
+      hasRealChange && (input.progress !== undefined || stateChanged)
+        ? now
+        : current.last_activity_at,
+    updated_at: hasRealChange ? now : current.updated_at,
   };
 
   const parsed = ticketSchema.safeParse(next);
@@ -177,17 +217,30 @@ export function buildUpdate(
   const validated = parsed.data;
 
   const patch = diffTicketPatch(current, validated, UPDATE_TOUCHABLE_FIELDS);
+  // `patch` is the ground truth for "did this field actually change" — a
+  // payload key is only worth emitting for a field the patch itself
+  // touched, so a redundant flag (e.g. `--priority` re-stating the
+  // ticket's current priority, or `--label +already-present`) given
+  // alongside a genuinely no-op call can never describe a change in the
+  // event payload that the patch doesn't back up (same "no fake mutation"
+  // principle as the `hasRealChange` short-circuit above, just applied
+  // per-field instead of to the call as a whole).
+  const patchedFields = new Set(patch.map((entry) => entry.path[0]));
   const verb: EventVerb = stateChanged ? "ticket.state_changed" : "ticket.updated";
   const payload: Record<string, unknown> = {};
-  if (input.progress !== undefined) payload.progress = input.progress;
+  if (input.progress !== undefined && patchedFields.has("latest_note")) {
+    payload.progress = input.progress;
+  }
   if (stateChanged) {
     payload.from = current.state;
     payload.to = validated.state;
   }
-  if (input.priority !== undefined) payload.priority = validated.priority;
-  if (labelOps.length > 0) payload.labels = validated.labels;
-  if (input.name !== undefined) payload.name = validated.name;
-  if (input.specRaw !== undefined) payload.spec = true;
+  if (input.priority !== undefined && patchedFields.has("priority")) {
+    payload.priority = validated.priority;
+  }
+  if (labelOps.length > 0 && patchedFields.has("labels")) payload.labels = validated.labels;
+  if (input.name !== undefined && patchedFields.has("name")) payload.name = validated.name;
+  if (input.specRaw !== undefined && patchedFields.has("spec")) payload.spec = true;
 
   return { ticket: validated, patch, verb, payload };
 }

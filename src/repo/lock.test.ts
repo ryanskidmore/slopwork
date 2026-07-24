@@ -424,16 +424,25 @@ describe("fencing token / assertHeld (adversarial-review Finding 1)", () => {
   });
 
   it("renewal prevents a live, slow holder from being reclaimed merely for running past staleTimeoutMs", async () => {
-    const handle = await acquireLock(lockPath, { staleTimeoutMs: 80 });
+    // 15ms renewal vs. 200ms staleTimeout is a wide (~13x) real-time
+    // margin, chosen specifically to not flake under load — the previous
+    // 20ms-vs-80ms pairing (~4x) left too little slack for a slow CI
+    // scheduler to occasionally miss a renewal window and make this test
+    // spuriously pass OR spuriously fail depending on which side of the
+    // race lost. Real wall-clock timing (not the injectable fixed clock
+    // used elsewhere in this file) is unavoidable here: what's under
+    // test is genuinely the *live* retry/renewal race between two
+    // independent async loops, not a value `acquireLock` merely records.
+    const handle = await acquireLock(lockPath, { staleTimeoutMs: 200 });
     const renewals = setInterval(() => {
       handle.assertHeld().catch(() => {});
-    }, 20);
+    }, 15);
     try {
-      // Without renewal this would be clearly stale well before 200ms —
+      // Without renewal this would be clearly stale well before 250ms —
       // the holder has been renewing the whole time via assertHeld(), so
       // a contender must still time out rather than steal it.
       await expect(
-        acquireLock(lockPath, { timeoutMs: 200, retryDelayMs: 10, staleTimeoutMs: 80 }),
+        acquireLock(lockPath, { timeoutMs: 250, retryDelayMs: 10, staleTimeoutMs: 200 }),
       ).rejects.toBeInstanceOf(SlopError);
     } finally {
       clearInterval(renewals);

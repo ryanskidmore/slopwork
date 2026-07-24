@@ -26,7 +26,27 @@ export function escapeHtml(input: string): string {
     .replaceAll("'", "&#39;");
 }
 
-/** For `href`/`src` attribute values: escapeHtml plus quote-breaking characters already covered — kept as a named alias so call sites read as attribute-safe, not just text-safe. */
+/**
+ * Escapes HTML metacharacters for a double-quoted HTML attribute value —
+ * identical to {@link escapeHtml} (quote-breaking characters are already
+ * covered there); kept as a separately named function so call sites read
+ * as attribute-safe, not just text-safe.
+ *
+ * Despite the name, this is NOT a URL-safety check: it does not look at,
+ * validate, or reject any URL *scheme* — a `javascript:alert(1)` string
+ * passes through completely unchanged (just HTML-escaped), since none of
+ * its characters are HTML metacharacters. Do not rely on this ALONE for
+ * anything headed for a live `href`/`src`; route it through {@link
+ * safeUrl} first (it returns `null` for an unsafe scheme, e.g.
+ * `javascript:`/`data:`/`vbscript:`) and only escape the result that
+ * survives — see `safeUrl`'s own doc comment below for the full scheme
+ * allowlist and rationale. `src/web/views/shared.ts`'s `ticketLink` is
+ * the one caller of this function today, and its input is always an
+ * internal `/tickets/<id>` path this module builds itself, never
+ * attacker-controlled — so it's safe in practice, but that safety comes
+ * from the caller's input being trusted, not from any guarantee this
+ * function makes.
+ */
 export function escapeAttr(input: string): string {
   return escapeHtml(input);
 }

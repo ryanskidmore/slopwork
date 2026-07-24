@@ -57,7 +57,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { mkdir, open, rename, rm } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, relative, sep } from "node:path";
 import { isEnoent, readDirSafe } from "./fs-utils.js";
 
 export const TEMP_FILE_PREFIX = ".tmp-";
@@ -114,6 +114,37 @@ async function fsyncDir(dir: string): Promise<void> {
 }
 
 /**
+ * Durability follow-up to Fix 4's self-heal (module doc above): `mkdir(dir,
+ * {recursive: true})` resolves to the path of the FIRST (topmost)
+ * directory it actually had to create, or `undefined` if `dir` already
+ * existed (Node's documented `recursive: true` return value — the
+ * overwhelmingly common case, unaffected by any of this). When it DID
+ * create something, every directory from `firstCreated` down through
+ * `dir` itself is brand new — and each one's own directory *entry* lives
+ * in its PARENT, not in itself. `atomicWriteFile` already fsyncs `dir`
+ * after the rename below, which makes durable what's INSIDE `dir` (the
+ * renamed file's entry); it says nothing about whether `dir` — or any
+ * newly-created ancestor of it — durably exists as an entry in ITS OWN
+ * parent. A power loss right after a fresh-clone `slop start` self-heals
+ * `.slop/db/sessions/` could otherwise durably write `session_x.jsonc`
+ * inside `sessions/`, yet lose the `sessions` directory-entry in `db/`
+ * itself, orphaning the file. Walks the newly-created chain top-down,
+ * fsyncing each level's PARENT (`firstCreated`'s parent, then
+ * `firstCreated` itself for its child, and so on down to — but not
+ * including — `dir`, which the caller fsyncs separately right after this
+ * for the rename anyway).
+ */
+async function fsyncNewlyCreatedDirChain(firstCreated: string, dir: string): Promise<void> {
+  let level = firstCreated;
+  for (;;) {
+    await fsyncDir(dirname(level));
+    if (level === dir) return;
+    const nextSegment = relative(level, dir).split(sep)[0] ?? "";
+    level = join(level, nextSegment);
+  }
+}
+
+/**
  * Write `contents` to `targetPath` atomically: tmp file in the same
  * directory, fsynced, renamed over the target, then the containing
  * directory is fsynced. On any failure before the rename completes, the
@@ -126,11 +157,19 @@ async function fsyncDir(dir: string): Promise<void> {
  * Self-heals a missing target directory first (Fix 4 — see module doc,
  * "self-heal a missing target directory"): a fresh clone missing
  * `.slop/db/sessions/` (git doesn't track empty directories) must never
- * crash on its first write of that kind.
+ * crash on its first write of that kind. When that self-heal actually
+ * creates one or more directory levels, each newly-created level's
+ * parent is fsynced too (see {@link fsyncNewlyCreatedDirChain}) — the
+ * common case (`dir` already exists, `mkdir` returns `undefined`) does
+ * exactly one extra `stat`-class syscall and nothing more, unchanged
+ * from before.
  */
 export async function atomicWriteFile(targetPath: string, contents: string): Promise<void> {
   const dir = dirname(targetPath);
-  await mkdir(dir, { recursive: true });
+  const firstCreated = await mkdir(dir, { recursive: true });
+  if (firstCreated !== undefined) {
+    await fsyncNewlyCreatedDirChain(firstCreated, dir);
+  }
   const tmpPath = tempFilePathFor(targetPath);
   let renamed = false;
   try {

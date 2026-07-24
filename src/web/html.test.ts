@@ -1,11 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { escapeHtml, html, joinHtml, raw, safeUrl } from "./html.js";
+import { escapeAttr, escapeHtml, html, joinHtml, raw, safeUrl } from "./html.js";
 
 describe("escapeHtml", () => {
   it("escapes the five HTML-significant characters", () => {
     expect(escapeHtml(`<a href="x">&'</a>`)).toBe(
       "&lt;a href=&quot;x&quot;&gt;&amp;&#39;&lt;/a&gt;",
     );
+  });
+});
+
+// Polish batch item 2: escapeAttr's doc comment was tightened to explicitly
+// say it does NOT validate URL schemes (it's HTML-metacharacter escaping
+// only, same as escapeHtml) — this pins down exactly that claim so a
+// future edit that quietly changes escapeAttr's behavior (e.g. someone
+// "fixing" it to reject javascript:/data: URLs, which would silently
+// change what every existing caller receives) fails a test instead of
+// just going unnoticed. Callers that need scheme validation must go
+// through `safeUrl` first — see safeUrl's own describe block below.
+describe("escapeAttr", () => {
+  it("is HTML-metachar escaping only — it does NOT validate or reject a javascript: URL scheme", () => {
+    // No `&`, `<`, `>`, `"`, or `'` in this string, so it round-trips
+    // completely unchanged — exactly the danger the doc comment warns
+    // about: this must never be relied on alone for a live href/src.
+    expect(escapeAttr("javascript:alert(1)")).toBe("javascript:alert(1)");
+  });
+
+  it("otherwise behaves identically to escapeHtml", () => {
+    const input = `<a href="x">&'</a>`;
+    expect(escapeAttr(input)).toBe(escapeHtml(input));
   });
 });
 

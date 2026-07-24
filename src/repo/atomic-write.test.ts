@@ -1,7 +1,7 @@
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_SWEEP_MIN_AGE_MS,
   TEMP_FILE_PREFIX,
@@ -9,6 +9,44 @@ import {
   isTempFileName,
   sweepStaleTempFiles,
 } from "./atomic-write.js";
+
+/**
+ * Records every `open(path, flags)` call node:fs/promises makes during a
+ * test, so the new-dir-parent-fsync tests below can tell a directory
+ * fsync (`fsyncDir` always calls `open(dir, "r")`) apart from the
+ * temp-file write (`open(tmpPath, "wx")`) without needing to touch
+ * atomic-write.ts's internals — `fsyncNewlyCreatedDirChain` is
+ * intentionally not exported, exactly like `fsyncDir` it builds on, so
+ * this is the only vantage point available from a co-located test. Off
+ * by default (every other test in this file never enables it) so this
+ * mock is a transparent passthrough everywhere else.
+ */
+const openLog = vi.hoisted(() => {
+  let enabled = false;
+  const calls: { path: string; flags: unknown }[] = [];
+  return {
+    enable(): void {
+      enabled = true;
+      calls.length = 0;
+    },
+    disable(): void {
+      enabled = false;
+    },
+    calls,
+    record(path: string, flags: unknown): void {
+      if (enabled) calls.push({ path, flags });
+    },
+  };
+});
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  const open: typeof actual.open = (path, flags, mode) => {
+    openLog.record(String(path), flags);
+    return actual.open(path, flags, mode);
+  };
+  return { ...actual, open };
+});
 
 let scratch: string;
 
@@ -114,6 +152,62 @@ describe("atomicWriteFile", () => {
       expect(await readFile(target, "utf8")).toBe('{"v":2}\n');
       const names = await readdir(missingDir);
       expect(names).toEqual(["event_x.jsonc"]);
+    });
+
+    // Polish batch item 4: the self-heal above always fsynced the
+    // newly-created TARGET dir, but never the target dir's own newly-
+    // created ANCESTORS' parents — so a crash right after a successful,
+    // fully-fsynced write could still lose the just-created directory
+    // chain itself (the directory ENTRY for e.g. `sessions` living in
+    // `db/` is a fact about `db/`, not about `sessions/`). Every level
+    // from the pre-existing ancestor down through the deepest new dir
+    // must now get its OWN parent fsynced too.
+    it("fsyncs every newly-created directory's parent, not just the deepest target dir, for a multi-level self-heal", async () => {
+      const newRoot = join(scratch, "newroot");
+      const level1 = join(newRoot, "level1");
+      const level2 = join(level1, "level2");
+      const target = join(level2, "ticket_x.jsonc");
+
+      openLog.enable();
+      try {
+        await atomicWriteFile(target, "{}\n");
+      } finally {
+        openLog.disable();
+      }
+
+      expect(await readFile(target, "utf8")).toBe("{}\n");
+
+      const dirsFsynced = openLog.calls
+        .filter((call) => call.flags === "r")
+        .map((call) => call.path);
+      // `scratch` (the pre-existing ancestor whose entry "newroot" is
+      // new), `newroot` (whose entry "level1" is new), and `level1`
+      // (whose entry "level2" is new) are the new fsyncs this fix adds;
+      // `level2` itself was already fsynced (post-rename, for the file
+      // entry) even before this fix.
+      expect(dirsFsynced).toEqual(expect.arrayContaining([scratch, newRoot, level1, level2]));
+    });
+
+    it("does NOT fsync any ancestor beyond the target dir once the directory already exists (common-path fsync count unchanged)", async () => {
+      const missingDir = join(scratch, "presynced");
+      const target = join(missingDir, "ticket_x.jsonc");
+      await atomicWriteFile(target, '{"v":1}\n'); // creates + fsyncs the chain once
+
+      openLog.enable();
+      try {
+        await atomicWriteFile(target, '{"v":2}\n'); // dir already exists now
+      } finally {
+        openLog.disable();
+      }
+
+      expect(await readFile(target, "utf8")).toBe('{"v":2}\n');
+      const dirsFsynced = openLog.calls
+        .filter((call) => call.flags === "r")
+        .map((call) => call.path);
+      // Only the target dir itself (the existing post-rename fsync) —
+      // `mkdir` created nothing this time, so the new parent-chain logic
+      // must not fire at all.
+      expect(dirsFsynced).toEqual([missingDir]);
     });
   });
 });
