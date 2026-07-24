@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { durationStringSchema, parseDurationMs } from "./duration.js";
+import { durationStringSchema, isRepresentableDurationMs, parseDurationMs } from "./duration.js";
 
 describe("parseDurationMs", () => {
   it("parses the two config.yaml defaults exactly (design.md §3)", () => {
@@ -55,5 +55,29 @@ describe("durationStringSchema", () => {
       }
       expect(schemaOk).toBe(parseOk);
     }
+  });
+});
+
+describe("isRepresentableDurationMs", () => {
+  it("accepts every ordinary duration, incl. the config.yaml defaults", () => {
+    expect(isRepresentableDurationMs(parseDurationMs("60m"))).toBe(true);
+    expect(isRepresentableDurationMs(parseDurationMs("24h"))).toBe(true);
+    expect(isRepresentableDurationMs(0)).toBe(true);
+  });
+
+  it("rejects a duration string schema-valid but too huge for a Date to represent (regression: ticket duration-huge-stale-after-overflows)", () => {
+    // "99999999999d" passes durationStringSchema (no magnitude cap) but is
+    // ~1000x ECMA-262's ±100,000,000-day Date range.
+    expect(isRepresentableDurationMs(parseDurationMs("99999999999d"))).toBe(false);
+  });
+
+  it("rejects non-finite input defensively", () => {
+    expect(isRepresentableDurationMs(Number.POSITIVE_INFINITY)).toBe(false);
+    expect(isRepresentableDurationMs(Number.NaN)).toBe(false);
+  });
+
+  it("rejects magnitude symmetrically (negative overflow too)", () => {
+    expect(isRepresentableDurationMs(-8_640_000_000_000_000)).toBe(false);
+    expect(isRepresentableDurationMs(-1)).toBe(true);
   });
 });

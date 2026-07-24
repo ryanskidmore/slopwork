@@ -35,3 +35,24 @@ export function parseDurationMs(input: string): number {
   }
   return Number(amountStr) * unitMs;
 }
+
+/**
+ * ECMA-262 §21.4.1.1: a `Date` can only represent times within
+ * ±100,000,000 days of the epoch — ±8.64e15 ms. `durationStringSchema`'s
+ * pattern has no magnitude bound (`\d+` accepts any number of digits), so
+ * `parseDurationMs` can hand back an `ms` value nowhere near representable
+ * — e.g. `"99999999999d"` parses fine but is ~1000x this bound. Adding
+ * such a value to any real timestamp produces an Invalid Date, and
+ * `Date#toISOString` throws `RangeError: Invalid time value` on one.
+ *
+ * `stale_after`/`review_stale_after` are exactly this shape of user input
+ * (config.yaml, no schema-level magnitude cap), and a huge value is a
+ * plausible thing for someone to write specifically *meaning* "never" /
+ * "disable staleness". Callers that turn a parsed duration into a
+ * deadline (`tickets/staleness.ts`'s `addMs`) use this guard to treat an
+ * unrepresentable magnitude as exactly that — no deadline — instead of
+ * crashing.
+ */
+export function isRepresentableDurationMs(ms: number): boolean {
+  return Number.isFinite(ms) && Math.abs(ms) < 8_640_000_000_000_000;
+}
