@@ -27,6 +27,7 @@ import {
   formatDurationShort,
   formatRelative,
   liveBlockers,
+  matchTicketByRef,
   msSince,
   type ReverseEdgeIndex,
   type StaleReason,
@@ -285,19 +286,25 @@ export async function handleTicketDetail(
   now: number,
 ): Promise<Response> {
   const ref = req.params.ref;
-  const [ticket, { config, warning: configWarning }, allTickets] = await Promise.all([
-    dataSource.findTicketByRef(ref),
-    dataSource.getConfig(),
+  // web-every-request-full-rescans: `allTickets` is fetched once and reused
+  // to resolve `ref` in-memory (matchTicketByRef) instead of ALSO calling
+  // `findTicketByRef` (which would independently re-scan the entire tickets
+  // directory just to answer the same question `allTickets` already
+  // answers) — one tickets-directory scan per request, not two.
+  const [allTickets, { config, warning: configWarning }] = await Promise.all([
     dataSource.listTickets(),
+    dataSource.getConfig(),
   ]);
+  const ticket = matchTicketByRef(allTickets, ref);
   if (!ticket) {
     return notFoundPage("tickets", `No ticket matches "${ref}".`);
   }
 
-  const [sessions, events] = await Promise.all([
-    dataSource.listSessionsForTicket(ticket.id),
-    dataSource.listEventsForTicket(ticket.id),
-  ]);
+  // Same idea for sessions: `sessions` is fetched once here and passed into
+  // `listEventsForTicket` so it doesn't independently re-scan the sessions
+  // directory a second time just to find this ticket's session ids.
+  const sessions = await dataSource.listSessionsForTicket(ticket.id);
+  const events = await dataSource.listEventsForTicket(ticket.id, sessions);
 
   // ticket_01KY9S0172V8AYCYV9KWS6RC9P: `latest_note`/`last_activity_at` as
   // `slop show` actually displays them — EFFECTIVE, not necessarily what's

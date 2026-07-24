@@ -4,12 +4,22 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { BunRequest } from "bun";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Event, Ticket, TicketId } from "../../core/index.js";
-import { newEventId, newTicketId, ticketSchema } from "../../core/index.js";
+import type { Event, EventId, Session, SessionId, Ticket, TicketId } from "../../core/index.js";
+import {
+  configSchema,
+  newEventId,
+  newSessionId,
+  newTicketId,
+  sessionSchema,
+  ticketSchema,
+} from "../../core/index.js";
+import type { ConfigResult, WebDataSource } from "../data-source.js";
 import type { ReverseEdgeIndex, StaleReason } from "../overlays.js";
 import {
   ancestryBreadcrumb,
+  handleTicketDetail,
   renderMrLink,
   renderOverlayReasons,
   renderRelationshipsSection,
@@ -72,6 +82,137 @@ function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
     ...overrides,
   });
 }
+
+function makeSession(overrides: Partial<Session> = {}): Session {
+  return sessionSchema.parse({
+    id: newSessionId(),
+    ticket: newTicketId(),
+    actor: { name: "ryan", kind: "human" },
+    harness: { kind: "other", session_id: null },
+    git: { branch: null, commit_at_start: null },
+    started_at: "2026-07-23T10:00:00.000Z",
+    ...overrides,
+  });
+}
+
+/**
+ * web-every-request-full-rescans: a {@link WebDataSource} fake that counts
+ * calls to each method instead of touching a filesystem — `handleTicketDetail`
+ * has no Bun-only dependency of its own (only `renderMarkdownToString`,
+ * routed around here via an empty `details_md`/no `resolution`, touches
+ * `Bun.markdown` — see `makeTicket`'s defaults), so this can drive the real
+ * handler function directly under vitest and assert exactly how many times
+ * each directory-scanning method got called for one request, instead of
+ * inferring it indirectly from a spawned process's behaviour.
+ */
+function makeCountingDataSource(
+  tickets: readonly Ticket[],
+  sessions: readonly Session[],
+  events: readonly Event[],
+): { dataSource: WebDataSource; calls: Record<keyof WebDataSource, number> } {
+  const calls: Record<keyof WebDataSource, number> = {
+    getConfig: 0,
+    listTickets: 0,
+    findTicketByRef: 0,
+    listSessionsForTicket: 0,
+    getSessionById: 0,
+    listEventsForTicket: 0,
+    listEvents: 0,
+    openTranscript: 0,
+  };
+  const dataSource: WebDataSource = {
+    async getConfig(): Promise<ConfigResult> {
+      calls.getConfig++;
+      return { config: configSchema.parse({ project: "test" }), warning: null };
+    },
+    async listTickets(): Promise<Ticket[]> {
+      calls.listTickets++;
+      return [...tickets];
+    },
+    async findTicketByRef(ref: string): Promise<Ticket | null> {
+      calls.findTicketByRef++;
+      return tickets.find((t) => t.slug === ref || t.id === ref) ?? null;
+    },
+    async listSessionsForTicket(ticketId: TicketId): Promise<Session[]> {
+      calls.listSessionsForTicket++;
+      return sessions.filter((s) => s.ticket === ticketId);
+    },
+    async getSessionById(id: SessionId): Promise<Session | null> {
+      calls.getSessionById++;
+      return sessions.find((s) => s.id === id) ?? null;
+    },
+    async listEventsForTicket(
+      ticketId: TicketId,
+      knownSessions?: readonly Session[],
+    ): Promise<Event[]> {
+      calls.listEventsForTicket++;
+      const relevantSessions = knownSessions ?? sessions.filter((s) => s.ticket === ticketId);
+      const sessionIds = new Set<string>(relevantSessions.map((s) => s.id));
+      return events.filter(
+        (e) =>
+          (e.entity.kind === "ticket" && e.entity.id === ticketId) ||
+          (e.entity.kind === "session" && sessionIds.has(e.entity.id)),
+      );
+    },
+    async listEvents(): Promise<Event[]> {
+      calls.listEvents++;
+      return [...events];
+    },
+    async openTranscript() {
+      calls.openTranscript++;
+      return null;
+    },
+  };
+  return { dataSource, calls };
+}
+
+function makeDetailRequest(ref: string): BunRequest<"/tickets/:ref"> {
+  return { params: { ref } } as unknown as BunRequest<"/tickets/:ref">;
+}
+
+describe("handleTicketDetail — one scan per directory per request (web-every-request-full-rescans)", () => {
+  it("calls listTickets and listSessionsForTicket exactly once each, and never calls findTicketByRef", async () => {
+    const ticket = makeTicket({ slug: "the-ticket" });
+    const session = makeSession({ ticket: ticket.id });
+    const event: Event = {
+      id: newEventId() as EventId,
+      actor: { name: "ryan", kind: "human" },
+      session: session.id,
+      verb: "session.started",
+      entity: { kind: "session", id: session.id },
+      payload: {},
+      at: "2026-07-23T10:00:00.000Z",
+    };
+    const { dataSource, calls } = makeCountingDataSource([ticket], [session], [event]);
+
+    const res = await handleTicketDetail(makeDetailRequest("the-ticket"), dataSource, Date.now());
+
+    expect(res.status).toBe(200);
+    // Before this fix: listTickets called twice (once directly, once again
+    // inside findTicketByRef) and listSessionsForTicket called twice (once
+    // directly, once again inside listEventsForTicket).
+    expect(calls.listTickets).toBe(1);
+    expect(calls.findTicketByRef).toBe(0);
+    expect(calls.listSessionsForTicket).toBe(1);
+    expect(calls.listEventsForTicket).toBe(1);
+    expect(calls.getConfig).toBe(1);
+  });
+
+  it("still 404s cleanly for an unknown ref, with the same single-scan behaviour", async () => {
+    const { dataSource, calls } = makeCountingDataSource([], [], []);
+    const res = await handleTicketDetail(
+      makeDetailRequest("does-not-exist"),
+      dataSource,
+      Date.now(),
+    );
+    expect(res.status).toBe(404);
+    expect(calls.listTickets).toBe(1);
+    expect(calls.findTicketByRef).toBe(0);
+    // Never reached — the ticket doesn't exist.
+    expect(calls.listSessionsForTicket).toBe(0);
+    expect(calls.listEventsForTicket).toBe(0);
+  });
+});
 
 // ticket_01KY9S0172V8AYCYV9KWS6RC9P — relationships, overlay reasons, and
 // the ancestry breadcrumb are all pure `html`-template rendering (no

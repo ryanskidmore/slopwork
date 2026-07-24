@@ -89,8 +89,16 @@ export interface WebDataSource {
    * see event.ts's EVENT_VERBS doc comments for why those are keyed to the
    * session, not the ticket). Returned oldest-first (event id order, which
    * is chronological per D6); callers reverse if they want newest-first.
+   *
+   * `knownSessions` (web-every-request-full-rescans): this method needs
+   * `ticketId`'s sessions to know which `entity.kind === "session"` events
+   * belong to it — pass the caller's own already-fetched sessions (e.g.
+   * `handleTicketDetail` already calls {@link listSessionsForTicket} for
+   * its own "Sessions" section) to skip re-scanning the sessions directory
+   * a second time in the same request. Omit it to have this method fetch
+   * them itself, unchanged from before.
    */
-  listEventsForTicket(ticketId: TicketId): Promise<Event[]>;
+  listEventsForTicket(ticketId: TicketId, knownSessions?: readonly Session[]): Promise<Event[]>;
 
   /**
    * ticket_01KY9S0172V8AYCYV9KWS6RC9P: every event in the db, unfiltered.

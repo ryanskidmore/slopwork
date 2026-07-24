@@ -10,6 +10,7 @@ import {
   formatRelative,
   isTicketStale,
   liveBlockers,
+  matchTicketByRef,
   msSince,
   staleThresholdsFromConfig,
 } from "./overlays.js";
@@ -30,6 +31,68 @@ function ticket(overrides: Record<string, unknown> = {}): Ticket {
     ...overrides,
   });
 }
+
+// web-every-request-full-rescans: matchTicketByRef is the ref-matching rule
+// FixtureDataSource.findTicketByRef delegates to, extracted so
+// handleTicketDetail can resolve `ref` against a ticket list it already
+// fetched instead of re-scanning the tickets directory a second time.
+//
+// ULIDs encode a millisecond timestamp in their first 10 characters (D6) —
+// two ids minted in the same test, quite possibly the same millisecond,
+// can genuinely share that whole prefix. `siblingId` below builds a second,
+// schema-valid id that shares an exact, controlled-length prefix with a
+// real one (rather than a short id-prefix test relying on two independently
+// generated ids happening not to collide, which would be flaky).
+const CROCKFORD_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"; // Crockford base32, no I/L/O/U — matches ticketSchema's id regex.
+function siblingId(id: string, diffAtIndex: number): string {
+  const prefix = "ticket_";
+  const chars = id.slice(prefix.length).split("");
+  const original = chars[diffAtIndex];
+  const replacement = CROCKFORD_ALPHABET.split("").find((c) => c !== original);
+  if (replacement === undefined) throw new Error("no replacement character found");
+  chars[diffAtIndex] = replacement;
+  return prefix + chars.join("");
+}
+
+describe("matchTicketByRef", () => {
+  it("matches by exact slug", () => {
+    const t = ticket({ slug: "my-ticket" });
+    const other = ticket({ slug: "other-ticket" });
+    expect(matchTicketByRef([t, other], "my-ticket")).toBe(t);
+  });
+
+  it("matches by exact id", () => {
+    const t = ticket();
+    const other = ticket();
+    expect(matchTicketByRef([t, other], t.id)).toBe(t);
+  });
+
+  it("matches an unambiguous short id-prefix", () => {
+    const t = ticket();
+    // Shares t's id up to (not including) ULID index 12, differs starting
+    // there — a prefix that extends through index 12 includes t's own
+    // differing character, so it matches t but not this sibling.
+    const otherId = siblingId(t.id, 12);
+    const other = ticket({ id: otherId, root_id: otherId });
+    const uniquePrefix = t.id.slice(0, "ticket_".length + 13);
+    expect(matchTicketByRef([t, other], uniquePrefix)).toBe(t);
+  });
+
+  it("returns null for zero matches", () => {
+    const t = ticket();
+    expect(matchTicketByRef([t], "no-such-slug")).toBeNull();
+  });
+
+  it("returns null (not a guess) for an ambiguous ref", () => {
+    const a = ticket();
+    // Shares a's first 20 characters exactly, differs from index 20 on —
+    // a prefix within that shared region matches both, so it's ambiguous.
+    const bId = siblingId(a.id, 20);
+    const b = ticket({ id: bId, root_id: bId });
+    const sharedPrefix = a.id.slice(0, "ticket_".length + 15);
+    expect(matchTicketByRef([a, b], sharedPrefix)).toBeNull();
+  });
+});
 
 describe("computeBlockedTicketIds", () => {
   it("marks a ticket blocked when a non-finished ticket lists it in `blocks`", () => {

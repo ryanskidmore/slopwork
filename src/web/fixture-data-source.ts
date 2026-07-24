@@ -34,7 +34,6 @@ import {
   configSchema,
   type Event,
   eventSchema,
-  idMatchesRef,
   isSessionId,
   parseJsonc,
   type Session,
@@ -45,6 +44,7 @@ import {
   ticketSchema,
 } from "../core/index.js";
 import type { ConfigResult, TranscriptHandle, WebDataSource } from "./data-source.js";
+import { matchTicketByRef } from "./overlays.js";
 
 /**
  * web-one-malformed-db-file-500s-every-page-and-leaks-filesyst: this used
@@ -228,15 +228,12 @@ export class FixtureDataSource implements WebDataSource {
   }
 
   async findTicketByRef(ref: string): Promise<Ticket | null> {
-    const tickets = await this.listTickets();
-    const bySlug = tickets.find((t) => t.slug === ref);
-    if (bySlug) return bySlug;
-    const byId = tickets.find((t) => t.id === ref);
-    if (byId) return byId;
-    // Unambiguous short id-prefix (D6/D12) — same matching rule the CLI's ref
-    // resolution uses (core/ids.ts idMatchesRef), reused rather than reimplemented.
-    const prefixMatches = tickets.filter((t) => idMatchesRef(t.id, ref));
-    return prefixMatches.length === 1 ? (prefixMatches[0] ?? null) : null;
+    // web-every-request-full-rescans: the matching rule itself lives in
+    // overlays.ts's matchTicketByRef (also used directly by
+    // handleTicketDetail, which already has to fetch the full ticket list
+    // anyway) so there's exactly one implementation of "which id does this
+    // ref mean", not two independently-drifting ones.
+    return matchTicketByRef(await this.listTickets(), ref);
   }
 
   async listSessionsForTicket(ticketId: TicketId): Promise<Session[]> {
@@ -265,10 +262,17 @@ export class FixtureDataSource implements WebDataSource {
     );
   }
 
-  async listEventsForTicket(ticketId: TicketId): Promise<Event[]> {
+  async listEventsForTicket(
+    ticketId: TicketId,
+    knownSessions?: readonly Session[],
+  ): Promise<Event[]> {
+    // web-every-request-full-rescans: a caller that already fetched this
+    // ticket's sessions (handleTicketDetail does, for its own "Sessions"
+    // section) can pass them in via `knownSessions` to skip re-scanning the
+    // sessions directory a second time in the same request.
     const [events, sessions] = await Promise.all([
       this.readAllEvents(),
-      this.listSessionsForTicket(ticketId),
+      knownSessions ? Promise.resolve(knownSessions) : this.listSessionsForTicket(ticketId),
     ]);
     const sessionIds = new Set<string>(sessions.map((s) => s.id));
     const relevant = events.filter(
