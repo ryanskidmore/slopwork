@@ -18,9 +18,21 @@ const SECTION_END = "# --- end slopworks ---";
 /**
  * D14 (always) + D16 ("gitignored by default ... unless `transcripts:
  * commit`") — the exact lines `slop init` is responsible for.
+ *
+ * Also always (independent of `transcripts`) ignores the lock file and
+ * atomic-write temp files: a `kill -9` mid-transaction can leave the lock
+ * file and/or a temp file (see atomic-write.ts's TEMP_FILE_PREFIX) on
+ * disk. Left untracked, a `git add -A` would commit these ephemeral
+ * files — the lock then round-trips through merge (a conflict on a file
+ * with no meaningful content to merge) and, worse, on a fresh clone its
+ * foreign pid can read as "alive" and stall every write for the full
+ * stale-lock timeout. One glob covers a temp file written directly in
+ * db/ (e.g. index.jsonc's own atomic write); the other covers one
+ * written in a subdirectory (tickets/, sessions/, events/) next to its
+ * target, per atomic-write.ts's same-directory-as-target rule.
  */
 export function computeGitignoreLines(transcriptsMode: TranscriptsMode): string[] {
-  const lines = [".slop/db/index.jsonc"];
+  const lines = [".slop/db/index.jsonc", ".slop/db/.lock", ".slop/db/.tmp-*", ".slop/db/*/.tmp-*"];
   if (transcriptsMode !== "commit") {
     lines.push(".slop/transcripts/");
   }
