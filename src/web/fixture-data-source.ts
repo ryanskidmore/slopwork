@@ -47,6 +47,32 @@ import {
 } from "../core/index.js";
 import type { TranscriptHandle, WebDataSource } from "./data-source.js";
 
+/**
+ * web-one-malformed-db-file-500s-every-page-and-leaks-filesyst: this used
+ * to read+parse every file in `dir` strictly (`for` loop, first throw wins)
+ * — which meant one corrupt/schema-drifted `.jsonc` file took the ENTIRE
+ * listing down with it, and every view built on that listing along with it
+ * (`/tickets`, `/tree`, `/review`, `/stale`, and — via `findTicketByRef`
+ * re-`listTickets()`-ing — even an unrelated ticket's own detail page).
+ *
+ * Mirrors the fault-tolerant `Promise.allSettled` pattern
+ * `repo/tickets.ts`'s `listTicketsTolerant` (reused by `repo/db-index.ts`'s
+ * `buildIndex`, see that module's "Fault tolerance" doc section) already
+ * established for exactly this class of problem: a file that fails to
+ * read, parse as JSONC, or validate against its schema is skipped and
+ * logged (stderr, via {@link warnSkippedFiles}) rather than aborting the
+ * whole directory read. Every other file in `dir` is still returned,
+ * unaffected — so one bad ticket/session/event file degrades to "N fewer
+ * rows in the listing", never a 500 on every page that listing feeds.
+ *
+ * Direct single-entity reads (`getSessionById`, `getConfig`) are
+ * deliberately UNCHANGED and still throw on a corrupt file — same
+ * reasoning `repo/tickets.ts`'s `readTicket`/`listTickets` doc gives: a
+ * direct-by-id read is the caller asking for that exact entity and has no
+ * sensible "skip it" option. This function is only ever used for
+ * *listings* (`listTickets`, the sessions/events dirs) — see this module's
+ * callers.
+ */
 async function readJsoncDir<T>(
   dir: string,
   parseOne: (text: string, file: string) => T,
@@ -59,13 +85,42 @@ async function readJsoncDir<T>(
     throw err;
   }
   const files = entries.filter((name) => name.endsWith(".jsonc")).sort();
+  const settled = await Promise.allSettled(
+    files.map(async (file) => {
+      const path = join(dir, file);
+      const text = await Bun.file(path).text();
+      return parseOne(text, path);
+    }),
+  );
+
   const out: T[] = [];
-  for (const file of files) {
-    const path = join(dir, file);
-    const text = await Bun.file(path).text();
-    out.push(parseOne(text, path));
+  const skipped: string[] = [];
+  for (const result of settled) {
+    if (result.status === "fulfilled") {
+      out.push(result.value);
+    } else {
+      const message =
+        result.reason instanceof Error ? result.reason.message : String(result.reason);
+      skipped.push(message);
+    }
   }
+  if (skipped.length > 0) warnSkippedFiles(dir, skipped);
   return out;
+}
+
+/**
+ * Never-silent counterpart to the skip-and-continue behaviour above —
+ * matches `repo/db-index.ts`'s `warnAboutIndexProblems`: a skipped file is
+ * degraded service, not something that should vanish without a trace.
+ * stderr only (this is a read-only local dev server; there is no request
+ * -scoped logger to route through), one line per directory read that hit
+ * at least one bad file, each skipped file's own high-quality parse/schema
+ * error indented beneath it.
+ */
+function warnSkippedFiles(dir: string, messages: string[]): void {
+  const header = `slop web: ${messages.length} file(s) in ${dir} failed to load and were skipped:`;
+  const body = messages.map((message) => `  - ${message}`).join("\n");
+  process.stderr.write(`${header}\n${body}\n`);
 }
 
 function parseEntity<T>(schema: { parse: (input: unknown) => T }, text: string, path: string): T {

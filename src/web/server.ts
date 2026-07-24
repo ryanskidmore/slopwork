@@ -55,6 +55,20 @@ export function createWebServer(
   return Bun.serve({
     hostname: options.hostname ?? "127.0.0.1",
     port: options.port,
+    // Bun.serve's `development` option controls whether an unhandled
+    // exception renders as its verbose dev error page (full stack trace +
+    // the server's absolute filesystem path, embedded straight into the
+    // HTTP response) or a terse, generic error body. Left unset, it
+    // defaults to reading `process.env.NODE_ENV` at Bun's own native
+    // startup — but this is a read-only local viewer over a project's
+    // `.slop/` directory, and a bug in any route should never hand back
+    // the server's own source layout as a side effect. Passing the option
+    // explicitly here means the behavior is controlled by THIS process's
+    // own arguments, not by whatever NODE_ENV happened to be set in the
+    // shell that launched `slop web` — false (terse errors) by default,
+    // with `SLOP_WEB_DEBUG=1` as an explicit, undocumented opt-in escape
+    // hatch back to the verbose page for local debugging.
+    development: Boolean(process.env.SLOP_WEB_DEBUG),
     routes: {
       "/": {
         GET: () => new Response(null, { status: 302, headers: { location: "/tickets" } }),
