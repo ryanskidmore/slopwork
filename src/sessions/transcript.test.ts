@@ -221,28 +221,74 @@ describe("locateTranscript — claude-code", () => {
 });
 
 // ---------------------------------------------------------------------------
-// locateTranscript — claude-code cwd encoding on win32 (Windows portability,
-// best-effort/unverified — see encodeClaudeCwd's own doc in transcript.ts).
-// `encodeClaudeCwd` isn't exported (same as every other internal helper in
-// this module); this exercises it the same indirect way the POSIX encoding
-// tests above already do, through `locateTranscript`'s public surface, with
-// `process.platform` mocked since this suite runs on a Linux host.
+// locateTranscript — claude-code cwd encoding: verified real algorithm
+// (ticket_01KYAPKRRE38SKMSFKF1GVQQTH) — `cwd.replace(/[^a-zA-Z0-9]/g, "-")`,
+// unconditionally, no OS-specific branching (see encodeClaudeCwd's own doc
+// in transcript.ts for how this was verified against a real Claude Code
+// install). `encodeClaudeCwd` isn't exported (same as every other internal
+// helper in this module); this exercises it indirectly through
+// `locateTranscript`'s public surface, same as the POSIX encoding tests
+// above.
 // ---------------------------------------------------------------------------
 
-describe("locateTranscript — claude-code cwd encoding on win32", () => {
-  const originalPlatform = process.platform;
+describe("locateTranscript — claude-code cwd encoding: verified real algorithm", () => {
+  it("folds underscores to - (the exact gap this ticket closes: a repo named my_project used to miss entirely)", async () => {
+    const claudeHome = join(scratch, "fake-claude-home-underscore");
+    await mkdir(claudeHome, { recursive: true });
+    const cwd = "/home/ryan/my_project";
+    const encoded = "-home-ryan-my-project";
+    const projectDir = join(claudeHome, "projects", encoded);
+    await mkdir(projectDir, { recursive: true });
+    const target = join(projectDir, "session-id.jsonl");
+    await writeFile(target, "{}\n", "utf8");
 
-  afterEach(() => {
-    Object.defineProperty(process, "platform", {
-      value: originalPlatform,
-      configurable: true,
-    });
+    const roots: LocateTranscriptRoots = { claudeHome };
+    const found = locateTranscript(harness("claude-code", "session-id"), cwd, undefined, roots);
+    expect(found).toBe(target);
   });
 
-  it("also folds \\ and : to - (in addition to / and .), producing a stable encoding for a Windows-shaped cwd", async () => {
-    Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+  it("folds spaces and other punctuation to -, not just / and .", async () => {
+    const claudeHome = join(scratch, "fake-claude-home-spaces");
+    await mkdir(claudeHome, { recursive: true });
+    const cwd = "/home/ryan/My Project (v2)";
+    const encoded = "-home-ryan-My-Project--v2-";
+    const projectDir = join(claudeHome, "projects", encoded);
+    await mkdir(projectDir, { recursive: true });
+    const target = join(projectDir, "session-id.jsonl");
+    await writeFile(target, "{}\n", "utf8");
 
-    const claudeHome = join(scratch, "fake-claude-home-win32");
+    const roots: LocateTranscriptRoots = { claudeHome };
+    const found = locateTranscript(harness("claude-code", "session-id"), cwd, undefined, roots);
+    expect(found).toBe(target);
+  });
+
+  it("a cwd with _ and spaces that DOESN'T exist on disk degrades to null with a warning, never a wrong file (acceptance criterion's second clause)", async () => {
+    const paths = repoPaths(scratch);
+    const claudeHome = join(scratch, "fake-claude-home-underscore-miss");
+    await mkdir(claudeHome, { recursive: true });
+    const session = sessionSchema.parse({
+      id: newSessionId(),
+      ticket: newTicketId(),
+      actor: { name: "ryan", kind: "human" },
+      harness: harness("claude-code", "some-id"),
+      git: { branch: null, commit_at_start: null },
+      started_at: "2026-07-23T10:00:00.000Z",
+    });
+
+    const result = await captureTranscript({
+      session,
+      paths,
+      cwd: "/home/ryan/my_missing_project (draft)",
+      transcriptsMode: "local",
+      roots: { claudeHome },
+    });
+
+    expect(result.transcriptRef).toBeNull();
+    expect(result.warning).not.toBeNull();
+  });
+
+  it("also folds \\ and : to - on a Windows-shaped cwd (the real rule is the SAME on every platform, no OS branching)", async () => {
+    const claudeHome = join(scratch, "fake-claude-home-windows-shaped");
     await mkdir(claudeHome, { recursive: true });
     const cwd = "C:\\Users\\x\\proj";
     const encoded = "C--Users-x-proj";
@@ -256,17 +302,18 @@ describe("locateTranscript — claude-code cwd encoding on win32", () => {
     // (both gated on `sessionId !== null`), which would otherwise find the
     // file by scanning every project dir regardless of how the cwd was
     // encoded and mask a broken encoding — leaving ONLY step 3
-    // (newest-mtime inside the win32-encoded `projectDir`) as the path
-    // that can locate it, so this genuinely exercises `encodeClaudeCwd`'s
-    // win32 branch, not the glob safety net.
+    // (newest-mtime inside the encoded `projectDir`) as the path that can
+    // locate it, so this genuinely exercises `encodeClaudeCwd`, not the
+    // glob safety net. Deliberately does NOT mock `process.platform` —
+    // the verified real algorithm applies identically regardless of host
+    // OS, so this passes on the Linux host this suite actually runs on.
     const roots: LocateTranscriptRoots = { claudeHome };
     const found = locateTranscript(harness("claude-code", null), cwd, undefined, roots);
     expect(found).toBe(target);
   });
 
-  it("the win32 encoding is stable/deterministic across repeated calls for the same cwd", () => {
-    Object.defineProperty(process, "platform", { value: "win32", configurable: true });
-    const cwd = "C:\\Users\\x\\proj";
+  it("the encoding is stable/deterministic across repeated calls for the same cwd", () => {
+    const cwd = "/repo/my_weird project~name";
     const roots: LocateTranscriptRoots = { claudeHome: join(scratch, "unused") };
     // Two calls with no matching transcript both return null via the exact
     // same code path either way — this only proves no throw/crash and no
@@ -275,9 +322,7 @@ describe("locateTranscript — claude-code cwd encoding on win32", () => {
     expect(locateTranscript(harness("claude-code", null), cwd, undefined, roots)).toBeNull();
   });
 
-  it("does NOT affect the POSIX encoding when explicitly on linux (unchanged)", async () => {
-    Object.defineProperty(process, "platform", { value: "linux", configurable: true });
-
+  it("still encodes plain / and . correctly (unchanged for the already-covered common case)", async () => {
     const claudeHome = join(scratch, "fake-claude-home-posix-explicit");
     await mkdir(claudeHome, { recursive: true });
     const cwd = "/home/ryan/proj";
