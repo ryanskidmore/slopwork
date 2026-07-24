@@ -102,7 +102,7 @@ describe("D1 onboarding content: one source, three renderings", () => {
 
   it("`update`'s corrected claim doesn't regress to a nonexistent flag", () => {
     // Regression guard for content.ts's `--blocks` correction against
-    // draft-v0-SKILL.md: `update` has no `--blocks` flag (only `new` does).
+    // the pre-v0 draft: `update` has no `--blocks` flag (only `new` does).
     const body = renderOnboardingBody(ctx);
     expect(body).not.toMatch(/update <current> --state open.*--blocks/s);
   });

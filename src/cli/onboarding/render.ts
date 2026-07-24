@@ -104,7 +104,7 @@ export function renderAgentsMd(ctx: OnboardingContext): string {
 
 /**
  * SKILL.md's YAML frontmatter. Claude Code discovers/triggers the skill
- * from `name`/`description` here (draft-v0-SKILL.md's own frontmatter
+ * from `name`/`description` here (the pre-v0 draft's own frontmatter
  * shape) — this is the one piece of the three renderings that only
  * SKILL.md carries, since it's meaningless to `slop instructions`'
  * stdout output or to AGENTS.md.

@@ -16,18 +16,19 @@
  * `render.test.ts` both fail loudly if any of the three stops reflecting
  * this module.
  *
- * Base structure, section order, and voice: `draft-v0-SKILL.md` (repo
- * root) — the "SKILL.md draft already written" this work item was handed.
- * A few claims were corrected against the shipped CLI; each fix is called
- * out at its own entry below rather than silently, since D1's brief is
- * explicit that a wrong onboarding doc is worse than none.
+ * Base structure, section order, and voice: the pre-v0 skill design draft
+ * (superseded, see git history) — the "SKILL.md draft already written"
+ * this work item was handed. A few claims were corrected against the
+ * shipped CLI; each fix is called out at its own entry below rather than
+ * silently, since D1's brief is explicit that a wrong onboarding doc is
+ * worse than none.
  */
 
 export const SKILL_NAME = "slopwork";
 
 /**
  * SKILL.md frontmatter `description` — this exact text is how Claude Code
- * decides when to load the skill (draft-v0-SKILL.md's own frontmatter,
+ * decides when to load the skill (the pre-v0 draft's own frontmatter,
  * unchanged: the trigger conditions it lists are still accurate against
  * the shipped CLI, nothing here needed correcting).
  */
@@ -39,7 +40,7 @@ export interface WhenToActRow {
   action: string;
 }
 
-/** "When to act, at a glance" table (draft-v0-SKILL.md's own table, one row corrected — see the `--blocks` note). */
+/** "When to act, at a glance" table (the pre-v0 draft's own table, one row corrected — see the `--blocks` note). */
 export const WHEN_TO_ACT: readonly WhenToActRow[] = [
   {
     situation: 'Told "work on X" (id, slug, or jira ref)',
@@ -93,7 +94,7 @@ export const WHEN_TO_ACT: readonly WhenToActRow[] = [
   },
 ] as const;
 
-/** "The loop" — the default per-ticket sequence (draft-v0-SKILL.md, unchanged: every command/flag named here exists on the shipped CLI). */
+/** "The loop" — the default per-ticket sequence (the pre-v0 draft, unchanged: every command/flag named here exists on the shipped CLI). */
 export const LOOP_STEPS: readonly string[] = [
   "`slop start <ref>` — moves the ticket to in_progress, creates your session, and prints the context pack (spec, ancestry, blockers, prior sessions). Read it fully before coding.",
   '`slop plan <ref> "step 1" "step 2" …` — always plan before multi-step work. Revise the plan if the approach changes; don\'t silently diverge from it.',
@@ -102,7 +103,7 @@ export const LOOP_STEPS: readonly string[] = [
   "Open an MR, then `slop review <ref> --mr <url>`. Only `slop done` after merge/verification — done means done.",
 ] as const;
 
-/** House rules (draft-v0-SKILL.md, one entry corrected — see the `--budget`/`--json` note). */
+/** House rules (the pre-v0 draft, one entry corrected — see the `--budget`/`--json` note). */
 export const HOUSE_RULES: readonly string[] = [
   "**The tracker is the truth.** No TODO comments, no NOTES.md, no work state in prose. If it's work, it's a ticket.",
   "**Never fake state.** Don't `done` unverified work, don't `--check` unfinished steps, don't skip `review` because the change \"is small.\"",
@@ -121,11 +122,11 @@ export const HOUSE_RULES: readonly string[] = [
   "**Budget your reads.** `ready`, `status`, `search`, `events`, and `context` all take `--json --budget N` to cap output (`show --context` too); use `slop context <ref>` to re-load your bearings after compaction instead of re-exploring the repo.",
 ] as const;
 
-/** Reference resolution rule (draft-v0-SKILL.md, unchanged). */
+/** Reference resolution rule (the pre-v0 draft, unchanged). */
 export const REF_RESOLUTION =
   "Anywhere a `<ref>` is accepted: full id (`ticket_01J9X7M3E8W2`), unique short prefix (`01J9X7`), slug (`adding-new-auth-provider`), and for parents also external refs (`jira:PROJ-123`). Ambiguous prefix → the CLI errors and lists candidates; pick explicitly.";
 
-/** Edge cases (draft-v0-SKILL.md, unchanged). */
+/** Edge cases (the pre-v0 draft, unchanged). */
 export const EDGE_CASES: readonly string[] = [
   "**No `.slop/` in the repo:** slopwork isn't set up. Ask the human before running `slop init` — never initialize on your own.",
   "**Transcript warnings** on `stop`/`done`: report the warning to the human; never block or retry-loop on it.",

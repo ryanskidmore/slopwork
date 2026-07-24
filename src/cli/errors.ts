@@ -45,15 +45,3 @@ export function reportError(err: unknown): ExitCode {
   printError(String(err));
   return EXIT_CODES.GENERIC_ERROR;
 }
-
-/**
- * Standard body for a command that is registered (so `--help` is complete
- * and correct from A1 onward) but not yet implemented. Later work items
- * replace the call site that invokes this, not the registration around it.
- */
-export function notImplemented(command: string, workItem: string): never {
-  throw new SlopError(
-    `\`slop ${command}\` is not yet implemented (work item ${workItem})`,
-    EXIT_CODES.NOT_IMPLEMENTED,
-  );
-}
