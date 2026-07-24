@@ -90,16 +90,30 @@ Rebuilds the derived, gitignored `.slop/db/index.jsonc` from the tickets,
 sessions, and events on disk. You rarely need this by hand — every read
 path auto-heals a missing/stale index — but it's the manual escape hatch
 after a bulk hand-edit, or to force-surface every unreadable ticket file
-in one pass.
+in one pass. It also scans for **orphaned active sessions** — sessions
+with no `ended_at` that no ticket's `active_session` references, which
+can happen if a `start`/takeover is interrupted (e.g. a crash) between
+creating the session and the ticket write that points to it.
 
 ```sh
 slop reindex
 slop reindex --strict   # fail on the first unreadable file instead of skipping it
+slop reindex --heal     # also close out any orphaned active sessions found
 ```
 
 `--strict` restores pre-fault-tolerance, all-or-nothing behavior. Without
 it, `reindex` skips unreadable ticket files, still rebuilds everything it
 could read, reports every problem, and exits `1` if any remain.
+
+`--heal` closes out every orphaned active session it finds: sets
+`ended_at` and a synthesized `end_summary` explaining the auto-heal, and
+records a `session.ended` event (`reason: "orphan_repair"`) per session,
+same audit trail any other session-ending command leaves. Detection
+always runs and is reported in the summary line even without `--heal`.
+The scan is skipped (with a warning) whenever the ticket read itself had
+unreadable files — a corrupt ticket's own `active_session` would
+otherwise be invisible to the scan, which could misreport a genuinely
+live session as orphaned.
 
 ---
 

@@ -1,0 +1,44 @@
+{
+  "id": "ticket_01KYAW7DSFYVNM7NP12J9CYJDZ",
+  "name": "start/takeover: eliminate the residual new-session orphan window with a write-ahead journal (currently detect+repair only)",
+  "slug": "start-takeover-eliminate-the-residual",
+  "spec": {
+    "summary": "start/takeover: eliminate the residual new-session orphan window with a write-ahead journal (currently detect+repair only)",
+    "details_md": "ticket_01KYAPKRJ9RJRJRAV42WCTJET4 fixed the takeover write order (the OLD/previous session is now closed BEFORE the ticket write, the point of no return) and added orphan detection+repair (slop reindex --heal). One window remains, structurally: start always creates the BRAND NEW session file before the ticket write that references it (the ticket needs the session's freshly-minted id), so a crash between createSession and updateTicket still leaves that new session unreferenced (ended_at: null, detectable/repairable via reindex --heal, but not prevented). Eliminating this outright would need a write-ahead journal or two-phase commit around the whole start transaction -- explicitly out of scope for the crash-window ticket per the write-order-fix-plus-repair-path scope the human coordinator set.",
+    "acceptance": [
+      "design a journal/two-phase-commit approach for start's multi-write transaction (or an equivalent mechanism) that closes the window entirely, not just detects it after the fact",
+      "either implement it, or record a considered decision not to (e.g. detect+repair is judged sufficient long-term) with rationale"
+    ],
+    "context": [
+      "src/cli/commands/start.ts",
+      "src/sessions/repair.ts",
+      "ticket_01KYAPKRJ9RJRJRAV42WCTJET4"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYAPKRJ9RJRJRAV42WCTJET4"
+  ],
+  "root_id": "ticket_01KYAW7DSFYVNM7NP12J9CYJDZ",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T20:14:19.441Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T20:14:19.441Z",
+  "updated_at": "2026-07-24T20:14:39.025Z"
+}

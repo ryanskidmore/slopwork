@@ -1,0 +1,52 @@
+{
+  "id": "session_01KYAVRD70X73EC5ACWH2XSF1B",
+  "ticket": "ticket_01KYAPKRJ9RJRJRAV42WCTJET4",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "worktree-agent-a7ff845d6e02c1d0b",
+    "commit_at_start": "1b14430ac9de39bb43668cb52335a9f904980d0d"
+  },
+  "started_at": "2026-07-24T20:06:07.328Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "reorder start.ts's takeover path: end the previous session BEFORE the ticket write (which becomes the last write / point of no return), matching stop.ts's already-safe ordering",
+          "checked": true
+        },
+        {
+          "text": "add orphaned-active-session detection (src/sessions/repair.ts: findOrphanedActiveSessions + buildHealedSession) plus a fault-tolerant listSessionsTolerant in repo/sessions.ts",
+          "checked": true
+        },
+        {
+          "text": "wire detection + --heal repair into slop reindex",
+          "checked": true
+        },
+        {
+          "text": "regression tests: start.ts write-order (event-cursor-order proof), repair.ts unit tests, reindex.ts CLI-level detect+heal tests",
+          "checked": true
+        },
+        {
+          "text": "file a follow-up ticket for the residual out-of-scope gap (true crash-safe journal/WAL for the still-unavoidable new-session-not-yet-referenced window)",
+          "checked": true
+        },
+        {
+          "text": "run full verification",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T20:06:29.043Z"
+    }
+  ],
+  "end_summary": null,
+  "transcript_ref": "transcripts/session_01KYAVRD70X73EC5ACWH2XSF1B.jsonl"
+}
