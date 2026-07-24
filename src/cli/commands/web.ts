@@ -1,7 +1,7 @@
 import { existsSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { Command } from "commander";
-import { type Clock, fixedClock } from "../../core/index.js";
+import { type Clock, EXIT_CODES, fixedClock } from "../../core/index.js";
 import { FixtureDataSource, PortInUseError, startWebServer } from "../../web/index.js";
 import { SlopError } from "../errors.js";
 import { parseIntegerOption } from "./shared.js";
@@ -42,6 +42,25 @@ function findSlopRoot(startDir: string): string | null {
   }
 }
 
+/**
+ * `--port <n>` — bound-checked to the valid TCP port range, 0-65535 (0
+ * keeps its documented "pick a free port" meaning, see startWebServer /
+ * PortInUseError below). An out-of-range value (`--port 99999`, `--port
+ * -1`) is a usage mistake, not a runtime failure, so it's rejected the
+ * same `SlopError(..., EXIT_CODES.USAGE_ERROR)` way `parseIntegerOption`
+ * already rejects a non-integer `--port` value.
+ */
+function parsePort(value: string): number {
+  const parsed = parseIntegerOption("--port")(value);
+  if (parsed < 0 || parsed > 65535) {
+    throw new SlopError(
+      `--port must be between 0 and 65535, got "${value}"`,
+      EXIT_CODES.USAGE_ERROR,
+    );
+  }
+  return parsed;
+}
+
 /** `slop web` — design.md §4.4; work item D5. */
 export function registerWebCommand(program: Command): void {
   program
@@ -50,12 +69,7 @@ export function registerWebCommand(program: Command): void {
       "Serve the read-only local web explorer: ticket list/filters, tree view, " +
         "ticket detail, transcript viewer, review panel, stale panel.",
     )
-    .option(
-      "--port <n>",
-      "port to listen on (0 = pick a free port)",
-      parseIntegerOption("--port"),
-      4553,
-    )
+    .option("--port <n>", "port to listen on (0 = pick a free port)", parsePort, 4553)
     .action((opts: { port: number }) => {
       const slopRoot = findSlopRoot(process.cwd());
       if (!slopRoot) {

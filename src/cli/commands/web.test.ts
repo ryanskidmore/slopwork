@@ -71,6 +71,69 @@ function runSlop(
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 }
 
+// ---------------------------------------------------------------------------
+// cli-input-validation-reject-truncated-numerics-fix-actor-fai:
+//
+// `--port` used to accept any integer `parseIntegerOption` produced with
+// no bound-check at all, so `--port 99999` or `--port -1` were silently
+// passed straight through to `startWebServer`. Commander parses/validates
+// options (running the option's parser function) BEFORE invoking the
+// command's action, so an invalid `--port` value is rejected during
+// argument parsing, before `slop web` ever looks for a `.slop` directory
+// or starts a server — these tests spawn the CLI in a plain scratch dir
+// (no `slop init` needed) and assert on the resulting exit code alone,
+// same "spawn the real CLI, never import server.ts's Bun-only globals into
+// vitest" reasoning as the rest of this file (see the module doc above).
+// ---------------------------------------------------------------------------
+
+describe("slop web --port bound-check (0-65535)", () => {
+  let scratch: string;
+
+  beforeAll(async () => {
+    scratch = await mkdtemp(join(tmpdir(), "slop-web-port-validation-"));
+  });
+
+  afterAll(async () => {
+    if (scratch) await rm(scratch, { recursive: true, force: true });
+  });
+
+  it("rejects a value above the valid range (--port 99999)", () => {
+    const result = runSlop(["web", "--port", "99999"], scratch);
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("--port");
+  });
+
+  it("rejects a negative value (--port -1)", () => {
+    const result = runSlop(["web", "--port", "-1"], scratch);
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("--port");
+  });
+
+  it("rejects non-integer garbage via the shared parseIntegerOption bound (--port 3xyz)", () => {
+    const result = runSlop(["web", "--port", "3xyz"], scratch);
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("--port");
+  });
+
+  it("accepts 0 (its documented 'pick a free port' meaning), failing later only for lack of a .slop dir", () => {
+    const result = runSlop(["web", "--port", "0"], scratch);
+    // No `slop init` in `scratch`, so this still fails — but on the
+    // "no .slop directory found" check inside the action, which only runs
+    // AFTER option parsing succeeded, proving `--port 0` itself parsed and
+    // was accepted rather than rejected by the bound-check.
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("no .slop directory found");
+    expect(result.stderr).not.toContain("--port");
+  });
+
+  it("accepts a normal port, failing later only for lack of a .slop dir", () => {
+    const result = runSlop(["web", "--port", "4553"], scratch);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("no .slop directory found");
+    expect(result.stderr).not.toContain("--port");
+  });
+});
+
 interface NewTicketJson {
   id: string;
   slug: string;

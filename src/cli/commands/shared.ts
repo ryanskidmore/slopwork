@@ -33,14 +33,22 @@ export function collect(value: string, previous: string[]): string[] {
  * `--port`, `ready`'s `--budget`, ...) is fixed by throwing a
  * {@link SlopError} instead, which `reportError` always honors regardless
  * of which layer catches it.
+ *
+ * **Input-validation fix:** `Number.parseInt` silently truncates
+ * leading-numeric garbage — `parseInt("2abc", 10)` is `2`, not NaN — so
+ * `--priority 2abc` used to persist priority `2` (a DIFFERENT value than
+ * the one typed, a data-integrity gap) instead of being rejected, and
+ * `--priority 1.9` truncated to `1`. The value's full trimmed text must
+ * now match `/^-?\d+$/` (a complete integer, nothing trailing) before
+ * it's accepted at all.
  */
 export function parseIntegerOption(flag: string): (value: string) => number {
   return (value: string): number => {
-    const parsed = Number.parseInt(value, 10);
-    if (Number.isNaN(parsed)) {
+    const trimmed = value.trim();
+    if (!/^-?\d+$/.test(trimmed)) {
       throw new SlopError(`${flag} must be an integer, got "${value}"`, EXIT_CODES.USAGE_ERROR);
     }
-    return parsed;
+    return Number.parseInt(trimmed, 10);
   };
 }
 

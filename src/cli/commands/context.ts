@@ -21,10 +21,17 @@ interface ContextCommandOptions {
  * mistake, reject eagerly" treatment `start.ts`'s `--harness` gets. Throws
  * a {@link SlopError} (USAGE_ERROR, exit 2) — E1's exit-code audit fix
  * (see `shared.ts`'s `parseIntegerOption` doc for why a bare `Error` here
- * would silently exit 1 instead). */
-function parseBudgetFlag(value: string): number {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isInteger(parsed) || parsed < 0) {
+ * would silently exit 1 instead).
+ *
+ * **Input-validation fix:** `Number.parseInt` silently truncates
+ * leading-numeric garbage — `--budget 100abc` used to parse as `100`
+ * instead of being rejected. The value's full trimmed text must now match
+ * `/^-?\d+$/` (a complete integer, nothing trailing) before it's accepted
+ * at all; the existing non-negative bound is unchanged. */
+export function parseBudgetFlag(value: string): number {
+  const trimmed = value.trim();
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!/^-?\d+$/.test(trimmed) || !Number.isInteger(parsed) || parsed < 0) {
     throw new SlopError(
       `--budget must be a non-negative integer (${CONTEXT_PACK_BUDGET_UNIT}), got "${value}"`,
       EXIT_CODES.USAGE_ERROR,

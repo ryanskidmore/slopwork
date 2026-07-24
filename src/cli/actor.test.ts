@@ -3,8 +3,10 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { EXIT_CODES } from "../core/index.js";
 import { ensureDbDirs } from "../repo/paths.js";
 import type { RepoPaths } from "../repo/paths.js";
+import { SlopError } from "./errors.js";
 import { gitUserName, isAgentHarnessEnv, loadConfig, resolveActor } from "./actor.js";
 
 let scratch: string;
@@ -150,6 +152,22 @@ describe("resolveActor (D17: --as > SLOP_ACTOR > config user > git user.name)", 
     expect(() => resolveActor({ config: null, cwd: scratch, env: isolatedGitEnv() })).toThrow(
       /SLOP_ACTOR/,
     );
+  });
+
+  // cli-input-validation-reject-truncated-numerics-fix-actor-fai:
+  // this used to throw `new SlopError(message)` with no exit-code
+  // argument, which defaults to GENERIC_ERROR (1) — but an unresolvable
+  // actor is a bad-invocation condition (fixable by passing --as, setting
+  // SLOP_ACTOR, etc.), not an unexpected runtime failure, so it must carry
+  // USAGE_ERROR (2), matching this function's own doc comment.
+  it("the unresolvable-actor failure is a SlopError carrying USAGE_ERROR (exit 2), not GENERIC_ERROR", () => {
+    try {
+      resolveActor({ config: null, cwd: scratch, env: isolatedGitEnv() });
+      throw new Error("expected resolveActor to throw");
+    } catch (err) {
+      expect(err).toBeInstanceOf(SlopError);
+      expect((err as SlopError).exitCode).toBe(EXIT_CODES.USAGE_ERROR);
+    }
   });
 
   it("resolves kind 'agent' under a detected harness env, 'human' otherwise", () => {

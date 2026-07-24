@@ -23,7 +23,7 @@ import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Actor, ActorKind, Config } from "../core/index.js";
-import { configSchema, resolveActorName } from "../core/index.js";
+import { configSchema, EXIT_CODES, resolveActorName } from "../core/index.js";
 import type { RepoPaths } from "../repo/paths.js";
 import { detectHarness, sniffHarnessKind } from "../sessions/harness.js";
 import { parseConfigYamlText } from "./config-yaml.js";
@@ -169,9 +169,16 @@ export function resolveActor(options: ResolveActorOptions): Actor {
     gitUserName: gitUserName(options.cwd, env),
   });
   if (name === null) {
+    // Input-validation fix: this used to omit the exit-code argument,
+    // silently defaulting to SlopError's GENERIC_ERROR (1) — but an
+    // unresolvable actor is a bad-invocation condition (fixable by passing
+    // --as, setting SLOP_ACTOR, etc.), not an unexpected runtime failure,
+    // so it belongs on the documented USAGE_ERROR (2) contract (see this
+    // function's own doc comment above, which already claimed USAGE_ERROR).
     throw new SlopError(
       "could not determine who is acting: pass --as <name>, set SLOP_ACTOR, set `user:` in " +
         ".slop/config.yaml, or configure `git config user.name` (design.md D17)",
+      EXIT_CODES.USAGE_ERROR,
     );
   }
   return { name, kind: actorKind(env, options.harnessFlag) };
