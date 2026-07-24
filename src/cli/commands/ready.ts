@@ -37,11 +37,11 @@
  * ```json
  * {
  *   "ready": [
- *     { "id", "slug", "name", "state", "priority", "labels", "why" }, ...
+ *     { "id", "slug", "handle", "name", "state", "priority", "labels", "why" }, ...
  *   ],
  *   "resumable_requested": boolean,
  *   "resumable": [
- *     { "id", "slug", "name", "state", "priority", "labels", "why", "mr"? }, ...
+ *     { "id", "slug", "handle", "name", "state", "priority", "labels", "why", "mr"? }, ...
  *   ],
  *   "elided": ["<note>", ...],   // only non-empty when --budget forced elision
  *   "hint": "<string> | null"    // non-null only when both arrays above are empty
@@ -51,15 +51,18 @@
  * `resumable` is always present as a key (even without `--resumable`) so a
  * script never has to special-case a missing field — it's simply `[]`
  * unless `resumable_requested` is `true`. Every row carries exactly what
- * `slop start` needs next (id, slug, name, priority, labels) plus `why`
- * this ticket is in the list — this work item's brief. `mr` (C5) is only
- * present on `review`-state rows — `string | null`, `null` meaning
- * "review-state, but no MR link on file yet" (D15: entering review without
- * `--mr` is allowed, just nagged).
+ * `slop start` needs next (id, slug, handle, name, priority, labels) plus
+ * `why` this ticket is in the list — this work item's brief. `handle` is
+ * the short `t-<code>` ref (core/ids.ts's `shortTicketCode`, computed —
+ * never stored — same as `slop new`/`slop show`/`slop status`), so an
+ * agent picking work here can start it with the short ref, not just the
+ * full id. `mr` (C5) is only present on `review`-state rows — `string |
+ * null`, `null` meaning "review-state, but no MR link on file yet" (D15:
+ * entering review without `--mr` is allowed, just nagged).
  */
 import type { Command } from "commander";
 import type { Clock, TicketId } from "../../core/index.js";
-import { fixedClock, systemClock } from "../../core/index.js";
+import { fixedClock, shortTicketCode, systemClock } from "../../core/index.js";
 import { loadIndex, readTicket, repoPaths, requireRepoRoot } from "../../repo/index.js";
 import type { RepoPaths } from "../../repo/index.js";
 import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
@@ -82,6 +85,8 @@ interface ReadyCommandOptions {
 interface ReadyJsonRow {
   id: string;
   slug: string;
+  /** handle-t-code-missing-from: short `t-<code>` ref — see module doc. */
+  handle: string;
   name: string;
   state: string;
   priority: number;
@@ -130,6 +135,7 @@ function toJsonRow(entry: ReadyEntry, mrLinks: ReadonlyMap<string, string | null
   return {
     id: row.id,
     slug: row.slug,
+    handle: shortTicketCode(row.id),
     name: row.name,
     state: row.state,
     priority: row.priority,

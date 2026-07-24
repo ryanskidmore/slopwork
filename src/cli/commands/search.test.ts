@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
 import { EXIT_CODES } from "../../core/exit-codes.js";
-import { newTicketId } from "../../core/index.js";
+import { newTicketId, shortTicketCode } from "../../core/index.js";
 import type { TicketId } from "../../core/index.js";
 import { repoPaths, ticketFilePath } from "../../repo/index.js";
 import { runNew } from "./new.js";
@@ -46,6 +46,24 @@ describe("runSearch (in-process)", () => {
     }
     const body = JSON.parse(out.stdout()) as { results: { id: string }[] };
     expect(body.results.map((r) => r.id)).toEqual([id]);
+  });
+
+  // handle-t-code-missing-from: `search --json` rows used to omit the short
+  // `t-<code>` handle that `new`/`show`/`status` already surface.
+  it("--json results carry the short t-<code> handle", async () => {
+    const root = await makeTempRepo("slop-search-inproc-handle-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Handle-findable widget ticket");
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runSearch("widget", { json: true }));
+    } finally {
+      out.restore();
+    }
+    const body = JSON.parse(out.stdout()) as { results: { id: string; handle: string }[] };
+    const row = body.results.find((r) => r.id === id);
+    expect(row?.handle).toBe(shortTicketCode(id));
   });
 
   it("finds text in progress-note HISTORY, not just the current latest_note", async () => {

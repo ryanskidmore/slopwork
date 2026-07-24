@@ -1,0 +1,48 @@
+{
+  "id": "session_01KYAXQ9D918B91HPBGBDDA802",
+  "ticket": "ticket_01KYAPMHFDYZQG8TXKGJAAZFXT",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "worktree-agent-a2f73771765d13db7",
+    "commit_at_start": "874a38631ad0101efdb0ec8e2c799aac53de77ec"
+  },
+  "started_at": "2026-07-24T20:40:27.817Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "add handle to ready --json and search --json row shapes",
+          "checked": true
+        },
+        {
+          "text": "add handle to status --json stale rows (was JSON-only gap; human view already had it)",
+          "checked": true
+        },
+        {
+          "text": "fix onboarding REF_RESOLUTION: add t-<code> handle, replace invalid 12-char example id",
+          "checked": true
+        },
+        {
+          "text": "regenerate .slop/AGENTS.md + SKILL.md via slop init --yes; fix same invalid id in docs/agent-workflow.md",
+          "checked": true
+        },
+        {
+          "text": "update pinned test shapes (D4, C5, status.test.ts) + add regression tests for handle in ready/search/onboarding",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T20:49:50.493Z"
+    }
+  ],
+  "end_summary": null,
+  "transcript_ref": "transcripts/session_01KYAXQ9D918B91HPBGBDDA802.jsonl"
+}

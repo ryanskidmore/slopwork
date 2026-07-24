@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
 import type { TicketId } from "../../core/index.js";
+import { shortTicketCode } from "../../core/index.js";
 import { runNew } from "./new.js";
 import { runReady } from "./ready.js";
 import { runReview } from "./review.js";
@@ -53,6 +54,26 @@ describe("runReady (in-process)", () => {
     }
     const body = JSON.parse(out.stdout()) as { ready: { id: string }[] };
     expect(body.ready.map((r) => r.id)).toContain(id);
+  });
+
+  // handle-t-code-missing-from: `ready --json` rows used to omit the short
+  // `t-<code>` handle that `new`/`show`/`status` already surface, so an
+  // agent picking work from `ready` had no short ref to reuse for `slop
+  // start`.
+  it("--json rows carry the short t-<code> handle", async () => {
+    const root = await makeTempRepo("slop-ready-inproc-handle-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Ready ticket with a handle");
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runReady({ json: true }));
+    } finally {
+      out.restore();
+    }
+    const body = JSON.parse(out.stdout()) as { ready: { id: string; handle: string }[] };
+    const row = body.ready.find((r) => r.id === id);
+    expect(row?.handle).toBe(shortTicketCode(id));
   });
 
   it("a blocked ticket does not appear until its blocker is done", async () => {
