@@ -35,12 +35,33 @@ export interface TranscriptHandle {
 }
 
 /**
+ * {@link WebDataSource.getConfig}'s return shape — web-corrupt-or-missing-config:
+ * `config.yaml` is a git-mergeable, collaborator-editable file, so ENOENT
+ * (never written yet) and a bad merge/hand-edit (invalid YAML, or YAML that
+ * fails `configSchema`) are both realistic, not just theoretical. Every
+ * §4.4 view calls `getConfig()`, so a throw there used to take the ENTIRE
+ * web UI down with an opaque 500 on every single page — the same class of
+ * fragility `readJsoncDir` (fixture-data-source.ts) already fixed for the
+ * tickets/sessions/events listings. `getConfig()` now never throws: `warning`
+ * is non-null (and `config` is a synthesized default) whenever the real
+ * file couldn't be read/parsed/validated, so callers can render the rest of
+ * the page normally and just surface `warning` to the human instead of
+ * 500ing.
+ */
+export interface ConfigResult {
+  /** The real parsed+validated config.yaml, or a synthesized default when `warning` is set. */
+  config: Config;
+  /** Human-readable explanation of what went wrong reading config.yaml, or `null` when it loaded cleanly. */
+  warning: string | null;
+}
+
+/**
  * The read operations every §4.4 view needs. Nothing here writes, matching
  * design.md §4.6: "web mutations are explicitly out of scope" for v0.
  */
 export interface WebDataSource {
-  /** `.slop/config.yaml`, validated against configSchema. */
-  getConfig(): Promise<Config>;
+  /** `.slop/config.yaml`, validated against configSchema — never throws, see {@link ConfigResult}. */
+  getConfig(): Promise<ConfigResult>;
 
   /** Every ticket in the db (every state, including draft/dropped) — views filter/sort/paginate in memory. */
   listTickets(): Promise<Ticket[]>;
@@ -68,8 +89,16 @@ export interface WebDataSource {
    * see event.ts's EVENT_VERBS doc comments for why those are keyed to the
    * session, not the ticket). Returned oldest-first (event id order, which
    * is chronological per D6); callers reverse if they want newest-first.
+   *
+   * `knownSessions` (web-every-request-full-rescans): this method needs
+   * `ticketId`'s sessions to know which `entity.kind === "session"` events
+   * belong to it — pass the caller's own already-fetched sessions (e.g.
+   * `handleTicketDetail` already calls {@link listSessionsForTicket} for
+   * its own "Sessions" section) to skip re-scanning the sessions directory
+   * a second time in the same request. Omit it to have this method fetch
+   * them itself, unchanged from before.
    */
-  listEventsForTicket(ticketId: TicketId): Promise<Event[]>;
+  listEventsForTicket(ticketId: TicketId, knownSessions?: readonly Session[]): Promise<Event[]>;
 
   /**
    * ticket_01KY9S0172V8AYCYV9KWS6RC9P: every event in the db, unfiltered.

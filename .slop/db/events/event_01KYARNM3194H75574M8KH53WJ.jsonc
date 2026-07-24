@@ -1,0 +1,17 @@
+{
+  "id": "event_01KYARNM3194H75574M8KH53WJ",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": "session_01KYARA0217HSTY1PHCGENGXRM",
+  "verb": "ticket.done",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYAPHFTMEFZ3QY5KC934F9PQ"
+  },
+  "payload": {
+    "from": "in_progress"
+  },
+  "at": "2026-07-24T19:12:10.337Z"
+}

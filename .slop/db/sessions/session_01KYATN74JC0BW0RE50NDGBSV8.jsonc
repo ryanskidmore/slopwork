@@ -1,0 +1,48 @@
+{
+  "id": "session_01KYATN74JC0BW0RE50NDGBSV8",
+  "ticket": "ticket_01KYAPN8X68TEEA4NHXZ1PZD52",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "worktree-agent-a0ba121b0cbf30e69",
+    "commit_at_start": "e2a91d96c0a9b5a654053f98d205f3c98499fb5a"
+  },
+  "started_at": "2026-07-24T19:46:54.226Z",
+  "ended_at": "2026-07-24T19:54:54.273Z",
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "add explicit HEAD handlers alongside GET on every route (Bun's routes table doesn't fall back HEAD onto GET automatically)",
+          "checked": true
+        },
+        {
+          "text": "verify Bun sends an empty body for HEAD despite the handler returning a full Response (or strip it manually if not)",
+          "checked": true
+        },
+        {
+          "text": "stale.ts: sort/label review rows by review.requested_at, not last_activity_at",
+          "checked": true
+        },
+        {
+          "text": "regression tests: HEAD 200s on every route + stale panel uses requested_at",
+          "checked": true
+        },
+        {
+          "text": "run full verification suite",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T19:47:39.570Z"
+    }
+  ],
+  "end_summary": "(1) server.ts: every route now registers HEAD alongside GET via a readMethods() helper (Bun's routes table doesn't fall HEAD back onto GET automatically — verified live: HEAD /tickets 404'd before, 200s with correct Content-Length and empty body after). (2) stale.ts: review rows now sort/label by review.requested_at via overlays.ts's computeStaleReason (same anchor isTicketStale already uses), not last_activity_at, so an unrelated update --progress note can no longer make a rotting MR look fresher. New tests: D5.test.ts HEAD-requests block + web-stale-panel-review-anchor.test.ts (built a real repo where requested_at/last_activity_at diverge, confirmed the test fails against the old code). Full verification suite green.",
+  "transcript_ref": "transcripts/session_01KYATN74JC0BW0RE50NDGBSV8.jsonl"
+}

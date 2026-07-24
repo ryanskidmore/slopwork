@@ -79,7 +79,7 @@ export async function handleTicketList(
   };
   if (filters.state && !isTicketState(filters.state)) filters.state = "";
 
-  const [rawTickets, config, events] = await Promise.all([
+  const [rawTickets, { config, warning: configWarning }, events] = await Promise.all([
     dataSource.listTickets(),
     dataSource.getConfig(),
     dataSource.listEvents(),
@@ -148,5 +148,11 @@ export async function handleTicketList(
 </div>
 <script src="/assets/app.js"></script>`;
 
-  return pageResponse({ title: "Tickets", nav: "tickets", project: config.project, body });
+  return pageResponse({
+    title: "Tickets",
+    nav: "tickets",
+    project: config.project,
+    configWarning,
+    body,
+  });
 }

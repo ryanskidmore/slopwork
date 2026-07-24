@@ -65,6 +65,7 @@
 import {
   type Config,
   type Event,
+  idMatchesRef,
   isTicketId,
   outgoingEdges,
   parseDurationMs,
@@ -89,6 +90,26 @@ export function staleThresholdsFromConfig(config: Config): StaleThresholds {
     staleAfterMs: parseDurationMs(config.defaults.stale_after),
     reviewStaleAfterMs: parseDurationMs(config.defaults.review_stale_after),
   };
+}
+
+/**
+ * web-every-request-full-rescans: the exact ref-matching rule
+ * `WebDataSource.findTicketByRef` uses (exact slug, exact id, unambiguous
+ * short id-prefix — core/ids.ts `idMatchesRef`) but over an ALREADY-FETCHED
+ * ticket list, for a caller (`handleTicketDetail`) that has to fetch the
+ * full list anyway (for the parent/children/blockers/relationships
+ * sections) and would otherwise re-scan the entire tickets directory a
+ * second time just to resolve `ref`. `FixtureDataSource.findTicketByRef`
+ * itself delegates to this function too, so the matching rule is defined in
+ * exactly one place — reused, not reimplemented, on both call paths.
+ */
+export function matchTicketByRef(tickets: readonly Ticket[], ref: string): Ticket | null {
+  const bySlug = tickets.find((t) => t.slug === ref);
+  if (bySlug) return bySlug;
+  const byId = tickets.find((t) => t.id === ref);
+  if (byId) return byId;
+  const prefixMatches = tickets.filter((t) => idMatchesRef(t.id, ref));
+  return prefixMatches.length === 1 ? (prefixMatches[0] ?? null) : null;
 }
 
 /**

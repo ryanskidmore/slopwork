@@ -14,7 +14,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "done",
   "priority": 2,
   "labels": [
     "area:web"
@@ -28,8 +28,8 @@
   "root_id": "ticket_01KYAPKSP6QQMGZ6Q6YDPE8NAV",
   "path": [],
   "active_session": null,
-  "last_activity_at": "2026-07-24T18:36:13.384Z",
-  "latest_note": null,
+  "last_activity_at": "2026-07-24T19:40:47.003Z",
+  "latest_note": "Bun.serve now passed reusePort:false explicitly (server.ts) — Bun was binding SO_REUSEPORT-style on Linux despite its own docs claiming that default, reproduced live before the fix (two instances both bound port 4996/4997 silently, requests round-robined). Confirmed live after the fix: second instance exits 1 with 'port N is already in use...'. New tests/acceptance/web-port-in-use.test.ts spawns two real slop web processes and asserts the second fails fast while the first keeps serving. Full verification suite green.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -39,5 +39,5 @@
     }
   },
   "created_at": "2026-07-24T18:36:13.384Z",
-  "updated_at": "2026-07-24T18:36:13.384Z"
+  "updated_at": "2026-07-24T19:40:47.003Z"
 }

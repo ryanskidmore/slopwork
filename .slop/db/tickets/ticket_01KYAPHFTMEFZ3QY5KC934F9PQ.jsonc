@@ -16,7 +16,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "done",
   "priority": 1,
   "labels": [
     "area:web"
@@ -30,8 +30,8 @@
   "root_id": "ticket_01KYAPHFTMEFZ3QY5KC934F9PQ",
   "path": [],
   "active_session": null,
-  "last_activity_at": "2026-07-24T18:34:57.753Z",
-  "latest_note": null,
+  "last_activity_at": "2026-07-24T19:12:10.330Z",
+  "latest_note": "externalParentBadge now routes config.remotes.jira through safeUrl before building href; unsafe schemes fall back to the existing inert-text badge. Added shared.test.ts (javascript:/data:/unconfigured cases). bun run test/lint/typecheck/format:check all green.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -41,5 +41,5 @@
     }
   },
   "created_at": "2026-07-24T18:34:57.753Z",
-  "updated_at": "2026-07-24T18:34:57.753Z"
+  "updated_at": "2026-07-24T19:12:10.330Z"
 }

@@ -1,0 +1,48 @@
+{
+  "id": "session_01KYARQJZ916V6Y0NWGJ31Q1K9",
+  "ticket": "ticket_01KYAPHG0TRPBRWF7BGC0HS1VX",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "worktree-agent-a0ba121b0cbf30e69",
+    "commit_at_start": "9b86dad518ad7aa1a8969159f8e87176cf492187"
+  },
+  "started_at": "2026-07-24T19:13:14.729Z",
+  "ended_at": "2026-07-24T19:23:40.056Z",
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "getConfig never throws: catches missing/unreadable/corrupt config.yaml, returns fallback defaults + a warning string",
+          "checked": true
+        },
+        {
+          "text": "surface the warning as a visible banner via renderPage/pageResponse, wired through all 6 views",
+          "checked": true
+        },
+        {
+          "text": "add CSS for the banner",
+          "checked": true
+        },
+        {
+          "text": "regression test: real slop init repo with config.yaml deleted/corrupted still 200s with the banner",
+          "checked": true
+        },
+        {
+          "text": "run full verification suite",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T19:17:14.073Z"
+    }
+  ],
+  "end_summary": "getConfig() never throws now; degrades to defaults + a visible banner (config.yaml missing/corrupt/schema-invalid). Wired through all 6 views via a new ConfigResult return shape + pageResponse's configWarning option. Regression tests in tests/acceptance/web-config-fault-tolerance.test.ts. Full verification suite green.",
+  "transcript_ref": "transcripts/session_01KYARQJZ916V6Y0NWGJ31Q1K9.jsonl"
+}

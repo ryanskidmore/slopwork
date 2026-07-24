@@ -31,11 +31,9 @@
 import { readdir } from "node:fs/promises";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import {
-  type Config,
   configSchema,
   type Event,
   eventSchema,
-  idMatchesRef,
   isSessionId,
   parseJsonc,
   type Session,
@@ -45,7 +43,8 @@ import {
   type TicketId,
   ticketSchema,
 } from "../core/index.js";
-import type { TranscriptHandle, WebDataSource } from "./data-source.js";
+import type { ConfigResult, TranscriptHandle, WebDataSource } from "./data-source.js";
+import { matchTicketByRef } from "./overlays.js";
 
 /**
  * web-one-malformed-db-file-500s-every-page-and-leaks-filesyst: this used
@@ -185,19 +184,40 @@ async function* readLines(path: string): AsyncGenerator<string> {
   }
 }
 
+/**
+ * `project` has no schema default (design.md §3: it's required, prompted at
+ * `init`) — so a synthesized fallback {@link Config} needs an explicit
+ * stand-in. Deliberately visible/unusual rather than something that could
+ * pass for a real project name, since {@link FixtureDataSource.getConfig}
+ * only ever returns this alongside a non-null `warning` the caller is
+ * expected to surface too.
+ */
+const FALLBACK_PROJECT_LABEL = "(unknown — config.yaml unavailable)";
+
 export class FixtureDataSource implements WebDataSource {
   /** Root of a `.slop` directory (design.md §3) — the directory that directly contains `config.yaml`, `db/`, and `transcripts/`. */
   constructor(private readonly slopRoot: string) {}
 
-  async getConfig(): Promise<Config> {
+  /**
+   * web-corrupt-or-missing-config: never throws. `config.yaml` missing
+   * (ENOENT), unreadable, invalid YAML, or schema-invalid all degrade to
+   * the same outcome — a synthesized default {@link Config} plus a non-null
+   * `warning` — instead of taking every §4.4 view down with a 500 (they all
+   * call this). Logged to stderr too (matches {@link warnSkippedFiles}'s
+   * convention for the tickets/sessions/events listings) so a real `slop
+   * web` operator sees it even if they don't have the browser open.
+   */
+  async getConfig(): Promise<ConfigResult> {
     const path = join(this.slopRoot, "config.yaml");
-    const text = await Bun.file(path).text();
-    const parsed: unknown = Bun.YAML.parse(text);
     try {
-      return configSchema.parse(parsed);
+      const text = await Bun.file(path).text();
+      const parsed: unknown = Bun.YAML.parse(text);
+      return { config: configSchema.parse(parsed), warning: null };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      throw new Error(`${path}: failed schema validation — ${message}`);
+      const warning = `config.yaml could not be read — showing defaults (${message})`;
+      process.stderr.write(`slop web: ${path}: ${message}\n`);
+      return { config: configSchema.parse({ project: FALLBACK_PROJECT_LABEL }), warning };
     }
   }
 
@@ -208,15 +228,12 @@ export class FixtureDataSource implements WebDataSource {
   }
 
   async findTicketByRef(ref: string): Promise<Ticket | null> {
-    const tickets = await this.listTickets();
-    const bySlug = tickets.find((t) => t.slug === ref);
-    if (bySlug) return bySlug;
-    const byId = tickets.find((t) => t.id === ref);
-    if (byId) return byId;
-    // Unambiguous short id-prefix (D6/D12) — same matching rule the CLI's ref
-    // resolution uses (core/ids.ts idMatchesRef), reused rather than reimplemented.
-    const prefixMatches = tickets.filter((t) => idMatchesRef(t.id, ref));
-    return prefixMatches.length === 1 ? (prefixMatches[0] ?? null) : null;
+    // web-every-request-full-rescans: the matching rule itself lives in
+    // overlays.ts's matchTicketByRef (also used directly by
+    // handleTicketDetail, which already has to fetch the full ticket list
+    // anyway) so there's exactly one implementation of "which id does this
+    // ref mean", not two independently-drifting ones.
+    return matchTicketByRef(await this.listTickets(), ref);
   }
 
   async listSessionsForTicket(ticketId: TicketId): Promise<Session[]> {
@@ -245,10 +262,17 @@ export class FixtureDataSource implements WebDataSource {
     );
   }
 
-  async listEventsForTicket(ticketId: TicketId): Promise<Event[]> {
+  async listEventsForTicket(
+    ticketId: TicketId,
+    knownSessions?: readonly Session[],
+  ): Promise<Event[]> {
+    // web-every-request-full-rescans: a caller that already fetched this
+    // ticket's sessions (handleTicketDetail does, for its own "Sessions"
+    // section) can pass them in via `knownSessions` to skip re-scanning the
+    // sessions directory a second time in the same request.
     const [events, sessions] = await Promise.all([
       this.readAllEvents(),
-      this.listSessionsForTicket(ticketId),
+      knownSessions ? Promise.resolve(knownSessions) : this.listSessionsForTicket(ticketId),
     ]);
     const sessionIds = new Set<string>(sessions.map((s) => s.id));
     const relevant = events.filter(

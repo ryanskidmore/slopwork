@@ -5,7 +5,7 @@
  */
 import type { Config, Ticket, TicketState } from "../../core/index.js";
 import { parseParentRef } from "../../core/index.js";
-import { escapeAttr, type HtmlValue, html, joinHtml, type RawHtml, raw } from "../html.js";
+import { escapeAttr, type HtmlValue, html, joinHtml, type RawHtml, raw, safeUrl } from "../html.js";
 
 export type NavKey = "tickets" | "tree" | "review" | "stale" | null;
 
@@ -20,6 +20,14 @@ export function renderPage(opts: {
   title: string;
   nav: NavKey;
   project?: string;
+  /**
+   * web-corrupt-or-missing-config: set (non-null) when `getConfig()`
+   * couldn't read/parse/validate `config.yaml` and fell back to defaults —
+   * rendered as a visible banner at the top of `<main>` so the human sees
+   * the page is degraded rather than silently trusting stale/default
+   * values. Absent/`null` on every normal page load.
+   */
+  configWarning?: string | null;
   body: RawHtml;
 }): string {
   const projectLabel = opts.project ? ` — ${opts.project}` : "";
@@ -29,6 +37,9 @@ export function renderPage(opts: {
         html`<a href="${item.href}" class="navlink${item.key === opts.nav ? " active" : ""}">${item.label}</a>`,
     ),
   );
+  const warningBanner = opts.configWarning
+    ? html`<div class="banner-warning">⚠ ${opts.configWarning}</div>`
+    : "";
   const page = html`<!doctype html>
 <html lang="en">
 <head>
@@ -43,6 +54,7 @@ export function renderPage(opts: {
   <nav>${navHtml}</nav>
 </header>
 <main>
+${warningBanner}
 ${opts.body}
 </main>
 </body>
@@ -58,7 +70,13 @@ export function htmlResponse(bodyHtml: string, status = 200): Response {
 }
 
 export function pageResponse(
-  opts: { title: string; nav: NavKey; project?: string; body: RawHtml },
+  opts: {
+    title: string;
+    nav: NavKey;
+    project?: string;
+    configWarning?: string | null;
+    body: RawHtml;
+  },
   status = 200,
 ): Response {
   return htmlResponse(renderPage(opts), status);
@@ -111,6 +129,15 @@ export function labelChips(labels: readonly string[]): RawHtml {
  * (design.md §3) when the ref's system is `jira` and a base URL is
  * configured; otherwise renders the raw ref as inert text so it's still
  * visible without pretending to be a working link.
+ *
+ * `remotes.jira` is schema-validated with `z.url()`, which accepts any
+ * URL scheme — including `javascript:`/`data:`/`vbscript:` — and
+ * config.yaml is collaborator-editable/git-merged, so it's attacker-
+ * reachable the same way an MR link is. Routed through `safeUrl`
+ * (src/web/html.ts), same backstop `renderMrLink` (ticket-detail.ts)
+ * applies to `ticket.review.mr`; an unsafe scheme falls back to the
+ * existing unconfigured-remote inert-text badge rather than ever
+ * emitting a live `href`.
  */
 export function externalParentBadge(ref: string, config: Config): RawHtml {
   let system = "";
@@ -124,8 +151,9 @@ export function externalParentBadge(ref: string, config: Config): RawHtml {
   } catch {
     // Malformed ref smuggled past schema validation somehow — fall back to showing it verbatim.
   }
-  if (system === "jira" && config.remotes.jira) {
-    const url = `${config.remotes.jira.replace(/\/+$/, "")}/browse/${encodeURIComponent(key)}`;
+  const safeBase = system === "jira" && config.remotes.jira ? safeUrl(config.remotes.jira) : null;
+  if (safeBase) {
+    const url = `${safeBase.replace(/\/+$/, "")}/browse/${encodeURIComponent(key)}`;
     return html`<a class="badge external-parent jira" href="${url}" target="_blank" rel="noopener noreferrer" title="External parent in Jira">↑ ${ref}</a>`;
   }
   return html`<span class="badge external-parent" title="External parent (no remote URL configured)">↑ ${ref}</span>`;

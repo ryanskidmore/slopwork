@@ -485,15 +485,34 @@ describe("D5: slop web", () => {
       expect(page1).not.toContain("— system");
       // The transcript has more than the default page size (40) worth of conversational records — pagination must kick in.
       expect(page1).toContain("records 1–40");
-      expect(page1).toContain("Older →");
+      // web-transcript-pager-newer-older: records render oldest-first, so
+      // offset 0 has nowhere older to go (disabled) but a live link toward
+      // newer records.
+      expect(page1).toContain('<span class="disabled">← Older</span>');
+      expect(page1).toMatch(/<a href="[^"]*">Newer →<\/a>/);
 
       const page2 = await (
         await get(`/tickets/${ticket.id}/sessions/${session.id}/transcript?offset=40&limit=40`)
       ).text();
-      expect(page2).toContain("Newer");
+      // Off the start now — a live link back toward older records.
+      expect(page2).toMatch(/<a href="[^"]*">← Older<\/a>/);
       // "(iteration 1)" is a unique marker for the very first loop message, which lands on page 1 — it must not reappear on page 2.
       expect(page1).toContain("(iteration 1).");
       expect(page2).not.toContain("(iteration 1).");
+    });
+
+    it("an out-of-range offset clamps onto the last real page instead of rendering a nonsense range", async () => {
+      const ticket = implementOauth();
+      const session = bigSession();
+      const res = await get(
+        `/tickets/${ticket.id}/sessions/${session.id}/transcript?offset=999999&limit=40`,
+      );
+      // fetch() follows the 302 redirect transparently — the final response is a normal 200 page.
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      expect(body).toMatch(/records \d+–\d+/);
+      expect(body).not.toContain("records 1000000–999999");
+      expect(body).not.toContain("No conversation records in this range.");
     });
 
     it("shows system records only when explicitly toggled on", async () => {
@@ -566,6 +585,40 @@ describe("D5: slop web", () => {
       // Never-stale states, regardless of age:
       expect(body).not.toContain("Old idea: Slack integration"); // dropped
       expect(body).not.toContain("Add authentication provider"); // open
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // HEAD requests (web-head-returns-404-despite): Bun's declarative `routes`
+  // table does not fall a HEAD request back onto a route's GET handler
+  // automatically — a route with only a `GET:` entry 404s on HEAD, which
+  // makes a health check (or `curl -I`, or anything else that HEADs before
+  // GETting) conclude the UI is dead even though it's fine.
+  // -------------------------------------------------------------------------
+  describe("HEAD requests", () => {
+    it.each([
+      "/tickets",
+      "/tree",
+      "/review",
+      "/stale",
+      "/assets/style.css",
+      "/assets/app.js",
+    ] as const)("HEAD %s returns 200 with an empty body", async (path) => {
+      const res = await get(path, { method: "HEAD" });
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe("");
+    });
+
+    it("HEAD on a ticket detail route returns 200 with an empty body", async () => {
+      const t = ticketBySlug("add-authentication-provider");
+      const res = await get(`/tickets/${t.id}`, { method: "HEAD" });
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe("");
+    });
+
+    it("HEAD on an unknown route still 404s, never silently 200s", async () => {
+      const res = await get("/nope/at/all", { method: "HEAD" });
+      expect(res.status).toBe(404);
     });
   });
 

@@ -14,7 +14,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "done",
   "priority": 1,
   "labels": [
     "area:web"
@@ -28,8 +28,8 @@
   "root_id": "ticket_01KYAPHG0TRPBRWF7BGC0HS1VX",
   "path": [],
   "active_session": null,
-  "last_activity_at": "2026-07-24T18:34:57.948Z",
-  "latest_note": null,
+  "last_activity_at": "2026-07-24T19:23:40.074Z",
+  "latest_note": "getConfig() never throws now; degrades to defaults + a visible banner (config.yaml missing/corrupt/schema-invalid). Wired through all 6 views via a new ConfigResult return shape + pageResponse's configWarning option. Regression tests in tests/acceptance/web-config-fault-tolerance.test.ts. Full verification suite green.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -39,5 +39,5 @@
     }
   },
   "created_at": "2026-07-24T18:34:57.948Z",
-  "updated_at": "2026-07-24T18:34:57.948Z"
+  "updated_at": "2026-07-24T19:23:40.074Z"
 }

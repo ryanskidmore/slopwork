@@ -1,0 +1,48 @@
+{
+  "id": "session_01KYAT3H1KC5DRXA4ES9X0T8TY",
+  "ticket": "ticket_01KYAPKSP6QQMGZ6Q6YDPE8NAV",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "worktree-agent-a0ba121b0cbf30e69",
+    "commit_at_start": "87c4cb3331346aa62ec3b8dc9d847370a6cd874c"
+  },
+  "started_at": "2026-07-24T19:37:14.547Z",
+  "ended_at": "2026-07-24T19:40:46.980Z",
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "reproduce: two instances on the same port both silently bind (confirmed live)",
+          "checked": true
+        },
+        {
+          "text": "pass reusePort:false explicitly to Bun.serve",
+          "checked": true
+        },
+        {
+          "text": "verify second instance now throws EADDRINUSE -> PortInUseError with the friendly message",
+          "checked": true
+        },
+        {
+          "text": "regression test: real spawned second slop web on an occupied port exits non-zero with the friendly message",
+          "checked": true
+        },
+        {
+          "text": "run full verification suite",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T19:38:08.276Z"
+    }
+  ],
+  "end_summary": "Bun.serve now passed reusePort:false explicitly (server.ts) — Bun was binding SO_REUSEPORT-style on Linux despite its own docs claiming that default, reproduced live before the fix (two instances both bound port 4996/4997 silently, requests round-robined). Confirmed live after the fix: second instance exits 1 with 'port N is already in use...'. New tests/acceptance/web-port-in-use.test.ts spawns two real slop web processes and asserts the second fails fast while the first keeps serving. Full verification suite green.",
+  "transcript_ref": "transcripts/session_01KYAT3H1KC5DRXA4ES9X0T8TY.jsonl"
+}

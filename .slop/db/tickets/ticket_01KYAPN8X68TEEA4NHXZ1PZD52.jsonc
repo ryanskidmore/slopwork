@@ -16,7 +16,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "done",
   "priority": 3,
   "labels": [
     "area:web"
@@ -30,8 +30,8 @@
   "root_id": "ticket_01KYAPN8X68TEEA4NHXZ1PZD52",
   "path": [],
   "active_session": null,
-  "last_activity_at": "2026-07-24T18:37:01.737Z",
-  "latest_note": null,
+  "last_activity_at": "2026-07-24T19:54:54.294Z",
+  "latest_note": "(1) server.ts: every route now registers HEAD alongside GET via a readMethods() helper (Bun's routes table doesn't fall HEAD back onto GET automatically — verified live: HEAD /tickets 404'd before, 200s with correct Content-Length and empty body after). (2) stale.ts: review rows now sort/label by review.requested_at via overlays.ts's computeStaleReason (same anchor isTicketStale already uses), not last_activity_at, so an unrelated update --progress note can no longer make a rotting MR look fresher. New tests: D5.test.ts HEAD-requests block + web-stale-panel-review-anchor.test.ts (built a real repo where requested_at/last_activity_at diverge, confirmed the test fails against the old code). Full verification suite green.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -41,5 +41,5 @@
     }
   },
   "created_at": "2026-07-24T18:37:01.737Z",
-  "updated_at": "2026-07-24T18:37:01.737Z"
+  "updated_at": "2026-07-24T19:54:54.294Z"
 }

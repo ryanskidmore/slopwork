@@ -34,7 +34,10 @@ export async function handleReviewPanel(
   dataSource: WebDataSource,
   now: number,
 ): Promise<Response> {
-  const [tickets, config] = await Promise.all([dataSource.listTickets(), dataSource.getConfig()]);
+  const [tickets, { config, warning: configWarning }] = await Promise.all([
+    dataSource.listTickets(),
+    dataSource.getConfig(),
+  ]);
   const thresholds = staleThresholdsFromConfig(config);
 
   const inReview = tickets
@@ -64,5 +67,11 @@ export async function handleReviewPanel(
 </table>
 </div>`;
 
-  return pageResponse({ title: "Review", nav: "review", project: config.project, body });
+  return pageResponse({
+    title: "Review",
+    nav: "review",
+    project: config.project,
+    configWarning,
+    body,
+  });
 }

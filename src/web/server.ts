@@ -25,6 +25,76 @@ import { handleTreeView } from "./views/tree.js";
 
 const READ_METHODS = new Set(["GET", "HEAD"]);
 
+/**
+ * DNS-rebinding guard (web-add-host-header-allowlist): {@link createWebServer}
+ * binds `127.0.0.1` only, but binding to loopback alone does not stop a
+ * malicious external page from DNS-rebinding a hostname it controls to
+ * `127.0.0.1` and having the victim's own browser issue same-origin-looking
+ * requests straight at this server — nothing here previously checked the
+ * `Host` header a request actually arrived with, so a DNS-rebound request
+ * was served identically to a real `http://127.0.0.1:<port>/` one. `.slop/db`
+ * and its transcripts routinely contain secrets (an API key pasted into a
+ * ticket, a token in a transcript), so this is a real scrape-the-local-repo
+ * vector, not just a theoretical one.
+ *
+ * Bun's declarative `routes` table dispatches a matched GET request
+ * straight to its own handler, bypassing the top-level `fetch` fallback
+ * entirely (see this file's header comment) — so the check wraps every
+ * route's handler individually via {@link guardHost}, and `fetch` re-checks
+ * it too for defense in depth on genuinely unmatched paths/methods.
+ */
+const ALLOWED_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
+
+/** `Host` header -> bare hostname, IPv6-literal-aware (`"[::1]:4553"` -> `"::1"`). `null`/empty is never allowed. */
+function hostnameFromHeader(hostHeader: string | null): string | null {
+  if (!hostHeader) return null;
+  if (hostHeader.startsWith("[")) {
+    const end = hostHeader.indexOf("]");
+    return end === -1 ? null : hostHeader.slice(1, end);
+  }
+  // IPv4/hostname[:port] — safe to split on the first colon since neither
+  // form contains one itself (unlike the IPv6-literal case handled above).
+  return hostHeader.split(":")[0] ?? null;
+}
+
+function isAllowedHost(hostHeader: string | null): boolean {
+  const hostname = hostnameFromHeader(hostHeader);
+  return hostname !== null && ALLOWED_HOSTNAMES.has(hostname);
+}
+
+function forbiddenHostResponse(): Response {
+  return new Response("Forbidden: untrusted Host header\n", { status: 403 });
+}
+
+/** Wraps a route handler so a request with a foreign/missing `Host` header never reaches it. */
+function guardHost<Req extends Request>(
+  handler: (req: Req) => Response | Promise<Response>,
+): (req: Req) => Response | Promise<Response> {
+  return (req) => (isAllowedHost(req.headers.get("host")) ? handler(req) : forbiddenHostResponse());
+}
+
+/**
+ * web-head-returns-404-despite: Bun's declarative `routes` table does NOT
+ * fall a `HEAD` request back onto a route's `GET` handler the way the
+ * underlying HTTP spec (and this file's own `fetch` fallback's `Allow:
+ * GET, HEAD`) implies — verified directly against Bun 1.3.11: a route
+ * with only a `GET:` entry 404s on `HEAD`, it never reaches the `fetch`
+ * fallback's "known route, wrong method" 405 branch either. A health
+ * check (or curl -I, or anything else that HEADs before GETting) reading
+ * that 404 has every reason to conclude the UI is dead. Every read route
+ * registers the identical guarded handler under both keys so `HEAD`
+ * genuinely works, not just gets dropped from the advertised Allow list.
+ */
+function readMethods<Req extends Request>(
+  handler: (req: Req) => Response | Promise<Response>,
+): {
+  GET: (req: Req) => Response | Promise<Response>;
+  HEAD: (req: Req) => Response | Promise<Response>;
+} {
+  const guarded = guardHost(handler);
+  return { GET: guarded, HEAD: guarded };
+}
+
 export interface WebServerOptions {
   port: number;
   /** @default "127.0.0.1" — see createWebServer's doc: this must never be reachable off-machine. */
@@ -55,6 +125,17 @@ export function createWebServer(
   return Bun.serve({
     hostname: options.hostname ?? "127.0.0.1",
     port: options.port,
+    // web-second-slop-web-on: Bun's own `reusePort` docs say it defaults to
+    // `false` (SO_REUSEPORT off), but on Linux a second `slop web` on an
+    // already-occupied port was observed binding "successfully" anyway,
+    // with requests round-robining between the two instances instead of
+    // the second one hitting the EADDRINUSE handler below — reproduced
+    // directly against Bun 1.3.11. Passing `reusePort: false` explicitly
+    // (rather than relying on whatever Bun's actual default resolves to)
+    // is the documented way to force exclusive binding, and does restore
+    // the expected EADDRINUSE-throws-synchronously behavior `startWebServer`
+    // below depends on.
+    reusePort: false,
     // Bun.serve's `development` option controls whether an unhandled
     // exception renders as its verbose dev error page (full stack trace +
     // the server's absolute filesystem path, embedded straight into the
@@ -71,36 +152,44 @@ export function createWebServer(
     development: Boolean(process.env.SLOP_WEB_DEBUG),
     routes: {
       "/": {
-        GET: () => new Response(null, { status: 302, headers: { location: "/tickets" } }),
+        ...readMethods(
+          () => new Response(null, { status: 302, headers: { location: "/tickets" } }),
+        ),
       },
       "/assets/style.css": {
-        GET: () =>
-          new Response(styleCss, { headers: { "content-type": "text/css; charset=utf-8" } }),
+        ...readMethods(
+          () => new Response(styleCss, { headers: { "content-type": "text/css; charset=utf-8" } }),
+        ),
       },
       "/assets/app.js": {
-        GET: () =>
-          new Response(appJs, { headers: { "content-type": "text/javascript; charset=utf-8" } }),
+        ...readMethods(
+          () =>
+            new Response(appJs, { headers: { "content-type": "text/javascript; charset=utf-8" } }),
+        ),
       },
       "/tickets": {
-        GET: (req) => handleTicketList(req, dataSource, now()),
+        ...readMethods((req) => handleTicketList(req, dataSource, now())),
       },
       "/tree": {
-        GET: (req) => handleTreeView(req, dataSource, now()),
+        ...readMethods((req) => handleTreeView(req, dataSource, now())),
       },
       "/review": {
-        GET: (req) => handleReviewPanel(req, dataSource, now()),
+        ...readMethods((req) => handleReviewPanel(req, dataSource, now())),
       },
       "/stale": {
-        GET: (req) => handleStalePanel(req, dataSource, now()),
+        ...readMethods((req) => handleStalePanel(req, dataSource, now())),
       },
       "/tickets/:ref": {
-        GET: (req) => handleTicketDetail(req, dataSource, now()),
+        ...readMethods((req) => handleTicketDetail(req, dataSource, now())),
       },
       "/tickets/:ref/sessions/:sessionId/transcript": {
-        GET: (req) => handleTranscriptView(req, dataSource),
+        ...readMethods((req) => handleTranscriptView(req, dataSource)),
       },
     },
     fetch(req) {
+      // Defense in depth for genuinely unmatched paths/methods — every
+      // matched route above is already wrapped in guardHost individually.
+      if (!isAllowedHost(req.headers.get("host"))) return forbiddenHostResponse();
       if (!READ_METHODS.has(req.method)) {
         return new Response("Method Not Allowed\n", {
           status: 405,
