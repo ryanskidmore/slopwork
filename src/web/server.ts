@@ -103,6 +103,17 @@ export function createWebServer(
   return Bun.serve({
     hostname: options.hostname ?? "127.0.0.1",
     port: options.port,
+    // web-second-slop-web-on: Bun's own `reusePort` docs say it defaults to
+    // `false` (SO_REUSEPORT off), but on Linux a second `slop web` on an
+    // already-occupied port was observed binding "successfully" anyway,
+    // with requests round-robining between the two instances instead of
+    // the second one hitting the EADDRINUSE handler below — reproduced
+    // directly against Bun 1.3.11. Passing `reusePort: false` explicitly
+    // (rather than relying on whatever Bun's actual default resolves to)
+    // is the documented way to force exclusive binding, and does restore
+    // the expected EADDRINUSE-throws-synchronously behavior `startWebServer`
+    // below depends on.
+    reusePort: false,
     // Bun.serve's `development` option controls whether an unhandled
     // exception renders as its verbose dev error page (full stack trace +
     // the server's absolute filesystem path, embedded straight into the
