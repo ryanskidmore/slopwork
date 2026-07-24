@@ -15,7 +15,16 @@ import { runUpdate } from "./update.js";
 async function jsonNewTicket(root: string, name: string): Promise<TicketId> {
   const out = captureOutput();
   try {
-    await withCwd(root, () => runNew(name, { blocks: [], relatesTo: [], label: [], json: true }));
+    await withCwd(root, () =>
+      runNew(name, {
+        blocks: [],
+        relatesTo: [],
+        label: [],
+        acceptance: [],
+        context: [],
+        json: true,
+      }),
+    );
     return (JSON.parse(out.stdout()) as { id: TicketId }).id;
   } finally {
     out.restore();
@@ -46,7 +55,13 @@ describe("runSearch (in-process)", () => {
     const out1 = captureOutput();
     try {
       await withCwd(root, () =>
-        runUpdate(id, { label: [], relatesTo: [], progress: "mentions gadgetronic" }),
+        runUpdate(id, {
+          label: [],
+          relatesTo: [],
+          acceptance: [],
+          context: [],
+          progress: "mentions gadgetronic",
+        }),
       );
     } finally {
       out1.restore();
@@ -54,7 +69,13 @@ describe("runSearch (in-process)", () => {
     const out2 = captureOutput();
     try {
       await withCwd(root, () =>
-        runUpdate(id, { label: [], relatesTo: [], progress: "a later, unrelated note" }),
+        runUpdate(id, {
+          label: [],
+          relatesTo: [],
+          acceptance: [],
+          context: [],
+          progress: "a later, unrelated note",
+        }),
       );
     } finally {
       out2.restore();

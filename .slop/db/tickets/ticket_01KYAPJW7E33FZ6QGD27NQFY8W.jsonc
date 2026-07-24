@@ -16,7 +16,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "done",
   "priority": 2,
   "labels": [
     "area:cli"
@@ -30,8 +30,8 @@
   "root_id": "ticket_01KYAPJW7E33FZ6QGD27NQFY8W",
   "path": [],
   "active_session": null,
-  "last_activity_at": "2026-07-24T18:35:43.219Z",
-  "latest_note": null,
+  "last_activity_at": "2026-07-24T19:27:25.593Z",
+  "latest_note": "Added first-class --summary/--details/--acceptance/--context flags to new/update. new: field flags build the spec directly (same defaults as no --spec). update: field flags overlay onto the CURRENT spec, field-by-field (say what changes, rest stays), unlike --spec's whole-blob replace. --spec is mutually exclusive with the field flags (USAGE_ERROR). Docs + onboarding house rule updated to recommend the flags over hand-assembled --spec JSON.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -41,5 +41,5 @@
     }
   },
   "created_at": "2026-07-24T18:35:43.219Z",
-  "updated_at": "2026-07-24T18:35:43.219Z"
+  "updated_at": "2026-07-24T19:27:25.593Z"
 }

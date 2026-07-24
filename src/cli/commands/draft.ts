@@ -45,6 +45,8 @@ export async function runDraft(ref: string): Promise<void> {
     const { ticket, patch, verb, payload } = buildUpdate(current, {
       state: "draft",
       labelOps: [],
+      acceptance: [],
+      context: [],
     });
 
     await updateTicket(

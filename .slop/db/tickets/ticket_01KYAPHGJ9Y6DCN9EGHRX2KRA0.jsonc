@@ -15,7 +15,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "done",
   "priority": 1,
   "labels": [
     "area:cli"
@@ -29,8 +29,8 @@
   "root_id": "ticket_01KYAPHGJ9Y6DCN9EGHRX2KRA0",
   "path": [],
   "active_session": null,
-  "last_activity_at": "2026-07-24T18:34:58.508Z",
-  "latest_note": null,
+  "last_activity_at": "2026-07-24T19:12:40.410Z",
+  "latest_note": "JSON-object --spec that fails the known-keys/schema gate now errors USAGE_ERROR(2) naming the offending key/issue, instead of silently degrading to details_md prose. Bare non-JSON markdown unaffected. Landing in this worktree's next commit.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -40,5 +40,5 @@
     }
   },
   "created_at": "2026-07-24T18:34:58.508Z",
-  "updated_at": "2026-07-24T18:34:58.508Z"
+  "updated_at": "2026-07-24T19:12:40.410Z"
 }

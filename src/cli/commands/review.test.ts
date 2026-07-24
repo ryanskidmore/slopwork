@@ -90,7 +90,16 @@ describe("buildReviewedTicket", () => {
 async function jsonNewTicket(root: string, name: string): Promise<TicketId> {
   const out = captureOutput();
   try {
-    await withCwd(root, () => runNew(name, { blocks: [], relatesTo: [], label: [], json: true }));
+    await withCwd(root, () =>
+      runNew(name, {
+        blocks: [],
+        relatesTo: [],
+        label: [],
+        acceptance: [],
+        context: [],
+        json: true,
+      }),
+    );
     return (JSON.parse(out.stdout()) as { id: TicketId }).id;
   } finally {
     out.restore();

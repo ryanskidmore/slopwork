@@ -78,19 +78,48 @@ export interface PlanSetResult {
  * v1 on the first call, v(N+1) on every later call. Prior versions are
  * never mutated in place — appending, not replacing, is what makes "plan
  * v2 diffable from v1" true (session.ts's doc).
+ *
+ * Throws a USAGE_ERROR (2) `SlopError` naming the offending step (1-based,
+ * matching `--check`/`--uncheck`'s own convention) if any `stepTexts`
+ * entry is blank after trimming — checked explicitly, UP FRONT, rather
+ * than left for `planVersionSchema`'s `text: z.string().trim().min(1)`
+ * to catch: a bare `.parse()` there would throw a raw, uncaught `ZodError`
+ * (naming the internal `steps.<N>.text` path, not the user's own `"step
+ * N"` CLI argument) straight out of this function — `slop plan <ref> ""`
+ * used to dump exactly that JSON array to stderr and exit 1. The trailing
+ * `planVersionSchema.safeParse` below is a second, generic backstop for
+ * any OTHER future constraint this explicit check doesn't anticipate —
+ * same defensive layering `tickets/spec.ts`/`tickets/split.ts` use.
  */
 export function buildPlanVersion(
   session: Session,
   stepTexts: readonly string[],
   clock: Clock = systemClock,
 ): PlanSetResult {
+  stepTexts.forEach((text, index) => {
+    if (text.trim().length === 0) {
+      throw new SlopError(
+        `step ${index + 1} is blank — every plan step needs non-empty text, e.g. ` +
+          '`slop plan <ref> "step 1" "step 2"`',
+        EXIT_CODES.USAGE_ERROR,
+      );
+    }
+  });
+
   const previous = session.plan.at(-1);
   const steps = buildPlanSteps(stepTexts, previous);
-  const version = planVersionSchema.parse({
+  const parsedVersion = planVersionSchema.safeParse({
     version: (previous?.version ?? 0) + 1,
     steps,
     created_at: nowIso(clock),
   });
+  if (!parsedVersion.success) {
+    throw new SlopError(
+      formatZodIssuesForUsage("invalid plan step(s)", parsedVersion.error),
+      EXIT_CODES.USAGE_ERROR,
+    );
+  }
+  const version = parsedVersion.data;
 
   const candidate = { ...session, plan: [...session.plan, version] };
   const parsed = sessionSchema.safeParse(candidate);

@@ -1,0 +1,17 @@
+{
+  "id": "event_01KYARNNEN099MH2ESMGYT9791",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYAPHGJ9Y6DCN9EGHRX2KRA0"
+  },
+  "payload": {
+    "progress": "docs: updated docs/cli-reference.md's --spec section with the new hard-error behavior; left onboarding content.ts untouched (nothing there was factually wrong, ticket 2 owns the new structured flags)"
+  },
+  "at": "2026-07-24T19:12:11.733Z"
+}

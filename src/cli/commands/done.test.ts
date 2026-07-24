@@ -486,7 +486,15 @@ async function jsonNewTicket(
   const out = captureOutput();
   try {
     await withCwd(root, () =>
-      runNew(name, { blocks: [], relatesTo: [], label: [], json: true, ...extra }),
+      runNew(name, {
+        blocks: [],
+        relatesTo: [],
+        label: [],
+        acceptance: [],
+        context: [],
+        json: true,
+        ...extra,
+      }),
     );
     return (JSON.parse(out.stdout()) as { id: TicketId }).id;
   } finally {

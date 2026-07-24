@@ -461,13 +461,28 @@ describe("update --relates-to <±ref>: add/remove a relates-to edge (ticket_01KY
 // ---------------------------------------------------------------------------
 
 function baseOpts(overrides: Partial<Parameters<typeof runUpdate>[1]> = {}) {
-  return { label: [] as string[], relatesTo: [] as string[], ...overrides };
+  return {
+    label: [] as string[],
+    relatesTo: [] as string[],
+    acceptance: [] as string[],
+    context: [] as string[],
+    ...overrides,
+  };
 }
 
 async function jsonNewTicket(root: string, name: string): Promise<TicketId> {
   const out = captureOutput();
   try {
-    await withCwd(root, () => runNew(name, { blocks: [], relatesTo: [], label: [], json: true }));
+    await withCwd(root, () =>
+      runNew(name, {
+        blocks: [],
+        relatesTo: [],
+        label: [],
+        acceptance: [],
+        context: [],
+        json: true,
+      }),
+    );
     return (JSON.parse(out.stdout()) as { id: TicketId }).id;
   } finally {
     out.restore();

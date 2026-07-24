@@ -109,7 +109,7 @@ export const HOUSE_RULES: readonly string[] = [
   "**Never fake state.** Don't `done` unverified work, don't `--check` unfinished steps, don't skip `review` because the change \"is small.\"",
   "**Don't takeover.** If `start` warns that another session is active, stop and tell the human. Use `--takeover` only when explicitly instructed.",
   "**Stopping requires a handoff note.** The next session (probably another amnesiac you) starts from your `--note`. Write what you'd want to read: current state, next step, traps.",
-  "**Prefer structured spec fields.** When creating tickets, put acceptance criteria in `acceptance[]` and file/URL pointers in `context[]`, not buried in prose.",
+  "**Prefer structured spec fields.** When creating or updating tickets, put acceptance criteria in `acceptance[]` and file/URL pointers in `context[]`, not buried in prose — use `new`/`update`'s own `--acceptance`/`--context`/`--summary`/`--details` flags (repeatable, plain text) rather than hand-assembling `--spec <json>`; it sidesteps shell-quoting hazards and the unknown-key/malformed-JSON errors `--spec` now raises.",
   // Originally FIXED against the shipped CLI (the draft read "Use `--json
   // --budget N` on `ready`/`show`", back when `show` had neither flag —
   // only `ready` did). E1 then genuinely landed `--json`/`--budget`

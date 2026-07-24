@@ -393,6 +393,28 @@ describe("C2: Plans", () => {
       const result = runSlop(["plan", ticket.slug], dir);
       expect(result.status).toBe(2);
     });
+
+    it("a blank/whitespace-only step is a clean USAGE_ERROR(2), never a raw ZodError JSON dump (regression: raw-zoderrors-escape-as-exit)", async () => {
+      const { dir, paths } = await makeRepo();
+      const ticket = makeTicket();
+      await createTicket(paths, ticket, ctx, ticketCreated);
+      runSlop(["start", ticket.slug], dir);
+
+      const blank = runSlop(["plan", ticket.slug, ""], dir);
+      expect(blank.status).toBe(2);
+      expect(blank.stderr).not.toContain("ZodError");
+      expect(blank.stderr).not.toMatch(/^\s*error:\s*\[/); // not a raw JSON issues array
+      expect(blank.stderr).toContain("step 1");
+
+      const whitespace = runSlop(["plan", ticket.slug, "good step", "   "], dir);
+      expect(whitespace.status).toBe(2);
+      expect(whitespace.stderr).not.toContain("ZodError");
+      expect(whitespace.stderr).toContain("step 2");
+
+      // Nothing was persisted for either rejected call.
+      const sessions = await listSessions(paths);
+      expect(sessions[0]?.plan ?? []).toEqual([]);
+    });
   });
 
   // -------------------------------------------------------------------------

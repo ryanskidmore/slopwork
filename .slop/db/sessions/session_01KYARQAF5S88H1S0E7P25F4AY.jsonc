@@ -1,0 +1,56 @@
+{
+  "id": "session_01KYARQAF5S88H1S0E7P25F4AY",
+  "ticket": "ticket_01KYAPJW7E33FZ6QGD27NQFY8W",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "worktree-agent-aa1a4517430374aa8",
+    "commit_at_start": "4a0b91cb5b31dc476a15f180d60776e39a39695b"
+  },
+  "started_at": "2026-07-24T19:13:06.021Z",
+  "ended_at": "2026-07-24T19:27:25.573Z",
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "add SpecFieldOverrides/hasSpecFieldOverrides/applySpecFieldOverrides to tickets/spec.ts",
+          "checked": true
+        },
+        {
+          "text": "wire structured fields into tickets/new.ts and tickets/update.ts, with --spec mutual-exclusion USAGE_ERROR",
+          "checked": true
+        },
+        {
+          "text": "add --summary/--details/--acceptance/--context flags to cli/commands/new.ts and update.ts (collect machinery, stdin support for --details)",
+          "checked": true
+        },
+        {
+          "text": "fix call sites broken by the new required NewTicketInput/UpdateInput fields (draft.ts, undraft.ts, and existing in-process CLI tests)",
+          "checked": true
+        },
+        {
+          "text": "add regression tests: unit (spec.test.ts, new.test.ts, update.test.ts) and CLI acceptance (B1.test.ts)",
+          "checked": true
+        },
+        {
+          "text": "update onboarding content.ts house rule and docs/cli-reference.md + concurrency-and-merging.md",
+          "checked": true
+        },
+        {
+          "text": "run full verification suite",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T19:27:03.620Z"
+    }
+  ],
+  "end_summary": "Added first-class --summary/--details/--acceptance/--context flags to new/update. new: field flags build the spec directly (same defaults as no --spec). update: field flags overlay onto the CURRENT spec, field-by-field (say what changes, rest stays), unlike --spec's whole-blob replace. --spec is mutually exclusive with the field flags (USAGE_ERROR). Docs + onboarding house rule updated to recommend the flags over hand-assembled --spec JSON.",
+  "transcript_ref": "transcripts/session_01KYARQAF5S88H1S0E7P25F4AY.jsonl"
+}

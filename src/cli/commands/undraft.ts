@@ -46,6 +46,8 @@ export async function runUndraft(ref: string): Promise<void> {
     const { ticket, patch, verb, payload } = buildUpdate(current, {
       state: "open",
       labelOps: [],
+      acceptance: [],
+      context: [],
     });
 
     await updateTicket(

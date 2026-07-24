@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { fixedClock } from "../core/clock.js";
 import type { Ticket } from "../core/index.js";
-import { newTicketId, ticketSchema } from "../core/index.js";
+import { EXIT_CODES, newTicketId, ticketSchema } from "../core/index.js";
 import type { EventContext, MutationEventSpec } from "../repo/events.js";
 import { ensureDbDirs } from "../repo/paths.js";
 import type { RepoPaths } from "../repo/paths.js";
@@ -39,6 +39,8 @@ function baseInput(overrides: Partial<NewTicketInput> = {}): NewTicketInput {
     name: "Add auth provider",
     blocksRaw: [],
     relatesToRaw: [],
+    acceptance: [],
+    context: [],
     labels: [],
     draft: false,
     adhoc: false,
@@ -88,6 +90,21 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
     expect(warnings).toEqual([]);
   });
 
+  it("an empty or whitespace-only name is a clean USAGE_ERROR(2), never a raw ZodError (regression: raw-zoderrors-escape-as-exit)", async () => {
+    let caughtEmpty: unknown;
+    try {
+      await buildNewTicket(paths, baseInput({ name: "" }), clock);
+    } catch (err) {
+      caughtEmpty = err;
+    }
+    expect(caughtEmpty).toMatchObject({ exitCode: EXIT_CODES.USAGE_ERROR });
+    expect((caughtEmpty as { name?: string }).name).not.toBe("ZodError");
+
+    await expect(buildNewTicket(paths, baseInput({ name: "   " }), clock)).rejects.toMatchObject({
+      exitCode: EXIT_CODES.USAGE_ERROR,
+    });
+  });
+
   it("--spec (JSON, structural)", async () => {
     const { ticket } = await buildNewTicket(
       paths,
@@ -106,6 +123,50 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
     );
     expect(ticket.spec.details_md).toBe("# Notes\nSome prose.");
     expect(ticket.spec.summary).toBe("Add auth provider");
+  });
+
+  it("--summary/--details/--acceptance/--context: structured spec fields, no --spec needed", async () => {
+    const { ticket } = await buildNewTicket(
+      paths,
+      baseInput({
+        summaryRaw: "Structured summary",
+        detailsRaw: "Structured prose",
+        acceptance: ["criterion 1", "criterion 2"],
+        context: ["src/foo.ts:12"],
+      }),
+      clock,
+    );
+    expect(ticket.spec.summary).toBe("Structured summary");
+    expect(ticket.spec.details_md).toBe("Structured prose");
+    expect(ticket.spec.acceptance).toEqual(["criterion 1", "criterion 2"]);
+    expect(ticket.spec.context).toEqual(["src/foo.ts:12"]);
+  });
+
+  it("--acceptance/--context alone still default summary from the name, same as no --spec at all", async () => {
+    const { ticket } = await buildNewTicket(
+      paths,
+      baseInput({ acceptance: ["criterion 1"] }),
+      clock,
+    );
+    expect(ticket.spec.summary).toBe("Add auth provider");
+    expect(ticket.spec.acceptance).toEqual(["criterion 1"]);
+  });
+
+  it("combining --spec with a structured field flag is a USAGE_ERROR, before any resolution happens", async () => {
+    await expect(
+      buildNewTicket(
+        paths,
+        baseInput({ specRaw: JSON.stringify({ summary: "x" }), summaryRaw: "y" }),
+        clock,
+      ),
+    ).rejects.toMatchObject({ exitCode: EXIT_CODES.USAGE_ERROR });
+    await expect(
+      buildNewTicket(
+        paths,
+        baseInput({ specRaw: JSON.stringify({ summary: "x" }), acceptance: ["a"] }),
+        clock,
+      ),
+    ).rejects.toMatchObject({ exitCode: EXIT_CODES.USAGE_ERROR });
   });
 
   it("--parent (local, resolved via slug)", async () => {
@@ -183,6 +244,20 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
       clock,
     );
     expect(ticket.labels).toEqual(["type:feature", "team:core"]);
+  });
+
+  it("--label starting with + or - is a USAGE_ERROR — that's update's ±label syntax, not new's", async () => {
+    await expect(
+      buildNewTicket(paths, baseInput({ labels: ["+bug"] }), clock),
+    ).rejects.toMatchObject({ exitCode: EXIT_CODES.USAGE_ERROR });
+    await expect(
+      buildNewTicket(paths, baseInput({ labels: ["-weird"] }), clock),
+    ).rejects.toMatchObject({ exitCode: EXIT_CODES.USAGE_ERROR });
+    // A good label alongside a bad one still rejects the whole call —
+    // never partially applies.
+    await expect(
+      buildNewTicket(paths, baseInput({ labels: ["good", "+bad"] }), clock),
+    ).rejects.toMatchObject({ exitCode: EXIT_CODES.USAGE_ERROR });
   });
 
   it("--draft (state draft; D13: drafts never ready)", async () => {

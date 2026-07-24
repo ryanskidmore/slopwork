@@ -153,7 +153,16 @@ describe("show: surfaces the t-<code> short handle (ticket_01KY9RVF2DCG6TDQ8EBSG
 async function jsonNewTicket(root: string, name: string): Promise<TicketId> {
   const out = captureOutput();
   try {
-    await withCwd(root, () => runNew(name, { blocks: [], relatesTo: [], label: [], json: true }));
+    await withCwd(root, () =>
+      runNew(name, {
+        blocks: [],
+        relatesTo: [],
+        label: [],
+        acceptance: [],
+        context: [],
+        json: true,
+      }),
+    );
     return (JSON.parse(out.stdout()) as { id: TicketId }).id;
   } finally {
     out.restore();
@@ -249,7 +258,13 @@ describe("runShow (in-process)", () => {
     const updateOut = captureOutput();
     try {
       await withCwd(root, () =>
-        runUpdate(id, { label: [], relatesTo: [], progress: "fresh progress note" }),
+        runUpdate(id, {
+          label: [],
+          relatesTo: [],
+          acceptance: [],
+          context: [],
+          progress: "fresh progress note",
+        }),
       );
     } finally {
       updateOut.restore();

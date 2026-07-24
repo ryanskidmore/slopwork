@@ -223,6 +223,84 @@ describe("B1: new / show / edit / update", () => {
       expect(mdTicket.spec.details_md).toBe("just prose");
     });
 
+    it("--spec JSON with an unknown top-level key errors USAGE_ERROR(2) naming the key, instead of silently becoming details_md prose", async () => {
+      const fixture = await makeFixture();
+      const raw = JSON.stringify({ acceptence: "typo'd key" });
+      const result = runSlop(["new", "Typo key spec", "--spec", raw], fixture.root);
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain("acceptence");
+      const listing = await readdir(fixture.paths.ticketsDir);
+      expect(listing).toEqual([]); // nothing was persisted
+    });
+
+    it("--spec JSON with only known keys but a schema violation errors USAGE_ERROR(2) naming the field", async () => {
+      const fixture = await makeFixture();
+      const raw = JSON.stringify({ acceptance: "not an array" });
+      const result = runSlop(["new", "Bad shape spec", "--spec", raw], fixture.root);
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain("acceptance");
+    });
+
+    it("--spec truncated/malformed JSON (not valid JSON at all) still falls through to details_md, unchanged", async () => {
+      const fixture = await makeFixture();
+      const raw = '{"summary": "oops, truncated';
+      const { id } = await createTicketViaCli(fixture, "Truncated JSON spec", ["--spec", raw]);
+      const ticket = await readTicketFile(fixture.paths, id);
+      expect(ticket.spec.details_md).toBe(raw);
+    });
+
+    it("--summary/--details/--acceptance/--context: structured spec flags, no --spec JSON needed", async () => {
+      const fixture = await makeFixture();
+      const { id } = await createTicketViaCli(fixture, "Structured spec ticket", [
+        "--summary",
+        "Structured summary",
+        "--details",
+        "Structured prose",
+        "--acceptance",
+        "criterion 1",
+        "--acceptance",
+        "criterion 2",
+        "--context",
+        "src/foo.ts:12",
+      ]);
+      const ticket = await readTicketFile(fixture.paths, id);
+      expect(ticket.spec.summary).toBe("Structured summary");
+      expect(ticket.spec.details_md).toBe("Structured prose");
+      expect(ticket.spec.acceptance).toEqual(["criterion 1", "criterion 2"]);
+      expect(ticket.spec.context).toEqual(["src/foo.ts:12"]);
+    });
+
+    it("--details - reads the details prose from stdin, same as --spec -", async () => {
+      const fixture = await makeFixture();
+      const spawned = runSlopWithStdin(
+        ["new", "Stdin details ticket", "--details", "-"],
+        fixture.root,
+        "# Heading\n\nSome *markdown* prose.",
+      );
+      expect(spawned.status, spawned.stderr).toBe(0);
+      const { id } = parseCreatedOutput(spawned.stdout);
+      const ticket = await readTicketFile(fixture.paths, id);
+      expect(ticket.spec.details_md).toBe("# Heading\n\nSome *markdown* prose.");
+    });
+
+    it("combining --spec with a structured field flag (e.g. --summary) is a USAGE_ERROR(2), nothing persisted", async () => {
+      const fixture = await makeFixture();
+      const result = runSlop(
+        [
+          "new",
+          "Conflicting spec flags",
+          "--spec",
+          JSON.stringify({ summary: "from json" }),
+          "--summary",
+          "from flag",
+        ],
+        fixture.root,
+      );
+      expect(result.status).toBe(2);
+      const listing = await readdir(fixture.paths.ticketsDir);
+      expect(listing).toEqual([]);
+    });
+
     it("--parent <local ref> (slug/prefix/full id all work — see also the dedicated slug+prefix describe below)", async () => {
       const fixture = await makeFixture();
       const { id: parentId, slug: parentSlug } = await createTicketViaCli(fixture, "Parent ticket");
@@ -285,15 +363,29 @@ describe("B1: new / show / edit / update", () => {
       expect(ticket.labels).toEqual(["type:feature", "team:core"]);
     });
 
-    it("--label survives the argv.ts rewrite pass unaffected on `new` too (no +/- semantics at creation; confirmed, not assumed)", async () => {
+    it("a --label starting with +/- on `new` is a USAGE_ERROR(2), not silently stored (label grammar consistency fix)", async () => {
       const fixture = await makeFixture();
-      // A value that happens to start with `-` is a legitimate label
-      // string here (design.md's `new` `--label a:b` form has no add
-      // /remove semantics — that's `update`'s job) — the argv rewrite
-      // must still leave it intact rather than mangling it.
-      const { id } = await createTicketViaCli(fixture, "Dash label ticket", ["--label", "-weird"]);
-      const ticket = await readTicketFile(fixture.paths, id);
-      expect(ticket.labels).toEqual(["-weird"]);
+      // Regression: `new` has no +/- add/remove semantics of its own (that's
+      // `update --label <±label>`'s job — `new` only ever adds) — a `+`/`-`
+      // -prefixed value used to be accepted verbatim as a literal label
+      // (`"-weird"`, exit 0, no warning), a grammar mismatch that made the
+      // label unreachable by a later `update --label -weird` (which parses
+      // as "remove label weird", never "remove label -weird"). argv.ts's
+      // rewrite pass still runs (so Commander doesn't choke on the `-`
+      // -prefixed token first) — the label content itself is what's now
+      // rejected, with a clean usage error rather than a raw Commander
+      // "unknown option" error.
+      const dash = runSlop(["new", "Dash label ticket", "--label", "-weird"], fixture.root);
+      expect(dash.status).toBe(2);
+      expect(dash.stderr).toContain("-weird");
+
+      const plus = runSlop(["new", "Plus label ticket", "--label", "+weird"], fixture.root);
+      expect(plus.status).toBe(2);
+      expect(plus.stderr).toContain("+weird");
+
+      // Nothing was persisted for either rejected attempt.
+      const listing = await readdir(fixture.paths.ticketsDir);
+      expect(listing).toEqual([]);
     });
 
     it("--draft (D13: drafts start in draft state)", async () => {
@@ -325,6 +417,23 @@ describe("B1: new / show / edit / update", () => {
 
       const bad = runSlop(["new", "Bad priority", "--priority", "9"], fixture.root);
       expect(bad.status).toBe(2); // USAGE_ERROR
+    });
+
+    it("an empty or whitespace-only name is a clean USAGE_ERROR(2), never a raw ZodError JSON dump (regression: raw-zoderrors-escape-as-exit)", async () => {
+      const fixture = await makeFixture();
+
+      const empty = runSlop(["new", ""], fixture.root);
+      expect(empty.status).toBe(2);
+      expect(empty.stderr).not.toContain("ZodError");
+      expect(empty.stderr).not.toMatch(/^\s*error:\s*\[/); // not a raw JSON issues array
+      expect(empty.stderr.toLowerCase()).toContain("name");
+
+      const whitespace = runSlop(["new", "   "], fixture.root);
+      expect(whitespace.status).toBe(2);
+      expect(whitespace.stderr).not.toContain("ZodError");
+
+      const listing = await readdir(fixture.paths.ticketsDir);
+      expect(listing).toEqual([]); // nothing persisted for either rejected call
     });
 
     it("every flag combined in a single `new` call", async () => {
@@ -675,6 +784,52 @@ describe("B1: new / show / edit / update", () => {
       );
       expect(result.status, result.stderr).toBe(0);
       expect((await readTicketFile(fixture.paths, id)).spec.summary).toBe("Replaced summary");
+    });
+
+    it("--spec JSON with an unknown top-level key on update errors USAGE_ERROR(2), leaving the existing spec untouched", async () => {
+      const fixture = await makeFixture();
+      const { id } = await createTicketViaCli(fixture, "Spec update typo");
+      const before = await readTicketFile(fixture.paths, id);
+      const result = runSlop(
+        ["update", id, "--spec", JSON.stringify({ acceptence: "typo'd key" })],
+        fixture.root,
+      );
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain("acceptence");
+      const after = await readTicketFile(fixture.paths, id);
+      expect(after.spec).toEqual(before.spec);
+    });
+
+    it("--acceptance on update replaces the acceptance[] wholesale, leaving summary/details/context untouched", async () => {
+      const fixture = await makeFixture();
+      const { id } = await createTicketViaCli(fixture, "Structured field update", [
+        "--summary",
+        "Original summary",
+        "--details",
+        "Original prose",
+        "--context",
+        "original ctx",
+      ]);
+      const result = runSlop(["update", id, "--acceptance", "new criterion"], fixture.root);
+      expect(result.status, result.stderr).toBe(0);
+      const ticket = await readTicketFile(fixture.paths, id);
+      expect(ticket.spec.acceptance).toEqual(["new criterion"]);
+      expect(ticket.spec.summary).toBe("Original summary");
+      expect(ticket.spec.details_md).toBe("Original prose");
+      expect(ticket.spec.context).toEqual(["original ctx"]);
+    });
+
+    it("combining --spec with a structured field flag on update is a USAGE_ERROR(2), leaving the spec untouched", async () => {
+      const fixture = await makeFixture();
+      const { id } = await createTicketViaCli(fixture, "Conflicting update spec flags");
+      const before = await readTicketFile(fixture.paths, id);
+      const result = runSlop(
+        ["update", id, "--spec", JSON.stringify({ summary: "x" }), "--summary", "y"],
+        fixture.root,
+      );
+      expect(result.status).toBe(2);
+      const after = await readTicketFile(fixture.paths, id);
+      expect(after.spec).toEqual(before.spec);
     });
 
     it("no flags at all is a usage error", async () => {

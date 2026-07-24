@@ -1,0 +1,19 @@
+{
+  "id": "event_01KYASZB01ZAQR59CX1V6MAZQQ",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": "session_01KYASJG9RH00N4XTNB5229631",
+  "verb": "session.ended",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KYASJG9RH00N4XTNB5229631"
+  },
+  "payload": {
+    "reason": "done",
+    "note": "Added a shared assertLabelHasNoLeadingSigil helper (src/tickets/labels.ts), used by both new's buildNewTicket (rejects any --label starting with +/-) and update's parseLabelOp (rejects a doubled sigil after its own op sigil is stripped, e.g. --label ++bug). Both now agree on what a valid label looks like, closing the grammar mismatch where new silently stored a literal '+bug'/'-weird' label that a later update --label could never correctly address. Updated the B1.test.ts test that had documented the old accept-silently behavior.",
+    "transcript_ref": "transcripts/session_01KYASJG9RH00N4XTNB5229631.jsonl"
+  },
+  "at": "2026-07-24T19:34:57.281Z"
+}

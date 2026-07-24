@@ -22,15 +22,30 @@ import { resolveTicketRef } from "../repo/refs.js";
 import { listTickets } from "../repo/tickets.js";
 import { SlopError } from "../cli/errors.js";
 import { validateTicketEdges } from "./edges.js";
+import { assertLabelHasNoLeadingSigil } from "./labels.js";
 import { ancestryFor, resolveParentRef } from "./parent.js";
 import { pickSlug, takenSlugs } from "./slug.js";
-import { defaultSpec, parseSpecInput } from "./spec.js";
+import {
+  applySpecFieldOverrides,
+  defaultSpec,
+  hasSpecFieldOverrides,
+  parseSpecInput,
+} from "./spec.js";
+import type { SpecFieldOverrides } from "./spec.js";
 import { formatZodIssuesForUsage } from "./validate.js";
 
 export interface NewTicketInput {
   name: string;
   /** Raw `--spec` text (already read from stdin if `--spec -` was given), or `undefined` if `--spec` was omitted entirely. */
   specRaw?: string;
+  /** Raw `--summary` text, or `undefined` if omitted. */
+  summaryRaw?: string;
+  /** Raw `--details` text (already read from stdin if `--details -` was given), or `undefined` if omitted. */
+  detailsRaw?: string;
+  /** Raw `--acceptance` entries (repeatable). */
+  acceptance: string[];
+  /** Raw `--context` entries (repeatable). */
+  context: string[];
   /** Raw `--parent` ref text, or `undefined` if omitted. */
   parentRaw?: string;
   /** Raw `--blocks` ref texts (repeatable). */
@@ -97,6 +112,16 @@ async function resolveSlug(paths: RepoPaths, input: NewTicketInput): Promise<str
 
 /**
  * Build (but do not persist) the new ticket. Throws:
+ *   - a USAGE_ERROR `SlopError` if any `--label` starts with `+`/`-` — see
+ *     {@link assertLabelHasNoLeadingSigil}: that's `update --label`'s
+ *     add/remove sigil, never legal as part of a label's actual text on
+ *     EITHER command, so it's rejected here up front rather than silently
+ *     stored as a literal `"+bug"`-shaped label a later `update --label
+ *     -bug` can never correctly address;
+ *   - a USAGE_ERROR `SlopError` if BOTH `--spec` and any of
+ *     `--summary`/`--details`/`--acceptance`/`--context` are given —
+ *     two different ways to say what the spec is, so combining them is
+ *     rejected rather than picking a silent winner;
  *   - whatever `resolveTicketRef` throws (NOT_FOUND/AMBIGUOUS_REF/USAGE_ERROR)
  *     for an unresolvable `--parent`/`--blocks`/`--relates-to`/`--discovered-from`
  *     local ref;
@@ -120,10 +145,27 @@ export async function buildNewTicket(
 ): Promise<NewTicketResult> {
   const warnings: string[] = [];
 
+  for (const label of input.labels) {
+    assertLabelHasNoLeadingSigil(label, "--label");
+  }
+
+  const specFieldOverrides: SpecFieldOverrides = {
+    summary: input.summaryRaw,
+    details: input.detailsRaw,
+    acceptance: input.acceptance,
+    context: input.context,
+  };
+  if (input.specRaw !== undefined && hasSpecFieldOverrides(specFieldOverrides)) {
+    throw new SlopError(
+      "--spec cannot be combined with --summary/--details/--acceptance/--context — " +
+        "pick one way to give the spec",
+      EXIT_CODES.USAGE_ERROR,
+    );
+  }
   const spec =
     input.specRaw !== undefined
       ? parseSpecInput(input.specRaw, input.name)
-      : defaultSpec(input.name);
+      : applySpecFieldOverrides(defaultSpec(input.name), specFieldOverrides);
 
   const parentResolution = await resolveParentRef(paths, input.parentRaw);
   if (parentResolution.kind === "external" && parentResolution.warning) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fixedClock } from "../core/clock.js";
 import {
+  EXIT_CODES,
   newSessionId,
   newTicketId,
   planVersionSchema,
@@ -8,6 +9,7 @@ import {
   ticketSchema,
 } from "../core/index.js";
 import type { Session, Ticket } from "../core/index.js";
+import { SlopError } from "../cli/errors.js";
 import {
   assertHasActiveSession,
   buildPlanStepToggle,
@@ -151,6 +153,32 @@ describe("buildPlanVersion", () => {
     // And v1 itself still shows step one unchecked -- the toggle only
     // touched the latest version at the time, not history.
     expect(checked.plan[0]?.steps[0]?.checked).toBe(true);
+  });
+
+  it("a blank step is a clean USAGE_ERROR(2) naming its 1-based position, never a raw ZodError (regression: raw-zoderrors-escape-as-exit)", () => {
+    const session = makeSession();
+    let caught: unknown;
+    try {
+      buildPlanVersion(session, [""], clock);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(SlopError);
+    const err = caught as SlopError;
+    expect(err.exitCode).toBe(EXIT_CODES.USAGE_ERROR);
+    expect(err.message).toContain("step 1");
+    expect(err.name).not.toBe("ZodError");
+  });
+
+  it("a whitespace-only step (not the first) names the right 1-based position", () => {
+    let caught: unknown;
+    try {
+      buildPlanVersion(makeSession(), ["good step", "   "], clock);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(SlopError);
+    expect((caught as SlopError).message).toContain("step 2");
   });
 });
 

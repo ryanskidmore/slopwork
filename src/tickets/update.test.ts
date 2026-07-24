@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { fixedClock } from "../core/clock.js";
 import type { Ticket } from "../core/index.js";
-import { newTicketId, ticketSchema } from "../core/index.js";
+import { EXIT_CODES, newTicketId, ticketSchema } from "../core/index.js";
+import { SlopError } from "../cli/errors.js";
 import { buildUpdate, parseLabelOp, parseRelatesToOpText } from "./update.js";
 import type { UpdateInput } from "./update.js";
 
@@ -26,7 +27,7 @@ function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
 }
 
 function baseInput(overrides: Partial<UpdateInput> = {}): UpdateInput {
-  return { labelOps: [], ...overrides };
+  return { labelOps: [], acceptance: [], context: [], ...overrides };
 }
 
 describe("parseLabelOp", () => {
@@ -41,6 +42,19 @@ describe("parseLabelOp", () => {
 
   it("rejects an empty label after the sigil", () => {
     expect(() => parseLabelOp("+")).toThrow();
+  });
+
+  it("rejects a doubled sigil — the label text after the op sigil can't itself start with +/-", () => {
+    let caught: unknown;
+    try {
+      parseLabelOp("++bug");
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(SlopError);
+    expect((caught as SlopError).exitCode).toBe(EXIT_CODES.USAGE_ERROR);
+
+    expect(() => parseLabelOp("+-bug")).toThrow(SlopError);
   });
 });
 
@@ -221,6 +235,79 @@ describe("buildUpdate", () => {
     const result = buildUpdate(before, baseInput({ specRaw: "just prose" }), clock);
     expect(result.ticket.spec.details_md).toBe("just prose");
     expect(result.ticket.spec.summary).toBe("Ticket name");
+  });
+
+  describe("--summary/--details/--acceptance/--context (structured spec field flags)", () => {
+    function specTicket(): Ticket {
+      return makeTicket({
+        spec: {
+          summary: "old summary",
+          details_md: "old detail",
+          acceptance: ["old criterion"],
+          context: ["old context"],
+          meta: {},
+          v: 1,
+        },
+      });
+    }
+
+    it("--summary alone changes only summary, everything else on the current spec is untouched", () => {
+      const before = specTicket();
+      const result = buildUpdate(before, baseInput({ summaryRaw: "new summary" }), clock);
+      expect(result.ticket.spec.summary).toBe("new summary");
+      expect(result.ticket.spec.details_md).toBe("old detail");
+      expect(result.ticket.spec.acceptance).toEqual(["old criterion"]);
+      expect(result.ticket.spec.context).toEqual(["old context"]);
+    });
+
+    it("--details alone changes only details_md", () => {
+      const before = specTicket();
+      const result = buildUpdate(before, baseInput({ detailsRaw: "new detail" }), clock);
+      expect(result.ticket.spec.details_md).toBe("new detail");
+      expect(result.ticket.spec.summary).toBe("old summary");
+    });
+
+    it("--acceptance replaces the whole acceptance array, leaving context untouched", () => {
+      const before = specTicket();
+      const result = buildUpdate(before, baseInput({ acceptance: ["new criterion"] }), clock);
+      expect(result.ticket.spec.acceptance).toEqual(["new criterion"]);
+      expect(result.ticket.spec.context).toEqual(["old context"]);
+    });
+
+    it("--context replaces the whole context array, leaving acceptance untouched", () => {
+      const before = specTicket();
+      const result = buildUpdate(before, baseInput({ context: ["new context"] }), clock);
+      expect(result.ticket.spec.context).toEqual(["new context"]);
+      expect(result.ticket.spec.acceptance).toEqual(["old criterion"]);
+    });
+
+    it("payload.spec is true when a structured field flag actually changed the spec", () => {
+      const before = specTicket();
+      const result = buildUpdate(before, baseInput({ summaryRaw: "new summary" }), clock);
+      expect(result.payload.spec).toBe(true);
+    });
+
+    it("combining --spec with a structured field flag is a USAGE_ERROR, current spec left untouched", () => {
+      const before = specTicket();
+      expect(() =>
+        buildUpdate(
+          before,
+          baseInput({ specRaw: JSON.stringify({ summary: "x" }), summaryRaw: "y" }),
+          clock,
+        ),
+      ).toThrow(SlopError);
+      try {
+        buildUpdate(
+          before,
+          baseInput({ specRaw: JSON.stringify({ summary: "x" }), acceptance: ["a"] }),
+          clock,
+        );
+        expect.unreachable("should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(SlopError);
+        expect((err as SlopError).exitCode).toBe(EXIT_CODES.USAGE_ERROR);
+      }
+    });
   });
 
   describe("--state", () => {
