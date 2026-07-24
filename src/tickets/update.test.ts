@@ -43,6 +43,19 @@ describe("parseLabelOp", () => {
   it("rejects an empty label after the sigil", () => {
     expect(() => parseLabelOp("+")).toThrow();
   });
+
+  it("rejects a doubled sigil — the label text after the op sigil can't itself start with +/-", () => {
+    let caught: unknown;
+    try {
+      parseLabelOp("++bug");
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(SlopError);
+    expect((caught as SlopError).exitCode).toBe(EXIT_CODES.USAGE_ERROR);
+
+    expect(() => parseLabelOp("+-bug")).toThrow(SlopError);
+  });
 });
 
 // ticket_01KYA3Z9FNZ2FDMDRWNKR9EV7J: `--relates-to <±ref>` uses the same

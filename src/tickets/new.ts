@@ -22,6 +22,7 @@ import { resolveTicketRef } from "../repo/refs.js";
 import { listTickets } from "../repo/tickets.js";
 import { SlopError } from "../cli/errors.js";
 import { validateTicketEdges } from "./edges.js";
+import { assertLabelHasNoLeadingSigil } from "./labels.js";
 import { ancestryFor, resolveParentRef } from "./parent.js";
 import { pickSlug, takenSlugs } from "./slug.js";
 import {
@@ -111,6 +112,12 @@ async function resolveSlug(paths: RepoPaths, input: NewTicketInput): Promise<str
 
 /**
  * Build (but do not persist) the new ticket. Throws:
+ *   - a USAGE_ERROR `SlopError` if any `--label` starts with `+`/`-` — see
+ *     {@link assertLabelHasNoLeadingSigil}: that's `update --label`'s
+ *     add/remove sigil, never legal as part of a label's actual text on
+ *     EITHER command, so it's rejected here up front rather than silently
+ *     stored as a literal `"+bug"`-shaped label a later `update --label
+ *     -bug` can never correctly address;
  *   - a USAGE_ERROR `SlopError` if BOTH `--spec` and any of
  *     `--summary`/`--details`/`--acceptance`/`--context` are given —
  *     two different ways to say what the spec is, so combining them is
@@ -137,6 +144,10 @@ export async function buildNewTicket(
   clock: Clock = systemClock,
 ): Promise<NewTicketResult> {
   const warnings: string[] = [];
+
+  for (const label of input.labels) {
+    assertLabelHasNoLeadingSigil(label, "--label");
+  }
 
   const specFieldOverrides: SpecFieldOverrides = {
     summary: input.summaryRaw,

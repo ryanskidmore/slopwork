@@ -363,15 +363,29 @@ describe("B1: new / show / edit / update", () => {
       expect(ticket.labels).toEqual(["type:feature", "team:core"]);
     });
 
-    it("--label survives the argv.ts rewrite pass unaffected on `new` too (no +/- semantics at creation; confirmed, not assumed)", async () => {
+    it("a --label starting with +/- on `new` is a USAGE_ERROR(2), not silently stored (label grammar consistency fix)", async () => {
       const fixture = await makeFixture();
-      // A value that happens to start with `-` is a legitimate label
-      // string here (design.md's `new` `--label a:b` form has no add
-      // /remove semantics — that's `update`'s job) — the argv rewrite
-      // must still leave it intact rather than mangling it.
-      const { id } = await createTicketViaCli(fixture, "Dash label ticket", ["--label", "-weird"]);
-      const ticket = await readTicketFile(fixture.paths, id);
-      expect(ticket.labels).toEqual(["-weird"]);
+      // Regression: `new` has no +/- add/remove semantics of its own (that's
+      // `update --label <±label>`'s job — `new` only ever adds) — a `+`/`-`
+      // -prefixed value used to be accepted verbatim as a literal label
+      // (`"-weird"`, exit 0, no warning), a grammar mismatch that made the
+      // label unreachable by a later `update --label -weird` (which parses
+      // as "remove label weird", never "remove label -weird"). argv.ts's
+      // rewrite pass still runs (so Commander doesn't choke on the `-`
+      // -prefixed token first) — the label content itself is what's now
+      // rejected, with a clean usage error rather than a raw Commander
+      // "unknown option" error.
+      const dash = runSlop(["new", "Dash label ticket", "--label", "-weird"], fixture.root);
+      expect(dash.status).toBe(2);
+      expect(dash.stderr).toContain("-weird");
+
+      const plus = runSlop(["new", "Plus label ticket", "--label", "+weird"], fixture.root);
+      expect(plus.status).toBe(2);
+      expect(plus.stderr).toContain("+weird");
+
+      // Nothing was persisted for either rejected attempt.
+      const listing = await readdir(fixture.paths.ticketsDir);
+      expect(listing).toEqual([]);
     });
 
     it("--draft (D13: drafts start in draft state)", async () => {

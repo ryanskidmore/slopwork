@@ -132,7 +132,7 @@ slop new --spec - "Detailed ticket" < spec.json
 | `--blocks <ref>` | this ticket blocks `<ref>` (repeatable) |
 | `--relates-to <ref>` | this ticket relates to `<ref>` — symmetric, informational (repeatable) |
 | `--discovered-from <ref>` | the ticket this work was discovered while doing |
-| `--label <key:value>` | repeatable |
+| `--label <key:value>` | repeatable; can't start with `+`/`-` (that's `update`'s `±label` add/remove syntax — `new` only ever adds) |
 | `--draft` | create in draft state (never appears in `ready`) |
 | `--adhoc` | mark as created outside normal planning (exempts `done` from the review-skip nag) |
 | `--owner <actor>` | owning actor, stored as a human actor |

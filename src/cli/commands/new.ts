@@ -174,7 +174,12 @@ export function registerNewCommand(program: Command): void {
       [] as string[],
     )
     .option("--discovered-from <ref>", "ref of the ticket this work was discovered while doing")
-    .option("--label <key:value>", "label in key:value form (repeatable)", collect, [] as string[])
+    .option(
+      "--label <key:value>",
+      "label in key:value form (repeatable); no leading +/- — that's update's ±label syntax",
+      collect,
+      [] as string[],
+    )
     .option("--draft", "create in draft state (drafts never appear in `ready`)")
     .option("--adhoc", "mark as created outside normal planning")
     .option("--owner <actor>", "owning actor (roots require a human owner, D1)")

@@ -19,6 +19,7 @@ import type { EventVerb, Ticket, TicketId, TicketState } from "../core/index.js"
 import { EXIT_CODES, nowIso, ticketSchema, ticketStateSchema } from "../core/index.js";
 import type { JsoncPatchEntry } from "../core/jsonc.js";
 import { SlopError } from "../cli/errors.js";
+import { assertLabelHasNoLeadingSigil } from "./labels.js";
 import { diffTicketPatch } from "./patch.js";
 import { checkStateTransition } from "./state.js";
 import { applySpecFieldOverrides, hasSpecFieldOverrides, parseSpecInput } from "./spec.js";
@@ -69,8 +70,11 @@ export interface LabelOp {
 }
 
 /** Parse one `--label +x`/`--label -y` entry. Throws a USAGE_ERROR
- * `SlopError` if it doesn't start with `+`/`-`, or the label text after
- * the sigil is blank. */
+ * `SlopError` if it doesn't start with `+`/`-`, the label text after the
+ * sigil is blank, or that label text ITSELF starts with another `+`/`-`
+ * (`--label ++bug`/`--label +-bug`) — same shared rule
+ * {@link assertLabelHasNoLeadingSigil} enforces on `new --label`, so
+ * "what's a valid label" can never drift between the two commands. */
 export function parseLabelOp(raw: string): LabelOp {
   const sigil = raw.charAt(0);
   if (sigil !== "+" && sigil !== "-") {
@@ -83,6 +87,7 @@ export function parseLabelOp(raw: string): LabelOp {
   if (label.length === 0) {
     throw new SlopError(`--label "${raw}": nothing after the ${sigil}`, EXIT_CODES.USAGE_ERROR);
   }
+  assertLabelHasNoLeadingSigil(label, "--label");
   return { op: sigil, label };
 }
 

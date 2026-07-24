@@ -231,6 +231,20 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
     expect(ticket.labels).toEqual(["type:feature", "team:core"]);
   });
 
+  it("--label starting with + or - is a USAGE_ERROR — that's update's ±label syntax, not new's", async () => {
+    await expect(
+      buildNewTicket(paths, baseInput({ labels: ["+bug"] }), clock),
+    ).rejects.toMatchObject({ exitCode: EXIT_CODES.USAGE_ERROR });
+    await expect(
+      buildNewTicket(paths, baseInput({ labels: ["-weird"] }), clock),
+    ).rejects.toMatchObject({ exitCode: EXIT_CODES.USAGE_ERROR });
+    // A good label alongside a bad one still rejects the whole call —
+    // never partially applies.
+    await expect(
+      buildNewTicket(paths, baseInput({ labels: ["good", "+bad"] }), clock),
+    ).rejects.toMatchObject({ exitCode: EXIT_CODES.USAGE_ERROR });
+  });
+
   it("--draft (state draft; D13: drafts never ready)", async () => {
     const { ticket } = await buildNewTicket(paths, baseInput({ draft: true }), clock);
     expect(ticket.state).toBe("draft");

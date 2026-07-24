@@ -1,0 +1,60 @@
+{
+  "id": "session_01KYASJG9RH00N4XTNB5229631",
+  "ticket": "ticket_01KYAPMGWR4F70BXAXNADM6H94",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "worktree-agent-aa1a4517430374aa8",
+    "commit_at_start": "d99faf0859fd64fe2f20930d76f543921507b3df"
+  },
+  "started_at": "2026-07-24T19:27:56.728Z",
+  "ended_at": "2026-07-24T19:34:57.272Z",
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "add shared assertLabelHasNoLeadingSigil helper (src/tickets/labels.ts)",
+          "checked": true
+        },
+        {
+          "text": "wire into tickets/new.ts's buildNewTicket (validate every --label entry)",
+          "checked": true
+        },
+        {
+          "text": "wire into tickets/update.ts's parseLabelOp (reject doubled sigil after the op sigil is stripped)",
+          "checked": true
+        },
+        {
+          "text": "update --label help text on new.ts",
+          "checked": true
+        },
+        {
+          "text": "update existing B1.test.ts test that documented the old accept-silently behavior",
+          "checked": true
+        },
+        {
+          "text": "add regression tests (labels.test.ts, new.test.ts, update.test.ts, B1.test.ts)",
+          "checked": true
+        },
+        {
+          "text": "update docs/cli-reference.md",
+          "checked": true
+        },
+        {
+          "text": "run full verification suite",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T19:34:20.142Z"
+    }
+  ],
+  "end_summary": "Added a shared assertLabelHasNoLeadingSigil helper (src/tickets/labels.ts), used by both new's buildNewTicket (rejects any --label starting with +/-) and update's parseLabelOp (rejects a doubled sigil after its own op sigil is stripped, e.g. --label ++bug). Both now agree on what a valid label looks like, closing the grammar mismatch where new silently stored a literal '+bug'/'-weird' label that a later update --label could never correctly address. Updated the B1.test.ts test that had documented the old accept-silently behavior.",
+  "transcript_ref": "transcripts/session_01KYASJG9RH00N4XTNB5229631.jsonl"
+}
