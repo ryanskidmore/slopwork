@@ -18,7 +18,7 @@ import {
 } from "../../sessions/transcript.js";
 import { diffTicketPatch, TICKET_FIELDS } from "../../tickets/patch.js";
 import { loadConfig, resolveActor } from "../actor.js";
-import { printWarning } from "./shared.js";
+import { printWarning, sessionOwnershipWarning } from "./shared.js";
 
 interface StopCommandOptions {
   note?: string;
@@ -103,6 +103,9 @@ export async function runStop(ref: string, opts: StopCommandOptions): Promise<vo
       throw new Error("unreachable: assertStoppable should have thrown");
     }
     const session = await readSession(paths, activeSessionId);
+    // ticket_01KYAPN9NXY6RPSV6WGR42CJHJ: session ownership is a warning,
+    // not an enforced gate — see sessionOwnershipWarning's own doc.
+    const ownershipWarning = sessionOwnershipWarning(session, actor);
 
     const stoppedSession = buildStoppedSession(session, opts.note);
 
@@ -154,14 +157,21 @@ export async function runStop(ref: string, opts: StopCommandOptions): Promise<vo
       { verb: "ticket.state_changed", payload: { from: current.state, to: stoppedTicket.state } },
     );
 
-    return { session: finalSession, ticket: stoppedTicket, transcriptWarning: capture.warning };
+    return {
+      session: finalSession,
+      ticket: stoppedTicket,
+      transcriptWarning: capture.warning,
+      ownershipWarning,
+    };
   });
 
   // Printed AFTER the transaction commits, deliberately: a transcript
   // problem is a warning, never a reason the state change itself could
   // fail (this is the C4 acceptance criterion's second half, made
-  // structural — see captureTranscript's own doc).
+  // structural — see captureTranscript's own doc). Same convention for
+  // the session-ownership warning (sessionOwnershipWarning's own doc).
   if (result.transcriptWarning !== null) printWarning(result.transcriptWarning);
+  if (result.ownershipWarning !== null) printWarning(result.ownershipWarning);
 
   process.stdout.write(
     `stopped ${result.session.id} on ${result.ticket.id} (${result.ticket.slug})\n` +

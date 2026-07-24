@@ -242,6 +242,34 @@ describe("runStop (in-process)", () => {
     expect(ticket.active_session).toBeNull();
   });
 
+  it("ticket_01KYAPN9NXY6RPSV6WGR42CJHJ: warns on stderr (but still succeeds) when the acting actor differs from who started the session", async () => {
+    const root = await makeTempRepo("slop-stop-inproc-ownership-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Ownership-mismatch stop ticket");
+    const startOut = captureOutput();
+    try {
+      await withCwd(root, () => runStart(id, {})); // started as "ryan" (config user:)
+    } finally {
+      startOut.restore();
+    }
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runStop(id, { note: "someone else's handoff" }), {
+        SLOP_ACTOR: "someone-else",
+      });
+      expect(out.stderr()).toContain("someone-else");
+      expect(out.stderr()).toContain("ryan");
+      expect(out.stderr()).toMatch(/session ownership/i);
+      // Never a block — the stop itself still succeeded.
+      expect(out.stdout()).toContain("stopped");
+    } finally {
+      out.restore();
+    }
+    const paths = repoPaths(root);
+    expect((await readTicket(paths, id)).state).toBe("open");
+  });
+
   it("warns on stderr when --note is omitted, but still succeeds", async () => {
     const root = await makeTempRepo("slop-stop-inproc-nonote-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });

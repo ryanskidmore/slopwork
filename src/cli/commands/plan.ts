@@ -24,7 +24,7 @@ import { diffSessionPatch } from "../../sessions/patch.js";
 import { renderLatestPlanVersion } from "../../sessions/plan-render.js";
 import { loadConfig, resolveActor } from "../actor.js";
 import { SlopError } from "../errors.js";
-import { parseIntegerOption } from "./shared.js";
+import { parseIntegerOption, printWarning, sessionOwnershipWarning } from "./shared.js";
 
 interface PlanCommandOptions {
   check?: number;
@@ -78,6 +78,13 @@ export async function runPlan(
     assertHasActiveSession(current);
     const sessionId = current.active_session as SessionId;
     const session = await readSession(paths, sessionId);
+    // ticket_01KYAPN9NXY6RPSV6WGR42CJHJ: session ownership is a warning,
+    // not an enforced gate — see sessionOwnershipWarning's own doc.
+    // Computed against the PRE-mutation session (same as every other
+    // "before" snapshot in this function) so it reflects who actually
+    // started the session being acted on, not whatever this call is
+    // about to change.
+    const ownershipWarning = sessionOwnershipWarning(session, actor);
 
     if (steps.length > 0) {
       const { session: updated, isFirstVersion, version } = buildPlanVersion(session, steps);
@@ -92,7 +99,7 @@ export async function runPlan(
           payload: { version: version.version, step_count: version.steps.length },
         },
       );
-      return { kind: "set" as const, ticket: current, session: updated, version };
+      return { kind: "set" as const, ticket: current, session: updated, version, ownershipWarning };
     }
 
     const checked = opts.check !== undefined;
@@ -107,8 +114,20 @@ export async function runPlan(
       { actor, session: session.id },
       { verb: "plan.step_checked", payload: { step: stepNumber, checked } },
     );
-    return { kind: "toggle" as const, ticket: current, session: updated, stepNumber, checked };
+    return {
+      kind: "toggle" as const,
+      ticket: current,
+      session: updated,
+      stepNumber,
+      checked,
+      ownershipWarning,
+    };
   });
+
+  // Printed AFTER the transaction commits — never a reason `plan` itself
+  // could fail, same convention as every other soft warning in this
+  // codebase (see sessionOwnershipWarning's own doc).
+  if (result.ownershipWarning !== null) printWarning(result.ownershipWarning);
 
   if (result.kind === "set") {
     const { ticket, session, version } = result;

@@ -4,6 +4,7 @@
  * does not implement them.
  */
 import { EXIT_CODES } from "../../core/exit-codes.js";
+import type { Actor, Session } from "../../core/index.js";
 import { SlopError } from "../errors.js";
 
 /** Commander "collect" reducer for options that may be repeated, e.g.
@@ -63,6 +64,46 @@ export const parsePriority = parseIntegerOption("--priority");
  * succeeding. */
 export function printWarning(message: string): void {
   process.stderr.write(`warning: ${message}\n`);
+}
+
+/**
+ * ticket_01KYAPN9NXY6RPSV6WGR42CJHJ (policy: session ownership): `plan`
+ * (incl. `--check`/`--uncheck`), `stop`, `done`, and `drop` all mutate
+ * WHATEVER session is currently active on a ticket, resolved via the
+ * ticket (`resolveTicketRef`) — never gated on "is the acting actor the
+ * one who started it," unlike `start`, which refuses a live session
+ * outright without `--takeover` (C1). Decision (recorded here and in
+ * docs/agent-workflow.md, "Session ownership"): this is intentional, not
+ * a bug — the coordinator pattern (docs/agent-workflow.md, "Dogfooding
+ * with parallel agents") legitimately has one actor (a human, or a lead
+ * agent) plan/stop/close out sessions other actors started, and every
+ * mutation already records the ACTING actor in its event regardless (A4's
+ * audit trail is never silent about who really did it) — so this is a
+ * WARNING, surfaced to whoever is about to act on someone else's session,
+ * never a hard block that would make the coordinator pattern impossible
+ * without `--takeover`-style ceremony on four more commands.
+ *
+ * Compares by `name` only (not `kind`): the SAME person can legitimately
+ * show up as `human` in one invocation (a raw shell) and `agent` in
+ * another (inside a harness) without being a different actor for
+ * ownership purposes — `name` is D17's actual identity axis.
+ *
+ * Returns `null` when `actor` (the invocation's resolved D17 identity)
+ * matches `session.actor` (whoever `start` recorded when this session was
+ * created) — the overwhelmingly common case, and the only one every
+ * existing test exercised before this ticket. Every caller should print
+ * the non-null result via {@link printWarning} AFTER its transaction
+ * commits, same convention as every other soft warning in this codebase
+ * (e.g. `stop.ts`'s transcript-capture warning) — this is informational,
+ * never a reason a mutation could fail.
+ */
+export function sessionOwnershipWarning(session: Session, actor: Actor): string | null {
+  if (session.actor.name === actor.name) return null;
+  return (
+    `acting as "${actor.name}" (${actor.kind}), but session ${session.id} was started by ` +
+    `"${session.actor.name}" (${session.actor.kind}) — proceeding anyway (session ownership is ` +
+    'not enforced by design; see docs/agent-workflow.md, "Session ownership").'
+  );
 }
 
 /** Read all of stdin as UTF-8 text — `--spec -`'s "read from stdin" (B1,

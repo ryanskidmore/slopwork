@@ -26,7 +26,7 @@ import { checkDoneEntry } from "../../tickets/state.js";
 import { formatZodIssuesForUsage } from "../../tickets/validate.js";
 import { loadConfig, resolveActor } from "../actor.js";
 import { SlopError } from "../errors.js";
-import { printWarning, readStdin } from "./shared.js";
+import { printWarning, readStdin, sessionOwnershipWarning } from "./shared.js";
 
 interface DoneCommandOptions {
   note?: string;
@@ -162,6 +162,9 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
       );
     }
     const session = await readSession(paths, activeSessionId);
+    // ticket_01KYAPN9NXY6RPSV6WGR42CJHJ: session ownership is a warning,
+    // not an enforced gate — see sessionOwnershipWarning's own doc.
+    const ownershipWarning = sessionOwnershipWarning(session, actor);
 
     const finalizedSession = buildFinalizedSession(session, opts.note ?? null);
 
@@ -224,12 +227,14 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
       transcriptWarning: capture.warning,
       cascade,
       skippedReview,
+      ownershipWarning,
     };
   });
 
   // Printed AFTER the transaction commits — a transcript miss, a skipped
-  // review, or a corrupt-elsewhere-in-the-db problem is a warning, never a
-  // reason `done` itself could fail (same convention as `stop.ts`).
+  // review, a session-ownership mismatch, or a corrupt-elsewhere-in-the-db
+  // problem is a warning, never a reason `done` itself could fail (same
+  // convention as `stop.ts`; see sessionOwnershipWarning's own doc).
   if (result.skippedReview) {
     printWarning(
       `${result.ticket.id} (${result.ticket.slug}) done without a review/MR — if this had a code ` +
@@ -238,6 +243,7 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
     );
   }
   if (result.transcriptWarning !== null) printWarning(result.transcriptWarning);
+  if (result.ownershipWarning !== null) printWarning(result.ownershipWarning);
   if (result.cascade.problems.length > 0) {
     process.stderr.write(`${formatIndexProblems(result.cascade.problems)}\n`);
   }
