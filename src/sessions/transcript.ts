@@ -244,6 +244,28 @@
  * (`path: null`); zero or one resolves exactly as before. `captureTranscript`
  * builds the same kind of "refusing to guess" warning for this case as it
  * already does for codex's — see its own inline comment.
+ *
+ * ---------------------------------------------------------------------
+ * Fix 5 (ticket_01KYAPHG6Q4AJ7J5Z2B8G53QCS) — `locateCodex`'s "zero-newer"
+ * case ALSO refuses, not just the ">1 newer" ambiguous one
+ * ---------------------------------------------------------------------
+ *
+ * Fix 3 only refused when MORE THAN ONE cwd-matching rollout was newer
+ * than `started_at`; when exactly ZERO were newer — every cwd-matching
+ * rollout predates this session's own start — `locateCodex` still picked
+ * the overall newest one anyway. That is silently wrong in a DIFFERENT way
+ * than the ambiguous case: a rollout whose mtime is at or before
+ * `started_at` cannot possibly be a transcript for THIS session (a real
+ * transcript is written no earlier than the session that produced it
+ * starts), so the newest such candidate is provably a PREVIOUS Codex
+ * session's leftover rollout in the same cwd — attaching it isn't a lucky
+ * guess that might be wrong, it is KNOWN wrong. `locateCodex` (below) now
+ * refuses this case too (`path: null, stale: true`) whenever at least one
+ * cwd-matching rollout existed (`matchedCount > 0`) but none is newer than
+ * `started_at`; `matchedCount === 0` (nothing matched the cwd at all)
+ * stays the ordinary, unremarkable "nothing found" case. `captureTranscript`
+ * builds a distinct "stale, not ambiguous" warning for this — see its own
+ * inline comment.
  */
 import { randomUUID } from "node:crypto";
 import {
@@ -517,27 +539,63 @@ function parseStartedAtMs(startedAt: string | null | undefined): number | null {
 }
 
 /** {@link locateCodex}'s result — `path` is what callers actually use;
- * `ambiguous`/`newerThanSessionCount` exist purely so `captureTranscript`
- * can build a specific warning (Fix 3) without `locateTranscript` itself
- * having to change its own `string | null` return contract. */
+ * every other field exists purely so `captureTranscript` can build a
+ * specific warning (Fix 3 / ticket_01KYAPHG6Q4AJ7J5Z2B8G53QCS) without
+ * `locateTranscript` itself having to change its own `string | null`
+ * return contract. */
 interface CodexLocateResult {
   path: string | null;
   ambiguous: boolean;
+  /** True when at least one cwd-matching rollout existed (`matchedCount >
+   * 0`) but EVERY one of them is at or before `sessionStartedAtMs` — the
+   * "zero-newer" case (ticket_01KYAPHG6Q4AJ7J5Z2B8G53QCS): a real
+   * transcript for THIS session can't have a first line written before
+   * this session started, so the newest such rollout is definitely a
+   * PREVIOUS session's leftover in the same cwd, not this session's — this
+   * refuses to attach it rather than silently pick it. `false` whenever
+   * `sessionStartedAtMs` wasn't supplied (check disabled, pre-Fix-3
+   * behaviour) or nothing matched the cwd at all (`matchedCount === 0` —
+   * plain "nothing found", a different, unremarkable case). Mutually
+   * exclusive with `ambiguous` — see `locateCodex`'s doc for why the two
+   * conditions can't both hold at once. */
+  stale: boolean;
   /** Count of cwd-matching rollouts strictly newer than
-   * `sessionStartedAtMs` — 0 when that wasn't provided/parseable. Only
-   * meaningful when `ambiguous` is true (>1); a caller diagnosing a
-   * `null` result should check `ambiguous` first. */
+   * `sessionStartedAtMs` — 0 when that wasn't provided/parseable or none
+   * matched. Meaningful when `ambiguous` is true (>1). */
   newerThanSessionCount: number;
+  /** Total cwd-matching rollouts found, regardless of mtime relative to
+   * `sessionStartedAtMs` — lets a caller (`captureTranscript`'s warning
+   * builder) tell "genuinely nothing matched this cwd" apart from
+   * "matched, but every candidate predates this session" (`stale`)
+   * without re-deriving it from `newerThanSessionCount` alone (which is 0
+   * in both cases). */
+  matchedCount: number;
 }
 
 /**
- * Fix 3 (ticket_01KY93E3WYD13E71QM7GHWG1DE): the same cwd-matching /
- * date-partitioned scan as before, but now REFUSES to pick a "newest
- * mtime" winner — returns `path: null, ambiguous: true` instead — when
- * more than one cwd-matching rollout is newer than `sessionStartedAtMs`
- * (see this module's top-of-file Fix 3 doc for the full rationale). Zero
- * or exactly one newer-than-`started_at` candidate is unambiguous and
- * resolves exactly as before: overall newest mtime among cwd matches.
+ * Fix 3 (ticket_01KY93E3WYD13E71QM7GHWG1DE) + zero-newer (ticket_01KYAPHG6Q4AJ7J5Z2B8G53QCS):
+ * the same cwd-matching / date-partitioned scan as before, but now REFUSES
+ * to pick a "newest mtime" winner in two distinct cases where doing so
+ * would silently attach the WRONG rollout (see this module's top-of-file
+ * Fix 3 doc for the full ambiguous-case rationale):
+ *
+ *   - MORE THAN ONE cwd-matching rollout is newer than `sessionStartedAtMs`
+ *     ("ambiguous" — a second, concurrent Codex session in this same cwd
+ *     could be the one actually holding the newest mtime).
+ *   - AT LEAST ONE cwd-matching rollout exists but NONE is newer than
+ *     `sessionStartedAtMs` ("stale" — every candidate predates this
+ *     session's own start, so the newest one is provably a PREVIOUS
+ *     session's rollout, not this session's; `newerThanSessionCount === 0`
+ *     alone can't tell this apart from "nothing matched at all", which is
+ *     why `matchedCount` exists).
+ *
+ * The two are mutually exclusive by construction (`newerThanSessionCount`
+ * is either `> 1`, `=== 1`, or `=== 0`; "stale" only fires in the `=== 0`
+ * branch, together with `matchedCount > 0`). EXACTLY ONE newer-than
+ * -`started_at` candidate is the sole unambiguous, non-stale case and
+ * resolves exactly as before: overall newest mtime among cwd matches (that
+ * candidate IS the overall newest — see the ambiguous-case reasoning: every
+ * older, non-newer candidate necessarily has a smaller mtime).
  */
 function locateCodex(
   codexHome: string,
@@ -547,6 +605,7 @@ function locateCodex(
   const sessionsDir = join(codexHome, "sessions");
   let best: { path: string; mtimeMs: number } | null = null;
   let newerThanSessionCount = 0;
+  let matchedCount = 0;
 
   for (const year of listSubdirsSync(sessionsDir)) {
     const yearDir = join(sessionsDir, year);
@@ -560,6 +619,7 @@ function locateCodex(
           if (!rolloutMatchesCwd(full, cwd)) continue;
           const mtimeMs = mtimeMsSync(full);
           if (mtimeMs === null) continue;
+          matchedCount++;
           if (best === null || mtimeMs > best.mtimeMs) best = { path: full, mtimeMs };
           if (sessionStartedAtMs !== null && mtimeMs > sessionStartedAtMs) {
             newerThanSessionCount++;
@@ -570,9 +630,18 @@ function locateCodex(
   }
 
   if (sessionStartedAtMs !== null && newerThanSessionCount > 1) {
-    return { path: null, ambiguous: true, newerThanSessionCount };
+    return { path: null, ambiguous: true, stale: false, newerThanSessionCount, matchedCount };
   }
-  return { path: best?.path ?? null, ambiguous: false, newerThanSessionCount };
+  if (sessionStartedAtMs !== null && matchedCount > 0 && newerThanSessionCount === 0) {
+    return { path: null, ambiguous: false, stale: true, newerThanSessionCount, matchedCount };
+  }
+  return {
+    path: best?.path ?? null,
+    ambiguous: false,
+    stale: false,
+    newerThanSessionCount,
+    matchedCount,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -825,34 +894,43 @@ export async function captureTranscript(
         ? ` (the given --transcript path "${explicitTranscriptPath}" does not exist or is not a readable file)`
         : "";
 
-      // Fix 3 (ticket_01KY93E3WYD13E71QM7GHWG1DE / ticket_01KYAPHGCPNMMSZNE5TEK65ERC):
-      // `locateTranscript`'s codex/claude-code branches above already
-      // refused to return a (possibly WRONG) guessed path when their own
-      // newest-mtime scan was genuinely ambiguous — see this module's
-      // top-of-file Fix 3 doc (codex) and `newestJsonlAmbiguityAware`'s
-      // own doc (claude-code). This re-runs that SAME cheap, bounded scan
-      // a second time, ONLY on this already-"nothing to copy" path,
-      // purely so the warning below can say *why* (ambiguity vs.
-      // genuinely nothing found) instead of both collapsing into the same
-      // generic message.
-      let ambiguityNote = "";
+      // Fix 3 (ticket_01KY93E3WYD13E71QM7GHWG1DE / ticket_01KYAPHGCPNMMSZNE5TEK65ERC)
+      // + Fix 5 (ticket_01KYAPHG6Q4AJ7J5Z2B8G53QCS, codex-only "zero-newer"
+      // case): `locateTranscript`'s codex/claude-code branches above
+      // already refused to return a (possibly/provably WRONG) guessed path
+      // when their own newest-mtime scan was genuinely ambiguous or stale
+      // — see this module's top-of-file Fix 3/Fix 5 doc (codex) and
+      // `newestJsonlAmbiguityAware`'s own doc (claude-code). This re-runs
+      // that SAME cheap, bounded scan a second time, ONLY on this
+      // already-"nothing to copy" path, purely so the warning below can
+      // say *why* (ambiguous / stale / genuinely nothing found) instead of
+      // all three collapsing into the same generic message. Named
+      // `refusalNote` (not `ambiguityNote`) since it now also covers the
+      // stale case, which isn't ambiguity.
+      let refusalNote = "";
       if (session.harness.kind === "codex") {
         const codexHome =
           resolvedRoots.codexHome ?? process.env.CODEX_HOME ?? join(homedir(), ".codex");
         const diag = locateCodex(codexHome, cwd, parseStartedAtMs(session.started_at));
         if (diag.ambiguous) {
-          ambiguityNote =
+          refusalNote =
             ` — ${diag.newerThanSessionCount} candidate Codex rollout files in this cwd are all ` +
             "newer than this session's own started_at (Codex exposes no session id, so mtime is " +
             "the only signal available); refusing to guess which one is this session's rather " +
             "than risk silently attaching another concurrent session's transcript";
+        } else if (diag.stale) {
+          refusalNote =
+            ` — ${diag.matchedCount} candidate Codex rollout file(s) in this cwd all PREDATE this ` +
+            "session's own started_at, so none of them can be this session's own transcript " +
+            "(likely a previous Codex session's leftover rollout in the same cwd); refusing to " +
+            "attach a rollout that provably isn't this session's";
         }
       } else if (session.harness.kind === "claude-code") {
         const claudeHome = resolvedRoots.claudeHome ?? join(homedir(), ".claude");
         const projectDir = join(claudeHome, "projects", encodeClaudeCwd(cwd));
         const diag = newestJsonlAmbiguityAware(projectDir, parseStartedAtMs(session.started_at));
         if (diag.ambiguous) {
-          ambiguityNote =
+          refusalNote =
             ` — ${diag.newerThanSessionCount} candidate claude-code transcript files in this ` +
             "project dir are all newer than this session's own started_at (no session id was " +
             "captured for this session, so mtime is the only signal available); refusing to " +
@@ -874,7 +952,7 @@ export async function captureTranscript(
           sourcePath: null,
           warning:
             `no new transcript located for session ${session.id} on this recapture ` +
-            `(harness=${session.harness.kind})${explicitNote}${ambiguityNote} — kept the ` +
+            `(harness=${session.harness.kind})${explicitNote}${refusalNote} — kept the ` +
             `previously-captured transcript (${session.transcript_ref}) rather than resetting ` +
             "it to null.",
         };
@@ -885,7 +963,7 @@ export async function captureTranscript(
         sourcePath: null,
         warning:
           `could not locate a transcript for session ${session.id} (harness=${session.harness.kind})` +
-          `${explicitNote}${ambiguityNote} — recording transcript_ref: null, never blocking. Pass ` +
+          `${explicitNote}${refusalNote} — recording transcript_ref: null, never blocking. Pass ` +
           "--transcript <path> next time to point at it directly.",
       };
     }

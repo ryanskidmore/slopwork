@@ -601,6 +601,111 @@ describe("locateTranscript — codex Fix 3: ambiguity refusal", () => {
 });
 
 // ---------------------------------------------------------------------------
+// locateTranscript — codex Fix 5 (ticket_01KYAPHG6Q4AJ7J5Z2B8G53QCS):
+// the "zero-newer" case (every cwd-matching rollout PREDATES started_at)
+// also refuses to guess, not just the ">1 newer" ambiguous case Fix 3 covers.
+// ---------------------------------------------------------------------------
+
+describe("locateTranscript — codex Fix 5: zero-newer (stale) refusal", () => {
+  async function fakeCodexHome(): Promise<string> {
+    const codexHome = join(scratch, "fake-codex-home-fix5");
+    await mkdir(codexHome, { recursive: true });
+    return codexHome;
+  }
+
+  function sessionMetaLine(cwd: string, id: string): string {
+    return `${JSON.stringify({ timestamp: "2026-01-01T00:00:00Z", type: "session_meta", payload: { id, cwd } })}\n`;
+  }
+
+  it("returns null (refuses to attach) when the ONLY cwd-matching rollout PREDATES the session's started_at, instead of silently attaching a previous session's leftover", async () => {
+    const codexHome = await fakeCodexHome();
+    const cwd = "/stale/codex/project";
+
+    const dayDir = join(codexHome, "sessions", "2026", "05", "01");
+    await mkdir(dayDir, { recursive: true });
+    const staleRollout = join(dayDir, "rollout-2026-05-01T00-00-00-old.jsonl");
+    await writeFile(staleRollout, sessionMetaLine(cwd, "old"), "utf8");
+    const staleTime = new Date("2026-05-01T00:00:00.000Z");
+    await utimes(staleRollout, staleTime, staleTime);
+
+    // started_at is AFTER the only matching rollout's mtime — zero
+    // candidates postdate it.
+    const sessionStartedAt = new Date(staleTime.getTime() + 60_000).toISOString();
+
+    const roots: LocateTranscriptRoots = { codexHome };
+    // Sanity check first: without the started_at check, this exact
+    // fixture WOULD resolve to the stale rollout — proving the null below
+    // comes from the new zero-newer refusal, not from the fixture failing
+    // to match at all.
+    expect(locateTranscript(harness("codex", null), cwd, undefined, roots)).toBe(staleRollout);
+    expect(
+      locateTranscript(harness("codex", null), cwd, undefined, roots, sessionStartedAt),
+    ).toBeNull();
+  });
+
+  it("also refuses when MULTIPLE cwd-matching rollouts all predate started_at, not just a single stale one", async () => {
+    const codexHome = await fakeCodexHome();
+    const cwd = "/multi-stale/codex/project";
+
+    const dayDir = join(codexHome, "sessions", "2026", "05", "01");
+    await mkdir(dayDir, { recursive: true });
+    const baseTime = new Date("2026-05-01T00:00:00.000Z");
+    const rolloutA = join(dayDir, "rollout-2026-05-01T00-00-00-aaa.jsonl");
+    await writeFile(rolloutA, sessionMetaLine(cwd, "aaa"), "utf8");
+    await utimes(rolloutA, baseTime, baseTime);
+    const rolloutBTime = new Date(baseTime.getTime() + 1_000);
+    const rolloutB = join(dayDir, "rollout-2026-05-01T00-00-01-bbb.jsonl");
+    await writeFile(rolloutB, sessionMetaLine(cwd, "bbb"), "utf8");
+    await utimes(rolloutB, rolloutBTime, rolloutBTime);
+
+    const sessionStartedAt = new Date(rolloutBTime.getTime() + 60_000).toISOString();
+
+    const roots: LocateTranscriptRoots = { codexHome };
+    expect(
+      locateTranscript(harness("codex", null), cwd, undefined, roots, sessionStartedAt),
+    ).toBeNull();
+  });
+
+  it("does NOT refuse when nothing matches the cwd at all — zero matches stays a plain 'nothing found' null, not a stale refusal", async () => {
+    const codexHome = await fakeCodexHome();
+    const roots: LocateTranscriptRoots = { codexHome };
+    const sessionStartedAt = "2026-01-01T00:00:00.000Z";
+
+    // No rollouts written at all — $CODEX_HOME/sessions doesn't even exist.
+    expect(() =>
+      locateTranscript(harness("codex", null), "/nothing/here", undefined, roots, sessionStartedAt),
+    ).not.toThrow();
+    expect(
+      locateTranscript(harness("codex", null), "/nothing/here", undefined, roots, sessionStartedAt),
+    ).toBeNull();
+  });
+
+  it("a single candidate newer than started_at still attaches — the zero-newer refusal only fires when NO candidate is newer, not merely 'not the newest overall'", async () => {
+    const codexHome = await fakeCodexHome();
+    const cwd = "/exactly-one-newer/codex/project";
+
+    const dayDir = join(codexHome, "sessions", "2026", "05", "01");
+    await mkdir(dayDir, { recursive: true });
+    const baseTime = new Date("2026-05-01T00:00:00.000Z");
+    const oldRollout = join(dayDir, "rollout-2026-05-01T00-00-00-old.jsonl");
+    await writeFile(oldRollout, sessionMetaLine(cwd, "old"), "utf8");
+    await utimes(oldRollout, baseTime, baseTime);
+
+    const sessionStartedAt = new Date(baseTime.getTime() + 60_000).toISOString();
+
+    const newRollout = join(dayDir, "rollout-2026-05-01T00-00-02-new.jsonl");
+    await writeFile(newRollout, sessionMetaLine(cwd, "new"), "utf8");
+    const newTime = new Date(baseTime.getTime() + 120_000);
+    await utimes(newRollout, newTime, newTime);
+
+    const roots: LocateTranscriptRoots = { codexHome };
+    expect(locateTranscript(harness("codex", null), cwd, undefined, roots, sessionStartedAt)).toBe(
+      newRollout,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // locateTranscript — opencode / other: no v0 auto-detection
 // ---------------------------------------------------------------------------
 
@@ -784,6 +889,40 @@ describe("captureTranscript", () => {
     // Distinguishes the ambiguity refusal from the generic "could not
     // locate" wording exercised by the "not found" test above.
     expect(result.warning).toMatch(/ambiguous|refus/i);
+    expect(result.warning).toContain("--transcript");
+  });
+
+  it("Fix 5 (ticket_01KYAPHG6Q4AJ7J5Z2B8G53QCS): codex zero-newer (stale) refusal — null transcriptRef with a warning distinguishing 'predates' from 'ambiguous'", async () => {
+    const paths = repoPaths(scratch);
+    const codexHome = join(scratch, "fake-codex-home-capture-fix5");
+    const cwd = "/stale/codex/capture-project";
+    const sessionStartedAt = "2030-01-01T00:00:00.000Z"; // well after the rollout below
+    const session = makeSession({ harness: harness("codex"), started_at: sessionStartedAt });
+
+    const dayDir = join(codexHome, "sessions", "2026", "06", "01");
+    await mkdir(dayDir, { recursive: true });
+    const metaLine = JSON.stringify({
+      timestamp: "2026-01-01T00:00:00Z",
+      type: "session_meta",
+      payload: { id: "old", cwd },
+    });
+    await writeFile(join(dayDir, "rollout-2026-06-01T01-00-00-old.jsonl"), `${metaLine}\n`, "utf8");
+
+    const result = await captureTranscript({
+      session,
+      paths,
+      cwd,
+      transcriptsMode: "local",
+      roots: { codexHome },
+    });
+
+    expect(result.transcriptRef).toBeNull();
+    expect(result.sourcePath).toBeNull();
+    expect(result.warning).not.toBeNull();
+    // Distinguishes the stale refusal from both the generic "could not
+    // locate" wording and the ">1 newer" ambiguous wording.
+    expect(result.warning).toMatch(/predate/i);
+    expect(result.warning).not.toMatch(/ambiguous/i);
     expect(result.warning).toContain("--transcript");
   });
 
