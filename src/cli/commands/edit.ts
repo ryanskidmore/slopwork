@@ -124,11 +124,15 @@ async function runEdit(ref: string): Promise<void> {
     return;
   }
 
-  const validation = validateEditedTicketText(after, ticket.id);
+  const validation = validateEditedTicketText(after, ticket);
   if (!validation.ok) {
     // Reject without persisting garbage, and don't lose the user's edit:
     // park it somewhere recoverable, then restore the file to its last
-    // -known-good content.
+    // -known-good content. `validation.exitCode` carries USAGE_ERROR for a
+    // shape problem or CONFLICT for an illegal state transition /
+    // incoherent active_session pairing (state.ts's checkStateTransition
+    // convention — see edit.ts's module doc) rather than a single fixed
+    // code for every rejection reason.
     await rescueAndRollback(
       filePath,
       before,
@@ -137,7 +141,7 @@ async function runEdit(ref: string): Promise<void> {
       ref,
       `edited ${ticket.id} failed validation and was NOT saved:`,
       validation.errors,
-      EXIT_CODES.USAGE_ERROR,
+      validation.exitCode,
     );
     return; // unreachable — rescueAndRollback always throws; here only for control-flow narrowing below
   }
