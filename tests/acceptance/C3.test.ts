@@ -375,19 +375,23 @@ describe("C3: Lifecycle", () => {
       steps: fc.array(stepArb, { minLength: 1, maxLength: 4 }),
     });
 
-    it("every transition the CLI performs is in the independent oracle's legal set; every illegal " +
-      "attempt is rejected with exit 6 and leaves state/review/active_session untouched", async () => {
-      await fc.assert(
-        fc.asyncProperty(caseArb, async ({ startDraft, steps }) => {
-          const { root, paths } = await makeFixtureRepo();
-          const extra = startDraft ? ["--draft"] : [];
-          const { id, slug } = newTicket(root, "Property ticket", extra);
-          const startState: TicketState = startDraft ? "draft" : "open";
-          await runPropertyCase(root, paths, id, slug, startState, steps);
-        }),
-        { numRuns: PROPERTY_RUNS },
-      );
-    }, 120_000);
+    it(
+      "every transition the CLI performs is in the independent oracle's legal set; every illegal " +
+        "attempt is rejected with exit 6 and leaves state/review/active_session untouched",
+      async () => {
+        await fc.assert(
+          fc.asyncProperty(caseArb, async ({ startDraft, steps }) => {
+            const { root, paths } = await makeFixtureRepo();
+            const extra = startDraft ? ["--draft"] : [];
+            const { id, slug } = newTicket(root, "Property ticket", extra);
+            const startState: TicketState = startDraft ? "draft" : "open";
+            await runPropertyCase(root, paths, id, slug, startState, steps);
+          }),
+          { numRuns: PROPERTY_RUNS },
+        );
+      },
+      120_000,
+    );
   });
 
   // ---------------------------------------------------------------------------

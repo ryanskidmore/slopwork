@@ -1,0 +1,17 @@
+{
+  "id": "event_01KYB14D5E19HWW64X983E1PYC",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYAZVFZE1GWMQS6JB51N82J5"
+  },
+  "payload": {
+    "progress": "Applied. KEY FINDING: oxfmt reflows html`` tagged templates as HTML, which CHANGES slop web's emitted output (broke 10 tests; reflowed text and lines around <pre><code> in the transcript viewer). Excluded src/web/views/** + html.test.ts for correctness, documented in config + DECISIONS; exclusion expires with the SPA rewrite. Also dropped organizeImports (proved it was never enforced: biome format doesn't run assist actions) and left sortImports off (goes further than biome ever did). Full gate green: 1950 tests, format/lint/typecheck clean."
+  },
+  "at": "2026-07-24T21:40:03.374Z"
+}

@@ -3,7 +3,6 @@
   "version": "0.1.1",
   "description": "Free OSS work tracker built for agents — a dependency graph of tickets, worked through sessions with an auditable trail.",
   "license": "MIT",
-  "type": "module",
   "bin": {
     "slop": "./bin/slop.mjs"
   },
@@ -13,10 +12,7 @@
     "README.md",
     "LICENSE"
   ],
-  "engines": {
-    "bun": ">=1.3.0",
-    "node": ">=18.0.0"
-  },
+  "type": "module",
   "scripts": {
     "build": "bun build ./src/cli/index.ts --compile --outfile dist/slop",
     "start": "bun src/cli/index.ts",
@@ -25,8 +21,8 @@
     "test:coverage": "vitest run --coverage",
     "lint": "oxlint .",
     "lint:fix": "oxlint . --fix",
-    "format": "biome format --write .",
-    "format:check": "biome format .",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run typecheck"
   },
@@ -37,12 +33,16 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.5",
     "@types/bun": "^1.3.14",
     "@vitest/coverage-v8": "^4.1.10",
     "fast-check": "^4.9.0",
+    "oxfmt": "0.59.0",
     "oxlint": "^1.74.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
+  },
+  "engines": {
+    "bun": ">=1.3.0",
+    "node": ">=18.0.0"
   }
 }

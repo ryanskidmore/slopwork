@@ -1,0 +1,48 @@
+{
+  "id": "session_01KYB0M6SS7PE71CSRCYJ51EAB",
+  "ticket": "ticket_01KYAZVFZE1GWMQS6JB51N82J5",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "main",
+    "commit_at_start": "4756df67fdb7f19249ee2afb37987ef2d3d06c6d"
+  },
+  "started_at": "2026-07-24T21:31:12.569Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Generate .oxfmtrc.json via --migrate=biome; add ignorePatterns (.slop, fixtures, docs md)",
+          "checked": true
+        },
+        {
+          "text": "Verify fixtures byte-identical + scope matches biome's old includes",
+          "checked": true
+        },
+        {
+          "text": "Swap package.json scripts; remove biome dep + biome.json",
+          "checked": true
+        },
+        {
+          "text": "Update DECISIONS.md to record the reversal; check README/CI refs",
+          "checked": true
+        },
+        {
+          "text": "Apply reformat; full gate green",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T21:31:12.809Z"
+    }
+  ],
+  "end_summary": null,
+  "transcript_ref": null
+}

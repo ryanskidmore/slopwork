@@ -71,7 +71,7 @@ crashing.
 bun install            # install dependencies
 bun run test           # run the test suite (vitest)
 bun run lint            # lint src/ and tests/ (oxlint)
-bun run format          # apply formatting (biome, --write)
+bun run format          # apply formatting (oxfmt, in place)
 bun run format:check     # check formatting without writing
 bun run typecheck        # tsc --noEmit
 bun run build            # compile the standalone binary to dist/slop

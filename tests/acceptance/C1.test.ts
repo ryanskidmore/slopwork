@@ -177,69 +177,73 @@ async function snapshotDb(paths: RepoPaths): Promise<Record<string, string>> {
 
 describe("C1: Sessions", () => {
   describe('"Two concurrent `start`s: second warns"', () => {
-    it("spawns two REAL racing processes against the same ticket: exactly one wins, the other warns " +
-      "and exits non-zero with an actionable message, and the db is left consistent — repeated, " +
-      "and never accidentally serialised", async () => {
-      const ITERATIONS = 8;
-      let sawGenuineOverlap = false;
+    it(
+      "spawns two REAL racing processes against the same ticket: exactly one wins, the other warns " +
+        "and exits non-zero with an actionable message, and the db is left consistent — repeated, " +
+        "and never accidentally serialised",
+      async () => {
+        const ITERATIONS = 8;
+        let sawGenuineOverlap = false;
 
-      for (let i = 0; i < ITERATIONS; i++) {
-        const { dir, paths } = await makeRepo();
-        const ticket = makeTicket({ name: `Race ticket ${i}` });
-        await createTicket(paths, ticket, ctx, ticketCreated);
+        for (let i = 0; i < ITERATIONS; i++) {
+          const { dir, paths } = await makeRepo();
+          const ticket = makeTicket({ name: `Race ticket ${i}` });
+          await createTicket(paths, ticket, ctx, ticketCreated);
 
-        // Spawned back-to-back, with NO await between them, so the OS
-        // starts both processes as close to simultaneously as this
-        // process can arrange — this is what makes the race real rather
-        // than accidentally serialised (see the overlap assertion below,
-        // which proves it rather than just hoping for it).
-        const procA = spawn(binaryPath, ["start", ticket.slug], {
-          cwd: dir,
-          env: slopEnv({ SLOP_ACTOR: "agent-a" }),
-        });
-        const procB = spawn(binaryPath, ["start", ticket.slug], {
-          cwd: dir,
-          env: slopEnv({ SLOP_ACTOR: "agent-b" }),
-        });
+          // Spawned back-to-back, with NO await between them, so the OS
+          // starts both processes as close to simultaneously as this
+          // process can arrange — this is what makes the race real rather
+          // than accidentally serialised (see the overlap assertion below,
+          // which proves it rather than just hoping for it).
+          const procA = spawn(binaryPath, ["start", ticket.slug], {
+            cwd: dir,
+            env: slopEnv({ SLOP_ACTOR: "agent-a" }),
+          });
+          const procB = spawn(binaryPath, ["start", ticket.slug], {
+            cwd: dir,
+            env: slopEnv({ SLOP_ACTOR: "agent-b" }),
+          });
 
-        const [resultA, resultB] = await Promise.all([collect(procA), collect(procB)]);
+          const [resultA, resultB] = await Promise.all([collect(procA), collect(procB)]);
 
-        // Proof the two invocations genuinely overlapped in wall-clock
-        // time (rather than one finishing before the other even started)
-        // — if this were never true across every iteration, the test
-        // could be passing vacuously off pure lock-based serialisation
-        // with no actual OS-level concurrency behind it.
-        const overlapped =
-          Math.max(resultA.startedAt, resultB.startedAt) <
-          Math.min(resultA.finishedAt, resultB.finishedAt);
-        if (overlapped) sawGenuineOverlap = true;
+          // Proof the two invocations genuinely overlapped in wall-clock
+          // time (rather than one finishing before the other even started)
+          // — if this were never true across every iteration, the test
+          // could be passing vacuously off pure lock-based serialisation
+          // with no actual OS-level concurrency behind it.
+          const overlapped =
+            Math.max(resultA.startedAt, resultB.startedAt) <
+            Math.min(resultA.finishedAt, resultB.finishedAt);
+          if (overlapped) sawGenuineOverlap = true;
 
-        const codes = [resultA.code, resultB.code].sort((a, b) => (a ?? -1) - (b ?? -1));
-        expect(codes, `iteration ${i}: codes were ${JSON.stringify(codes)}`).toEqual([0, 6]);
+          const codes = [resultA.code, resultB.code].sort((a, b) => (a ?? -1) - (b ?? -1));
+          expect(codes, `iteration ${i}: codes were ${JSON.stringify(codes)}`).toEqual([0, 6]);
 
-        const winner = resultA.code === 0 ? resultA : resultB;
-        const loser = resultA.code === 0 ? resultB : resultA;
-        expect(winner.stdout).toContain("started");
-        expect(loser.stderr).toMatch(/already has an active session/i);
-        expect(loser.stderr).toMatch(/--takeover/);
+          const winner = resultA.code === 0 ? resultA : resultB;
+          const loser = resultA.code === 0 ? resultB : resultA;
+          expect(winner.stdout).toContain("started");
+          expect(loser.stderr).toMatch(/already has an active session/i);
+          expect(loser.stderr).toMatch(/--takeover/);
 
-        // The db is left consistent: exactly one session was created, it
-        // is active, and the ticket points at exactly it — no half
-        // -written state from the loser.
-        const sessions = await listSessions(paths);
-        expect(sessions, `iteration ${i}`).toHaveLength(1);
-        expect(sessions[0]?.ended_at).toBeNull();
-        const finalTicket = await readTicket(paths, ticket.id);
-        expect(finalTicket.state).toBe("in_progress");
-        expect(finalTicket.active_session).toBe(sessions[0]?.id);
-      }
+          // The db is left consistent: exactly one session was created, it
+          // is active, and the ticket points at exactly it — no half
+          // -written state from the loser.
+          const sessions = await listSessions(paths);
+          expect(sessions, `iteration ${i}`).toHaveLength(1);
+          expect(sessions[0]?.ended_at).toBeNull();
+          const finalTicket = await readTicket(paths, ticket.id);
+          expect(finalTicket.state).toBe("in_progress");
+          expect(finalTicket.active_session).toBe(sessions[0]?.id);
+        }
 
-      expect(
-        sawGenuineOverlap,
-        "no iteration showed the two processes genuinely overlapping in wall-clock time — " +
-          "this would mean the test could pass vacuously via accidental serialisation",
-      ).toBe(true);
-    }, 60_000);
+        expect(
+          sawGenuineOverlap,
+          "no iteration showed the two processes genuinely overlapping in wall-clock time — " +
+            "this would mean the test could pass vacuously via accidental serialisation",
+        ).toBe(true);
+      },
+      60_000,
+    );
   });
 
   // ---------------------------------------------------------------------------
