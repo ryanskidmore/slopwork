@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { fixedClock } from "../core/clock.js";
-import { type Event, eventSchema, newEventId, newTicketId } from "../core/index.js";
+import { type Event, type EventId, eventSchema, newEventId, newTicketId } from "../core/index.js";
 import * as eventsModule from "./events.js";
 import {
   type EventContext,
@@ -287,5 +287,102 @@ describe("queryEvents — the cursor D3's `slop events --since` builds on", () =
     );
     const page = await queryEvents(paths, { since: first.id });
     expect(page.map((e) => e.id)).toEqual([second.id]);
+  });
+});
+
+// Perf fix regression coverage: `queryEvents` used to read+parse EVERY
+// event file on disk before applying `since`/`limit` at all (full scan,
+// then filter). These tests plant "poisoned" event files — well-formed
+// `event_<ulid>.jsonc` names, but bodies that fail JSONC parsing — so that
+// merely *reading* one throws. A bounded implementation must never touch a
+// poisoned file that `since`/`limit` rules out; the old full-scan
+// implementation would have thrown trying to parse it. That makes these
+// tests fail against the pre-fix code (evidence: reverting the `queryEvents`
+// body to `listEvents` + filter-afterward makes both throw) and pass
+// against the fix.
+describe("queryEvents — bounded reads (perf: since/limit bound what gets read, not just returned)", () => {
+  it("`since` skips reading/parsing every file at or before the cursor", async () => {
+    // Plant poisoned files that sort BEFORE the cursor. A read-everything
+    // implementation reads every id before ever consulting `since`, so it
+    // would try (and fail) to parse these.
+    const poisonedIds: EventId[] = [];
+    for (let i = 0; i < 20; i++) {
+      const id = newEventId();
+      await writeFile(eventFilePath(paths, id), "{ this is not valid jsonc", "utf8");
+      poisonedIds.push(id);
+    }
+    const cursor = poisonedIds[poisonedIds.length - 1];
+    if (!cursor) throw new Error("unreachable");
+
+    // Real, well-formed events AFTER the cursor — these are what a bounded
+    // `since` query should actually return.
+    const good: Event[] = [];
+    for (let i = 0; i < 5; i++) {
+      const e = makeEvent();
+      await createEvent(paths, e);
+      good.push(e);
+    }
+
+    const page = await queryEvents(paths, { since: cursor });
+    expect(page.map((e) => e.id)).toEqual([...good.map((e) => e.id)].sort());
+  });
+
+  it("`limit` (no ticket filter) stops before ever reading a later file", async () => {
+    const good: Event[] = [];
+    for (let i = 0; i < 5; i++) {
+      const e = makeEvent();
+      await createEvent(paths, e);
+      good.push(e);
+    }
+    // A poisoned file sorting AFTER every good event, past the requested
+    // window — a bounded `limit` must never reach it.
+    const poisonedId = newEventId();
+    await writeFile(eventFilePath(paths, poisonedId), "{ this is not valid jsonc", "utf8");
+
+    const page = await queryEvents(paths, { limit: 5 });
+    expect(page.map((e) => e.id)).toEqual([...good.map((e) => e.id)].sort());
+  });
+
+  it("`ticket` + `limit` together stop as soon as the limit is satisfied, never reading past the last match", async () => {
+    const ticketA = newTicketId();
+    const onA: Event[] = [];
+    for (let i = 0; i < 3; i++) {
+      const e = makeEvent({ entity: { kind: "ticket", id: ticketA } });
+      await createEvent(paths, e);
+      onA.push(e);
+    }
+    // A poisoned file sorting after the 3rd (last needed) match — `limit:
+    // 2` should never reach it.
+    const poisonedId = newEventId();
+    await writeFile(eventFilePath(paths, poisonedId), "{ this is not valid jsonc", "utf8");
+
+    const sortedOnA = [...onA].sort((x, y) => (x.id < y.id ? -1 : 1));
+    const page = await queryEvents(paths, { ticket: ticketA, limit: 2 });
+    expect(page.map((e) => e.id)).toEqual(sortedOnA.slice(0, 2).map((e) => e.id));
+  });
+
+  it("bounded results are identical to a full-scan-then-filter over the same (unpoisoned) data", async () => {
+    const ticketA = newTicketId();
+    const events: Event[] = [];
+    for (let i = 0; i < 8; i++) {
+      const e = makeEvent(i % 2 === 0 ? { entity: { kind: "ticket", id: ticketA } } : {});
+      await createEvent(paths, e);
+      events.push(e);
+    }
+    const sorted = [...events].sort((x, y) => (x.id < y.id ? -1 : 1));
+    const cursor = sorted[1];
+    if (!cursor) throw new Error("unreachable");
+
+    // Reference: read everything, then filter/slice by hand — the exact
+    // semantics the old implementation had, reproduced here (not called)
+    // purely as the expected shape.
+    const everything = await listEvents(paths);
+    const expected = everything
+      .filter((e) => e.id > cursor.id)
+      .filter((e) => e.entity.kind === "ticket" && e.entity.id === ticketA)
+      .slice(0, 2);
+
+    const page = await queryEvents(paths, { since: cursor.id, ticket: ticketA, limit: 2 });
+    expect(page).toEqual(expected);
   });
 });

@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixedClock } from "../core/clock.js";
 import { type Ticket, type TicketId, newTicketId, ticketSchema } from "../core/index.js";
 import type { EventContext, LockHandle, MutationEventSpec, RepoPaths } from "../repo/index.js";
@@ -9,6 +9,7 @@ import {
   buildIndex,
   createTicket,
   ensureDbDirs,
+  listEventIds,
   listEvents,
   readTicket,
   updateTicket,
@@ -16,6 +17,23 @@ import {
 } from "../repo/index.js";
 import { TICKET_FIELDS, diffTicketPatch } from "./patch.js";
 import { cascadeOnClose } from "./cascade.js";
+
+// Perf fix regression coverage (see cascade.ts's module doc, "Emission is
+// deduplicated against the event log"): the dedup check used to call
+// `queryEvents(paths, { ticket })` once per unblocked candidate, each call
+// reading/parsing the ENTIRE event log — O(candidates × total events) on
+// this lock-held hot path. Wrapping `node:fs/promises`'s `readFile` lets the
+// "reads the event log exactly once" test below count actual file reads
+// under `paths.eventsDir`, without touching any file outside this test's
+// allowlist (`entity-file.ts` itself is unmodified — this only observes the
+// real reads it makes).
+const { readFileMock } = vi.hoisted(() => ({ readFileMock: vi.fn() }));
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  readFileMock.mockImplementation(actual.readFile);
+  return { ...actual, readFile: readFileMock };
+});
 
 const ctx: EventContext = { actor: { name: "ryan", kind: "human" }, session: null };
 const createdEvent: MutationEventSpec = { verb: "ticket.created" };
@@ -44,6 +62,7 @@ let paths: RepoPaths;
 beforeEach(async () => {
   scratch = await mkdtemp(join(tmpdir(), "slop-cascade-test-"));
   paths = await ensureDbDirs(scratch);
+  readFileMock.mockClear();
 });
 
 afterEach(async () => {
@@ -264,6 +283,37 @@ describe("cascadeOnClose", () => {
       const row = index.tickets.find((r) => r.id === target.id);
       expect(row?.ready).toBe(true);
       expect(row?.blocked_count).toBe(0);
+    });
+  });
+
+  describe("perf: dedup check does not re-scan the whole event log per candidate", () => {
+    it("reads the event log exactly once for the whole cascade, regardless of how many candidates it unblocks", async () => {
+      const M = 6;
+      const targets: Ticket[] = [];
+      for (let i = 0; i < M; i++) targets.push(makeTicket({ state: "open" }));
+      const closer = makeTicket({ state: "open", blocks: targets.map((t) => t.id) });
+      for (const t of [...targets, closer]) await createTicket(paths, t, ctx, createdEvent);
+
+      await closeTicket(closer.id, "done");
+
+      // M+1 `createTicket` calls + 1 closing `updateTicket` call = M+2
+      // events on disk right before the cascade runs.
+      const totalEventsBeforeCascade = (await listEventIds(paths)).length;
+      expect(totalEventsBeforeCascade).toBe(M + 2);
+
+      readFileMock.mockClear();
+      const result = await cascadeOnClose(paths, closer.id, ctx, fakeLock(), clock);
+      expect(result.unblocked).toHaveLength(M);
+      expect(result.events).toHaveLength(M);
+
+      const eventFileReads = readFileMock.mock.calls.filter(([path]) =>
+        String(path).startsWith(paths.eventsDir),
+      ).length;
+
+      // The bug: one `queryEvents({ ticket })` full-log scan per candidate
+      // would read the event log M times here — M * (M+2) reads. The fix
+      // reads it exactly once, independent of M.
+      expect(eventFileReads).toBe(totalEventsBeforeCascade);
     });
   });
 });

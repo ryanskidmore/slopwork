@@ -64,16 +64,15 @@
  * already-unblocked ticket on every re-invocation — at-least-once with
  * unbounded duplication, not the exactly-once the rest of this design
  * implies (adversarial-review finding; a clean audit trail is a §4.7
- * dogfood requirement). The fix: before writing a `ticket.ready` for
- * candidate ticket `T`, this function calls `queryEvents(paths, { ticket:
- * T })` — scoped to `T` alone via that function's own `ticket` filter,
- * not a hand-rolled scan of the whole log — and skips the write if a
- * `ticket.ready` event already exists for `T` whose `payload.unblocked_by`
- * is this `closedTicketId`. This is one `queryEvents` call per candidate
- * (an event lookup per candidate, not amortized across the whole cascade);
- * fine at v0's target scale, and deliberately scoped per-ticket via the
- * existing `ticket` filter rather than fetching and re-scanning the
- * unfiltered event log once per candidate by hand. The result: a
+ * dogfood requirement). The fix: before writing any `ticket.ready` events
+ * this function reads the event log ONCE (`listEvents`) and keeps only the
+ * prior `ticket.ready` events for THIS closure's candidate tickets; each
+ * candidate `T`'s write is then skipped if that in-memory set already has a
+ * `ticket.ready` for `T` whose `payload.unblocked_by` is this
+ * `closedTicketId`. This one read is shared across every candidate — NOT
+ * one `queryEvents`/log-scan per candidate, which would make the dedup
+ * check O(candidates × total events) on this lock-held hot path (perf
+ * finding; a log with no v0 compaction only grows). The result: a
  * re-invoked cascade emits only the events that were genuinely missing the
  * first time — true exactly-once across retries. See
  * {@link CascadeOnCloseResult}'s `unblocked`/`events` docs for how this
@@ -161,8 +160,8 @@ import {
   computeBlockedCounts,
   createEvent,
   isLiveBlockerState,
+  listEvents,
   listTicketsTolerant,
-  queryEvents,
 } from "../repo/index.js";
 import type { EventContext, LockHandle, RepoPaths, TicketReadProblem } from "../repo/index.js";
 
@@ -213,23 +212,45 @@ function isDefined<T>(value: T | undefined): value is T {
 }
 
 /**
- * Has `ticketId` already received a `ticket.ready` event crediting
- * `closedTicketId` for its unblock? Module doc: "Emission is deduplicated
- * against the event log". Scoped per candidate via `queryEvents`'s own
- * `ticket` filter — reusing the repo layer's existing filter rather than
- * hand-rolling a scan — so this asks only about `ticketId`'s own events,
- * not the whole event log. This IS one `queryEvents` call per candidate
- * ticket (cheap at v0 scale: see this work item's report for the cost
- * discussion), not a single lookup amortized across the whole cascade.
+ * Every prior `ticket.ready` event for any of `candidateIds`, fetched with
+ * ONE pass over the event log rather than one `queryEvents` call per
+ * candidate (module doc: "Emission is deduplicated against the event log"
+ * — this is the fix for the O(candidates × total events) scan that used to
+ * live here). `candidateIds` is a plain `Set<string>` — not `Set<TicketId>`
+ * — because `event.entity.id` is deliberately an unbranded `string` (see
+ * `cli/commands/events.ts`'s `ticketEventPredicate` for the same
+ * convention), so the membership check below needs a plain-string set to
+ * compare against. Returns `[]` without touching disk when there are no
+ * candidates at all (a closure that unblocks nothing costs nothing here).
  */
-async function alreadyEmittedReadyFor(
+async function priorReadyEventsFor(
   paths: RepoPaths,
+  candidateIds: ReadonlySet<string>,
+): Promise<Event[]> {
+  if (candidateIds.size === 0) return [];
+  const allEvents = await listEvents(paths);
+  return allEvents.filter(
+    (event) =>
+      event.verb === "ticket.ready" &&
+      event.entity.kind === "ticket" &&
+      candidateIds.has(event.entity.id),
+  );
+}
+
+/**
+ * Has `ticketId` already received a `ticket.ready` event crediting
+ * `closedTicketId` for its unblock, per the single upfront read {@link
+ * priorReadyEventsFor} produced? Pure in-memory lookup — no disk access —
+ * so calling this once per candidate inside the loop below is O(1) each,
+ * not another log scan.
+ */
+function alreadyEmittedReadyFor(
+  priorReadyEvents: readonly Event[],
   ticketId: TicketId,
   closedTicketId: TicketId,
-): Promise<boolean> {
-  const priorEvents = await queryEvents(paths, { ticket: ticketId });
-  return priorEvents.some(
-    (event) => event.verb === "ticket.ready" && event.payload.unblocked_by === closedTicketId,
+): boolean {
+  return priorReadyEvents.some(
+    (event) => event.entity.id === ticketId && event.payload.unblocked_by === closedTicketId,
   );
 }
 
@@ -287,13 +308,19 @@ export async function cascadeOnClose(
     .filter((t) => t.state === "open" && (blockedCounts.get(t.id) ?? 0) === 0)
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
+  // One read for the whole cascade (module doc: "Emission is deduplicated
+  // against the event log") — NOT one `queryEvents`/log-scan per candidate.
+  const priorReadyEvents = await priorReadyEventsFor(
+    paths,
+    new Set(newlyUnblocked.map((t) => t.id)),
+  );
+
   const events: Event[] = [];
   for (const ticket of newlyUnblocked) {
-    // Dedup guard (module doc: "Emission is deduplicated against the event
-    // log") — skip a ticket that already has a `ticket.ready` event for
-    // THIS closure, so a re-invocation (the documented recovery path after
-    // a partial cascade) is exactly-once, not at-least-once.
-    if (await alreadyEmittedReadyFor(paths, ticket.id, closedTicketId)) continue;
+    // Dedup guard — skip a ticket that already has a `ticket.ready` event
+    // for THIS closure, so a re-invocation (the documented recovery path
+    // after a partial cascade) is exactly-once, not at-least-once.
+    if (alreadyEmittedReadyFor(priorReadyEvents, ticket.id, closedTicketId)) continue;
     await lock.assertHeld();
     const event = buildTicketReadyEvent(ticket.id, closedTicketId, ctx, clock);
     await createEvent(paths, event);

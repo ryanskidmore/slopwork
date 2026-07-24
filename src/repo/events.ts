@@ -211,19 +211,59 @@ export interface EventQuery {
  * `index.jsonc`'s content fingerprint, so rebuilding the ticket index can
  * never change what this function returns for a given query. See
  * tests/acceptance/A4.test.ts for that property exercised directly.
+ *
+ * Bounded read (perf): unlike a naive `listEvents` + filter-afterward, this
+ * never reads or parses a file it doesn't need to. `since` is honored on
+ * the id LIST first — ids sort chronologically as plain strings (this
+ * module's `listEventIds` doc), so every id `<= since` is dropped before
+ * any file is opened, not after. `limit` is honored while collecting
+ * matches: with no `ticket` filter the id list itself is truncated to
+ * `limit` before reading (so files past the window are never touched at
+ * all); with a `ticket` filter — which can't be decided without reading
+ * each candidate event — the scan instead stops as soon as `limit` matches
+ * have been found, so files past the last match are never touched either.
+ * Same events, same order as the old read-everything-then-filter version —
+ * this only changes how much gets read.
  */
 export async function queryEvents(paths: RepoPaths, query: EventQuery = {}): Promise<Event[]> {
-  let events = await listEvents(paths);
+  const ids = await listEventIds(paths);
+  let candidateIds: EventId[] = ids;
   if (query.since !== undefined) {
     const since = query.since;
-    events = events.filter((event) => event.id > since);
+    candidateIds = candidateIds.filter((id) => id > since);
   }
-  if (query.ticket !== undefined) {
-    const ticket = query.ticket;
-    events = events.filter((event) => event.entity.kind === "ticket" && event.entity.id === ticket);
+
+  const { ticket, limit } = query;
+
+  if (ticket === undefined) {
+    // No per-event predicate beyond `since` — `limit` can bound how many
+    // files get read at all, not just how many survive a post-hoc slice.
+    if (limit !== undefined) candidateIds = candidateIds.slice(0, limit);
+    return Promise.all(candidateIds.map((id) => readEvent(paths, id)));
   }
-  if (query.limit !== undefined) {
-    events = events.slice(0, query.limit);
+
+  if (limit === undefined) {
+    // A `ticket` filter can't be decided from the id alone, but with no
+    // `limit` every since-filtered candidate has to be read regardless —
+    // no early stop is possible — so read them in parallel exactly like
+    // the unfiltered branch above, then apply the ticket predicate.
+    const candidates = await Promise.all(candidateIds.map((id) => readEvent(paths, id)));
+    return candidates.filter(
+      (event) => event.entity.kind === "ticket" && event.entity.id === ticket,
+    );
+  }
+
+  // `ticket` + `limit` together: which ids match can't be known without
+  // reading them, so read candidates in ascending (= cursor) order and
+  // stop the moment `limit` matches have been found — still bounded to
+  // the since-filtered window above, never the whole log.
+  const events: Event[] = [];
+  for (const id of candidateIds) {
+    const event = await readEvent(paths, id);
+    if (event.entity.kind === "ticket" && event.entity.id === ticket) {
+      events.push(event);
+      if (events.length >= limit) break;
+    }
   }
   return events;
 }
