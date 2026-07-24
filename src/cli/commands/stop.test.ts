@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
 import { EXIT_CODES } from "../../core/exit-codes.js";
+import { END_SUMMARY_MAX_LENGTH } from "../../core/index.js";
 import type { TicketId } from "../../core/index.js";
 import type { RepoPaths } from "../../repo/index.js";
 import { readTicket, repoPaths } from "../../repo/index.js";
@@ -289,5 +290,26 @@ describe("runStop (in-process)", () => {
     } finally {
       out.restore();
     }
+  });
+
+  it("rejects a --note over the max length with USAGE_ERROR (exit 2), never touching the session/ticket (regression: ticket housekeeping-gitignore-lock-stale)", async () => {
+    const root = await makeTempRepo("slop-stop-inproc-toolong-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "In-progress ticket, absurdly long note");
+    const startOut = captureOutput();
+    try {
+      await withCwd(root, () => runStart(id, {}));
+    } finally {
+      startOut.restore();
+    }
+
+    const tooLong = "x".repeat(END_SUMMARY_MAX_LENGTH + 1);
+    await expect(withCwd(root, () => runStop(id, { note: tooLong }))).rejects.toMatchObject({
+      exitCode: EXIT_CODES.USAGE_ERROR,
+    });
+
+    const paths = repoPaths(root);
+    const ticket = await readTicket(paths, id);
+    expect(ticket.state).toBe("in_progress"); // untouched — rejected before any write
   });
 });

@@ -1,0 +1,48 @@
+{
+  "id": "ticket_01KYASA3YHA41F9TKCB0H0SHQ4",
+  "name": "sessions: capture transcript on --takeover and D15 review re-entry (session ends without a snapshot)",
+  "slug": "sessions-capture-transcript-on-takeover",
+  "spec": {
+    "summary": "sessions: capture transcript on --takeover and D15 review re-entry (session ends without a snapshot)",
+    "details_md": "Discovered while fixing docs/configuration.md's transcript-capture claim (ticket housekeeping-gitignore-lock-stale): `slop start --takeover` (sessions/start.ts's buildSupersededSession) and D15's review re-entry (cli/commands/start.ts's buildReenteredSession) both end the PREVIOUS session (ended_at set) but neither calls transcript.ts's capture helper for it. stop/done/drop/review all do. The result: a session that gets forcibly superseded or re-entered never gets a transcript snapshot unless an earlier `review` call on it happened to leave one -- often exactly the sessions most worth reviewing (interrupted/handed-off work). Add best-effort capture (same 'never blocks, warns on miss' contract stop/done/drop/review already use) to both paths in src/cli/commands/start.ts before finalizing the superseded/reentered session.",
+    "acceptance": [
+      "slop start --takeover captures the previous session's transcript (best effort) before ending it, same warning-on-miss contract as stop/done/drop",
+      "D15 review re-entry (plain slop start on a review-state ticket) captures the previous session's transcript (best effort) before ending it",
+      "regression tests for both paths",
+      "docs/configuration.md's Transcripts section updated again once this lands, since the gap it documents will be closed"
+    ],
+    "context": [
+      "src/cli/commands/start.ts:249 (previousSession handling, both isReviewReentry and takeover branches)",
+      "src/sessions/transcript.ts (the capture helper stop/done/drop/review already use)",
+      "docs/configuration.md (Transcripts section, notes this exact gap)"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 3,
+  "labels": [
+    "area:sessions"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYAPN9G0K6AX3408QWRKHMHD"
+  ],
+  "root_id": "ticket_01KYASA3YHA41F9TKCB0H0SHQ4",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T19:23:21.939Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T19:23:21.939Z",
+  "updated_at": "2026-07-24T19:25:04.974Z"
+}

@@ -338,12 +338,28 @@ describe("E1: Polish", () => {
       assertJsonBudgetNeverCorrupts(["events"], root);
 
       // Budget-driven elision must keep next_cursor/has_more coherent with
-      // what was ACTUALLY returned (this file's events.ts doc) — a tiny
-      // budget should report has_more: true once it starts dropping events.
+      // what was ACTUALLY returned (this file's events.ts doc) —
+      // housekeeping-gitignore-lock-stale: when a tiny budget elides EVERY
+      // fetched event (nothing at all makes it into the page), has_more
+      // must be false and next_cursor unchanged — reporting has_more: true
+      // there used to pair it with a stuck cursor (next_cursor: null or
+      // unchanged) a caller could never actually page past, since the
+      // events were fetched but never shown (see events.ts's `pageFor`
+      // doc: never silently drop a fetched-but-unseen event by advancing
+      // past it). has_more is only ever true alongside a next_cursor that
+      // genuinely differs from the input --since, i.e. one that lets the
+      // caller make real progress.
       const tiny = runSlop(["events", "--json", "--budget", "5"], root);
-      const parsed = expectValidJson(tiny.stdout) as { events: unknown[]; has_more: boolean };
+      const parsed = expectValidJson(tiny.stdout) as {
+        events: unknown[];
+        has_more: boolean;
+        next_cursor: string | null;
+      };
       if (parsed.events.length === 0) {
-        expect(parsed.has_more).toBe(true);
+        expect(parsed.has_more).toBe(false);
+        expect(parsed.next_cursor).toBeNull();
+      } else if (parsed.has_more) {
+        expect(parsed.next_cursor).not.toBeNull();
       }
     });
 

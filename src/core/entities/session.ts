@@ -86,6 +86,19 @@ function isUnsafeTranscriptRef(ref: string): boolean {
   return ref.startsWith("/") || ref.split("/").includes("..");
 }
 
+/**
+ * housekeeping-gitignore-lock-stale: `end_summary` is the handoff/summary
+ * text behind `stop`'s `--note`, `done`'s `--note`, and `drop`'s
+ * `--reason` — free-form text an agent types, previously unbounded. A
+ * generous ceiling (a genuine multi-paragraph handoff comfortably fits)
+ * that still stops an accidentally-piped-in file or a runaway generation
+ * from landing whole in the db. `src/cli/commands/shared.ts`'s
+ * `assertMaxLength` enforces this same bound up front, at the CLI layer,
+ * for a clean `USAGE_ERROR` (exit 2) instead of a schema-validation error
+ * surfacing several calls deeper.
+ */
+export const END_SUMMARY_MAX_LENGTH = 10_000;
+
 export const sessionSchema = z.object({
   id: sessionIdSchema,
   ticket: ticketIdSchema,
@@ -95,7 +108,7 @@ export const sessionSchema = z.object({
   started_at: isoTimestampSchema,
   ended_at: isoTimestampSchema.nullable().default(null),
   plan: z.array(planVersionSchema).default([]),
-  end_summary: z.string().nullable().default(null),
+  end_summary: z.string().max(END_SUMMARY_MAX_LENGTH).nullable().default(null),
   // See transcriptRefSchema above for the full contract and rationale.
   transcript_ref: transcriptRefSchema,
 });

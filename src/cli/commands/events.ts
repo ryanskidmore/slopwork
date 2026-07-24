@@ -66,15 +66,28 @@
  * the same query later, once new events land, picks them up without the
  * caller having to special-case "empty page" vs "no cursor yet". A caller
  * pages by looping `--since <next_cursor>` until `has_more` is `false`.
- * `has_more` is only meaningful relative to `--limit` OR `--budget`:
- * without either, every matching event is already returned, so `has_more`
- * is always `false`. When `--budget` (E1) forces eliding trailing events
- * from what would otherwise be the page, `next_cursor`/`has_more` are
- * recomputed against what's ACTUALLY returned (not the pre-budget page) —
- * a caller paging with `--since <next_cursor>` must never silently skip an
- * event that got elided rather than actually sent. This shape is E1's
- * starting point for standardising `--json` across commands, not a final
- * cross-command contract on its own.
+ *
+ * housekeeping-gitignore-lock-stale: `--limit` defaults to
+ * {@link DEFAULT_EVENTS_LIMIT} when omitted (was previously unbounded —
+ * every matching event, however many, on every call with no flags) —
+ * `query.limit` in the `--json` body always reflects the EFFECTIVE limit
+ * actually applied, default or explicit, never `null`. `has_more` is
+ * `true` whenever the effective limit or `--budget` held back events the
+ * caller hasn't seen yet. Whenever `has_more` is `true`, `next_cursor` is
+ * GUARANTEED to differ from the input `--since` (or from `null` if none
+ * was given) — i.e. genuinely usable to make forward progress — never the
+ * degenerate "has_more: true, next_cursor: null/unchanged" combination a
+ * caller could get stuck retrying forever (the bug this fix closes: a
+ * `--budget` small enough to elide every fetched event from the rendered
+ * page used to report exactly that combination). When `--budget` (E1)
+ * elides ALL fetched events from what would otherwise be the page,
+ * `has_more` is reported as `false` instead — paging with the SAME
+ * `--since`/`--limit` would only re-fetch and re-elide the identical
+ * events, so it is not genuinely "more" the caller can reach; `elided`
+ * already names this explicitly ("all N event(s) omitted to fit
+ * --budget"), which is the actionable signal (raise `--budget`), not
+ * pagination. This shape is E1's starting point for standardising `--json`
+ * across commands, not a final cross-command contract on its own.
  */
 import type { Command } from "commander";
 import {
@@ -137,6 +150,15 @@ async function verifyCursorExists(paths: RepoPaths, since: EventId): Promise<voi
     throw err;
   }
 }
+
+/**
+ * housekeeping-gitignore-lock-stale: the effective `--limit` whenever the
+ * flag is omitted — see this module's doc comment. Generous enough to
+ * comfortably cover a single ticket's whole lifecycle (D1's acceptance
+ * fixture: 9 events) or a small burst, while still bounding the truly
+ * unbounded case (a long-lived repo's full event log) by default.
+ */
+export const DEFAULT_EVENTS_LIMIT = 100;
 
 function parseLimit(raw: number): number {
   if (!Number.isInteger(raw) || raw <= 0) {
@@ -230,11 +252,23 @@ function formatHumanLine(event: Event): string {
  * caller that pages with `--since <next_cursor>` must land exactly after
  * the last event it actually SAW, never after one that got silently
  * elided (that would drop it from every future page too).
+ *
+ * housekeeping-gitignore-lock-stale: `has_more` is forced `false` whenever
+ * `nextCursor` didn't actually advance past the input `since` (`kept` is
+ * empty — `--budget` elided every fetched event) — see this module's doc
+ * comment for why: reporting `has_more: true` there would be a lie a
+ * caller can't act on (re-querying with the SAME `--since` just re-fetches
+ * and re-elides the identical events forever), and advancing the cursor
+ * anyway would silently drop those fetched-but-never-shown events from
+ * every future page — the one thing this function exists to prevent. This
+ * makes `next_cursor !== (since ?? null)` a hard invariant of `has_more:
+ * true` — never the reverse-inferrable "true but stuck" combination.
  */
 function pageFor(page: EventsPage, kept: readonly Event[], since: EventId | undefined): EventsPage {
-  const hasMore = page.hasMore || kept.length < page.events.length;
   const last = kept[kept.length - 1];
   const nextCursor = last ? last.id : (since ?? null);
+  const madeProgress = nextCursor !== (since ?? null);
+  const hasMore = madeProgress && (page.hasMore || kept.length < page.events.length);
   return { events: [...kept], nextCursor, hasMore };
 }
 
@@ -260,11 +294,11 @@ function buildJson(
   page: EventsPage,
   since: EventId | undefined,
   ticketId: TicketId | undefined,
-  limit: number | undefined,
+  limit: number,
   elisions: readonly string[],
 ): string {
   const body = {
-    query: { since: since ?? null, ticket: ticketId ?? null, limit: limit ?? null },
+    query: { since: since ?? null, ticket: ticketId ?? null, limit },
     events: page.events,
     count: page.events.length,
     next_cursor: page.nextCursor,
@@ -284,7 +318,11 @@ export async function runEvents(opts: EventsOptions): Promise<void> {
     await verifyCursorExists(paths, since);
   }
 
-  const limit = opts.limit !== undefined ? parseLimit(opts.limit) : undefined;
+  // housekeeping-gitignore-lock-stale: `--limit` always has an EFFECTIVE
+  // value now — the user's if given, else DEFAULT_EVENTS_LIMIT — never
+  // "no limit at all" (see this module's doc comment for why an unbounded
+  // default was the other half of the bug this closes).
+  const limit = opts.limit !== undefined ? parseLimit(opts.limit) : DEFAULT_EVENTS_LIMIT;
 
   let predicate: ((event: Event) => boolean) | undefined;
   let ticketId: TicketId | undefined;
@@ -315,7 +353,11 @@ export function registerEventsCommand(program: Command): void {
     .description("List immutable events, optionally since a cursor or scoped to a ticket.")
     .option("--since <event_id>", "exclusive cursor: only events after this event id")
     .option("--ticket <ref>", "only events for this ticket (id, slug, or short prefix)")
-    .option("--limit <n>", "cap the number of events returned", parseIntegerOption("--limit"))
+    .option(
+      "--limit <n>",
+      `cap the number of events returned (default ${DEFAULT_EVENTS_LIMIT})`,
+      parseIntegerOption("--limit"),
+    )
     .option("--json", "machine-readable output (events + a next cursor for paging)")
     .option(
       "--budget <n>",

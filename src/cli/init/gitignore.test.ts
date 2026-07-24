@@ -23,6 +23,27 @@ describe("computeGitignoreLines", () => {
     }
   });
 
+  it("always ignores the .lock.stale-<token> sentinel glob, regardless of transcripts mode (regression: ticket housekeeping-gitignore-lock-stale)", () => {
+    for (const mode of ["local", "off", "commit"] as const) {
+      const lines = computeGitignoreLines(mode);
+      expect(lines).toContain(".slop/db/.lock.stale-*");
+    }
+  });
+
+  it("the .lock.stale-* glob actually matches lock.ts's own sentinel naming (tryBreakStaleLock: `${lockPath}.stale-${token}`)", () => {
+    const glob = computeGitignoreLines("local").find((l) => l === ".slop/db/.lock.stale-*");
+    if (glob === undefined) {
+      throw new Error(
+        "expected '.slop/db/.lock.stale-*' to be present in the generated gitignore lines",
+      );
+    }
+    const regex = new RegExp(`^${glob.replace(/\*/g, ".*")}$`);
+    expect(regex.test(".slop/db/.lock.stale-01ARZ3NDEKTSV4RRFFQ69G5FAV")).toBe(true);
+    // Must not accidentally also swallow the plain lock file under a
+    // different rule's coverage assumption — both entries coexist.
+    expect(regex.test(".slop/db/.lock")).toBe(false);
+  });
+
   it("the generated glob entries actually match a stray .lock and a stray tickets/.tmp-* left by a killed process", () => {
     const lines = computeGitignoreLines("local");
 

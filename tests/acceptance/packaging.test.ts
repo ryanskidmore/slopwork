@@ -1,4 +1,6 @@
 import { type SpawnSyncReturns, spawnSync } from "node:child_process";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -51,6 +53,39 @@ describe("packaging: bin/slop.mjs (Node-runnable launcher)", () => {
       // not swallow or remap that.
       const result = runLauncher(["totally-not-a-real-command"]);
       expect(result.status).toBe(2);
+    });
+  });
+
+  describe("spawns bun exactly once per invocation (regression: ticket housekeeping-gitignore-lock-stale — no separate `bun --version` pre-check)", () => {
+    it("a single command invocation results in exactly one `bun` process spawn", () => {
+      // A fake `bun` on PATH ahead of the real one, which just logs its
+      // own invocation (one line per call) and exits 0 immediately —
+      // fast, and lets this test count spawns without depending on the
+      // real Bun runtime actually executing anything.
+      const fakeBinDir = mkdtempSync(join(tmpdir(), "slop-fake-bun-"));
+      const logFile = join(fakeBinDir, "invocations.log");
+      const fakeBunPath = join(fakeBinDir, "bun");
+      writeFileSync(fakeBunPath, `#!/bin/sh\necho "$@" >> "${logFile}"\nexit 0\n`, {
+        mode: 0o755,
+      });
+      chmodSync(fakeBunPath, 0o755);
+
+      try {
+        const realBunDir = dirname(process.execPath); // irrelevant here, just keeps PATH resolvable for node itself
+        const result = runLauncher(["--version"], {
+          ...process.env,
+          PATH: `${fakeBinDir}:${realBunDir}`,
+        });
+        expect(result.status, result.stderr).toBe(0);
+
+        const invocations = readFileSync(logFile, "utf8").trim().split("\n").filter(Boolean);
+        // Exactly one spawn of `bun` — the real command, not a separate
+        // `bun --version` probe beforehand.
+        expect(invocations).toHaveLength(1);
+        expect(invocations[0]).toContain("--version");
+      } finally {
+        rmSync(fakeBinDir, { recursive: true, force: true });
+      }
     });
   });
 

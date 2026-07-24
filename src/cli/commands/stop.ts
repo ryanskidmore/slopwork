@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { sessionSchema } from "../../core/index.js";
+import { END_SUMMARY_MAX_LENGTH, sessionSchema } from "../../core/index.js";
 import {
   readSession,
   readTicket,
@@ -18,7 +18,7 @@ import {
 } from "../../sessions/transcript.js";
 import { diffTicketPatch, TICKET_FIELDS } from "../../tickets/patch.js";
 import { loadConfig, resolveActor } from "../actor.js";
-import { printWarning } from "./shared.js";
+import { assertMaxLength, printWarning } from "./shared.js";
 
 interface StopCommandOptions {
   note?: string;
@@ -52,6 +52,8 @@ export async function runStop(ref: string, opts: StopCommandOptions): Promise<vo
       "no --note handoff given — the next session (or your future self) will have to reconstruct " +
         `context from scratch. Consider \`slop stop ${ref} --note "..."\`.`,
     );
+  } else {
+    assertMaxLength("--note", opts.note, END_SUMMARY_MAX_LENGTH);
   }
 
   const initialTicket = await resolveTicketRef(paths, ref);

@@ -17,7 +17,14 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "review",
+  "review": {
+    "requested_at": "2026-07-24T19:45:52.520Z",
+    "by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
   "priority": 3,
   "labels": [
     "area:polish"
@@ -30,8 +37,8 @@
   ],
   "root_id": "ticket_01KYAPN9G0K6AX3408QWRKHMHD",
   "path": [],
-  "active_session": null,
-  "last_activity_at": "2026-07-24T18:37:02.339Z",
+  "active_session": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ",
+  "last_activity_at": "2026-07-24T19:45:52.520Z",
   "latest_note": null,
   "owner": null,
   "provenance": {
@@ -42,5 +49,5 @@
     }
   },
   "created_at": "2026-07-24T18:37:02.339Z",
-  "updated_at": "2026-07-24T18:37:02.339Z"
+  "updated_at": "2026-07-24T19:45:52.520Z"
 }

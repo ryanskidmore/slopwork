@@ -2,7 +2,13 @@ import type { Command } from "commander";
 import type { Clock } from "../../core/clock.js";
 import { systemClock } from "../../core/clock.js";
 import type { Session, Ticket } from "../../core/index.js";
-import { EXIT_CODES, nowIso, sessionSchema, ticketSchema } from "../../core/index.js";
+import {
+  END_SUMMARY_MAX_LENGTH,
+  EXIT_CODES,
+  nowIso,
+  sessionSchema,
+  ticketSchema,
+} from "../../core/index.js";
 import {
   formatIndexProblems,
   readSession,
@@ -26,7 +32,7 @@ import { checkDropEntry } from "../../tickets/state.js";
 import { formatZodIssuesForUsage } from "../../tickets/validate.js";
 import { loadConfig, resolveActor } from "../actor.js";
 import { SlopError } from "../errors.js";
-import { printWarning } from "./shared.js";
+import { assertMaxLength, printWarning } from "./shared.js";
 
 interface DropCommandOptions {
   reason: string;
@@ -89,6 +95,7 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
       EXIT_CODES.USAGE_ERROR,
     );
   }
+  assertMaxLength("--reason", opts.reason, END_SUMMARY_MAX_LENGTH);
 
   const initialTicket = await resolveTicketRef(paths, ref);
 
