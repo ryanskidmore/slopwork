@@ -6,7 +6,7 @@
  *     to stdout, with project-specific values interpolated.
  *   - `.slop/AGENTS.md` — written by `slop init`, committed to the repo
  *     (design.md §3: "committed — agent onboarding").
- *   - `.claude/skills/slopworks/SKILL.md` — installed by `slop init` only
+ *   - `.claude/skills/slopwork/SKILL.md` — installed by `slop init` only
  *     when a Claude Code setup is detected (src/cli/init/claude-detect.ts).
  *
  * `render.ts` turns the data below into the three documents (all three
@@ -23,7 +23,7 @@
  * explicit that a wrong onboarding doc is worse than none.
  */
 
-export const SKILL_NAME = "slopworks";
+export const SKILL_NAME = "slopwork";
 
 /**
  * SKILL.md frontmatter `description` — this exact text is how Claude Code
@@ -32,7 +32,7 @@ export const SKILL_NAME = "slopworks";
  * the shipped CLI, nothing here needed correcting).
  */
 export const SKILL_DESCRIPTION =
-  'Work tracker for agents. Use whenever (a) the repo contains a .slop/ directory, (b) you are asked to work on a ticket, feature, or "the next thing" — including refs like ticket_01J9X7…, a slug like adding-new-auth-provider, or jira:PROJ-123, (c) you are about to start any non-trivial coding task, (d) you discover new work mid-task (bug, todo, follow-up), or (e) you are finishing, blocked, or handing off. Slopworks is the single source of truth for what to do, what\'s in progress, and what happened — never keep work state in markdown files or your own memory.';
+  'Work tracker for agents. Use whenever (a) the repo contains a .slop/ directory, (b) you are asked to work on a ticket, feature, or "the next thing" — including refs like ticket_01J9X7…, a slug like adding-new-auth-provider, or jira:PROJ-123, (c) you are about to start any non-trivial coding task, (d) you discover new work mid-task (bug, todo, follow-up), or (e) you are finishing, blocked, or handing off. Slopwork is the single source of truth for what to do, what\'s in progress, and what happened — never keep work state in markdown files or your own memory.';
 
 export interface WhenToActRow {
   situation: string;
@@ -127,7 +127,7 @@ export const REF_RESOLUTION =
 
 /** Edge cases (draft-v0-SKILL.md, unchanged). */
 export const EDGE_CASES: readonly string[] = [
-  "**No `.slop/` in the repo:** slopworks isn't set up. Ask the human before running `slop init` — never initialize on your own.",
+  "**No `.slop/` in the repo:** slopwork isn't set up. Ask the human before running `slop init` — never initialize on your own.",
   "**Transcript warnings** on `stop`/`done`: report the warning to the human; never block or retry-loop on it.",
   "**Draft tickets** (`state: draft`) are not workable — they're being defined. Don't start them; ask if one looks like it should be yours.",
   "**`ready` returns nothing:** check `slop status` for blocked/stale items and report what's gating progress rather than inventing work.",

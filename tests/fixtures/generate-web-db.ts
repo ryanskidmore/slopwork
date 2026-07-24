@@ -162,7 +162,7 @@ const rootAlpha = makeTicket({
   details_md:
     "## Why\n\nSeveral self-hosters have asked for OAuth/SSO support. This is the umbrella ticket for that work.\n\n- Keep the built-in provider as the default\n- New providers register through one interface\n",
   acceptance: ["At least one OAuth provider works end to end", "Existing auth is unaffected"],
-  context: ["https://github.com/ryan/slopworks-fixture/discussions/12"],
+  context: ["https://github.com/ryan/slopwork-fixture/discussions/12"],
   meta: { estimated_days: 5, epic: "auth-2026" },
   state: "open",
   priority: 1,
@@ -620,7 +620,7 @@ const refactorCliErrors = makeTicket({
   lastActivityOffsetMs: -10 * MIN,
   createdOffsetMs: -1 * DAY,
   review: {
-    mr: "https://github.com/ryan/slopworks-fixture/pull/42",
+    mr: "https://github.com/ryan/slopwork-fixture/pull/42",
     requestedOffsetMs: -10 * MIN,
     by: AGENT_1,
   },
@@ -640,7 +640,7 @@ addEvent(
   AGENT_1,
   null,
   -10 * MIN,
-  { mr: "https://github.com/ryan/slopworks-fixture/pull/42" },
+  { mr: "https://github.com/ryan/slopwork-fixture/pull/42" },
 );
 
 const s6Id = newSessionId();
@@ -689,14 +689,14 @@ const darkModeWeb = makeTicket({
   lastActivityOffsetMs: -3 * DAY,
   createdOffsetMs: -5 * DAY,
   review: {
-    mr: "https://github.com/ryan/slopworks-fixture/pull/37",
+    mr: "https://github.com/ryan/slopwork-fixture/pull/37",
     requestedOffsetMs: -3 * DAY,
     by: AGENT_2,
   },
 });
 addEvent({ kind: "ticket", id: darkModeWeb.id }, "ticket.created", RYAN, null, -5 * DAY);
 addEvent({ kind: "ticket", id: darkModeWeb.id }, "review.requested", AGENT_2, null, -3 * DAY, {
-  mr: "https://github.com/ryan/slopworks-fixture/pull/37",
+  mr: "https://github.com/ryan/slopwork-fixture/pull/37",
 });
 
 const investigateMemLeak = makeTicket({
@@ -828,10 +828,10 @@ addEvent({ kind: "ticket", id: staleIndexBuilder.id }, "ticket.updated", AGENT_2
 // ---------------------------------------------------------------------------
 
 const config: Config = configSchema.parse({
-  project: "slopworks-fixture",
+  project: "slopwork-fixture",
   user: "ryan",
   remotes: {
-    repo: "https://github.com/ryan/slopworks-fixture",
+    repo: "https://github.com/ryan/slopwork-fixture",
     jira: "https://fixtureorg.atlassian.net",
   },
   defaults: {
@@ -856,7 +856,7 @@ function baseFields(sessionId: string, gitBranch: string, offsetMs: number): Raw
     sessionId,
     isSidechain: false,
     userType: "external",
-    cwd: "/home/ryan/projects/slopworks-fixture",
+    cwd: "/home/ryan/projects/slopwork-fixture",
     version: "1.2.3",
     timestamp: at(offsetMs),
     gitBranch,

@@ -86,7 +86,7 @@ describe("D1 onboarding content: one source, three renderings", () => {
 
   it("SKILL.md frontmatter carries the exact name/description Claude Code discovers the skill by", () => {
     const frontmatter = renderSkillFrontmatter();
-    expect(frontmatter).toMatch(/^---\nname: slopworks\ndescription: >\n/);
+    expect(frontmatter).toMatch(/^---\nname: slopwork\ndescription: >\n/);
     expect(frontmatter.trim().endsWith("---")).toBe(true);
     // The folded (`>`) scalar's lines, rejoined, reproduce the exact
     // canonical description with no words dropped or duplicated by the
@@ -97,7 +97,7 @@ describe("D1 onboarding content: one source, three renderings", () => {
       .map((line) => line.trim())
       .join(" ");
     expect(foldedBody).toBe(SKILL_DESCRIPTION);
-    expect(SKILL_NAME).toBe("slopworks");
+    expect(SKILL_NAME).toBe("slopwork");
   });
 
   it("`update`'s corrected claim doesn't regress to a nonexistent flag", () => {

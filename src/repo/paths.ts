@@ -76,14 +76,14 @@ export function findRepoRoot(startDir: string): string | null {
 }
 
 /**
- * {@link findRepoRoot}, but throws the scope-item-6 "not a slopworks
+ * {@link findRepoRoot}, but throws the scope-item-6 "not a slopwork
  * repo" error (exit 4, NOT_FOUND) instead of returning `null`.
  */
 export function requireRepoRoot(startDir: string): string {
   const root = findRepoRoot(startDir);
   if (root === null) {
     throw new SlopError(
-      "not a slopworks repo (no .slop/ found in this or any parent directory) — run `slop init`",
+      "not a slopwork repo (no .slop/ found in this or any parent directory) — run `slop init`",
       EXIT_CODES.NOT_FOUND,
     );
   }

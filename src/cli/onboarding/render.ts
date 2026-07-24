@@ -1,7 +1,7 @@
 /**
  * Renders `content.ts`'s single canonical source three ways (work item
  * D1): `slop instructions`, `.slop/AGENTS.md`, and
- * `.claude/skills/slopworks/SKILL.md`. All three call
+ * `.claude/skills/slopwork/SKILL.md`. All three call
  * {@link renderOnboardingBody} for their body text — the only difference
  * between them is SKILL.md's YAML frontmatter wrapper. That is what makes
  * the "genuinely derive from the same source" acceptance clause true by
@@ -64,11 +64,11 @@ export function renderOnboardingBody(ctx: OnboardingContext): string {
   const rules = HOUSE_RULES.map((rule, i) => `${i + 1}. ${rule}`).join("\n");
   const edgeCases = EDGE_CASES.map((edgeCase) => `- ${edgeCase}`).join("\n");
 
-  return `# Slopworks
+  return `# Slopwork
 
 ${projectLine(ctx)}
 
-Slopworks (\`slop\`) tracks work as a dependency graph of tickets. You read it to know what to do, you write to it as you work, and humans audit your trail (sessions, plans, progress, MRs, transcripts). Run \`slop instructions\` anytime for this project's local copy of these rules.
+Slopwork (\`slop\`) tracks work as a dependency graph of tickets. You read it to know what to do, you write to it as you work, and humans audit your trail (sessions, plans, progress, MRs, transcripts). Run \`slop instructions\` anytime for this project's local copy of these rules.
 
 ## When to act, at a glance
 
@@ -120,7 +120,7 @@ ${wrapped}
 `;
 }
 
-/** `.claude/skills/slopworks/SKILL.md` — installed by `slop init` only when a Claude Code setup is detected. */
+/** `.claude/skills/slopwork/SKILL.md` — installed by `slop init` only when a Claude Code setup is detected. */
 export function renderSkillMd(ctx: OnboardingContext): string {
   return renderSkillFrontmatter() + renderOnboardingBody(ctx);
 }

@@ -32,7 +32,7 @@ npm-debug.log*
 # per D14/D16 — that is a runtime concern of the tool, not this repo's own
 # tooling config.
 
-# --- slopworks (managed by `slop init`) ---
+# --- slopwork (managed by `slop init`) ---
 .slop/db/index.jsonc
 .slop/transcripts/
-# --- end slopworks ---
+# --- end slopwork ---

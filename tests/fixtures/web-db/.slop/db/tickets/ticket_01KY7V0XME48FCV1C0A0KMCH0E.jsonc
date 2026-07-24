@@ -12,7 +12,7 @@
   },
   "state": "review",
   "review": {
-    "mr": "https://github.com/ryan/slopworks-fixture/pull/37",
+    "mr": "https://github.com/ryan/slopwork-fixture/pull/37",
     "requested_at": "2026-07-20T12:00:00.000Z",
     "by": {
       "name": "claude-agent-2",

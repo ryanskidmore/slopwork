@@ -1,21 +1,21 @@
 ---
-name: slopworks
+name: slopwork
 description: >
   Work tracker for agents. Use whenever (a) the repo contains a .slop/
   directory, (b) you are asked to work on a ticket, feature, or "the next thing"
   — including refs like ticket_01J9X7…, a slug like adding-new-auth-provider, or
   jira:PROJ-123, (c) you are about to start any non-trivial coding task, (d) you
   discover new work mid-task (bug, todo, follow-up), or (e) you are finishing,
-  blocked, or handing off. Slopworks is the single source of truth for what to
+  blocked, or handing off. Slopwork is the single source of truth for what to
   do, what's in progress, and what happened — never keep work state in markdown
   files or your own memory.
 ---
 
-# Slopworks
+# Slopwork
 
 Project: **slopwork**
 
-Slopworks (`slop`) tracks work as a dependency graph of tickets. You read it to know what to do, you write to it as you work, and humans audit your trail (sessions, plans, progress, MRs, transcripts). Run `slop instructions` anytime for this project's local copy of these rules.
+Slopwork (`slop`) tracks work as a dependency graph of tickets. You read it to know what to do, you write to it as you work, and humans audit your trail (sessions, plans, progress, MRs, transcripts). Run `slop instructions` anytime for this project's local copy of these rules.
 
 ## When to act, at a glance
 
@@ -55,7 +55,7 @@ Anywhere a `<ref>` is accepted: full id (`ticket_01J9X7M3E8W2`), unique short pr
 
 ## Edge cases
 
-- **No `.slop/` in the repo:** slopworks isn't set up. Ask the human before running `slop init` — never initialize on your own.
+- **No `.slop/` in the repo:** slopwork isn't set up. Ask the human before running `slop init` — never initialize on your own.
 - **Transcript warnings** on `stop`/`done`: report the warning to the human; never block or retry-loop on it.
 - **Draft tickets** (`state: draft`) are not workable — they're being defined. Don't start them; ask if one looks like it should be yours.
 - **`ready` returns nothing:** check `slop status` for blocked/stale items and report what's gating progress rather than inventing work.

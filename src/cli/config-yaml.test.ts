@@ -4,10 +4,10 @@ import { type ConfigYamlInput, parseConfigYamlText, stringifyConfigYaml } from "
 
 describe("parseConfigYamlText", () => {
   it("parses design.md §3's exact config.yaml example", () => {
-    const text = `project: slopworks
+    const text = `project: slopwork
 user: ryan                    # actor fallback (D17)
 remotes:
-  repo: https://github.com/ryan/slopworks   # autodetected
+  repo: https://github.com/ryan/slopwork   # autodetected
   jira: https://yourorg.atlassian.net       # prompted or blank
 defaults:
   stale_after: 60m
@@ -16,10 +16,10 @@ transcripts: local            # local | commit | off
 `;
     const parsed = configSchema.parse(parseConfigYamlText(text));
     expect(parsed).toEqual({
-      project: "slopworks",
+      project: "slopwork",
       user: "ryan",
       remotes: {
-        repo: "https://github.com/ryan/slopworks",
+        repo: "https://github.com/ryan/slopwork",
         jira: "https://yourorg.atlassian.net",
       },
       defaults: { stale_after: "60m", review_stale_after: "24h" },
@@ -58,9 +58,9 @@ transcripts: local            # local | commit | off
 
 describe("stringifyConfigYaml", () => {
   const full: ConfigYamlInput = {
-    project: "slopworks",
+    project: "slopwork",
     user: "ryan",
-    repo: "https://github.com/ryan/slopworks",
+    repo: "https://github.com/ryan/slopwork",
     jira: "https://yourorg.atlassian.net",
     staleAfter: "60m",
     reviewStaleAfter: "24h",
@@ -71,10 +71,10 @@ describe("stringifyConfigYaml", () => {
     const text = stringifyConfigYaml(full);
     const parsed = configSchema.parse(parseConfigYamlText(text));
     expect(parsed).toEqual({
-      project: "slopworks",
+      project: "slopwork",
       user: "ryan",
       remotes: {
-        repo: "https://github.com/ryan/slopworks",
+        repo: "https://github.com/ryan/slopwork",
         jira: "https://yourorg.atlassian.net",
       },
       defaults: { stale_after: "60m", review_stale_after: "24h" },

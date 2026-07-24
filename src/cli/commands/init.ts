@@ -3,7 +3,7 @@
  *
  * Creates `.slop/`'s full §3 layout, autodetects `config.yaml`'s fields,
  * writes agent onboarding (`.slop/AGENTS.md`, and
- * `.claude/skills/slopworks/SKILL.md` when a Claude Code setup is
+ * `.claude/skills/slopwork/SKILL.md` when a Claude Code setup is
  * detected — all rendered from the single canonical source in
  * src/cli/onboarding/), maintains a clearly-labelled, idempotent section of
  * `.gitignore` (D14/D16), and (Fix 4, adversarial review / E2 Defect 2)
@@ -56,8 +56,8 @@ interface InitOptions {
   linkClaudeMd?: boolean;
 }
 
-const CLAUDE_MD_MARKER_START = "<!-- slopworks:start -->";
-const CLAUDE_MD_MARKER_END = "<!-- slopworks:end -->";
+const CLAUDE_MD_MARKER_START = "<!-- slopwork:start -->";
+const CLAUDE_MD_MARKER_END = "<!-- slopwork:end -->";
 
 // ---------------------------------------------------------------------------
 // Root resolution
@@ -70,7 +70,7 @@ const CLAUDE_MD_MARKER_END = "<!-- slopworks:end -->";
  * never create a second, nested `.slop/`). Otherwise, prefer the git
  * repo's top level over bare `cwd` so `.slop/` and `.gitignore` land
  * alongside `.git/` even when `init` is run from a subdirectory; falls
- * back to `cwd` outright when there's no git repo at all (slopworks does
+ * back to `cwd` outright when there's no git repo at all (slopwork does
  * not require git).
  */
 function determineRoot(cwd: string): { root: string; alreadyInitialized: boolean } {
@@ -209,7 +209,7 @@ async function writeAgentsMd(paths: RepoPaths, config: Config): Promise<void> {
 /** Installs/refreshes the skill only when a Claude Code setup is detected (D1); returns whether it did. */
 async function maybeInstallSkill(root: string, config: Config): Promise<boolean> {
   if (!detectClaudeCode(root)) return false;
-  const skillDir = join(root, ".claude", "skills", "slopworks");
+  const skillDir = join(root, ".claude", "skills", "slopwork");
   await mkdir(skillDir, { recursive: true });
   await atomicWriteFile(join(skillDir, "SKILL.md"), renderSkillMd(onboardingContext(config)));
   return true;
@@ -238,9 +238,9 @@ async function updateGitignore(root: string, config: Config): Promise<void> {
 function claudeMdPointerBlock(): string {
   return [
     CLAUDE_MD_MARKER_START,
-    "## Slopworks",
+    "## Slopwork",
     "",
-    "This repo tracks work with Slopworks (`slop`). Read `.slop/AGENTS.md` (or run " +
+    "This repo tracks work with Slopwork (`slop`). Read `.slop/AGENTS.md` (or run " +
       "`slop instructions`) before starting any ticket work.",
     CLAUDE_MD_MARKER_END,
   ].join("\n");
@@ -265,7 +265,7 @@ async function maybeLinkClaudeMd(root: string, opts: InitOptions): Promise<Claud
   let shouldLink = opts.linkClaudeMd === true;
   if (!shouldLink && !opts.yes && isInteractive()) {
     shouldLink = await promptYesNo(
-      "CLAUDE.md found — add a pointer to slopworks (.slop/AGENTS.md / `slop instructions`)?",
+      "CLAUDE.md found — add a pointer to slopwork (.slop/AGENTS.md / `slop instructions`)?",
       false,
     );
   }
@@ -293,11 +293,11 @@ function report(args: {
 
   if (alreadyInitialized && wasExisting) {
     process.stdout.write(
-      `slopworks is already initialized at ${root} — config.yaml and db/ left untouched; ` +
+      `slopwork is already initialized at ${root} — config.yaml and db/ left untouched; ` +
         `refreshed AGENTS.md${skillInstalled ? "/SKILL.md" : ""} and .gitignore.\n`,
     );
   } else {
-    process.stdout.write(`Initialized slopworks at ${root}\n`);
+    process.stdout.write(`Initialized slopwork at ${root}\n`);
   }
 
   process.stdout.write(
@@ -306,13 +306,13 @@ function report(args: {
   process.stdout.write("  .slop/AGENTS.md     (generated)\n");
   if (skillInstalled) {
     process.stdout.write(
-      "  .claude/skills/slopworks/SKILL.md   (generated — Claude Code setup detected)\n",
+      "  .claude/skills/slopwork/SKILL.md   (generated — Claude Code setup detected)\n",
     );
   }
-  process.stdout.write("  .gitignore          (slopworks section up to date)\n");
+  process.stdout.write("  .gitignore          (slopwork section up to date)\n");
 
   if (claudeMdResult === "linked") {
-    process.stdout.write("  CLAUDE.md           (added a pointer to slopworks)\n");
+    process.stdout.write("  CLAUDE.md           (added a pointer to slopwork)\n");
   } else if (claudeMdResult === "skipped") {
     process.stdout.write(
       "  CLAUDE.md found but not linked — re-run `slop init --link-claude-md` to add a pointer.\n",
@@ -359,10 +359,7 @@ export function registerInitCommand(program: Command): void {
     .option("--project <name>", "override the autodetected project name")
     .option("--user <name>", "override the autodetected user (D17 config rung)")
     .option("--yes", "accept all detected defaults; never prompt")
-    .option(
-      "--link-claude-md",
-      "non-interactively add a slopworks pointer to an existing CLAUDE.md",
-    )
+    .option("--link-claude-md", "non-interactively add a slopwork pointer to an existing CLAUDE.md")
     .action(async (opts: InitOptions) => {
       await runInit(opts);
     });

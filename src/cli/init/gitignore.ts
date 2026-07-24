@@ -12,8 +12,8 @@
  */
 import type { TranscriptsMode } from "../../core/index.js";
 
-const SECTION_START = "# --- slopworks (managed by `slop init`) ---";
-const SECTION_END = "# --- end slopworks ---";
+const SECTION_START = "# --- slopwork (managed by `slop init`) ---";
+const SECTION_END = "# --- end slopwork ---";
 
 /**
  * D14 (always) + D16 ("gitignored by default ... unless `transcripts:
@@ -40,7 +40,7 @@ export function computeGitignoreLines(transcriptsMode: TranscriptsMode): string[
 }
 
 /**
- * Replace (or insert) the managed slopworks section of a `.gitignore`'s
+ * Replace (or insert) the managed slopwork section of a `.gitignore`'s
  * text with `lines`. Any content outside the markers — including a
  * missing/empty file — is left exactly as found; an existing managed
  * section (from a prior `init`) is removed and rewritten in place rather

@@ -1,8 +1,8 @@
-# Slopworks
+# Slopwork
 
 Project: **slopwork**
 
-Slopworks (`slop`) tracks work as a dependency graph of tickets. You read it to know what to do, you write to it as you work, and humans audit your trail (sessions, plans, progress, MRs, transcripts). Run `slop instructions` anytime for this project's local copy of these rules.
+Slopwork (`slop`) tracks work as a dependency graph of tickets. You read it to know what to do, you write to it as you work, and humans audit your trail (sessions, plans, progress, MRs, transcripts). Run `slop instructions` anytime for this project's local copy of these rules.
 
 ## When to act, at a glance
 
@@ -42,7 +42,7 @@ Anywhere a `<ref>` is accepted: full id (`ticket_01J9X7M3E8W2`), unique short pr
 
 ## Edge cases
 
-- **No `.slop/` in the repo:** slopworks isn't set up. Ask the human before running `slop init` — never initialize on your own.
+- **No `.slop/` in the repo:** slopwork isn't set up. Ask the human before running `slop init` — never initialize on your own.
 - **Transcript warnings** on `stop`/`done`: report the warning to the human; never block or retry-loop on it.
 - **Draft tickets** (`state: draft`) are not workable — they're being defined. Don't start them; ask if one looks like it should be yours.
 - **`ready` returns nothing:** check `slop status` for blocked/stale items and report what's gating progress rather than inventing work.

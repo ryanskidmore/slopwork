@@ -187,7 +187,7 @@ describe("D1: init + agent onboarding", () => {
     it("degrades gracefully with no git remote and no git user configured at all", async () => {
       const dir = await mkdtemp(join(tmpdir(), "slop-d1-nogit-"));
       scratchDirs.push(dir);
-      // Deliberately no `git init` at all — slopworks does not require git.
+      // Deliberately no `git init` at all — slopwork does not require git.
       // `git config user.name` still falls back to *global*/system config
       // even outside a repo, so `HOME` is pointed at an empty, isolated
       // directory (with system/global config disabled outright) — without
@@ -352,11 +352,11 @@ describe("D1: init + agent onboarding", () => {
   // ---------------------------------------------------------------------------
 
   describe("SKILL.md installation is gated on Claude Code detection", () => {
-    it("installs .claude/skills/slopworks/SKILL.md when CLAUDECODE=1 is set", async () => {
+    it("installs .claude/skills/slopwork/SKILL.md when CLAUDECODE=1 is set", async () => {
       const dir = await makeScratchRepo("slop-d1-claude-yes-");
       const result = runSlop(["init", "--yes"], dir, { CLAUDECODE: "1" });
       expect(result.status, result.stderr).toBe(0);
-      expect(existsSync(join(dir, ".claude", "skills", "slopworks", "SKILL.md"))).toBe(true);
+      expect(existsSync(join(dir, ".claude", "skills", "slopwork", "SKILL.md"))).toBe(true);
     });
 
     it("installs SKILL.md when a .claude/ directory already exists, even with CLAUDECODE unset", async () => {
@@ -364,7 +364,7 @@ describe("D1: init + agent onboarding", () => {
       execFileSync("mkdir", ["-p", join(dir, ".claude")]);
       const result = runSlop(["init", "--yes"], dir);
       expect(result.status, result.stderr).toBe(0);
-      expect(existsSync(join(dir, ".claude", "skills", "slopworks", "SKILL.md"))).toBe(true);
+      expect(existsSync(join(dir, ".claude", "skills", "slopwork", "SKILL.md"))).toBe(true);
     });
 
     it("does NOT install SKILL.md (or create .claude/) when Claude Code isn't detected", async () => {
@@ -386,7 +386,7 @@ describe("D1: init + agent onboarding", () => {
       expect(result.status, result.stderr).toBe(0);
 
       const agentsMd = readFileSync(join(dir, ".slop", "AGENTS.md"), "utf8");
-      const skillMd = readFileSync(join(dir, ".claude", "skills", "slopworks", "SKILL.md"), "utf8");
+      const skillMd = readFileSync(join(dir, ".claude", "skills", "slopwork", "SKILL.md"), "utf8");
       const instructionsResult = runSlop(["instructions"], dir, { CLAUDECODE: "1" });
       expect(instructionsResult.status, instructionsResult.stderr).toBe(0);
       const instructionsOut = instructionsResult.stdout;
@@ -399,7 +399,7 @@ describe("D1: init + agent onboarding", () => {
       }
 
       // SKILL.md carries frontmatter the other two don't.
-      expect(skillMd.startsWith("---\nname: slopworks\n")).toBe(true);
+      expect(skillMd.startsWith("---\nname: slopwork\n")).toBe(true);
       expect(agentsMd.startsWith("---")).toBe(false);
       expect(instructionsOut.startsWith("---")).toBe(false);
 
@@ -436,7 +436,7 @@ describe("D1: init + agent onboarding", () => {
       expect(initResult.status, initResult.stderr).toBe(0);
 
       const agentsMd = readFileSync(join(dir, ".slop", "AGENTS.md"), "utf8");
-      const skillMd = readFileSync(join(dir, ".claude", "skills", "slopworks", "SKILL.md"), "utf8");
+      const skillMd = readFileSync(join(dir, ".claude", "skills", "slopwork", "SKILL.md"), "utf8");
       const instructionsResult = runSlop(["instructions"], dir, { CLAUDECODE: "1" });
       expect(instructionsResult.status, instructionsResult.stderr).toBe(0);
 
@@ -618,7 +618,7 @@ describe("D1: init + agent onboarding", () => {
         expect(init.status, init.stderr).toBe(0);
 
         const skillMd = readFileSync(
-          join(dir, ".claude", "skills", "slopworks", "SKILL.md"),
+          join(dir, ".claude", "skills", "slopwork", "SKILL.md"),
           "utf8",
         );
 
@@ -671,7 +671,7 @@ describe("D1: init + agent onboarding", () => {
       // Fresh init (--yes: non-interactive), skill installed for real.
       const init = runSlop(["init", "--yes"], dir, { CLAUDECODE: "1" });
       expect(init.status, init.stderr).toBe(0);
-      expect(existsSync(join(dir, ".claude", "skills", "slopworks", "SKILL.md"))).toBe(true);
+      expect(existsSync(join(dir, ".claude", "skills", "slopwork", "SKILL.md"))).toBe(true);
       expect(existsSync(join(dir, ".slop", "AGENTS.md"))).toBe(true);
 
       // A dependent ticket, filed BEFORE the loop starts and blocked by

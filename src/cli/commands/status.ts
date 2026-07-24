@@ -376,7 +376,7 @@ function buildHuman(data: StatusData, elisions: readonly string[]): string {
     return 'no tickets yet — `slop new "..."` to create one\n';
   }
 
-  const lines: string[] = [`Slopworks status — ${data.counts.total} ticket(s)`, ""];
+  const lines: string[] = [`Slopwork status — ${data.counts.total} ticket(s)`, ""];
   lines.push(...renderCountsSection(data.counts, data.derived));
   lines.push("");
   lines.push(...renderInProgressSection(data.inProgress));

@@ -5,7 +5,7 @@
  * v0 genuinely requires Bun at runtime (Bun.serve / Bun.file / Bun.YAML /
  * text-imports throughout src/) — this file does NOT reimplement or
  * type-strip anything. Its only job is to be the thing plain Node can
- * execute after `npm i -g slopworks` / `npx slopworks` (Node can't run the
+ * execute after `npm i -g slopwork` / `npx slopwork` (Node can't run the
  * real entrypoint's shebang or strip its TypeScript under node_modules), so
  * that:
  *   - when Bun is on PATH, it re-execs the real CLI
@@ -24,7 +24,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = join(here, "..");
 const entry = join(pkgRoot, "src", "cli", "index.ts");
 
-const NO_BUN_MESSAGE = "Slopworks requires Bun >= 1.3 — install from https://bun.sh\n";
+const NO_BUN_MESSAGE = "Slopwork requires Bun >= 1.3 — install from https://bun.sh\n";
 
 function bunIsAvailable() {
   const check = spawnSync("bun", ["--version"], { stdio: "ignore" });

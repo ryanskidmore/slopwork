@@ -1,12 +1,12 @@
-# Slopworks — Spec
+# Slopwork — Spec
 
-**v0.6 · July 17, 2026 · slopworks.dev · free OSS**
+**v0.6 · July 17, 2026 · slopwork.dev · free OSS**
 
 > **Next action:** build v0 (§4). First milestone: `slop init && slop new "Test feature" && slop ready` against the flatfile db. ~1 day. Full v0: ~2.5 weeks. **v0 exit bar: a full dogfood week (§4.7) with zero fallbacks to markdown TODOs.**
 
 **This spec in five lines:**
 
-1. Slopworks: free OSS work tracker built for agents — engineers break work into a dependency graph; agents pick up tickets, plan, work, and leave an auditable trail ending in an MR and a transcript.
+1. Slopwork: free OSS work tracker built for agents — engineers break work into a dependency graph; agents pick up tickets, plan, work, and leave an auditable trail ending in an MR and a transcript.
 2. Scale target: one engineer (or small team) running 2–3 agents on parallel streams.
 3. v0 = local CLI + flatfile JSONC db in `.slop/db/` (git-mergeable) + sessions/plans/transcripts + `review` state linked to MRs + read-only `slop web`.
 4. No locks/leases: `start` → `in_progress` under a session; activity timestamps derive `stale`; `review` tracks the MR awaiting human eyes.
@@ -19,7 +19,7 @@
 | # | Decision | Notes |
 |---|---|---|
 | D1 | **Human owner at the root**; agent-owned below, any depth | Enforcement = F4 |
-| D2 | **TypeScript; binary `slop`** (npm `slopworks`) | |
+| D2 | **TypeScript; binary `slop`** (npm `slopwork`) | |
 | D3 | **v0 datastore = flatfile JSONC in `.slop/db/`**, ULID filenames, derived gitignored `index.jsonc` (`slop reindex`). SQL backends return at F8 | |
 | D5 | **`blocked`/`stale` derived, never asserted** | |
 | D6 | **Full-length prefixed ULIDs** + `root_id` + `path` + short-prefix + slug resolution | |
@@ -73,10 +73,10 @@ Merge story: ULID filenames → create-conflicts impossible; events immutable �
 **config.yaml:**
 
 ```yaml
-project: slopworks
+project: slopwork
 user: ryan                    # actor fallback (D17)
 remotes:
-  repo: https://github.com/ryan/slopworks   # autodetected
+  repo: https://github.com/ryan/slopwork   # autodetected
   jira: https://yourorg.atlassian.net       # prompted or blank
 defaults:
   stale_after: 60m
@@ -151,7 +151,7 @@ Ticket list with filters · tree view (external parents as badges → Jira URL f
 6. **Transcript capture (per-harness locators + fallback) + `search`.** *(~1.5 days)*
 7. Events + `events --since`. *(~1 day)*
 8. `slop web` incl. transcript viewer + review panel. *(~3 days)*
-9. Instructions + context packs + polish; **move Slopworks' backlog into Slopworks**. *(~1 day)*
+9. Instructions + context packs + polish; **move Slopwork' backlog into Slopwork**. *(~1 day)*
 
 ### 4.6 v0 skips (menu)
 
@@ -159,7 +159,7 @@ MCP · elicitations · acceptance-check *execution* · SlopQL · Jira snapshot f
 
 ### 4.7 The dogfood-ability bar (v0 done =)
 
-A full week of building Slopworks with Slopworks where all of these hold:
+A full week of building Slopwork with Slopwork where all of these hold:
 
 1. Every piece of work — including bugs found mid-session — exists as a ticket before it's worked (`discovered-from` chains visible in web).
 2. Two agents run in parallel on separate branches; their `.slop/db` merges without manual conflict surgery.

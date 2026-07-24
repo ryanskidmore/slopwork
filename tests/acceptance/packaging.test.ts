@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import pkg from "../../package.json" with { type: "json" };
 
-// Packaging: `npm i -g slopworks` / `npx slopworks` must produce a `slop`
+// Packaging: `npm i -g slopwork` / `npx slopwork` must produce a `slop`
 // that plain Node can run.
 //
 // Acceptance criteria, from ticket_01KY93E2NTZ7WK156HEQRVKCN1:

@@ -1,4 +1,4 @@
-# Slopworks — Engineering Decisions
+# Slopwork — Engineering Decisions
 
 Short-form log of implementation decisions made while executing
 `v0-implementation-plan.md` that aren't already captured by one of

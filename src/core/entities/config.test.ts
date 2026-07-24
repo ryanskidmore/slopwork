@@ -4,10 +4,10 @@ import { configSchema } from "./config.js";
 describe("configSchema", () => {
   it("parses the exact example from design.md §3, defaults included", () => {
     const parsed = configSchema.parse({
-      project: "slopworks",
+      project: "slopwork",
       user: "ryan",
       remotes: {
-        repo: "https://github.com/ryan/slopworks",
+        repo: "https://github.com/ryan/slopwork",
         jira: "https://yourorg.atlassian.net",
       },
       defaults: {
@@ -17,10 +17,10 @@ describe("configSchema", () => {
       transcripts: "local",
     });
     expect(parsed).toEqual({
-      project: "slopworks",
+      project: "slopwork",
       user: "ryan",
       remotes: {
-        repo: "https://github.com/ryan/slopworks",
+        repo: "https://github.com/ryan/slopwork",
         jira: "https://yourorg.atlassian.net",
       },
       defaults: {
@@ -32,9 +32,9 @@ describe("configSchema", () => {
   });
 
   it("fully defaults from just a project name (fresh `slop init`)", () => {
-    const parsed = configSchema.parse({ project: "slopworks" });
+    const parsed = configSchema.parse({ project: "slopwork" });
     expect(parsed).toEqual({
-      project: "slopworks",
+      project: "slopwork",
       remotes: {},
       defaults: {
         stale_after: "60m",
@@ -96,10 +96,10 @@ describe("configSchema", () => {
   it("coerces remotes.jira: null to absent, keeping a sibling repo intact", () => {
     const parsed = configSchema.parse({
       project: "x",
-      remotes: { repo: "https://github.com/ryan/slopworks", jira: null },
+      remotes: { repo: "https://github.com/ryan/slopwork", jira: null },
     });
     expect(parsed.remotes.jira).toBeUndefined();
-    expect(parsed.remotes.repo).toBe("https://github.com/ryan/slopworks");
+    expect(parsed.remotes.repo).toBe("https://github.com/ryan/slopwork");
   });
 
   it("coerces remotes.repo: null to absent", () => {
@@ -111,12 +111,12 @@ describe("configSchema", () => {
     const parsed = configSchema.parse({
       project: "x",
       remotes: {
-        repo: "https://github.com/ryan/slopworks",
+        repo: "https://github.com/ryan/slopwork",
         jira: "https://yourorg.atlassian.net",
       },
     });
     expect(parsed.remotes).toEqual({
-      repo: "https://github.com/ryan/slopworks",
+      repo: "https://github.com/ryan/slopwork",
       jira: "https://yourorg.atlassian.net",
     });
   });

@@ -163,7 +163,7 @@ describe("E1: Polish", () => {
       // A different NOT_FOUND path entirely: no .slop/ at all (repo-root
       // resolution, not ref resolution) — same code, different mechanism,
       // both documented in README's exit-code table as "a <ref> did not
-      // resolve" / "not a slopworks repo".
+      // resolve" / "not a slopwork repo".
       const noRepo = await mkdtemp(join(tmpdir(), "slop-e1-norepo-"));
       scratchDirs.push(noRepo);
       expect(runSlop(["status"], noRepo).status).toBe(4);

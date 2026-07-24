@@ -64,7 +64,7 @@ describe("findRepoRoot / requireRepoRoot", () => {
     }
     expect(threw).toBeInstanceOf(SlopError);
     expect((threw as SlopError).exitCode).toBe(EXIT_CODES.NOT_FOUND);
-    expect((threw as SlopError).message).toMatch(/not a slopworks repo/i);
+    expect((threw as SlopError).message).toMatch(/not a slopwork repo/i);
     expect((threw as SlopError).message).toMatch(/slop init/);
   });
 

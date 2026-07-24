@@ -395,7 +395,7 @@ describe("D5: slop web", () => {
       const inReview = ticketBySlug("refactor-cli-error-reporting");
       const res = await get(`/tickets/${inReview.id}`);
       const body = await res.text();
-      expect(body).toContain("https://github.com/ryan/slopworks-fixture/pull/42");
+      expect(body).toContain("https://github.com/ryan/slopwork-fixture/pull/42");
       expect(body).toContain("awaiting review for");
     });
 
@@ -526,9 +526,9 @@ describe("D5: slop web", () => {
       const body = await res.text();
 
       expect(body).toContain("Refactor CLI error reporting");
-      expect(body).toContain("https://github.com/ryan/slopworks-fixture/pull/42");
+      expect(body).toContain("https://github.com/ryan/slopwork-fixture/pull/42");
       expect(body).toContain("Add dark mode to slop web");
-      expect(body).toContain("https://github.com/ryan/slopworks-fixture/pull/37");
+      expect(body).toContain("https://github.com/ryan/slopwork-fixture/pull/37");
 
       // Exactly one of the two review tickets is stale (requested 3 days
       // ago vs. review_stale_after: 24h) — the other was requested 10

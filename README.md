@@ -1,6 +1,6 @@
-# slopworks
+# slopwork
 
-Slopworks (`slop`) is a free, open-source work tracker built for agents. Engineers break work
+Slopwork (`slop`) is a free, open-source work tracker built for agents. Engineers break work
 into a dependency graph of tickets; coding agents pick tickets up, plan their approach, work
 through a session, and leave an auditable trail — progress notes, plan checkpoints, an MR, and a
 transcript — ending in `done`. v0 is a local CLI backed by a flatfile JSONC database
@@ -16,17 +16,17 @@ and covered by acceptance tests — setup (`init`, `instructions`, `reindex`), t
 
 ## Installation
 
-Slopworks needs **Bun ≥ 1.3 at runtime** no matter which install channel you use — the CLI is
+Slopwork needs **Bun ≥ 1.3 at runtime** no matter which install channel you use — the CLI is
 Bun-native (`Bun.serve`, `Bun.file`, `Bun.YAML`, and text-imports throughout `src/`), so there is
 no pure-Node build.
 
 ```sh
 # Bun (recommended — the tool needs Bun at runtime)
 curl -fsSL https://bun.sh/install | bash    # if Bun isn't installed
-bun add -g slopworks
+bun add -g slopwork
 
 # Node users: works too, via a launcher that delegates to Bun
-npm i -g slopworks       # (still requires Bun installed; prints a clear message if missing)
+npm i -g slopwork       # (still requires Bun installed; prints a clear message if missing)
 ```
 
 ## Quickstart

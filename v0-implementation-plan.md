@@ -1,4 +1,4 @@
-# Slopworks v0 — Implementation Plan
+# Slopwork v0 — Implementation Plan
 
 **July 17, 2026 · companion to Spec v0.6 · target: ~2.5 weeks with you + 2 agents**
 
@@ -86,7 +86,7 @@ Estimates assume an agent does the typing and you review. **Bold** = critical pa
 
 | # | Item | ⛓ | Est | Acceptance |
 |---|---|---|---|---|
-| D1 | `init` (dirs, config.yaml with repo autodetect + jira prompt, gitignore entries) + agent onboarding: `instructions`, `.slop/AGENTS.md`, and **SKILL.md** installed to `.claude/skills/slopworks/` when a Claude Code setup is detected (all three generated from one source; SKILL.md draft already written — see deliverable `slopworks-SKILL.md`) | A3 | 1d | Fresh repo → `init` → a real agent follows the skill unaided through one full ready→start→plan→review→done loop |
+| D1 | `init` (dirs, config.yaml with repo autodetect + jira prompt, gitignore entries) + agent onboarding: `instructions`, `.slop/AGENTS.md`, and **SKILL.md** installed to `.claude/skills/slopwork/` when a Claude Code setup is detected (all three generated from one source; SKILL.md draft already written — see deliverable `slopwork-SKILL.md`) | A3 | 1d | Fresh repo → `init` → a real agent follows the skill unaided through one full ready→start→plan→review→done loop |
 | D2 | `search`: scan names/specs/notes, ranked-ish output | B1 | 0.5d | Finds text in `details_md` and progress notes |
 | D3 | `events` command: `--since`, `--ticket`, `--json` | A4 | 0.5d | Cursor pagination stable across reindex |
 | D4 | `status`: counts by state, in-progress w/ sessions+age, stale, awaiting review w/ MR links | C1 (full value after C5) | 0.5d | One screen, < 1s on 1k tickets |
@@ -94,7 +94,7 @@ Estimates assume an agent does the typing and you review. **Bold** = critical pa
 
 *D5 note: start against fixture data immediately after A3 so the SPA doesn't wait on lanes B/C — wire real data last. It's the biggest parallel win in the plan.*
 
-**Milestone M2 (day ~7): the dogfood flip.** B1–B4 + C1–C3 + D1 landed → `init`, file the remaining plan items as real tickets (E3 starts early), and from here on **all remaining v0 work is tracked in Slopworks itself**.
+**Milestone M2 (day ~7): the dogfood flip.** B1–B4 + C1–C3 + D1 landed → `init`, file the remaining plan items as real tickets (E3 starts early), and from here on **all remaining v0 work is tracked in Slopwork itself**.
 
 ### Integration & hardening (whoever's free; E2 pairs well with you personally)
 

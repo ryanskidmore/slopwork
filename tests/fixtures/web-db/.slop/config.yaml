@@ -1,7 +1,7 @@
-project: slopworks-fixture
+project: slopwork-fixture
 user: ryan
 remotes: 
-  repo: https://github.com/ryan/slopworks-fixture
+  repo: https://github.com/ryan/slopwork-fixture
   jira: https://fixtureorg.atlassian.net
 defaults: 
   stale_after: 60m

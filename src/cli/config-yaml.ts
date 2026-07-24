@@ -98,7 +98,7 @@ export function parseConfigYamlText(text: string): unknown {
     const trimmed = withoutComment.trim();
     const colonIdx = findKeyColon(trimmed);
     if (colonIdx === -1) {
-      throw new Error(`slopworks config.yaml: cannot parse line: "${rawLine}"`);
+      throw new Error(`slopwork config.yaml: cannot parse line: "${rawLine}"`);
     }
     const key = trimmed.slice(0, colonIdx).trim();
     const rest = trimmed.slice(colonIdx + 1).trim();
@@ -108,7 +108,7 @@ export function parseConfigYamlText(text: string): unknown {
     }
     const parentFrame = stack[stack.length - 1];
     if (!parentFrame) {
-      throw new Error(`slopworks config.yaml: unexpected indentation: "${rawLine}"`);
+      throw new Error(`slopwork config.yaml: unexpected indentation: "${rawLine}"`);
     }
 
     if (rest.length === 0) {

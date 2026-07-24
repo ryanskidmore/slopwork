@@ -51,7 +51,7 @@ describe("upsertGitignoreSection", () => {
     const { text, changed } = upsertGitignoreSection("", [".slop/db/index.jsonc"]);
     expect(changed).toBe(true);
     expect(text).toBe(
-      "# --- slopworks (managed by `slop init`) ---\n.slop/db/index.jsonc\n# --- end slopworks ---\n",
+      "# --- slopwork (managed by `slop init`) ---\n.slop/db/index.jsonc\n# --- end slopwork ---\n",
     );
   });
 
@@ -59,7 +59,7 @@ describe("upsertGitignoreSection", () => {
     const existing = "node_modules/\n*.log\n";
     const { text } = upsertGitignoreSection(existing, [".slop/db/index.jsonc"]);
     expect(text).toBe(
-      "node_modules/\n*.log\n\n# --- slopworks (managed by `slop init`) ---\n.slop/db/index.jsonc\n# --- end slopworks ---\n",
+      "node_modules/\n*.log\n\n# --- slopwork (managed by `slop init`) ---\n.slop/db/index.jsonc\n# --- end slopwork ---\n",
     );
   });
 
@@ -87,7 +87,7 @@ describe("upsertGitignoreSection", () => {
 
   it("preserves content on both sides of an existing managed section (it re-appends at the end, content is never dropped)", () => {
     const existing =
-      "before/\n\n# --- slopworks (managed by `slop init`) ---\n.slop/db/index.jsonc\n# --- end slopworks ---\nafter/\n";
+      "before/\n\n# --- slopwork (managed by `slop init`) ---\n.slop/db/index.jsonc\n# --- end slopwork ---\nafter/\n";
     const { text } = upsertGitignoreSection(existing, [".slop/db/index.jsonc"]);
     expect(text).toContain("before/");
     expect(text).toContain("after/");
@@ -105,8 +105,8 @@ describe("upsertGitignoreSection", () => {
   describe("tolerates a CRLF-line-ended .gitignore (Windows / core.autocrlf)", () => {
     it("recognizes an existing CRLF managed section and replaces it in place — no duplication", () => {
       const existingCrlf =
-        "before/\r\n\r\n# --- slopworks (managed by `slop init`) ---\r\n" +
-        ".slop/db/index.jsonc\r\n# --- end slopworks ---\r\nafter/\r\n";
+        "before/\r\n\r\n# --- slopwork (managed by `slop init`) ---\r\n" +
+        ".slop/db/index.jsonc\r\n# --- end slopwork ---\r\nafter/\r\n";
 
       const { text, changed } = upsertGitignoreSection(existingCrlf, [".slop/db/index.jsonc"]);
 
@@ -116,7 +116,7 @@ describe("upsertGitignoreSection", () => {
       // Exactly one managed section — the CRLF one was found and replaced,
       // not left behind alongside a freshly-appended second copy.
       expect(text.match(/index\.jsonc/g)).toHaveLength(1);
-      expect(text.match(/# --- slopworks/g)).toHaveLength(1);
+      expect(text.match(/# --- slopwork/g)).toHaveLength(1);
     });
 
     it("re-running init against its own CRLF output is idempotent (no duplicate section)", () => {
@@ -137,7 +137,7 @@ describe("upsertGitignoreSection", () => {
       const { text, changed } = upsertGitignoreSection(existing, [".slop/db/index.jsonc"]);
       expect(changed).toBe(true);
       expect(text).toBe(
-        "node_modules/\n*.log\n\n# --- slopworks (managed by `slop init`) ---\n.slop/db/index.jsonc\n# --- end slopworks ---\n",
+        "node_modules/\n*.log\n\n# --- slopwork (managed by `slop init`) ---\n.slop/db/index.jsonc\n# --- end slopwork ---\n",
       );
     });
   });
