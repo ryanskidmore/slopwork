@@ -1,5 +1,12 @@
 import type { Command } from "commander";
-import { repoPaths, requireRepoRoot, resolveTicketRef, updateTicket } from "../../repo/index.js";
+import {
+  readTicket,
+  repoPaths,
+  requireRepoRoot,
+  resolveTicketRef,
+  updateTicket,
+  withLock,
+} from "../../repo/index.js";
 import { buildUpdate } from "../../tickets/update.js";
 import type { UpdateInput } from "../../tickets/update.js";
 import { loadConfig, resolveActor } from "../actor.js";
@@ -20,23 +27,43 @@ async function runUpdate(ref: string, opts: UpdateCommandOptions): Promise<void>
   const config = await loadConfig(paths);
   const actor = resolveActor({ config, cwd: root });
 
-  const current = await resolveTicketRef(paths, ref);
+  // A read outside the lock is fine for resolving <ref> -> id (and
+  // surfacing NOT_FOUND/AMBIGUOUS_REF quickly on a cold ref); the decisive
+  // read-modify-write happens fresh, under the lock, below — same
+  // convention as start.ts/stop.ts/done.ts (see start.ts's comment on
+  // `initialTicket`) — otherwise a concurrent `start`/`stop`/`done` landing
+  // between this read and the write below would be silently reverted by
+  // `updateTicket`'s `writeCanonical(expectedAfter)` fallback.
+  const initialTicket = await resolveTicketRef(paths, ref);
 
   const specRaw =
     opts.spec === undefined ? undefined : opts.spec === "-" ? await readStdin() : opts.spec;
 
-  const input: UpdateInput = {
-    progress: opts.progress,
-    state: opts.state,
-    priority: opts.priority,
-    labelOps: opts.label,
-    name: opts.name,
-    specRaw,
-  };
+  const ticket = await withLock(paths.lockFile, async () => {
+    const current = await readTicket(paths, initialTicket.id);
 
-  const { ticket, patch, verb, payload } = buildUpdate(current, input);
+    const input: UpdateInput = {
+      progress: opts.progress,
+      state: opts.state,
+      priority: opts.priority,
+      labelOps: opts.label,
+      name: opts.name,
+      specRaw,
+    };
 
-  await updateTicket(paths, current.id, patch, ticket, { actor, session: null }, { verb, payload });
+    const { ticket, patch, verb, payload } = buildUpdate(current, input);
+
+    await updateTicket(
+      paths,
+      current.id,
+      patch,
+      ticket,
+      { actor, session: null },
+      { verb, payload },
+    );
+
+    return ticket;
+  });
 
   process.stdout.write(
     `updated ${ticket.id}  (slug: ${ticket.slug})\n` +
