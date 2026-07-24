@@ -51,7 +51,16 @@
  *   cwd more recently; `--transcript <path>` is the reliable path for
  *   anything else — findings.md §7 risk 3 frames `--harness codex`
  *   resolving to a `--transcript`-only flow as a first-class, expected
- *   v0 outcome, not a gap to paper over.
+ *   v0 outcome, not a gap to paper over. Fix 3 (below) additionally
+ *   refuses to guess at all — falls straight to `null` plus a warning,
+ *   rather than silently attaching the WRONG session's transcript — when
+ *   more than one cwd-matching rollout is newer than this session's own
+ *   `started_at`, i.e. exactly the case where a second, concurrent Codex
+ *   session in the same cwd could be the one actually holding the
+ *   newest mtime. `--transcript <path>` is the only reliable path once
+ *   that happens; there is no way to auto-disambiguate two truly
+ *   concurrent same-cwd Codex sessions without a session id Codex simply
+ *   does not expose.
  *
  * opencode — NO auto-detection in v0. opencode exposes no session id to
  *   the environment at all and stores sessions in a SQLite db, not flat
@@ -180,6 +189,38 @@
  * "could not locate" behaviour, unchanged. This lives entirely inside
  * `captureTranscript` itself, so all four callers get it for free and
  * cannot drift out of sync with each other.
+ *
+ * ---------------------------------------------------------------------
+ * Fix 3 (ticket_01KY93E3WYD13E71QM7GHWG1DE) — codex's newest-mtime
+ * heuristic refuses to guess under genuine ambiguity
+ * ---------------------------------------------------------------------
+ *
+ * `locateCodex`'s newest-mtime-among-cwd-matching-rollouts scan
+ * (implemented below) is exactly the "known-unsound case" findings.md §5
+ * calls out for its own step 3: two CONCURRENT Codex sessions in the same
+ * cwd both produce cwd-matching rollout files with very recent mtimes,
+ * and "newest" only answers "which rollout was touched most recently in
+ * this cwd," not "which one is THIS session's" — unlike claude-code,
+ * Codex has no session id to prefer instead (§1.3/§3.3), so there was
+ * previously no way to tell a correct pick from a lucky guess apart, and
+ * a wrong guess is silently wrong audit data — worse than a clean `null`.
+ *
+ * `locateCodex` now also takes the session's own `started_at` and
+ * refuses to pick anything — returns `path: null`, not a guess — when
+ * MORE THAN ONE cwd-matching rollout is newer than `started_at`: that is
+ * exactly the condition under which a second, concurrent Codex session in
+ * this same cwd could be the one actually holding the newest mtime. Zero
+ * or exactly one newer-than-`started_at` candidate is unambiguous (this
+ * session hasn't raced with another one in this cwd) and still resolves
+ * exactly as before — newest-mtime overall. `captureTranscript` folds an
+ * ambiguous refusal into a specific "refusing to guess" warning (still
+ * `transcript_ref: null`, never blocking — findings.md §6's guarantee is
+ * unaffected either way) instead of the generic "could not locate" one,
+ * by re-running the same cheap, bounded scan a second time purely to
+ * build that message — see its own inline comment for why that is fine.
+ * `--transcript <path>` remains the only reliable override once this
+ * happens; there is no way to auto-disambiguate two truly concurrent
+ * same-cwd Codex sessions without a session id Codex does not expose.
  */
 import { randomUUID } from "node:crypto";
 import {
@@ -369,9 +410,48 @@ function rolloutMatchesCwd(path: string, cwd: string): boolean {
   }
 }
 
-function locateCodex(codexHome: string, cwd: string): string | null {
+/** `session.started_at` (ISO 8601) -> epoch ms, or `null` if absent or
+ * unparseable — feeds `locateCodex`'s ambiguity check (Fix 3) only; never
+ * throws, and a `null` here simply disables that check (falls back to
+ * the old newest-mtime-overall behaviour), same never-block posture as
+ * everything else in this module. */
+function parseStartedAtMs(startedAt: string | null | undefined): number | null {
+  if (startedAt === null || startedAt === undefined) return null;
+  const ms = Date.parse(startedAt);
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/** {@link locateCodex}'s result — `path` is what callers actually use;
+ * `ambiguous`/`newerThanSessionCount` exist purely so `captureTranscript`
+ * can build a specific warning (Fix 3) without `locateTranscript` itself
+ * having to change its own `string | null` return contract. */
+interface CodexLocateResult {
+  path: string | null;
+  ambiguous: boolean;
+  /** Count of cwd-matching rollouts strictly newer than
+   * `sessionStartedAtMs` — 0 when that wasn't provided/parseable. Only
+   * meaningful when `ambiguous` is true (>1); a caller diagnosing a
+   * `null` result should check `ambiguous` first. */
+  newerThanSessionCount: number;
+}
+
+/**
+ * Fix 3 (ticket_01KY93E3WYD13E71QM7GHWG1DE): the same cwd-matching /
+ * date-partitioned scan as before, but now REFUSES to pick a "newest
+ * mtime" winner — returns `path: null, ambiguous: true` instead — when
+ * more than one cwd-matching rollout is newer than `sessionStartedAtMs`
+ * (see this module's top-of-file Fix 3 doc for the full rationale). Zero
+ * or exactly one newer-than-`started_at` candidate is unambiguous and
+ * resolves exactly as before: overall newest mtime among cwd matches.
+ */
+function locateCodex(
+  codexHome: string,
+  cwd: string,
+  sessionStartedAtMs: number | null,
+): CodexLocateResult {
   const sessionsDir = join(codexHome, "sessions");
   let best: { path: string; mtimeMs: number } | null = null;
+  let newerThanSessionCount = 0;
 
   for (const year of listSubdirsSync(sessionsDir)) {
     const yearDir = join(sessionsDir, year);
@@ -386,11 +466,18 @@ function locateCodex(codexHome: string, cwd: string): string | null {
           const mtimeMs = mtimeMsSync(full);
           if (mtimeMs === null) continue;
           if (best === null || mtimeMs > best.mtimeMs) best = { path: full, mtimeMs };
+          if (sessionStartedAtMs !== null && mtimeMs > sessionStartedAtMs) {
+            newerThanSessionCount++;
+          }
         }
       }
     }
   }
-  return best?.path ?? null;
+
+  if (sessionStartedAtMs !== null && newerThanSessionCount > 1) {
+    return { path: null, ambiguous: true, newerThanSessionCount };
+  }
+  return { path: best?.path ?? null, ambiguous: false, newerThanSessionCount };
 }
 
 // ---------------------------------------------------------------------------
@@ -415,14 +502,25 @@ function locateCodex(codexHome: string, cwd: string): string | null {
  *   2. Env-derived session id (claude-code only — opencode/codex never
  *      expose one, findings.md §1.2/§1.3, so this is an unconditional
  *      no-op for them).
- *   3. Newest-mtime heuristic, scoped per harness, LAST RESORT.
- *   4. Nothing found → `null`.
+ *   3. Newest-mtime heuristic, scoped per harness, LAST RESORT. For
+ *      codex specifically, this now REFUSES to pick (falls to step 4)
+ *      when more than one cwd-matching candidate is newer than
+ *      `sessionStartedAt` — see Fix 3 in this module's top-of-file doc.
+ *   4. Nothing found (or step 3's codex ambiguity refusal fired) → `null`.
+ *
+ * `sessionStartedAt` (ISO 8601, optional) is the session's own
+ * `started_at` — pass it whenever it's known (every real caller has it;
+ * `captureTranscript` below always supplies it). Omitting it disables
+ * ONLY step 3's codex ambiguity check (falls back to the pre-Fix-3
+ * newest-mtime-overall behaviour) — every other harness/step is
+ * unaffected either way.
  */
 export function locateTranscript(
   harness: Harness,
   cwd: string,
   explicitTranscriptPath?: string | null,
   roots: LocateTranscriptRoots = {},
+  sessionStartedAt?: string | null,
 ): string | null {
   try {
     if (
@@ -445,7 +543,7 @@ export function locateTranscript(
       case "claude-code":
         return locateClaudeCode(claudeHome, cwd, harness.session_id);
       case "codex":
-        return locateCodex(codexHome, cwd);
+        return locateCodex(codexHome, cwd, parseStartedAtMs(sessionStartedAt)).path;
       case "opencode":
       case "other":
         // No auto-detection for either in v0 — see this module's doc.
@@ -618,6 +716,7 @@ export async function captureTranscript(
       cwd,
       explicitTranscriptPath,
       resolvedRoots,
+      session.started_at,
     );
 
     if (sourcePath === null) {
@@ -628,6 +727,28 @@ export async function captureTranscript(
       const explicitNote = hadExplicit
         ? ` (the given --transcript path "${explicitTranscriptPath}" does not exist or is not a readable file)`
         : "";
+
+      // Fix 3 (ticket_01KY93E3WYD13E71QM7GHWG1DE): `locateTranscript`'s
+      // codex branch above already refused to return a (possibly WRONG)
+      // guessed path when the cwd-matching-rollout scan was genuinely
+      // ambiguous — see this module's top-of-file Fix 3 doc. This
+      // re-runs that SAME cheap, bounded scan a second time, ONLY on
+      // this already-"nothing to copy" path, purely so the warning below
+      // can say *why* (ambiguity vs. genuinely nothing found) instead of
+      // both collapsing into the same generic message.
+      let ambiguityNote = "";
+      if (session.harness.kind === "codex") {
+        const codexHome =
+          resolvedRoots.codexHome ?? process.env.CODEX_HOME ?? join(homedir(), ".codex");
+        const diag = locateCodex(codexHome, cwd, parseStartedAtMs(session.started_at));
+        if (diag.ambiguous) {
+          ambiguityNote =
+            ` — ${diag.newerThanSessionCount} candidate Codex rollout files in this cwd are all ` +
+            "newer than this session's own started_at (Codex exposes no session id, so mtime is " +
+            "the only signal available); refusing to guess which one is this session's rather " +
+            "than risk silently attaching another concurrent session's transcript";
+        }
+      }
 
       // Fix 2 (ticket_01KY9NVM1YRM1F7NX1QS5JJAW1): a RECAPTURE that finds
       // nothing new must not clobber a transcript_ref an EARLIER capture
@@ -642,8 +763,9 @@ export async function captureTranscript(
           sourcePath: null,
           warning:
             `no new transcript located for session ${session.id} on this recapture ` +
-            `(harness=${session.harness.kind})${explicitNote} — kept the previously-captured ` +
-            `transcript (${session.transcript_ref}) rather than resetting it to null.`,
+            `(harness=${session.harness.kind})${explicitNote}${ambiguityNote} — kept the ` +
+            `previously-captured transcript (${session.transcript_ref}) rather than resetting ` +
+            "it to null.",
         };
       }
 
@@ -652,7 +774,7 @@ export async function captureTranscript(
         sourcePath: null,
         warning:
           `could not locate a transcript for session ${session.id} (harness=${session.harness.kind})` +
-          `${explicitNote} — recording transcript_ref: null, never blocking. Pass ` +
+          `${explicitNote}${ambiguityNote} — recording transcript_ref: null, never blocking. Pass ` +
           "--transcript <path> next time to point at it directly.",
       };
     }

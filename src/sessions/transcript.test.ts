@@ -271,6 +271,99 @@ describe("locateTranscript — codex", () => {
 });
 
 // ---------------------------------------------------------------------------
+// locateTranscript — codex Fix 3 (ticket_01KY93E3WYD13E71QM7GHWG1DE):
+// refuses to guess under genuine cwd-matching-rollout ambiguity
+// ---------------------------------------------------------------------------
+
+describe("locateTranscript — codex Fix 3: ambiguity refusal", () => {
+  async function fakeCodexHome(): Promise<string> {
+    const codexHome = join(scratch, "fake-codex-home-fix3");
+    await mkdir(codexHome, { recursive: true });
+    return codexHome;
+  }
+
+  function sessionMetaLine(cwd: string, id: string): string {
+    return `${JSON.stringify({ timestamp: "2026-01-01T00:00:00Z", type: "session_meta", payload: { id, cwd } })}\n`;
+  }
+
+  it("returns null (refuses to guess) when TWO cwd-matching rollouts are both newer than the session's started_at, instead of silently picking the newest one", async () => {
+    const codexHome = await fakeCodexHome();
+    const cwd = "/concurrent/codex/project";
+    // Both rollouts below are written well after this — the exact shape
+    // of two genuinely concurrent Codex sessions racing in the same cwd.
+    const sessionStartedAt = "2020-01-01T00:00:00.000Z";
+
+    const dayDir = join(codexHome, "sessions", "2026", "06", "01");
+    await mkdir(dayDir, { recursive: true });
+    const rolloutA = join(dayDir, "rollout-2026-06-01T01-00-00-aaa.jsonl");
+    await writeFile(rolloutA, sessionMetaLine(cwd, "aaa"), "utf8");
+    await new Promise((r) => setTimeout(r, 5));
+    const rolloutB = join(dayDir, "rollout-2026-06-01T02-00-00-bbb.jsonl");
+    await writeFile(rolloutB, sessionMetaLine(cwd, "bbb"), "utf8");
+
+    const roots: LocateTranscriptRoots = { codexHome };
+    // Sanity check first: without the ambiguity check (no started_at
+    // passed), this exact fixture WOULD resolve to rolloutB (newest) —
+    // proving the null below comes from the new refusal, not from the
+    // fixture failing to match at all.
+    expect(locateTranscript(harness("codex", null), cwd, undefined, roots)).toBe(rolloutB);
+    expect(
+      locateTranscript(harness("codex", null), cwd, undefined, roots, sessionStartedAt),
+    ).toBeNull();
+  });
+
+  it("a SINGLE cwd-matching rollout newer than started_at still attaches (unambiguous), even alongside older cwd-matching rollouts", async () => {
+    const codexHome = await fakeCodexHome();
+    const cwd = "/single-match/codex/project";
+
+    // Real mtimes (not the date-partitioned directory names, which are
+    // just a path convention) drive the ambiguity check, so this uses
+    // actual wall-clock ordering with a small sleep either side of the
+    // `started_at` cutoff, same as every other mtime-ordering test in
+    // this file (e.g. the "finds the newest rollout ..." test above).
+    const oldDayDir = join(codexHome, "sessions", "2026", "05", "01");
+    await mkdir(oldDayDir, { recursive: true });
+    const oldRollout = join(oldDayDir, "rollout-2026-05-01T00-00-00-old.jsonl");
+    await writeFile(oldRollout, sessionMetaLine(cwd, "old"), "utf8");
+
+    // started_at sits strictly between the old rollout above and the new
+    // one below, so exactly ONE cwd-matching candidate ends up newer.
+    await new Promise((r) => setTimeout(r, 5));
+    const sessionStartedAt = new Date().toISOString();
+    await new Promise((r) => setTimeout(r, 5));
+
+    const newDayDir = join(codexHome, "sessions", "2026", "07", "23");
+    await mkdir(newDayDir, { recursive: true });
+    const newRollout = join(newDayDir, "rollout-2026-07-23T00-00-00-new.jsonl");
+    await writeFile(newRollout, sessionMetaLine(cwd, "new"), "utf8");
+
+    const roots: LocateTranscriptRoots = { codexHome };
+    expect(locateTranscript(harness("codex", null), cwd, undefined, roots, sessionStartedAt)).toBe(
+      newRollout,
+    );
+  });
+
+  it("omitting sessionStartedAt entirely preserves the pre-Fix-3 newest-mtime-overall behaviour — no ambiguity check performed", async () => {
+    const codexHome = await fakeCodexHome();
+    const cwd = "/no-started-at/codex/project";
+
+    const dayDir = join(codexHome, "sessions", "2026", "06", "01");
+    await mkdir(dayDir, { recursive: true });
+    await writeFile(
+      join(dayDir, "rollout-2026-06-01T01-00-00-aaa.jsonl"),
+      sessionMetaLine(cwd, "aaa"),
+      "utf8",
+    );
+    await new Promise((r) => setTimeout(r, 5));
+    const rolloutB = join(dayDir, "rollout-2026-06-01T02-00-00-bbb.jsonl");
+    await writeFile(rolloutB, sessionMetaLine(cwd, "bbb"), "utf8");
+
+    const roots: LocateTranscriptRoots = { codexHome };
+    expect(locateTranscript(harness("codex", null), cwd, undefined, roots)).toBe(rolloutB);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // locateTranscript — opencode / other: no v0 auto-detection
 // ---------------------------------------------------------------------------
 
@@ -390,6 +483,38 @@ describe("captureTranscript", () => {
     expect(result.transcriptRef).toBeNull();
     expect(result.warning).not.toBeNull();
     expect(result.warning).toMatch(new RegExp(session.id));
+  });
+
+  it("Fix 3 (ticket_01KY93E3WYD13E71QM7GHWG1DE): codex ambiguity refusal — null transcriptRef with a warning explaining WHY (not the generic 'could not locate' message), suggesting --transcript", async () => {
+    const paths = repoPaths(scratch);
+    const codexHome = join(scratch, "fake-codex-home-capture-fix3");
+    const cwd = "/concurrent/codex/capture-project";
+    const sessionStartedAt = "2020-01-01T00:00:00.000Z";
+    const session = makeSession({ harness: harness("codex"), started_at: sessionStartedAt });
+
+    const dayDir = join(codexHome, "sessions", "2026", "06", "01");
+    await mkdir(dayDir, { recursive: true });
+    const metaLine = (id: string) =>
+      `${JSON.stringify({ timestamp: "2026-01-01T00:00:00Z", type: "session_meta", payload: { id, cwd } })}\n`;
+    await writeFile(join(dayDir, "rollout-2026-06-01T01-00-00-aaa.jsonl"), metaLine("aaa"), "utf8");
+    await new Promise((r) => setTimeout(r, 5));
+    await writeFile(join(dayDir, "rollout-2026-06-01T02-00-00-bbb.jsonl"), metaLine("bbb"), "utf8");
+
+    const result = await captureTranscript({
+      session,
+      paths,
+      cwd,
+      transcriptsMode: "local",
+      roots: { codexHome },
+    });
+
+    expect(result.transcriptRef).toBeNull();
+    expect(result.sourcePath).toBeNull();
+    expect(result.warning).not.toBeNull();
+    // Distinguishes the ambiguity refusal from the generic "could not
+    // locate" wording exercised by the test above.
+    expect(result.warning).toMatch(/ambiguous|refus/i);
+    expect(result.warning).toContain("--transcript");
   });
 
   it("mentions the given --transcript path explicitly in the warning when it was provided but didn't exist", async () => {

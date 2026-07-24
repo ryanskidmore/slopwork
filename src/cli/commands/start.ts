@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { Clock } from "../../core/clock.js";
 import { systemClock } from "../../core/clock.js";
-import type { EventVerb, HarnessKind, Session } from "../../core/index.js";
+import type { EventVerb, HarnessKind, Session, SessionId } from "../../core/index.js";
 import {
   EXIT_CODES,
   HARNESS_KINDS,
@@ -16,6 +16,7 @@ import {
   repoPaths,
   requireRepoRoot,
   resolveTicketRef,
+  sessionFilePath,
   updateTicket,
   updateSession,
   withLock,
@@ -135,9 +136,59 @@ async function runStart(ref: string, opts: StartCommandOptions): Promise<void> {
     const isReviewReentry = current.state === "review";
 
     let previousSession: Session | null = null;
+    // ticket_01KY93E3WYD13E71QM7GHWG1DE (Fix 2): a recorded active
+    // session whose file can't be READ (corrupt/missing — as distinct
+    // from `current.active_session === null`, i.e. no active session at
+    // all) is tracked separately from `previousSession` below, since we
+    // can never safely build/patch an "ended previous session" object we
+    // never managed to read. Non-null here is what still gates/logs a
+    // takeover in that case.
+    let unreadableActiveSessionId: SessionId | null = null;
     if (current.active_session !== null) {
-      const existing = await readSession(paths, current.active_session).catch(() => null);
-      if (existing !== null && existing.ended_at === null) {
+      let existing: Session | null = null;
+      let readFailed = false;
+      try {
+        existing = await readSession(paths, current.active_session);
+      } catch {
+        readFailed = true;
+      }
+
+      if (readFailed) {
+        // FAIL CLOSED (the actual fix — was
+        // `readSession(...).catch(() => null)`, which made an unreadable
+        // active-session file indistinguishable from "nothing active" and
+        // let `start` silently proceed with no --takeover required and no
+        // session.takeover event: exactly the audit-trail gap this ticket
+        // closes). We can't know whether the broken file's session was
+        // genuinely still active or already ended, so — same as a
+        // confirmed-active session — this conservatively requires
+        // --takeover to proceed at all. D15 review re-entry is exempted
+        // for the same reason it always was (see buildReenteredSession's
+        // doc above): it isn't a takeover of someone else's work.
+        if (!isReviewReentry) {
+          if (!opts.takeover) {
+            throw new SlopError(
+              `ticket "${current.name}" (${current.slug}) has an active session recorded ` +
+                `(${current.active_session}) but that session's file could not be read ` +
+                "(missing or corrupt) — refusing to start without --takeover, since another " +
+                "session may genuinely still be active.\n" +
+                "Pass --takeover to proceed anyway; only do this when a human explicitly " +
+                "instructed you to (see .slop/AGENTS.md).",
+              EXIT_CODES.CONFLICT,
+            );
+          }
+          // --takeover was passed: proceed, but there is no readable
+          // session object to end/patch here (attempting to would either
+          // throw on a genuinely missing file — aborting this whole
+          // `start` outright — or blindly overwrite an already-broken
+          // one) — `previousSession` intentionally stays null; the
+          // printWarning after the transaction commits (below, in
+          // `runStart`) names the exact broken file so a human can go
+          // look, and the `session.started` event below still records
+          // this as a takeover via `unreadableActiveSessionId`.
+          unreadableActiveSessionId = current.active_session;
+        }
+      } else if (existing !== null && existing.ended_at === null) {
         if (isReviewReentry) {
           previousSession = existing;
         } else if (!opts.takeover) {
@@ -160,8 +211,15 @@ async function runStart(ref: string, opts: StartCommandOptions): Promise<void> {
           // `takeover` stays true ONLY for a genuine --takeover seizure —
           // a review re-entry is ordinary expected usage, not a takeover,
           // even though it mechanically also supersedes a live session.
-          takeover: previousSession !== null && !isReviewReentry,
+          // An unreadable-but-recorded active session (Fix 2) still
+          // counts: it's the only place that takeover gets logged at all,
+          // since there's no readable previous session to end/patch.
+          takeover:
+            (previousSession !== null || unreadableActiveSessionId !== null) && !isReviewReentry,
           ...(isReviewReentry ? { re_entry: true } : {}),
+          ...(unreadableActiveSessionId !== null
+            ? { unreadable_previous_session: unreadableActiveSessionId }
+            : {}),
         },
       },
     );
@@ -222,10 +280,37 @@ async function runStart(ref: string, opts: StartCommandOptions): Promise<void> {
       }
     }
 
-    return { session, ticket: startedTicket, previousSession, isReviewReentry };
+    return {
+      session,
+      ticket: startedTicket,
+      previousSession,
+      isReviewReentry,
+      unreadableActiveSessionId,
+    };
   });
 
+  // ticket_01KY93E3WYD13E71QM7GHWG1DE (Fix 2): surfaced AFTER the
+  // transaction commits, same posture as `warnings` above — never a
+  // reason for `start` itself to fail once --takeover already cleared
+  // the gate, but naming the exact broken file so a human/agent can go
+  // repair or delete it, per the ticket's "warn naming the unreadable
+  // session file" requirement.
+  if (result.unreadableActiveSessionId !== null) {
+    printWarning(
+      `ticket ${result.ticket.id} (${result.ticket.slug}) had an active session recorded ` +
+        `(${result.unreadableActiveSessionId}) whose file could not be read (missing or ` +
+        `corrupt): ${sessionFilePath(paths, result.unreadableActiveSessionId)}\n` +
+        "  proceeded via --takeover, but that broken session could not be ended/logged as " +
+        "superseded — only this new session's own session.started event records the takeover. " +
+        "Inspect/repair or remove the file above manually.",
+    );
+  }
+
   for (const w of warnings) printWarning(w);
+
+  const tookOver =
+    (result.previousSession !== null || result.unreadableActiveSessionId !== null) &&
+    !result.isReviewReentry;
 
   if (opts.json) {
     // E1: a small, stable `--json` result — the id/slug an agent's next
@@ -248,7 +333,7 @@ async function runStart(ref: string, opts: StartCommandOptions): Promise<void> {
       },
       git: { branch: git.branch, commit_at_start: git.commit_at_start },
       re_entry: result.previousSession !== null && result.isReviewReentry,
-      takeover: result.previousSession !== null && !result.isReviewReentry,
+      takeover: tookOver,
       warnings,
     };
     process.stdout.write(`${JSON.stringify(body, null, 2)}\n`);
@@ -265,7 +350,10 @@ async function runStart(ref: string, opts: StartCommandOptions): Promise<void> {
         ? result.isReviewReentry
           ? `  re-entered from review (changes requested, D15); closed out ${describeActiveSession(result.previousSession)}\n`
           : `  took over from ${describeActiveSession(result.previousSession)}\n`
-        : ""),
+        : result.unreadableActiveSessionId !== null
+          ? `  took over from an active session recorded on this ticket that could not be read ` +
+            `(${result.unreadableActiveSessionId}) — see warning above\n`
+          : ""),
   );
 
   // §5.2: "one command to full context" — start prints the pack every time.
