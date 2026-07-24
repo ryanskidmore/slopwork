@@ -1,0 +1,17 @@
+{
+  "id": "event_01KYAXMW3HYWKAAV4WSKC6MHF6",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYAPJWK1AC66QP7RDCJPHX7J"
+  },
+  "payload": {
+    "progress": "Unified exit code: web.ts now uses shared requireRepoRoot/repoPaths (was local findSlopRoot + bare GENERIC_ERROR). Updated web.test.ts, README, cli-reference.md, exit-codes.ts docs. Full verification suite green."
+  },
+  "at": "2026-07-24T20:39:08.657Z"
+}

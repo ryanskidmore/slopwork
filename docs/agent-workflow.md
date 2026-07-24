@@ -100,8 +100,8 @@ you're operating on the wrong ticket, or a stale `<ref>`.
 
 ## Reference resolution
 
-Anywhere a `<ref>` is accepted: a full id (`ticket_01J9X7M3E8W2`), a unique
-short prefix (`01J9X7`), a slug (`adding-new-auth-provider`), a short
+Anywhere a `<ref>` is accepted: a full id (`ticket_01KY9RVF2DCG6TDQ8EBSGXQXT1`),
+a unique short prefix (`01KY9R`), a slug (`adding-new-auth-provider`), a short
 `t-<code>` handle, and — for `--parent` only — an external ref
 (`jira:PROJ-123`). An ambiguous prefix makes the CLI error and list every
 candidate; pick explicitly. Full rules:

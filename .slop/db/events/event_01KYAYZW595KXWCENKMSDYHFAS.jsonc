@@ -1,0 +1,17 @@
+{
+  "id": "event_01KYAYZW595KXWCENKMSDYHFAS",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYAPMH96595NEJNKPSZH6XT5"
+  },
+  "payload": {
+    "progress": "Unit was already reconciled to chars everywhere in live code (show --context migrated to renderContextPackWithBudget earlier); fixed the stale docs still claiming a token-estimate inconsistency and removed the now-dead budgetCharsFromTokens helper. Added shared parseBudgetOption (shared.ts) rejecting negative --budget consistently across ready/search/status/events/show/context (context's old local parser is now an alias). Also fixed a pre-existing tiny-budget overshoot bug in renderContextPack's truncation note. Full verification suite green."
+  },
+  "at": "2026-07-24T21:02:37.737Z"
+}

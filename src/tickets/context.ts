@@ -24,16 +24,6 @@ export interface ContextPackData {
   sessions: Session[];
 }
 
-/** Rough token->char conversion for `--budget N` (E1 generalises this
- * properly; this is the "if you can do so cheaply" version B1's brief
- * asks for) — ~4 characters per token is a standard rough-order-of
- * -magnitude estimate for English prose and JSON-ish text alike. */
-export const CHARS_PER_TOKEN_ESTIMATE = 4;
-
-export function budgetCharsFromTokens(budgetTokens: number): number {
-  return Math.max(0, Math.floor(budgetTokens * CHARS_PER_TOKEN_ESTIMATE));
-}
-
 const TRUNCATION_NOTE = "\n\n… [truncated to fit --budget]";
 
 function sessionLine(session: Session): string {
@@ -47,7 +37,17 @@ function sessionLine(session: Session): string {
 /**
  * Render the context pack as plain text. `budgetChars`, when given, caps
  * the output length (post-render truncation with a note — cheap, not
- * section-aware; E1's `--budget` generalisation can make this smarter).
+ * section-aware).
+ *
+ * No live command calls this with a `budgetChars` today: `slop show
+ * --context`/`slop context` both went through `sessions/context-budget.ts`'s
+ * `renderContextPackWithBudget` instead (E1's smarter, section-aware
+ * elider — drops oldest sessions, then long `spec.details_md`, before ever
+ * falling back to a raw slice of ITS OWN output, never this function's).
+ * `budgetChars` stays a supported parameter of this function itself
+ * (exercised directly by this file's own tests) rather than being removed,
+ * since it's still the simplest correct primitive `renderContextPackWithBudget`
+ * builds on.
  */
 export function renderContextPack(data: ContextPackData, budgetChars?: number): string {
   const { ticket } = data;
@@ -113,8 +113,18 @@ export function renderContextPack(data: ContextPackData, budgetChars?: number): 
 
   let text = lines.join("\n");
   if (budgetChars !== undefined && text.length > budgetChars) {
-    const keep = Math.max(0, budgetChars - TRUNCATION_NOTE.length);
-    text = `${text.slice(0, keep)}${TRUNCATION_NOTE}`;
+    // budget-flags-units-and-validation: for a `budgetChars` smaller than
+    // TRUNCATION_NOTE's own length, `slice(0, keep) + TRUNCATION_NOTE` used
+    // to overshoot — `keep` floors at 0, but the note itself still gets
+    // appended in full, so the result stays longer than `budgetChars` (e.g.
+    // `budgetChars=10` still returned all ~32 characters of the note alone).
+    // A raw slice, with no note, is the only thing that can never exceed a
+    // budget this tiny — same reasoning context-budget.ts's smarter elider
+    // uses for ITS own last-resort raw-slice step.
+    text =
+      budgetChars < TRUNCATION_NOTE.length
+        ? text.slice(0, Math.max(0, budgetChars))
+        : `${text.slice(0, budgetChars - TRUNCATION_NOTE.length)}${TRUNCATION_NOTE}`;
   }
   return text;
 }

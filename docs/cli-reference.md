@@ -11,7 +11,10 @@ order — lowest-priority tickets, stale rows before review rows before
 in-progress rows, oldest sessions before long spec prose, etc. — is
 documented per-command below and in each command's own `--help`). With
 `--json`, hitting the budget never produces truncated/invalid JSON — it
-degrades to a smaller, still-valid envelope instead.
+degrades to a smaller, still-valid envelope instead. `--budget` counts in
+characters on every command it appears on — `ready`, `search`, `status`,
+`events`, `context`, and `show --context` — and rejects a negative value
+as a usage error (exit `2`) rather than silently eliding everything.
 
 ## Ref resolution
 
@@ -42,10 +45,22 @@ so a driving agent can branch on `$?` instead of scraping output:
 | 0 | `SUCCESS` | Command completed successfully. |
 | 1 | `GENERIC_ERROR` | Unexpected runtime error (I/O failure, bug, etc). |
 | 2 | `USAGE_ERROR` | Bad invocation — missing/invalid arguments or flags. |
-| 3 | `NOT_IMPLEMENTED` | Command is registered but its body isn't built yet. |
-| 4 | `NOT_FOUND` | A `<ref>` did not resolve to any entity. |
+| 3 | `NOT_IMPLEMENTED` | **Reserved, currently unreachable** — no command throws it today; see below. |
+| 4 | `NOT_FOUND` | A `<ref>` did not resolve to any entity, or no `.slop/` repo was found. |
 | 5 | `AMBIGUOUS_REF` | A short-prefix or slug `<ref>` matched more than one entity. |
 | 6 | `CONFLICT` | Illegal state transition or other conflicting operation. |
+
+`NOT_IMPLEMENTED` (3) was scaffolding for a command registered but not yet built during early v0
+— by design every §4.2 command shipped a real implementation before v0 was done, so no command
+exits 3 today and no test asserts one does (it would break the moment that command's own work item
+landed, which is exactly what happened to this suite's prior assertion about `status`). The code
+stays reserved (not repurposed for something else) rather than removed, in case a future command
+is scaffolded the same way.
+
+`NOT_FOUND` (4) is also what every command throws when it can't find a `.slop/` repo — walking up
+from the cwd the same way `git` looks for `.git/` (`requireRepoRoot`, `src/repo/paths.ts`). This
+includes `slop web`, which used to run its own separate discovery and exit `1` instead; it now
+shares the same discovery and exit code as every other command.
 
 ---
 

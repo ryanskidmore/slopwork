@@ -109,7 +109,7 @@ import {
 } from "../../repo/index.js";
 import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
 import { SlopError } from "../errors.js";
-import { parseIntegerOption } from "./shared.js";
+import { parseBudgetOption, parseIntegerOption } from "./shared.js";
 
 interface EventsOptions {
   since?: string;
@@ -363,7 +363,7 @@ export function registerEventsCommand(program: Command): void {
       "--budget <n>",
       `cap output size to N ${CONTEXT_PACK_BUDGET_UNIT} (elides the newest trailing events first, ` +
         "adjusting next_cursor/has_more to match what's actually returned)",
-      parseIntegerOption("--budget"),
+      parseBudgetOption,
     )
     .action(runEvents);
 }

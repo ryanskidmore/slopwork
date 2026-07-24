@@ -184,6 +184,31 @@ describe("new --relates-to <ref>: sets a relates-to edge (ticket_01KYA3Z9FNZ2FDM
   });
 });
 
+// docs-exit-3-documented-as: `--owner`'s help text used to claim "roots
+// require a human owner, D1" — D1 (design.md) is only the POLICY that root
+// tickets should have a human owner; enforcing it is a separate, not-yet-
+// built work item (design.md §6, F4 "Root ownership enforcement"). Nothing
+// in the schema/command actually rejects a root ticket created without
+// `--owner` (owner is a plain nullable field), so the old help text
+// promised a constraint the CLI doesn't enforce.
+describe("new --owner: help text matches actual (unenforced) behavior", () => {
+  it("--help does not claim root tickets require a human owner", () => {
+    const result = spawnSync("bun", [cliEntry, "new", "--help"], { encoding: "utf8" });
+    expect(result.stdout).not.toMatch(/require.*human owner/i);
+  });
+
+  it("a root ticket (no --parent) is created successfully with no --owner given", async () => {
+    const root = await makeFixtureRepo();
+    const result = mustRunSlop(["new", "Ownerless root ticket", "--json"], root);
+    const created = JSON.parse(result.stdout) as { id: string; parent: unknown };
+    expect(created.parent).toBeNull();
+
+    const show = mustRunSlop(["show", created.id, "--json"], root);
+    const shown = JSON.parse(show.stdout) as { ticket: { owner: unknown } };
+    expect(shown.ticket.owner).toBeNull();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // In-process coverage of `runNew` (real v8 coverage, no subprocess) —
 // tests/support/cli-harness.ts's withCwd/bootstrapRepo/captureOutput.

@@ -21,7 +21,7 @@ import { jiraBrowseUrl } from "../../tickets/jira.js";
 import type { TreeNode } from "../../tickets/tree.js";
 import { buildTree, renderTreeLines } from "../../tickets/tree.js";
 import { loadConfig } from "../actor.js";
-import { parseIntegerOption } from "./shared.js";
+import { parseBudgetOption } from "./shared.js";
 
 interface ShowCommandOptions {
   context?: boolean;
@@ -228,7 +228,7 @@ export function registerShowCommand(program: Command): void {
       "--budget <n>",
       `cap --context output to N ${CONTEXT_PACK_BUDGET_UNIT} (has no effect without --context — a ` +
         "single ticket/tree is never elided; see this command's floor-behavior doc)",
-      parseIntegerOption("--budget"),
+      parseBudgetOption,
     )
     .option("--json", "machine-readable output (ticket, and --tree/--context when given)")
     .action(runShow);

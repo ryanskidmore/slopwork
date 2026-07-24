@@ -182,7 +182,14 @@ export function registerNewCommand(program: Command): void {
     )
     .option("--draft", "create in draft state (drafts never appear in `ready`)")
     .option("--adhoc", "mark as created outside normal planning")
-    .option("--owner <actor>", "owning actor (roots require a human owner, D1)")
+    // docs-exit-3-documented-as: this used to say "(roots require a human
+    // owner, D1)" — D1 is design.md's POLICY that root tickets should have
+    // a human owner, but enforcing it is a separate, not-yet-built work
+    // item (design.md §6, F4 "Root ownership enforcement"). Nothing today
+    // rejects `slop new` for a root ticket with no `--owner` (owner is a
+    // plain nullable field, core/entities/ticket.ts), so the old text
+    // claimed a requirement the CLI doesn't actually enforce.
+    .option("--owner <actor>", "owning actor for this ticket (optional; defaults to unowned)")
     .option("--priority <0-3>", "priority: 0 urgent .. 3 low, default 2", parsePriority)
     .option(
       "--slug <slug>",

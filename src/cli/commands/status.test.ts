@@ -203,13 +203,19 @@ describe("status: surfaces the t-<code> short handle (ticket_01KY9RVF2DCG6TDQ8EB
 
     const json = runSlop(["status", "--json"], paths.root, fakeNow);
     const body = JSON.parse(json.stdout) as {
-      stale: { id: string; slug: string; name: string; state: string }[];
+      stale: { id: string; slug: string; handle: string; name: string; state: string }[];
     };
-    // Exactly the 4 documented fields — no `handle` here (deliberately;
-    // tests/acceptance/D4.test.ts and C5.test.ts pin this exact shape
-    // with `toEqual`, outside this ticket's edit allowlist to update).
+    // handle-t-code-missing-from: stale rows now carry `handle` too, same
+    // as in_progress/review — tests/acceptance/D4.test.ts and C5.test.ts's
+    // `toEqual` pins were updated alongside this one.
     expect(body.stale).toEqual([
-      { id: ticket.id, slug: ticket.slug, name: ticket.name, state: "in_progress" },
+      {
+        id: ticket.id,
+        slug: ticket.slug,
+        handle: expectedHandle,
+        name: ticket.name,
+        state: "in_progress",
+      },
     ]);
   });
 
@@ -343,7 +349,13 @@ describe("runStatus (in-process)", () => {
     }
     const body = JSON.parse(out.stdout()) as { stale: { id: string; state: string }[] };
     expect(body.stale).toEqual([
-      { id, slug: expect.any(String), name: expect.any(String), state: "in_progress" },
+      {
+        id,
+        slug: expect.any(String),
+        handle: expect.any(String),
+        name: expect.any(String),
+        state: "in_progress",
+      },
     ]);
   });
 

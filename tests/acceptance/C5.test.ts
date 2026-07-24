@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { fixedClock } from "../../src/core/clock.js";
-import { newSessionId, newTicketId, ticketSchema } from "../../src/core/index.js";
+import { newSessionId, newTicketId, shortTicketCode, ticketSchema } from "../../src/core/index.js";
 import type { Ticket } from "../../src/core/index.js";
 import type { DbIndex, RepoPaths } from "../../src/repo/index.js";
 import {
@@ -265,7 +265,13 @@ describe("C5: Staleness", () => {
         const json = statusJson(paths.root, { SLOP_STATUS_FAKE_NOW: "2026-07-23T11:00:01.000Z" });
         expect(json.derived.stale).toBe(1);
         expect(json.stale).toEqual([
-          { id: t.id, slug: t.slug, name: t.name, state: "in_progress" },
+          {
+            id: t.id,
+            slug: t.slug,
+            handle: shortTicketCode(t.id),
+            name: t.name,
+            state: "in_progress",
+          },
         ]);
       });
     });

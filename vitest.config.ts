@@ -64,10 +64,12 @@ export default defineConfig({
         // `slop web`'s CLI wrapper — imports `../../web/index.js`, which
         // re-exports `startWebServer` from the now-excluded server.ts, so
         // it transitively fails to import under vitest the same way.
-        // web.test.ts already covers this file's OWN pure logic
-        // (parsePort, findSlopRoot) by testing those directly rather than
-        // through this exclusion; the full command is exercised via the
-        // same spawned acceptance suites as server.ts above.
+        // web.test.ts already covers this file's OWN pure logic (parsePort)
+        // by testing it directly rather than through this exclusion; repo
+        // root discovery itself is the shared `requireRepoRoot`
+        // (src/repo/paths.ts, covered by its own unit tests), and the full
+        // command is exercised via the same spawned acceptance suites as
+        // server.ts above.
         "src/cli/commands/web.ts",
         // The root CLI entrypoint (`bin/slop.mjs`'s target, and `bun
         // build --compile`'s target for `dist/slop`) — imports

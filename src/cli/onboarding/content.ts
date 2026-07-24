@@ -122,9 +122,20 @@ export const HOUSE_RULES: readonly string[] = [
   "**Budget your reads.** `ready`, `status`, `search`, `events`, and `context` all take `--json --budget N` to cap output (`show --context` too); use `slop context <ref>` to re-load your bearings after compaction instead of re-exploring the repo.",
 ] as const;
 
-/** Reference resolution rule (the pre-v0 draft, unchanged). */
+/**
+ * Reference resolution rule (the pre-v0 draft) — handle-t-code-missing-from:
+ * two fixes to the original text. (1) it omitted the short `t-<code>`
+ * handle (core/ids.ts's `shortTicketCode`, printed by `slop new`/`slop
+ * show`/`slop status`/`slop ready`/`slop search`) from the list of forms a
+ * `<ref>` may take, even though `src/repo/refs.ts`'s resolver has always
+ * accepted it. (2) its full-id example, `ticket_01J9X7M3E8W2`, is only 12
+ * characters after the `ticket_` prefix — real ids are always
+ * `ticket_<26-char ULID>` (core/ids.ts) — so it was never a value
+ * `resolveTicketRef` could actually match; replaced with a real one used
+ * elsewhere in this codebase's own doc comments.
+ */
 export const REF_RESOLUTION =
-  "Anywhere a `<ref>` is accepted: full id (`ticket_01J9X7M3E8W2`), unique short prefix (`01J9X7`), slug (`adding-new-auth-provider`), and for parents also external refs (`jira:PROJ-123`). Ambiguous prefix → the CLI errors and lists candidates; pick explicitly.";
+  "Anywhere a `<ref>` is accepted: full id (`ticket_01KY9RVF2DCG6TDQ8EBSGXQXT1`), unique short prefix (`01KY9R`), short `t-<code>` handle (`t-wi5fe`), slug (`adding-new-auth-provider`), and for parents also external refs (`jira:PROJ-123`). Ambiguous prefix or handle → the CLI errors and lists candidates; pick explicitly.";
 
 /** Edge cases (the pre-v0 draft, unchanged). */
 export const EDGE_CASES: readonly string[] = [

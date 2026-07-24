@@ -16,7 +16,14 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "review",
+  "review": {
+    "requested_at": "2026-07-24T20:50:43.117Z",
+    "by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
   "priority": 3,
   "labels": [
     "area:cli"
@@ -29,8 +36,8 @@
   ],
   "root_id": "ticket_01KYAPMHFDYZQG8TXKGJAAZFXT",
   "path": [],
-  "active_session": null,
-  "last_activity_at": "2026-07-24T18:36:37.743Z",
+  "active_session": "session_01KYAXQ9D918B91HPBGBDDA802",
+  "last_activity_at": "2026-07-24T20:50:43.117Z",
   "latest_note": null,
   "owner": null,
   "provenance": {
@@ -41,5 +48,5 @@
     }
   },
   "created_at": "2026-07-24T18:36:37.743Z",
-  "updated_at": "2026-07-24T18:36:37.743Z"
+  "updated_at": "2026-07-24T20:50:43.117Z"
 }

@@ -1,3 +1,4 @@
+import { monotonicFactory } from "ulid";
 import { describe, expect, it } from "vitest";
 import {
   eventIdSchema,
@@ -15,6 +16,27 @@ import {
   shortTicketCode,
   ticketIdSchema,
 } from "./ids.js";
+
+/**
+ * flaky-test-ids-test-ts: a seeded, fully deterministic stand-in for
+ * `newTicketId()`'s real randomness, used ONLY by the collision-batch test
+ * below. mulberry32 — a small, standard, seeded PRNG (`state` is the only
+ * mutable bit of state, closed over) — matches the `ulid` package's own
+ * `PRNG = () => number` contract (a float in `[0, 1)`, same as
+ * `Math.random`), so `monotonicFactory(mulberry32(seed))` drives the SAME
+ * production `ulid` code path `ids.ts`'s `nextRawUlid` uses, just with
+ * reproducible "randomness" instead of real entropy.
+ */
+function mulberry32(seed: number): () => number {
+  let state = seed;
+  return () => {
+    state |= 0;
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 describe("id generators", () => {
   it("newTicketId produces a valid ticket_<ULID> id", () => {
@@ -176,14 +198,34 @@ describe("shortTicketCode (t-<code> short handles — ticket_01KY9RVF2DCG6TDQ8EB
   });
 
   it("distinct ids generally give distinct codes (no collisions across a realistic batch)", () => {
+    // flaky-test-ids-test-ts: this used to draw 500 REAL newTicketId()
+    // ULIDs (true randomness, no seed) — a genuine, if rare, birthday
+    // -paradox false failure: P(collision) ≈ n²/2N for n=500 draws over
+    // N=36^5≈60.5M codes is ~0.2% per run, so the suite occasionally failed
+    // with no code regression at all. Fixed by generating the SAME 500
+    // ULID-shaped ids every run instead: a LOCAL `ulid` monotonicFactory
+    // (this module's real dependency, same code path `ids.ts`'s
+    // `newTicketId` uses) seeded with a fixed PRNG (mulberry32 above) and
+    // driven by explicit, strictly-increasing seed-times (never `Date.now()`
+    // — see monotonicFactory's own source: an ascending explicit seedTime
+    // always draws fresh "randomness" from the PRNG, so this never
+    // degrades into the same-millisecond +1-increment path that would
+    // depend on real wall-clock timing). Fully reproducible regardless of
+    // system speed. `shortTicketCode` itself — the actual thing under test
+    // — runs completely unchanged; only the id-generation SOURCE is now
+    // deterministic instead of truly random.
+    const nextId = monotonicFactory(mulberry32(0xc0ffee));
     const codes = new Set<string>();
     for (let i = 0; i < 500; i++) {
-      codes.add(shortTicketCode(newTicketId()));
+      const id = `ticket_${nextId(1_700_000_000_000 + i)}`;
+      codes.add(shortTicketCode(id));
     }
     // 36^5 ≈ 60.5M possible codes vs. 500 draws — collisions are not
     // impossible (refs.ts handles that rare case explicitly) but
     // shouldn't happen in a batch this small; a genuine formula bug
     // (e.g. collapsing everything to one bucket) would fail this hard.
+    // Deterministic (see above), so this assertion's outcome is
+    // reproducible forever, not a per-run coin flip.
     expect(codes.size).toBe(500);
   });
 

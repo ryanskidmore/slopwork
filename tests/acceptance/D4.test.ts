@@ -10,6 +10,7 @@ import {
   newSessionId,
   newTicketId,
   sessionSchema,
+  shortTicketCode,
   slugify,
   ticketSchema,
 } from "../../src/core/index.js";
@@ -599,6 +600,7 @@ describe("D4: status", () => {
         {
           id: staleInProgress.id,
           slug: staleInProgress.slug,
+          handle: shortTicketCode(staleInProgress.id),
           name: staleInProgress.name,
           state: "in_progress",
         },

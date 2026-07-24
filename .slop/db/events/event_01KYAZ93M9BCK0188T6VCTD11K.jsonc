@@ -1,0 +1,18 @@
+{
+  "id": "event_01KYAZ93M9BCK0188T6VCTD11K",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB",
+  "verb": "plan.step_checked",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB"
+  },
+  "payload": {
+    "step": 2,
+    "checked": true
+  },
+  "at": "2026-07-24T21:07:40.299Z"
+}

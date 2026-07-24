@@ -33,12 +33,12 @@ Slopwork (`slop`) tracks work as a dependency graph of tickets. You read it to k
 2. **Never fake state.** Don't `done` unverified work, don't `--check` unfinished steps, don't skip `review` because the change "is small."
 3. **Don't takeover.** If `start` warns that another session is active, stop and tell the human. Use `--takeover` only when explicitly instructed.
 4. **Stopping requires a handoff note.** The next session (probably another amnesiac you) starts from your `--note`. Write what you'd want to read: current state, next step, traps.
-5. **Prefer structured spec fields.** When creating tickets, put acceptance criteria in `acceptance[]` and file/URL pointers in `context[]`, not buried in prose.
+5. **Prefer structured spec fields.** When creating or updating tickets, put acceptance criteria in `acceptance[]` and file/URL pointers in `context[]`, not buried in prose — use `new`/`update`'s own `--acceptance`/`--context`/`--summary`/`--details` flags (repeatable, plain text) rather than hand-assembling `--spec <json>`; it sidesteps shell-quoting hazards and the unknown-key/malformed-JSON errors `--spec` now raises.
 6. **Budget your reads.** `ready`, `status`, `search`, `events`, and `context` all take `--json --budget N` to cap output (`show --context` too); use `slop context <ref>` to re-load your bearings after compaction instead of re-exploring the repo.
 
 ## Reference resolution
 
-Anywhere a `<ref>` is accepted: full id (`ticket_01J9X7M3E8W2`), unique short prefix (`01J9X7`), slug (`adding-new-auth-provider`), and for parents also external refs (`jira:PROJ-123`). Ambiguous prefix → the CLI errors and lists candidates; pick explicitly.
+Anywhere a `<ref>` is accepted: full id (`ticket_01KY9RVF2DCG6TDQ8EBSGXQXT1`), unique short prefix (`01KY9R`), short `t-<code>` handle (`t-wi5fe`), slug (`adding-new-auth-provider`), and for parents also external refs (`jira:PROJ-123`). Ambiguous prefix or handle → the CLI errors and lists candidates; pick explicitly.
 
 ## Edge cases
 

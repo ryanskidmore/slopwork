@@ -137,7 +137,7 @@ import {
   sortReviewRows,
   staleTicketRows,
 } from "../../tickets/status.js";
-import { parseIntegerOption } from "./shared.js";
+import { parseBudgetOption } from "./shared.js";
 
 interface StatusCommandOptions {
   json?: boolean;
@@ -438,14 +438,18 @@ function buildJson(data: StatusData, generatedAtIso: string, elisions: readonly 
       age_human: humanizeAge(row.ageMs),
       review_stale: row.reviewStale,
     })),
-    // `stale` is intentionally left as the raw StaleTicketRow[] (no
-    // `handle` added here): tests/acceptance/D4.test.ts and C5.test.ts
-    // pin this array's exact shape with `toEqual([{ id, slug, name,
-    // state }, ...])` — outside this ticket's edit allowlist to update.
-    // The handle IS still surfaced for stale rows in the human view
-    // (renderStaleSection above); this is a JSON-only gap, not a human
-    // -output one. See this ticket's report for the full reasoning.
-    stale: data.stale,
+    // handle-t-code-missing-from: stale rows now carry `handle` too, same
+    // as in_progress/review above — it used to be left as the raw
+    // StaleTicketRow[] (id/slug/name/state only), so tests/acceptance/
+    // D4.test.ts and C5.test.ts's `toEqual([{ id, slug, name, state },
+    // ...])` pins were updated alongside this to include it.
+    stale: data.stale.map((row) => ({
+      id: row.id,
+      slug: row.slug,
+      handle: shortTicketCode(row.id),
+      name: row.name,
+      state: row.state,
+    })),
     problems: data.problems,
     elided: elisions,
   };
@@ -528,7 +532,7 @@ export function registerStatusCommand(program: Command): void {
       "--budget <n>",
       `cap output size to N ${CONTEXT_PACK_BUDGET_UNIT} (elides stale rows, then review rows, then ` +
         "in_progress rows, least-important-first; counts/derived are always kept in full)",
-      parseIntegerOption("--budget"),
+      parseBudgetOption,
     )
     .action(runStatus);
 }

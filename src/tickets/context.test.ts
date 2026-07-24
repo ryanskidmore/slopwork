@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { configSchema, newTicketId, sessionSchema, ticketSchema } from "../core/index.js";
 import type { Ticket } from "../core/index.js";
-import { type ContextPackData, budgetCharsFromTokens, renderContextPack } from "./context.js";
+import { type ContextPackData, renderContextPack } from "./context.js";
 
 function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
   const id = overrides.id ?? newTicketId();
@@ -23,16 +23,6 @@ function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
 const config = configSchema.parse({
   project: "p",
   remotes: { jira: "https://example.atlassian.net" },
-});
-
-describe("budgetCharsFromTokens", () => {
-  it("uses a ~4 chars/token estimate", () => {
-    expect(budgetCharsFromTokens(100)).toBe(400);
-  });
-
-  it("never goes negative", () => {
-    expect(budgetCharsFromTokens(-5)).toBe(0);
-  });
 });
 
 describe("renderContextPack", () => {
@@ -100,4 +90,17 @@ describe("renderContextPack", () => {
     const text = renderContextPack(baseData(), full.length + 1000);
     expect(text).toBe(full);
   });
+
+  // budget-flags-units-and-validation: a budget smaller than the
+  // truncation note's own length (~32 chars) used to overshoot — `slice(0,
+  // keep) + TRUNCATION_NOTE` floors `keep` at 0 but still appends the full
+  // note, so the result stayed longer than `budgetChars`. A raw slice (no
+  // note) is the only thing that can never exceed a budget this tiny.
+  it.each([0, 1, 10, 20])(
+    "never exceeds a budget smaller than the truncation note itself (budgetChars=%i)",
+    (budgetChars) => {
+      const text = renderContextPack(baseData(), budgetChars);
+      expect(text.length).toBeLessThanOrEqual(budgetChars);
+    },
+  );
 });

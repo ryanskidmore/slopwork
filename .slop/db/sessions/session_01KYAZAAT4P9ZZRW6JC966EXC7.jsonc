@@ -1,0 +1,40 @@
+{
+  "id": "session_01KYAZAAT4P9ZZRW6JC966EXC7",
+  "ticket": "ticket_01KYAT19QM3WGW1PB8J5N0GMX0",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "worktree-agent-a2f73771765d13db7",
+    "commit_at_start": "1b8c63a1c89cf805dc400bfdfafb967b9273dd88"
+  },
+  "started_at": "2026-07-24T21:08:20.420Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "diagnose root cause: birthday-paradox collision on shortTicketCode over 500 true-random newTicketId() draws in a 36^5 space (~0.2% per run)",
+          "checked": true
+        },
+        {
+          "text": "fix: seed a local ulid monotonicFactory with a deterministic PRNG (mulberry32) + explicit incrementing seed-times, replacing newTicketId()'s true randomness in this one test only",
+          "checked": true
+        },
+        {
+          "text": "verify deterministic: same test run repeatedly, always passes; shortTicketCode itself untouched",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T21:11:51.006Z"
+    }
+  ],
+  "end_summary": null,
+  "transcript_ref": "transcripts/session_01KYAZAAT4P9ZZRW6JC966EXC7.jsonl"
+}

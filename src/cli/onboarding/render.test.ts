@@ -107,6 +107,19 @@ describe("D1 onboarding content: one source, three renderings", () => {
     expect(body).not.toMatch(/update <current> --state open.*--blocks/s);
   });
 
+  it("handle-t-code-missing-from: the ref-resolution rule lists the t-<code> handle and a structurally valid full-id example", () => {
+    // content.ts's REF_RESOLUTION used to omit the short `t-<code>` handle
+    // (src/repo/refs.ts has always accepted it as a ref form) and used
+    // `ticket_01J9X7M3E8W2` as its full-id example — only 12 characters
+    // after the prefix, never a value `resolveTicketRef` could actually
+    // match (real ids are `ticket_<26-char ULID>`, core/ids.ts).
+    const body = renderOnboardingBody(ctx);
+    expect(body).toMatch(/short `t-<code>` handle/);
+    expect(body).not.toContain("ticket_01J9X7M3E8W2");
+    const fullIdMatch = /`ticket_([0-9A-HJKMNP-TV-Z]+)`/.exec(body);
+    expect(fullIdMatch?.[1]).toHaveLength(26);
+  });
+
   it("the budget/--json house rule matches the CLI's ACTUAL shipped surface, not a stale claim in either direction", () => {
     // content.ts's `--budget`/`--json` house rule has been corrected
     // twice: first (D1) narrowed from the draft's over-broad "ready/show"

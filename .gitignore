@@ -32,10 +32,15 @@ npm-debug.log*
 # per D14/D16 — that is a runtime concern of the tool, not this repo's own
 # tooling config.
 
-# --- slopwork (managed by `slop init`) ---
-.slop/db/index.jsonc
-.slop/transcripts/
-# --- end slopwork ---
 
 # agent worktrees (temporary, isolated)
 .claude/worktrees/
+
+# --- slopwork (managed by `slop init`) ---
+.slop/db/index.jsonc
+.slop/db/.lock
+.slop/db/.lock.stale-*
+.slop/db/.tmp-*
+.slop/db/*/.tmp-*
+.slop/transcripts/
+# --- end slopwork ---

@@ -50,7 +50,7 @@
  *   "query": { "text": "<raw text>", "terms": ["term1", "term2"], "limit": number | null },
  *   "results": [
  *     {
- *       "id", "slug", "name", "state", "priority",
+ *       "id", "slug", "handle", "name", "state", "priority",
  *       "field": "name" | "slug" | "summary" | "acceptance" | "context" | "details_md" | "note",
  *       "matched_terms": ["term1", ...],   // terms matched within the winning field/occurrence
  *       "snippet": "…surrounding **term** text…",
@@ -65,7 +65,12 @@
  */
 import type { Command } from "commander";
 import type { Event, Ticket, TicketId } from "../../core/index.js";
-import { EXIT_CODES, isTicketId, renderEntriesWithBudget } from "../../core/index.js";
+import {
+  EXIT_CODES,
+  isTicketId,
+  renderEntriesWithBudget,
+  shortTicketCode,
+} from "../../core/index.js";
 import { listEvents, listTicketsTolerant, repoPaths, requireRepoRoot } from "../../repo/index.js";
 import type { TicketReadProblem } from "../../repo/index.js";
 import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
@@ -77,7 +82,7 @@ import {
   searchTerms,
 } from "../../tickets/search.js";
 import { SlopError } from "../errors.js";
-import { parseIntegerOption } from "./shared.js";
+import { parseBudgetOption, parseIntegerOption } from "./shared.js";
 
 interface SearchCommandOptions {
   json?: boolean;
@@ -183,6 +188,8 @@ function buildHuman(
 interface SearchJsonResult {
   id: string;
   slug: string;
+  /** handle-t-code-missing-from: short `t-<code>` ref — see module doc. */
+  handle: string;
   name: string;
   state: string;
   priority: number;
@@ -197,6 +204,7 @@ function toJsonResult(entry: RankedResult<Ticket>): SearchJsonResult {
   return {
     id: ticket.id,
     slug: ticket.slug,
+    handle: shortTicketCode(ticket.id),
     name: ticket.name,
     state: ticket.state,
     priority: ticket.priority,
@@ -294,7 +302,7 @@ export function registerSearchCommand(program: Command): void {
     .option(
       "--budget <n>",
       `cap output size to N ${CONTEXT_PACK_BUDGET_UNIT} (elides lowest-ranked results first)`,
-      parseIntegerOption("--budget"),
+      parseBudgetOption,
     )
     .action(runSearch);
 }
