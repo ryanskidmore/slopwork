@@ -20,14 +20,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "review",
-  "review": {
-    "requested_at": "2026-07-24T22:42:17.583Z",
-    "by": {
-      "name": "Ryan Skidmore",
-      "kind": "agent"
-    }
-  },
+  "state": "done",
   "priority": 2,
   "labels": [
     "area:web",
@@ -39,9 +32,9 @@
   "discovered_from": [],
   "root_id": "ticket_01KYAY563XSEE9C0AEZ7MH23HG",
   "path": [],
-  "active_session": "session_01KYB1DRQDM5JPH288YE664ZYA",
-  "last_activity_at": "2026-07-24T22:42:17.583Z",
-  "latest_note": null,
+  "active_session": null,
+  "last_activity_at": "2026-07-24T22:49:12.647Z",
+  "latest_note": "Merged to main. Verified independently: SPA served from the compiled binary, zero external fetches (font inlined as data URI), deep links 200, Host allowlist 403, API serving 84 tickets. Audit spine renders as briefed with shape-coded authorship; dark mode first-class. 1915 tests green.",
   "owner": {
     "name": "ryan",
     "kind": "human"
@@ -54,5 +47,5 @@
     }
   },
   "created_at": "2026-07-24T20:48:03.207Z",
-  "updated_at": "2026-07-24T22:42:17.583Z"
+  "updated_at": "2026-07-24T22:49:12.647Z"
 }
