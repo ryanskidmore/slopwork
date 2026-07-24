@@ -105,6 +105,7 @@ import type {
 import {
   fixedClock,
   renderEntriesWithBudget,
+  shortTicketCode,
   systemClock,
   TICKET_STATES,
 } from "../../core/index.js";
@@ -331,7 +332,10 @@ function renderInProgressSection(rows: readonly InProgressTicketRow[]): string[]
     const sessionText = row.session
       ? `${row.session.actor} (${row.session.harness})  ${humanizeAge(row.session.ageMs)}`
       : "(no active session on file)";
-    lines.push(`  ${row.slug.padEnd(30)}  ${row.id}  ${sessionText}`);
+    // ticket_01KY9RVF2DCG6TDQ8EBSGXQXT1: the short t-<code> handle,
+    // computed (never stored) alongside id/slug so a human/agent sees it
+    // right where they'd otherwise copy the full id to reuse.
+    lines.push(`  ${row.slug.padEnd(30)}  ${row.id}  (${shortTicketCode(row.id)})  ${sessionText}`);
   }
   if (omitted > 0) lines.push(`  … and ${omitted} more`);
   return lines;
@@ -350,7 +354,7 @@ function renderReviewSection(rows: readonly ReviewTicketRow[]): string[] {
     // item's acceptance: "stale review ticket surfaces with MR link").
     const staleTag = row.reviewStale ? "  [STALE]" : "";
     lines.push(
-      `  ${row.slug.padEnd(30)}  ${row.id}  ${row.mr ?? "(no MR link yet)"}  ${row.by}  ${humanizeAge(row.ageMs)}${staleTag}`,
+      `  ${row.slug.padEnd(30)}  ${row.id}  (${shortTicketCode(row.id)})  ${row.mr ?? "(no MR link yet)"}  ${row.by}  ${humanizeAge(row.ageMs)}${staleTag}`,
     );
   }
   if (omitted > 0) lines.push(`  … and ${omitted} more`);
@@ -365,7 +369,7 @@ function renderStaleSection(rows: readonly StaleTicketRow[]): string[] {
   }
   const { shown, omitted } = capRows(rows);
   for (const row of shown) {
-    lines.push(`  ${row.slug.padEnd(30)}  ${row.id}  ${row.state}`);
+    lines.push(`  ${row.slug.padEnd(30)}  ${row.id}  (${shortTicketCode(row.id)})  ${row.state}`);
   }
   if (omitted > 0) lines.push(`  … and ${omitted} more`);
   return lines;
@@ -406,6 +410,9 @@ function buildJson(data: StatusData, generatedAtIso: string, elisions: readonly 
     in_progress: data.inProgress.map((row) => ({
       id: row.id,
       slug: row.slug,
+      // ticket_01KY9RVF2DCG6TDQ8EBSGXQXT1: additive field, computed
+      // (never stored) — see core/ids.ts's shortTicketCode.
+      handle: shortTicketCode(row.id),
       name: row.name,
       priority: row.priority,
       session: row.session
@@ -422,6 +429,7 @@ function buildJson(data: StatusData, generatedAtIso: string, elisions: readonly 
     review: data.review.map((row) => ({
       id: row.id,
       slug: row.slug,
+      handle: shortTicketCode(row.id),
       name: row.name,
       mr: row.mr,
       requested_at: row.requestedAt,
@@ -430,6 +438,13 @@ function buildJson(data: StatusData, generatedAtIso: string, elisions: readonly 
       age_human: humanizeAge(row.ageMs),
       review_stale: row.reviewStale,
     })),
+    // `stale` is intentionally left as the raw StaleTicketRow[] (no
+    // `handle` added here): tests/acceptance/D4.test.ts and C5.test.ts
+    // pin this array's exact shape with `toEqual([{ id, slug, name,
+    // state }, ...])` — outside this ticket's edit allowlist to update.
+    // The handle IS still surfaced for stale rows in the human view
+    // (renderStaleSection above); this is a JSON-only gap, not a human
+    // -output one. See this ticket's report for the full reasoning.
     stale: data.stale,
     problems: data.problems,
     elided: elisions,

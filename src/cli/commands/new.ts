@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { DEFAULT_PRIORITY } from "../../core/index.js";
+import { DEFAULT_PRIORITY, shortTicketCode } from "../../core/index.js";
 import { createTicket, repoPaths, requireRepoRoot, withLock } from "../../repo/index.js";
 import { buildNewTicket } from "../../tickets/new.js";
 import type { NewTicketInput } from "../../tickets/new.js";
@@ -67,15 +67,23 @@ async function runNew(name: string, opts: NewCommandOptions): Promise<void> {
 
   for (const warning of warnings) printWarning(warning);
 
+  // Short, stable, typeable handle (ticket_01KY9RVF2DCG6TDQ8EBSGXQXT1) —
+  // derived from the id, not stored (core/ids.ts's shortTicketCode), so
+  // there's nothing new on `ticket` to read here; just compute it.
+  const handle = shortTicketCode(ticket.id);
+
   if (opts.json) {
     // E1: small `--json` result for a mutator that creates an entity — the
     // id/slug the next command in an agent's loop needs, not a full ticket
-    // dump (that's `slop show <ref> --json`'s job).
+    // dump (that's `slop show <ref> --json`'s job). `handle` is additive
+    // (E1's existing consumers only read specific known keys), so this
+    // doesn't disturb the documented shape.
     process.stdout.write(
       `${JSON.stringify(
         {
           id: ticket.id,
           slug: ticket.slug,
+          handle,
           name: ticket.name,
           state: ticket.state,
           priority: ticket.priority,
@@ -88,8 +96,15 @@ async function runNew(name: string, opts: NewCommandOptions): Promise<void> {
     return;
   }
 
+  // The `created <id>  (slug: <slug>)` first line is a stable, widely
+  // depended-on contract — many other commands' own tests bootstrap a
+  // ticket via this CLI and parse that EXACT line with a regex (see e.g.
+  // draft.test.ts/undraft.test.ts/update.test.ts's own `CREATED_LINE`).
+  // The handle is therefore surfaced on its own line right after it,
+  // never folded into that line's parentheses.
   process.stdout.write(
     `created ${ticket.id}  (slug: ${ticket.slug})\n` +
+      `  handle: ${handle}\n` +
       `  ${ticket.name}\n` +
       `  state: ${ticket.state}  priority: ${ticket.priority}` +
       `${ticket.parent !== undefined ? `  parent: ${ticket.parent}` : ""}\n`,

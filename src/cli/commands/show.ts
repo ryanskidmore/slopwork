@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { Config, Ticket } from "../../core/index.js";
-import { isTicketId } from "../../core/index.js";
+import { isTicketId, shortTicketCode } from "../../core/index.js";
 import { listTickets, repoPaths, requireRepoRoot, resolveTicketRef } from "../../repo/index.js";
 import type { RepoPaths } from "../../repo/index.js";
 import {
@@ -102,7 +102,17 @@ async function runShowJson(
     ticket.parent !== undefined && !isTicketId(ticket.parent)
       ? jiraBrowseUrl(config, ticket.parent)
       : null;
-  const body: Record<string, unknown> = { ticket, jira_url: jiraUrl };
+  // ticket_01KY9RVF2DCG6TDQ8EBSGXQXT1: the short t-<code> handle, derived
+  // (never stored — core/ids.ts's shortTicketCode) and added as a
+  // top-level key so it's always present regardless of --tree/--context,
+  // without touching either of those sub-objects' own budget-bounded
+  // shape (E1's `--budget` floor-behavior contract for this command only
+  // covers `context`; a stray extra top-level key never risks it).
+  const body: Record<string, unknown> = {
+    ticket,
+    handle: shortTicketCode(ticket.id),
+    jira_url: jiraUrl,
+  };
 
   if (opts.tree) {
     const { tree, externalParentRef } = await loadTreeFor(paths, ticket);
@@ -158,7 +168,17 @@ async function runShow(ref: string, opts: ShowCommandOptions): Promise<void> {
   }
 
   if (!printedSomething) {
-    process.stdout.write(`${formatTicketDetail(ticket, config)}\n`);
+    // ticket_01KY9RVF2DCG6TDQ8EBSGXQXT1: surface the t-<code> handle here
+    // too — but only on this plain (no --tree/--context) path.
+    // formatTicketDetail (tickets/detail.ts) itself is left untouched
+    // (detail.test.ts pins its output directly), and --context's own
+    // printed text is exactly `renderContextPackWithBudget`'s budgeted
+    // output with nothing else around it (E1: `bounded.stdout.length <=
+    // budget + 1` — prepending a line here would inflate that past the
+    // budget by the line's own length), so this stays out of that path.
+    process.stdout.write(
+      `handle: ${shortTicketCode(ticket.id)}\n${formatTicketDetail(ticket, config)}\n`,
+    );
   }
 }
 

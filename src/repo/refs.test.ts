@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { type Ticket, newTicketId, ticketSchema } from "../core/index.js";
+import { newTicketId, shortTicketCode, type Ticket, ticketSchema } from "../core/index.js";
 import type { IndexTicketRow } from "./db-index.js";
 import type { EventContext, MutationEventSpec } from "./events.js";
 import { ambiguousRefMessage, resolveTicketRef } from "./refs.js";
@@ -199,6 +199,94 @@ describe("resolveTicketRef — unique short prefix, ambiguous prefix (git-style)
     expect(message).toMatch(/^short ref "01ARZ" is ambiguous/);
     expect(message).toContain("hint: the candidates are:");
     expect(message).toContain('hint:   ticket_01ARZ3NDEKTSV4RRFFQ69G5FA1  "Alpha" (alpha)');
+  });
+});
+
+describe("resolveTicketRef — t-<code> short handles (ticket_01KY9RVF2DCG6TDQ8EBSGXQXT1)", () => {
+  it("resolves a ticket's own t-<code> handle", async () => {
+    const t = makeTicket();
+    await createTicket(paths, t, ctx, createdEvent);
+    const handle = shortTicketCode(t.id);
+    await expect(resolveTicketRef(paths, handle)).resolves.toEqual(t);
+  });
+
+  it("resolves the handle case-insensitively", async () => {
+    const t = makeTicket();
+    await createTicket(paths, t, ctx, createdEvent);
+    const handle = shortTicketCode(t.id);
+    await expect(resolveTicketRef(paths, handle.toUpperCase())).resolves.toEqual(t);
+  });
+
+  it("a well-formed but nonexistent code is NOT_FOUND (exit 4)", async () => {
+    const t = makeTicket();
+    await createTicket(paths, t, ctx, createdEvent);
+    // A different, deterministically-picked, valid-shaped code that isn't
+    // this (or any) ticket's actual derived code.
+    const real = shortTicketCode(t.id);
+    const bogus = real === "t-00000" ? "t-00001" : "t-00000";
+    await expect(resolveTicketRef(paths, bogus)).rejects.toMatchObject({
+      exitCode: 4,
+    });
+  });
+
+  it("a forced collision (two distinct ids sharing a derived code) is AMBIGUOUS_REF (exit 5), listing both candidates — never silently picked", async () => {
+    // A real sha256-collision pair for shortTicketCode, found once via
+    // brute-force search offline and hardcoded here so this test is
+    // deterministic (searching for a collision live, in-test, against a
+    // 36^5 ≈ 60.5M code space is not something to do on every test run).
+    // Both are valid ticket_<ULID> ids (26-char Crockford base32 bodies);
+    // shortTicketCode(idA) === shortTicketCode(idB) === "t-l4slk".
+    const idA = "ticket_01KY9TRHGW7KQ1430JE45DH5NF" as Ticket["id"];
+    const idB = "ticket_01KY9TRHH3NTEFFY28BH37YJQ9" as Ticket["id"];
+    const collidingCode = "t-l4slk";
+    expect(shortTicketCode(idA)).toBe(collidingCode);
+    expect(shortTicketCode(idB)).toBe(collidingCode);
+
+    const a = makeTicket({ id: idA, root_id: idA, name: "Collision A", slug: "collision-a" });
+    const b = makeTicket({ id: idB, root_id: idB, name: "Collision B", slug: "collision-b" });
+    await createTicket(paths, a, ctx, createdEvent);
+    await createTicket(paths, b, ctx, createdEvent);
+
+    let threw: unknown;
+    try {
+      await resolveTicketRef(paths, collidingCode);
+    } catch (err) {
+      threw = err;
+    }
+    expect(threw).toMatchObject({ exitCode: 5 });
+    const message = (threw as Error).message;
+    expect(message).toMatch(/ambiguous/i);
+    expect(message).toContain(a.id);
+    expect(message).toContain(b.id);
+    expect(message).toContain(a.slug);
+    expect(message).toContain(b.slug);
+  });
+
+  it("precedence: a real slug that happens to look t--ish still resolves as a slug, not a code lookup", async () => {
+    // "t-shirt" is NOT t-<code>-shaped (SHORT_TICKET_CODE_LENGTH is 5, and
+    // this slug's suffix is 6 chars plus contains no non-alnum weirdness
+    // that would matter either way) — but the point of this test is the
+    // PRECEDENCE rule itself: slug lookup runs before code lookup, so even
+    // if a slug were exactly code-shaped it must still win. Assert both:
+    // the slug resolves correctly, and it is never confused for a code.
+    const t = makeTicket({ slug: "t-shirt-feature" });
+    await createTicket(paths, t, ctx, createdEvent);
+    await expect(resolveTicketRef(paths, "t-shirt-feature")).resolves.toEqual(t);
+  });
+
+  it("precedence: an exact-code-shaped slug still resolves as that slug, even though it also matches the t-<code> shape", async () => {
+    // A slug that is itself exactly 't-' + 5 lowercase alnum chars — the
+    // shape short-code resolution also accepts. Slug wins regardless of
+    // whether it happens to be this ticket's own derived code or a
+    // completely unrelated string; what matters is that the slug branch
+    // (which runs first) intercepts it before code resolution ever runs.
+    const t = makeTicket({ slug: "t-abcde" });
+    const other = makeTicket({ name: "Some other ticket" });
+    await createTicket(paths, t, ctx, createdEvent);
+    await createTicket(paths, other, ctx, createdEvent);
+
+    const resolved = await resolveTicketRef(paths, "t-abcde");
+    expect(resolved.id).toBe(t.id);
   });
 });
 
