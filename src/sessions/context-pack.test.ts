@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -11,7 +11,13 @@ import {
 } from "../core/index.js";
 import type { Session, Ticket } from "../core/index.js";
 import type { EventContext, MutationEventSpec, RepoPaths } from "../repo/index.js";
-import { createSession, createTicket, ensureDbDirs } from "../repo/index.js";
+import {
+  createSession,
+  createTicket,
+  ensureDbDirs,
+  sessionFilePath,
+  ticketFilePath,
+} from "../repo/index.js";
 import { buildContextPackData } from "./context-pack.js";
 
 let scratch: string;
@@ -105,5 +111,45 @@ describe("buildContextPackData", () => {
     await createTicket(paths, ticket, ctx, createdEvent);
     const data = await buildContextPackData(paths, ticket, config);
     expect(data.externalParentRef).toBe("jira:PROJ-1");
+  });
+});
+
+// ticket_01KY93E32PXJW76FA9CXYAA0B7: after `start`'s withLock mutation has
+// already committed (session created, ticket -> in_progress), it calls
+// buildContextPackData purely to print the pack. A corrupt file ANYWHERE
+// else in the db must never be able to make that call throw — that would
+// turn an already-successful `start` into a non-zero exit, and a retrying
+// agent would then hit activeSessionConflict on the very session it just
+// started. These assert buildContextPackData tolerates a corrupt file for
+// an ENTIRELY UNRELATED ticket/session, not the one being built for.
+describe("buildContextPackData tolerates corrupt files elsewhere in the db", () => {
+  it("skips a corrupt, unrelated ticket file instead of throwing", async () => {
+    const ticket = makeTicket({ name: "Good ticket" });
+    await createTicket(paths, ticket, ctx, createdEvent);
+
+    const unrelated = makeTicket({ name: "Unrelated ticket" });
+    await createTicket(paths, unrelated, ctx, createdEvent);
+    // Corrupt it on disk after creation — invalid JSONC, unparseable.
+    await writeFile(ticketFilePath(paths, unrelated.id), "{ not valid jsonc !!!", "utf8");
+
+    const data = await buildContextPackData(paths, ticket, config);
+    expect(data.ticket.id).toBe(ticket.id);
+  });
+
+  it("skips a corrupt, unrelated session file and still returns this ticket's own sessions", async () => {
+    const ticket = makeTicket({ name: "Good ticket" });
+    await createTicket(paths, ticket, ctx, createdEvent);
+    const goodSession = makeSession(ticket, "2026-07-23T10:00:00.000Z");
+    await createSession(paths, goodSession, ctx, startedEvent);
+
+    const otherTicket = makeTicket({ name: "Other ticket" });
+    await createTicket(paths, otherTicket, ctx, createdEvent);
+    const otherSession = makeSession(otherTicket, "2026-07-23T09:00:00.000Z");
+    await createSession(paths, otherSession, ctx, startedEvent);
+    // Corrupt the unrelated session on disk — invalid JSONC, unparseable.
+    await writeFile(sessionFilePath(paths, otherSession.id), "{ broken !!!", "utf8");
+
+    const data = await buildContextPackData(paths, ticket, config);
+    expect(data.sessions.map((s) => s.id)).toEqual([goodSession.id]);
   });
 });

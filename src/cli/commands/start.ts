@@ -269,8 +269,25 @@ async function runStart(ref: string, opts: StartCommandOptions): Promise<void> {
   );
 
   // §5.2: "one command to full context" — start prints the pack every time.
-  const data = await buildContextPackData(paths, result.ticket, config);
-  process.stdout.write(`\n${renderContextPack(data)}\n`);
+  //
+  // The session/ticket write above has already committed by this point.
+  // ticket_01KY93E32PXJW76FA9CXYAA0B7: `buildContextPackData` now tolerates
+  // corrupt/unreadable files elsewhere in the db on its own (see
+  // context-pack.ts's doc), but this try/catch is a second, independent
+  // guard — belt and suspenders — so that even an unanticipated failure
+  // in gathering or rendering the pack can only ever produce a warning,
+  // never overturn an already-successful `start` into a non-zero exit
+  // (which would send a retrying agent straight into `activeSessionConflict`
+  // on the session it just started).
+  try {
+    const data = await buildContextPackData(paths, result.ticket, config);
+    process.stdout.write(`\n${renderContextPack(data)}\n`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    printWarning(
+      `started ${result.session.id} on ${result.ticket.id}, but could not render the context pack: ${message}`,
+    );
+  }
 }
 
 /** `slop start` — design.md §2, §4.2, §4.3, D9, D17; work item C1. */
