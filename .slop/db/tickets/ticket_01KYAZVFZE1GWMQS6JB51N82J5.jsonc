@@ -1,0 +1,50 @@
+{
+  "id": "ticket_01KYAZVFZE1GWMQS6JB51N82J5",
+  "name": "Switch formatter from Biome to oxfmt (supersedes the earlier defer-until-1.0 decision)",
+  "slug": "switch-formatter-from-biome-to",
+  "spec": {
+    "summary": "Adopt oxfmt as the formatter, retiring Biome; user-directed reversal of the earlier deferral",
+    "details_md": "User-directed: move to oxfmt instead of Biome, completing the oxc migration started when oxlint replaced `biome lint`.\n\nThis DELIBERATELY SUPERSEDES the \"oxfmt — evaluated, deferred\" decision in docs/DECISIONS.md (which said revisit at 1.0). oxfmt is still pre-1.0 (0.60.0; 0.59.0 is the newest the machine's min-release-age=3 npmrc guard allows) — accepted as a known tradeoff, since formatting is reversible and non-semantic. Update that DECISIONS entry to record the reversal and its rationale rather than leaving the log contradicting the code.\n\nMeasured impact on the current tree (2026-07-24): 11 of 255 TS files differ from Biome output — and 5 of those are `src/web/views/*` (the html`` tagged-template reflow that was the ORIGINAL blocker), which the shadcn SPA rewrite is about to replace wholesale, so that objection is largely moot now.\n\nCRITICAL HAZARD: with no config, oxfmt wants to reformat 78 `.jsonc` files under `tests/fixtures/web-db/.slop/db/` — slopwork's own database fixtures. Those are written by src/core/jsonc.ts's canonical writer (FORMATTING_OPTIONS, eol LF) and reformatting them by another tool would corrupt the fixtures and misrepresent what slop actually writes. The oxfmt config MUST exclude `.slop/` and all fixture db files. Biome's config also handled `assist`/organize-imports — confirm what is lost and either replicate it or record it as dropped.",
+    "acceptance": [
+      "oxfmt replaces biome for formatting: package.json format/format:check scripts, config file committed, CI (bun run format:check) green",
+      "oxfmt config EXCLUDES .slop/ and tests/fixtures/**/.slop/** — no .jsonc db fixture is ever reformatted (verify fixture files byte-identical after a format run)",
+      "@biomejs/biome removed from devDependencies and biome.json deleted (or reduced to nothing if still needed); no stale references in docs/README/CI",
+      "Full gate green after the reformat: bun run build && test && lint && typecheck && format:check",
+      "docs/DECISIONS.md's oxfmt entry updated to record this reversal and the pre-1.0 tradeoff accepted"
+    ],
+    "context": [
+      "docs/DECISIONS.md (Tooling — oxlint adopted; oxfmt deferred)",
+      "biome.json, .oxlintrc.json, package.json scripts",
+      ".github/workflows/ci.yml"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "area:tooling"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYAZVFZE1GWMQS6JB51N82J5",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T21:17:42.807Z",
+  "latest_note": null,
+  "owner": {
+    "name": "ryan",
+    "kind": "human"
+  },
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T21:17:42.807Z",
+  "updated_at": "2026-07-24T21:17:42.807Z"
+}

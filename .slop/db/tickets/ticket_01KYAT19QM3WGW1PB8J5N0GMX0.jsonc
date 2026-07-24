@@ -14,14 +14,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "review",
-  "review": {
-    "requested_at": "2026-07-24T21:12:15.539Z",
-    "by": {
-      "name": "Ryan Skidmore",
-      "kind": "agent"
-    }
-  },
+  "state": "done",
   "priority": 3,
   "labels": [],
   "adhoc": false,
@@ -32,9 +25,9 @@
   ],
   "root_id": "ticket_01KYAT19QM3WGW1PB8J5N0GMX0",
   "path": [],
-  "active_session": "session_01KYAZAAT4P9ZZRW6JC966EXC7",
-  "last_activity_at": "2026-07-24T21:12:15.539Z",
-  "latest_note": null,
+  "active_session": null,
+  "last_activity_at": "2026-07-24T21:16:16.661Z",
+  "latest_note": "Merged to main + full suite (1907 tests) green",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -44,5 +37,5 @@
     }
   },
   "created_at": "2026-07-24T19:36:01.527Z",
-  "updated_at": "2026-07-24T21:12:15.539Z"
+  "updated_at": "2026-07-24T21:16:16.661Z"
 }
