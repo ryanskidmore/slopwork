@@ -37,6 +37,7 @@ distills those into what you need to actually use the tool.
 | [Web UI](web-ui.md) | What `slop web` shows — list, tree, ticket detail, transcripts, review/stale panels |
 | [Configuration](configuration.md) | `.slop/config.yaml`, actor/harness identity resolution, environment variables |
 | [Concurrency & merging](concurrency-and-merging.md) | Why `.slop/db/` merges cleanly, the multi-file lock, and lock-free progress updates |
+| [Benchmarks](benchmarks.md) | Measured scaling limits: where the flatfile store stops being fast, and how it behaves under heavy concurrency |
 
 ## History & internals
 

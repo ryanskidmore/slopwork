@@ -56,6 +56,8 @@ against the shipped CLI:
 - [`docs/configuration.md`](docs/configuration.md) — `config.yaml`, actor/harness identity, env vars
 - [`docs/concurrency-and-merging.md`](docs/concurrency-and-merging.md) — the git-merge story, the
   db lock, and lock-free progress updates
+- [`docs/benchmarks.md`](docs/benchmarks.md) — measured scaling limits (1k → 1M tickets) and
+  behavior under concurrent writers
 
 [`CHANGELOG.md`](CHANGELOG.md) records what changed in each release, including the breaking
 changes in the current unreleased line.

@@ -306,39 +306,47 @@ async function runConcurrency(args: Args): Promise<{
       ),
     );
 
-  // Lock-free path
-  results.push(
-    await timeOnce(
-      `concurrency: ${args.workers}x lock-free 'update --progress'`,
+  // A rejected writer is DATA, not a crash: finding where concurrent writes
+  // start being refused is the point of this phase. `outcomes` records the
+  // exit-code distribution so the results doc can say exactly how the system
+  // degrades (cleanly, with CONFLICT/6, vs. corrupting anything).
+  const outcomes: Record<string, { ok: number; conflict: number; other: number }> = {};
+  const runWave = async (
+    label: string,
+    argsFor: (i: number) => string[],
+    notes: string,
+  ): Promise<void> => {
+    let codes: number[] = [];
+    const timing = await timeOnce(
+      label,
       async () => {
-        const children = spawnAll((i) => [
-          "update",
-          seeded.sampleSlug,
-          "--progress",
-          `worker ${i} note`,
-        ]);
-        const codes = await waitAll(children);
-        const failed = codes.filter((c) => c !== 0).length;
-        if (failed > 0) throw new Error(`${failed} lock-free progress writers failed`);
+        codes = await waitAll(spawnAll(argsFor));
       },
       args.workers,
-      "no db lock taken; each writer appends its own ULID-named event file",
-    ),
+      notes,
+    );
+    outcomes[label] = {
+      ok: codes.filter((c) => c === 0).length,
+      conflict: codes.filter((c) => c === 6).length,
+      other: codes.filter((c) => c !== 0 && c !== 6).length,
+    };
+    const o = outcomes[label];
+    log(
+      `  ${label}: ${round(timing.medianMs)}ms — ${o.ok} ok, ${o.conflict} lock-timeout(6), ${o.other} other`,
+    );
+    results.push({ ...timing, notes: `${notes}; ${o.ok}/${args.workers} succeeded` });
+  };
+
+  await runWave(
+    `concurrency: ${args.workers}x lock-free 'update --progress'`,
+    (i) => ["update", seeded.sampleSlug, "--progress", `worker ${i} note`],
+    "no db lock taken; each writer appends its own ULID-named event file",
   );
 
-  // Lock-contended path
-  results.push(
-    await timeOnce(
-      `concurrency: ${args.workers}x 'new' (db lock contention)`,
-      async () => {
-        const children = spawnAll((i) => ["new", `concurrent bench ticket ${i}`]);
-        const codes = await waitAll(children);
-        const failed = codes.filter((c) => c !== 0).length;
-        if (failed > 0) throw new Error(`${failed} concurrent 'new' writers failed (exit != 0)`);
-      },
-      args.workers,
-      "every writer serializes through .slop/db/.lock",
-    ),
+  await runWave(
+    `concurrency: ${args.workers}x 'new' (db lock contention)`,
+    (i) => ["new", `concurrent bench ticket ${i}`],
+    "every writer serializes through .slop/db/.lock (5s acquisition timeout)",
   );
 
   // Correctness under contention: N starts on ONE ticket.
@@ -354,7 +362,7 @@ async function runConcurrency(args: Args): Promise<{
   );
 
   if (!args.keep) await rm(root, { recursive: true, force: true });
-  return { workers: args.workers, results, startRace };
+  return { workers: args.workers, results, startRace, outcomes };
 }
 
 async function main(): Promise<void> {

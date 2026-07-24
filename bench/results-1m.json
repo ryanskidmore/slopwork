@@ -1,0 +1,114 @@
+{
+  "machine": {
+    "platform": "linux 6.18.33.2-microsoft-standard-WSL2",
+    "cpus": "32x AMD Ryzen 9 9950X3D 16-Core Processor",
+    "memoryGb": 30,
+    "bunVersion": "1.3.11",
+    "fixtureDir": "/home/ryan/go/src/github.com/ryanskidmore/slopwork/.bench-work",
+    "fixtureFs": "ext4",
+    "warning": null
+  },
+  "generatedAt": "2026-07-24T22:11:57.087Z",
+  "scales": [
+    {
+      "tickets": 1000000,
+      "events": 200000,
+      "seed": {
+        "label": "fixture seed (not an op)",
+        "runs": 1,
+        "medianMs": 51708.75,
+        "minMs": 51708.75,
+        "maxMs": 51708.75,
+        "n": 1000000
+      },
+      "dbBytes": 1725582498,
+      "indexBytes": 654008057,
+      "timings": [
+        {
+          "label": "index: cold build (no index.jsonc)",
+          "runs": 3,
+          "medianMs": 31249.39,
+          "minMs": 26665.46,
+          "maxMs": 32977.78,
+          "n": 1000000,
+          "notes": "rebuilt from every entity file; what a fresh clone pays"
+        },
+        {
+          "label": "index: warm load (fingerprint verify + parse)",
+          "runs": 5,
+          "medianMs": 13219.05,
+          "minMs": 12053.39,
+          "maxMs": 14328.03,
+          "n": 1000000,
+          "notes": "no rebuild; readdir+stat fingerprint then parse index.jsonc"
+        },
+        {
+          "label": "resolve ref: by slug (index map lookup)",
+          "runs": 5,
+          "medianMs": 14061.47,
+          "minMs": 12330.56,
+          "maxMs": 15581.21,
+          "n": 1000000
+        },
+        {
+          "label": "resolve ref: by id prefix (row scan, 33-char prefix)",
+          "runs": 5,
+          "medianMs": 0.25,
+          "minMs": 0.2,
+          "maxMs": 1.47,
+          "n": 1000000,
+          "notes": "shortest unambiguous prefix at this scale was 33 chars of 33"
+        },
+        {
+          "label": "read: parse + validate every ticket (listTicketsTolerant)",
+          "runs": 3,
+          "medianMs": 17466.47,
+          "minMs": 16455.24,
+          "maxMs": 22230.36,
+          "n": 1000000,
+          "notes": "the floor under `search` and `reindex`"
+        }
+      ]
+    }
+  ],
+  "concurrency": {
+    "workers": 32,
+    "results": [
+      {
+        "label": "concurrency: 32x lock-free 'update --progress'",
+        "runs": 1,
+        "medianMs": 663.54,
+        "minMs": 663.54,
+        "maxMs": 663.54,
+        "n": 32,
+        "notes": "no db lock taken; each writer appends its own ULID-named event file; 32/32 succeeded"
+      },
+      {
+        "label": "concurrency: 32x 'new' (db lock contention)",
+        "runs": 1,
+        "medianMs": 5497.53,
+        "minMs": 5497.53,
+        "maxMs": 5497.53,
+        "n": 32,
+        "notes": "every writer serializes through .slop/db/.lock (5s acquisition timeout); 14/32 succeeded"
+      }
+    ],
+    "startRace": {
+      "winners": 1,
+      "conflicts": 31,
+      "other": 0
+    },
+    "outcomes": {
+      "concurrency: 32x lock-free 'update --progress'": {
+        "ok": 32,
+        "conflict": 0,
+        "other": 0
+      },
+      "concurrency: 32x 'new' (db lock contention)": {
+        "ok": 14,
+        "conflict": 18,
+        "other": 0
+      }
+    }
+  }
+}

@@ -1,0 +1,354 @@
+{
+  "machine": {
+    "platform": "linux 6.18.33.2-microsoft-standard-WSL2",
+    "cpus": "32x AMD Ryzen 9 9950X3D 16-Core Processor",
+    "memoryGb": 30,
+    "bunVersion": "1.3.11",
+    "fixtureDir": "/home/ryan/go/src/github.com/ryanskidmore/slopwork/.bench-work",
+    "fixtureFs": "ext4",
+    "warning": null
+  },
+  "generatedAt": "2026-07-24T22:03:53.233Z",
+  "scales": [
+    {
+      "tickets": 1000,
+      "events": 2000,
+      "seed": {
+        "label": "fixture seed (not an op)",
+        "runs": 1,
+        "medianMs": 108.75,
+        "minMs": 108.75,
+        "maxMs": 108.75,
+        "n": 1000
+      },
+      "dbBytes": 2342339,
+      "indexBytes": 667962,
+      "timings": [
+        {
+          "label": "index: cold build (no index.jsonc)",
+          "runs": 3,
+          "medianMs": 48.25,
+          "minMs": 43.94,
+          "maxMs": 65.65,
+          "n": 1000,
+          "notes": "rebuilt from every entity file; what a fresh clone pays"
+        },
+        {
+          "label": "index: warm load (fingerprint verify + parse)",
+          "runs": 5,
+          "medianMs": 13.68,
+          "minMs": 12.56,
+          "maxMs": 17.78,
+          "n": 1000,
+          "notes": "no rebuild; readdir+stat fingerprint then parse index.jsonc"
+        },
+        {
+          "label": "resolve ref: by slug (index map lookup)",
+          "runs": 5,
+          "medianMs": 14.34,
+          "minMs": 12.56,
+          "maxMs": 16.97,
+          "n": 1000
+        },
+        {
+          "label": "resolve ref: by id prefix (row scan, 33-char prefix)",
+          "runs": 5,
+          "medianMs": 0.15,
+          "minMs": 0.13,
+          "maxMs": 0.16,
+          "n": 1000,
+          "notes": "shortest unambiguous prefix at this scale was 33 chars of 33"
+        },
+        {
+          "label": "read: parse + validate every ticket (listTicketsTolerant)",
+          "runs": 3,
+          "medianMs": 16.03,
+          "minMs": 15.18,
+          "maxMs": 16.3,
+          "n": 1000,
+          "notes": "the floor under `search` and `reindex`"
+        },
+        {
+          "label": "cli: slop status",
+          "runs": 3,
+          "medianMs": 85.03,
+          "minMs": 83.47,
+          "maxMs": 87.72,
+          "notes": "end-to-end, includes binary startup"
+        },
+        {
+          "label": "cli: slop ready --json",
+          "runs": 3,
+          "medianMs": 88.44,
+          "minMs": 85.91,
+          "maxMs": 94.22,
+          "notes": "end-to-end, includes binary startup"
+        },
+        {
+          "label": "cli: slop show <slug>",
+          "runs": 3,
+          "medianMs": 110.58,
+          "minMs": 109.18,
+          "maxMs": 117.76,
+          "notes": "end-to-end, includes binary startup"
+        },
+        {
+          "label": "cli: slop search",
+          "runs": 3,
+          "medianMs": 121.73,
+          "minMs": 120.92,
+          "maxMs": 122.95,
+          "notes": "end-to-end, includes binary startup"
+        },
+        {
+          "label": "cli: slop new (write path)",
+          "runs": 3,
+          "medianMs": 202.7,
+          "minMs": 129.53,
+          "maxMs": 214.51,
+          "notes": "one full mutation: lock, write ticket, append event, invalidate index"
+        }
+      ]
+    },
+    {
+      "tickets": 10000,
+      "events": 20000,
+      "seed": {
+        "label": "fixture seed (not an op)",
+        "runs": 1,
+        "medianMs": 946.1,
+        "minMs": 946.1,
+        "maxMs": 946.1,
+        "n": 10000
+      },
+      "dbBytes": 23484441,
+      "indexBytes": 6715164,
+      "timings": [
+        {
+          "label": "index: cold build (no index.jsonc)",
+          "runs": 3,
+          "medianMs": 440.87,
+          "minMs": 410.8,
+          "maxMs": 454.79,
+          "n": 10000,
+          "notes": "rebuilt from every entity file; what a fresh clone pays"
+        },
+        {
+          "label": "index: warm load (fingerprint verify + parse)",
+          "runs": 5,
+          "medianMs": 121.53,
+          "minMs": 118.16,
+          "maxMs": 150.8,
+          "n": 10000,
+          "notes": "no rebuild; readdir+stat fingerprint then parse index.jsonc"
+        },
+        {
+          "label": "resolve ref: by slug (index map lookup)",
+          "runs": 5,
+          "medianMs": 122.76,
+          "minMs": 115.62,
+          "maxMs": 125.91,
+          "n": 10000
+        },
+        {
+          "label": "resolve ref: by id prefix (row scan, 33-char prefix)",
+          "runs": 5,
+          "medianMs": 0.14,
+          "minMs": 0.12,
+          "maxMs": 0.15,
+          "n": 10000,
+          "notes": "shortest unambiguous prefix at this scale was 33 chars of 33"
+        },
+        {
+          "label": "read: parse + validate every ticket (listTicketsTolerant)",
+          "runs": 3,
+          "medianMs": 153.81,
+          "minMs": 147.83,
+          "maxMs": 160.45,
+          "n": 10000,
+          "notes": "the floor under `search` and `reindex`"
+        },
+        {
+          "label": "cli: slop status",
+          "runs": 3,
+          "medianMs": 246,
+          "minMs": 225.26,
+          "maxMs": 248.33,
+          "notes": "end-to-end, includes binary startup"
+        },
+        {
+          "label": "cli: slop ready --json",
+          "runs": 3,
+          "medianMs": 282.64,
+          "minMs": 280.85,
+          "maxMs": 303.13,
+          "notes": "end-to-end, includes binary startup"
+        },
+        {
+          "label": "cli: slop show <slug>",
+          "runs": 3,
+          "medianMs": 431.04,
+          "minMs": 422.85,
+          "maxMs": 463.95,
+          "notes": "end-to-end, includes binary startup"
+        },
+        {
+          "label": "cli: slop search",
+          "runs": 3,
+          "medianMs": 537.84,
+          "minMs": 514.04,
+          "maxMs": 557.44,
+          "notes": "end-to-end, includes binary startup"
+        },
+        {
+          "label": "cli: slop new (write path)",
+          "runs": 3,
+          "medianMs": 915.64,
+          "minMs": 459.66,
+          "maxMs": 1003.24,
+          "notes": "one full mutation: lock, write ticket, append event, invalidate index"
+        }
+      ]
+    },
+    {
+      "tickets": 100000,
+      "events": 200000,
+      "seed": {
+        "label": "fixture seed (not an op)",
+        "runs": 1,
+        "medianMs": 10572.95,
+        "minMs": 10572.95,
+        "maxMs": 10572.95,
+        "n": 100000
+      },
+      "dbBytes": 235058443,
+      "indexBytes": 67079166,
+      "timings": [
+        {
+          "label": "index: cold build (no index.jsonc)",
+          "runs": 3,
+          "medianMs": 4845.19,
+          "minMs": 4291.65,
+          "maxMs": 5013.17,
+          "n": 100000,
+          "notes": "rebuilt from every entity file; what a fresh clone pays"
+        },
+        {
+          "label": "index: warm load (fingerprint verify + parse)",
+          "runs": 5,
+          "medianMs": 1349.79,
+          "minMs": 1280.38,
+          "maxMs": 1433.58,
+          "n": 100000,
+          "notes": "no rebuild; readdir+stat fingerprint then parse index.jsonc"
+        },
+        {
+          "label": "resolve ref: by slug (index map lookup)",
+          "runs": 5,
+          "medianMs": 1296.22,
+          "minMs": 1272.19,
+          "maxMs": 1347.98,
+          "n": 100000
+        },
+        {
+          "label": "resolve ref: by id prefix (row scan, 33-char prefix)",
+          "runs": 5,
+          "medianMs": 0.17,
+          "minMs": 0.14,
+          "maxMs": 2.67,
+          "n": 100000,
+          "notes": "shortest unambiguous prefix at this scale was 33 chars of 33"
+        },
+        {
+          "label": "read: parse + validate every ticket (listTicketsTolerant)",
+          "runs": 3,
+          "medianMs": 1522.32,
+          "minMs": 1509.48,
+          "maxMs": 1525.73,
+          "n": 100000,
+          "notes": "the floor under `search` and `reindex`"
+        },
+        {
+          "label": "cli: slop status",
+          "runs": 3,
+          "medianMs": 1544.98,
+          "minMs": 1488.66,
+          "maxMs": 1667.88,
+          "notes": "end-to-end, includes binary startup"
+        },
+        {
+          "label": "cli: slop ready --json",
+          "runs": 3,
+          "medianMs": 1965.29,
+          "minMs": 1933.1,
+          "maxMs": 1979.03,
+          "notes": "end-to-end, includes binary startup"
+        },
+        {
+          "label": "cli: slop show <slug>",
+          "runs": 3,
+          "medianMs": 3494.54,
+          "minMs": 3424.42,
+          "maxMs": 3532.23,
+          "notes": "end-to-end, includes binary startup"
+        },
+        {
+          "label": "cli: slop search",
+          "runs": 3,
+          "medianMs": 4512.95,
+          "minMs": 4454.47,
+          "maxMs": 4572.94,
+          "notes": "end-to-end, includes binary startup"
+        },
+        {
+          "label": "cli: slop new (write path)",
+          "runs": 3,
+          "medianMs": 8675.03,
+          "minMs": 3233.89,
+          "maxMs": 9352.12,
+          "notes": "one full mutation: lock, write ticket, append event, invalidate index"
+        }
+      ]
+    }
+  ],
+  "concurrency": {
+    "workers": 64,
+    "results": [
+      {
+        "label": "concurrency: 64x lock-free 'update --progress'",
+        "runs": 1,
+        "medianMs": 1109.42,
+        "minMs": 1109.42,
+        "maxMs": 1109.42,
+        "n": 64,
+        "notes": "no db lock taken; each writer appends its own ULID-named event file; 64/64 succeeded"
+      },
+      {
+        "label": "concurrency: 64x 'new' (db lock contention)",
+        "runs": 1,
+        "medianMs": 5550.75,
+        "minMs": 5550.75,
+        "maxMs": 5550.75,
+        "n": 64,
+        "notes": "every writer serializes through .slop/db/.lock (5s acquisition timeout); 14/64 succeeded"
+      }
+    ],
+    "startRace": {
+      "winners": 1,
+      "conflicts": 63,
+      "other": 0
+    },
+    "outcomes": {
+      "concurrency: 64x lock-free 'update --progress'": {
+        "ok": 64,
+        "conflict": 0,
+        "other": 0
+      },
+      "concurrency: 64x 'new' (db lock contention)": {
+        "ok": 14,
+        "conflict": 50,
+        "other": 0
+      }
+    }
+  }
+}
