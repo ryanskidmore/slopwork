@@ -31,6 +31,14 @@ whether they can surprise an existing user.
   found". All budget-taking commands now share one parser and one unit.
 - **`--note`/`--reason`/`--outcome` have length caps** (10k, 10k, 64k) enforced
   as clean usage errors rather than growing the ticket file unbounded.
+- **`--json` shapes are now consistent across the loop.** Commands that report
+  only a ticket stay flat (`new`, `update`, `draft`, `undraft`); commands that
+  act through a session nest `ticket` and `session` (`start`, `stop`, `done`,
+  `drop`, `review`). Previously `start` nested while `stop`/`done`/`drop`/
+  `review` flattened ticket fields alongside session ones, so `id` meant the
+  ticket but `session_id` meant the session. Read `ticket.id` and
+  `session.id` now. `drop` reports `"session": null` when there was no active
+  session.
 - **`slop events` defaults to `--limit 100`.** It previously returned the entire
   log; pass `--limit` to widen. `has_more` is now only ever true alongside a
   cursor that genuinely advances.

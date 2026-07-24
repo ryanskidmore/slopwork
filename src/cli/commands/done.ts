@@ -8,7 +8,6 @@ import {
   nowIso,
   RESOLUTION_MAX_LENGTH,
   sessionSchema,
-  shortTicketCode,
   ticketSchema,
 } from "../../core/index.js";
 import {
@@ -34,7 +33,13 @@ import { checkDoneEntry } from "../../tickets/state.js";
 import { formatZodIssuesForUsage } from "../../tickets/validate.js";
 import { loadConfig, resolveActor } from "../actor.js";
 import { SlopError } from "../errors.js";
-import { assertMaxLength, printWarning, readStdin, sessionOwnershipWarning } from "./shared.js";
+import {
+  assertMaxLength,
+  printWarning,
+  readStdin,
+  sessionOwnershipWarning,
+  ticketJson,
+} from "./shared.js";
 
 interface DoneCommandOptions {
   note?: string;
@@ -286,14 +291,13 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
     process.stdout.write(
       `${JSON.stringify(
         {
-          id: result.ticket.id,
-          slug: result.ticket.slug,
-          handle: shortTicketCode(result.ticket.id),
-          name: result.ticket.name,
-          state: result.ticket.state,
-          note: result.session.end_summary,
+          ticket: ticketJson(result.ticket),
+          session: {
+            id: result.session.id,
+            note: result.session.end_summary,
+            transcript: result.session.transcript_ref,
+          },
           resolution_set: result.ticket.resolution !== undefined,
-          transcript: result.session.transcript_ref,
           unblocked: result.cascade.unblocked,
           problems: result.cascade.problems.map((p) => ({ id: p.id, message: p.message })),
           skipped_review: result.skippedReview,

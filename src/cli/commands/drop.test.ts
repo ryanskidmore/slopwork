@@ -164,23 +164,23 @@ describe("runDrop (in-process)", () => {
     try {
       await withCwd(root, () => runDrop(id, { reason: "superseded", json: true }));
       const body = JSON.parse(out.stdout()) as {
-        id: TicketId;
-        slug: string;
-        handle: string;
-        name: string;
-        state: string;
+        ticket: { id: string; slug: string; handle: string; name: string; state: string };
+        session: { id: string; transcript: string | null } | null;
         reason: string;
-        transcript: string | null;
-        unblocked: TicketId[];
-        problems: unknown[];
+        unblocked: string[];
+        problems: { id: string; message: string }[];
       };
-      expect(body.id).toBe(id);
-      expect(body.state).toBe("dropped");
+      expect(body.ticket.id).toBe(id);
+      expect(body.ticket.state).toBe("dropped");
       expect(body.reason).toBe("superseded");
       expect(body.unblocked).toEqual([dependent]);
       expect(body.problems).toEqual([]);
-      expect(body.transcript).toBeNull();
-      expect(body.handle).toMatch(/^t-/);
+      // This ticket was dropped with no active session, and the nested shape
+      // can now say so precisely: `session` is null, rather than the old flat
+      // shape's ambiguous `transcript: null` (which could equally have meant
+      // "a session ran but captured nothing").
+      expect(body.session).toBeNull();
+      expect(body.ticket.handle).toMatch(/^t-/);
     } finally {
       out.restore();
     }

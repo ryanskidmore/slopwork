@@ -2,14 +2,7 @@ import type { Command } from "commander";
 import type { Clock } from "../../core/clock.js";
 import { systemClock } from "../../core/clock.js";
 import type { Actor, Session, Ticket } from "../../core/index.js";
-import {
-  EXIT_CODES,
-  mrUrlSchema,
-  nowIso,
-  sessionSchema,
-  shortTicketCode,
-  ticketSchema,
-} from "../../core/index.js";
+import { EXIT_CODES, mrUrlSchema, nowIso, sessionSchema, ticketSchema } from "../../core/index.js";
 import {
   readSession,
   readTicket,
@@ -30,7 +23,7 @@ import { checkReviewEntry } from "../../tickets/state.js";
 import { formatZodIssuesForUsage } from "../../tickets/validate.js";
 import { loadConfig, resolveActor } from "../actor.js";
 import { SlopError } from "../errors.js";
-import { printWarning } from "./shared.js";
+import { printWarning, ticketJson } from "./shared.js";
 
 interface ReviewCommandOptions {
   mr?: string;
@@ -275,11 +268,11 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
     process.stdout.write(
       `${JSON.stringify(
         {
-          id: result.ticket.id,
-          slug: result.ticket.slug,
-          handle: shortTicketCode(result.ticket.id),
-          name: result.ticket.name,
-          state: result.ticket.state,
+          ticket: ticketJson(result.ticket),
+          session: {
+            id: result.session.id,
+            transcript: result.session.transcript_ref,
+          },
           review: result.ticket.review
             ? {
                 mr: result.ticket.review.mr ?? null,
@@ -287,7 +280,6 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
                 by: result.ticket.review.by,
               }
             : null,
-          transcript: result.session.transcript_ref,
           already_in_review: alreadyInReview,
         },
         null,

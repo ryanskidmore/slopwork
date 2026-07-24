@@ -166,20 +166,16 @@ describe("runReview (in-process)", () => {
         runReview(id, { mr: "https://example.com/org/repo/pull/5", json: true }),
       );
       const body = JSON.parse(out.stdout()) as {
-        id: TicketId;
-        slug: string;
-        handle: string;
-        name: string;
-        state: string;
+        ticket: { id: string; slug: string; handle: string; name: string; state: string };
+        session: { id: string; transcript: string | null };
         review: { mr: string | null; requested_at: string; by: unknown } | null;
-        transcript: string | null;
         already_in_review: boolean;
       };
-      expect(body.id).toBe(id);
-      expect(body.state).toBe("review");
+      expect(body.ticket.id).toBe(id);
+      expect(body.ticket.state).toBe("review");
       expect(body.review?.mr).toBe("https://example.com/org/repo/pull/5");
       expect(body.already_in_review).toBe(false);
-      expect(body.handle).toMatch(/^t-/);
+      expect(body.ticket.handle).toMatch(/^t-/);
     } finally {
       out.restore();
     }

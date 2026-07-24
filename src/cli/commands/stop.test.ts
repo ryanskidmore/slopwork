@@ -268,20 +268,16 @@ describe("runStop (in-process)", () => {
     try {
       await withCwd(root, () => runStop(id, { note: "handoff via json", json: true }));
       const body = JSON.parse(out.stdout()) as {
-        id: TicketId;
-        slug: string;
-        handle: string;
-        name: string;
-        state: string;
-        session_id: string;
-        note: string;
-        transcript: string | null;
+        ticket: { id: string; slug: string; handle: string; name: string; state: string };
+        session: { id: string; note: string | null; transcript: string | null };
       };
-      expect(body.id).toBe(id);
-      expect(body.state).toBe("open");
-      expect(body.note).toBe("handoff via json");
-      expect(body.session_id).toMatch(/^session_/);
-      expect(body.handle).toMatch(/^t-/);
+      // json-shapes-are-inconsistent-across: ticket and session are nested, so
+      // `ticket.id` means the same thing here as it does in `start --json`.
+      expect(body.ticket.id).toBe(id);
+      expect(body.ticket.state).toBe("open");
+      expect(body.ticket.handle).toMatch(/^t-/);
+      expect(body.session.note).toBe("handoff via json");
+      expect(body.session.id).toMatch(/^session_/);
     } finally {
       out.restore();
     }

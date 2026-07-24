@@ -595,26 +595,21 @@ describe("runDone (in-process)", () => {
         runDone(id, { note: "shipped via json", outcome: "Full writeup.", json: true }),
       );
       const body = JSON.parse(out.stdout()) as {
-        id: TicketId;
-        slug: string;
-        handle: string;
-        name: string;
-        state: string;
-        note: string;
-        resolution_set: boolean;
-        transcript: string | null;
-        unblocked: TicketId[];
-        problems: unknown[];
+        ticket: { id: string; slug: string; handle: string; name: string; state: string };
+        session: { id: string; note: string | null; transcript: string | null };
+        unblocked: string[];
+        problems: { id: string; message: string }[];
         skipped_review: boolean;
+        resolution_set: boolean;
       };
-      expect(body.id).toBe(id);
-      expect(body.state).toBe("done");
-      expect(body.note).toBe("shipped via json");
+      expect(body.ticket.id).toBe(id);
+      expect(body.ticket.state).toBe("done");
+      expect(body.session.note).toBe("shipped via json");
       expect(body.resolution_set).toBe(true);
       expect(body.unblocked).toEqual([dependent]);
       expect(body.problems).toEqual([]);
       expect(body.skipped_review).toBe(false);
-      expect(body.handle).toMatch(/^t-/);
+      expect(body.ticket.handle).toMatch(/^t-/);
     } finally {
       out.restore();
     }

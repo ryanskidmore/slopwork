@@ -35,6 +35,34 @@ pick-the-first-one. `jira:PROJ-123`-style external refs are only valid as
 `--parent` values — passing one where a local ticket ref is expected is a
 usage error (exit `2`).
 
+## `--json` output shapes
+
+Commands that support `--json` follow one rule, so an agent can parse any of
+them without special-casing:
+
+- **Commands that report only a ticket** return its fields **flat**: `new`,
+  `update`, `draft`, `undraft`.
+  ```json
+  { "id": "ticket_01…", "slug": "add-auth", "handle": "t-ab12x", "name": "Add auth", "state": "open" }
+  ```
+- **Commands that act on a ticket through a session** nest both, plus whatever
+  else that command reports: `start`, `stop`, `done`, `drop`, `review`.
+  ```json
+  {
+    "ticket":  { "id": "ticket_01…", "slug": "add-auth", "handle": "t-ab12x", "name": "Add auth", "state": "done" },
+    "session": { "id": "session_01…", "note": "shipped", "transcript": "transcripts/session_01….jsonl" },
+    "unblocked": ["ticket_01…"]
+  }
+  ```
+
+The `ticket` object always carries the same five fields (`id`, `slug`,
+`handle`, `name`, `state`), so `ticket.id` means the same thing everywhere.
+`drop` reports `"session": null` when the dropped ticket had no active session
+at all — distinct from a session that simply captured no transcript.
+
+Errors never go to stdout, so a `--json` stdout stream is always either valid
+JSON or empty; branch on the [exit code](#exit-codes) first.
+
 ## Exit codes
 
 Every command exits with exactly one of these (`src/core/exit-codes.ts`),

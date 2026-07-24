@@ -7,7 +7,6 @@ import {
   EXIT_CODES,
   nowIso,
   sessionSchema,
-  shortTicketCode,
   ticketSchema,
 } from "../../core/index.js";
 import {
@@ -33,7 +32,7 @@ import { checkDropEntry } from "../../tickets/state.js";
 import { formatZodIssuesForUsage } from "../../tickets/validate.js";
 import { loadConfig, resolveActor } from "../actor.js";
 import { SlopError } from "../errors.js";
-import { assertMaxLength, printWarning, sessionOwnershipWarning } from "./shared.js";
+import { assertMaxLength, printWarning, sessionOwnershipWarning, ticketJson } from "./shared.js";
 
 interface DropCommandOptions {
   reason: string;
@@ -222,13 +221,14 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
     process.stdout.write(
       `${JSON.stringify(
         {
-          id: result.ticket.id,
-          slug: result.ticket.slug,
-          handle: shortTicketCode(result.ticket.id),
-          name: result.ticket.name,
-          state: result.ticket.state,
+          ticket: ticketJson(result.ticket),
+          // `null` when the dropped ticket had no active session at all (an
+          // open/draft ticket) — there was no session to report on.
+          session:
+            result.session === null
+              ? null
+              : { id: result.session.id, transcript: result.session.transcript_ref },
           reason: opts.reason,
-          transcript: result.session?.transcript_ref ?? null,
           unblocked: result.cascade.unblocked,
           problems: result.cascade.problems.map((p) => ({ id: p.id, message: p.message })),
         },

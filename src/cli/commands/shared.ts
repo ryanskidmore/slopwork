@@ -7,6 +7,8 @@ import { BUDGET_UNIT } from "../../core/budget.js";
 import { EXIT_CODES } from "../../core/exit-codes.js";
 import type { Actor, Session } from "../../core/index.js";
 import { SlopError } from "../errors.js";
+import { shortTicketCode } from "../../core/index.js";
+import type { TicketId } from "../../core/index.js";
 
 /** Commander "collect" reducer for options that may be repeated, e.g.
  * `--blocks x --blocks y` → `["x", "y"]`. */
@@ -175,4 +177,35 @@ export async function readStdin(): Promise<string> {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   }
   return Buffer.concat(chunks).toString("utf8");
+}
+
+/**
+ * The canonical `ticket` object every `--json` result embeds
+ * (json-shapes-are-inconsistent-across).
+ *
+ * The rule this enforces, documented in docs/cli-reference.md: a command that
+ * reports ONLY a ticket returns these fields flat (`new`, `update`, `draft`,
+ * `undraft`); a command that reports a ticket AND the session it acted on
+ * nests them under `ticket` and `session` (`start`, `stop`, `done`, `drop`,
+ * `review`). Before this, `start --json` nested while `stop`/`done`/`drop`/
+ * `review` flattened ticket fields alongside session ones — so an agent read
+ * `ticket.id` from one command and `id` from the next, and in the flat shape
+ * `id` meant the ticket while `session_id` meant the session. Routing every
+ * ticket sub-object through one function is what keeps the two families from
+ * drifting apart again.
+ */
+export function ticketJson(ticket: { id: TicketId; slug: string; name: string; state: string }): {
+  id: string;
+  slug: string;
+  handle: string;
+  name: string;
+  state: string;
+} {
+  return {
+    id: ticket.id,
+    slug: ticket.slug,
+    handle: shortTicketCode(ticket.id),
+    name: ticket.name,
+    state: ticket.state,
+  };
 }

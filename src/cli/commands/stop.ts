@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { END_SUMMARY_MAX_LENGTH, sessionSchema, shortTicketCode } from "../../core/index.js";
+import { END_SUMMARY_MAX_LENGTH, sessionSchema } from "../../core/index.js";
 import {
   readSession,
   readTicket,
@@ -18,7 +18,7 @@ import {
 } from "../../sessions/transcript.js";
 import { diffTicketPatch, TICKET_FIELDS } from "../../tickets/patch.js";
 import { loadConfig, resolveActor } from "../actor.js";
-import { assertMaxLength, printWarning, sessionOwnershipWarning } from "./shared.js";
+import { assertMaxLength, printWarning, sessionOwnershipWarning, ticketJson } from "./shared.js";
 
 interface StopCommandOptions {
   note?: string;
@@ -200,14 +200,12 @@ export async function runStop(ref: string, opts: StopCommandOptions): Promise<vo
     process.stdout.write(
       `${JSON.stringify(
         {
-          id: result.ticket.id,
-          slug: result.ticket.slug,
-          handle: shortTicketCode(result.ticket.id),
-          name: result.ticket.name,
-          state: result.ticket.state,
-          session_id: result.session.id,
-          note: result.session.end_summary,
-          transcript: result.session.transcript_ref,
+          ticket: ticketJson(result.ticket),
+          session: {
+            id: result.session.id,
+            note: result.session.end_summary,
+            transcript: result.session.transcript_ref,
+          },
         },
         null,
         2,

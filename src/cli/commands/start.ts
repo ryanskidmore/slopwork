@@ -45,7 +45,7 @@ import { renderContextPack } from "../../tickets/context.js";
 import { TICKET_FIELDS, diffTicketPatch } from "../../tickets/patch.js";
 import { loadConfig, resolveActor } from "../actor.js";
 import { SlopError } from "../errors.js";
-import { printWarning } from "./shared.js";
+import { printWarning, ticketJson } from "./shared.js";
 
 interface StartCommandOptions {
   as?: string;
@@ -444,12 +444,7 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
         harness_session_id: harness.session_id,
         started_at: result.session.started_at,
       },
-      ticket: {
-        id: result.ticket.id,
-        slug: result.ticket.slug,
-        name: result.ticket.name,
-        state: result.ticket.state,
-      },
+      ticket: ticketJson(result.ticket),
       git: { branch: git.branch, commit_at_start: git.commit_at_start },
       re_entry: result.previousSession !== null && result.isReviewReentry,
       takeover: tookOver,
