@@ -21,6 +21,15 @@ export function defaultSpec(name: string): Spec {
   return specSchema.parse({ summary: defaultSummaryFromName(name) });
 }
 
+/** The complete set of top-level keys `specSchema` knows about. Every field
+ * on the schema is optional/defaulted, which means `specSchema.safeParse`
+ * would otherwise happily strip any *unknown* key (e.g. a typo'd `details`
+ * meant as `details_md`) and still succeed — silently discarding whatever
+ * prose lived under it. Keys are checked against this set *before* handing
+ * the candidate to zod, so that case is caught up front instead of sliding
+ * through as a false "validated" success. */
+const SPEC_SCHEMA_KEYS = new Set(Object.keys(specSchema.shape));
+
 /**
  * Decide JSON-structural vs bare-markdown, per D10:
  *
@@ -28,19 +37,26 @@ export function defaultSpec(name: string): Spec {
  *      object (arrays and bare JSON primitives — `"hello"`, `42`, `true`
  *      — are all valid JSON but not spec-shaped), `raw` is not
  *      JSON-structural at all: fall straight to the markdown path.
- *   2. Otherwise, merge `{ summary: <default from name> }` underneath the
+ *   2. If it IS a plain object but carries any top-level key outside
+ *      {@link SPEC_SCHEMA_KEYS} (`summary`, `details_md`, `acceptance`,
+ *      `context`, `meta`, `v`), treat it the same as a validation failure
+ *      (see 4) rather than letting `specSchema.safeParse` silently strip
+ *      the unrecognized key(s) and default the rest — that would look like
+ *      success while quietly losing whatever content lived under the typo.
+ *   3. Otherwise, merge `{ summary: <default from name> }` underneath the
  *      parsed object (so a JSON spec that omits `summary` still gets the
  *      same "defaults from name" treatment as the no-`--spec` case) and
  *      validate the result against {@link specSchema}. If it validates,
  *      that's the spec — used structurally, exactly as D10 asks.
- *   3. If it's a JSON object but DOESN'T validate against `specSchema`
- *      (wrong field types, unexpected shape, ...) — still not "matching
- *      the spec schema" — fall through to the markdown path too, with the
- *      original raw text (JSON and all) landing verbatim in `details_md`.
- *      This is a deliberate, honest fallback rather than a rejection: a
- *      human/agent typing free-form text that happens to start with `{`
- *      should never get a confusing schema-validation error for what was
- *      always meant as prose.
+ *   4. If it's a JSON object but DOESN'T validate against `specSchema`
+ *      (wrong field types, unrecognized top-level keys, unexpected shape,
+ *      ...) — still not "matching the spec schema" — fall through to the
+ *      markdown path too, with the original raw text (JSON and all)
+ *      landing verbatim in `details_md`. This is a deliberate, honest
+ *      fallback rather than a rejection: a human/agent typing free-form
+ *      text that happens to start with `{` should never get a confusing
+ *      schema-validation error for what was always meant as prose, and the
+ *      original text — unknown keys included — is never dropped.
  */
 export function parseSpecInput(raw: string, name: string): Spec {
   let parsedJson: unknown;
@@ -54,12 +70,13 @@ export function parseSpecInput(raw: string, name: string): Spec {
   }
 
   if (isJsonObject) {
-    const candidate = {
-      summary: defaultSummaryFromName(name),
-      ...(parsedJson as Record<string, unknown>),
-    };
-    const result = specSchema.safeParse(candidate);
-    if (result.success) return result.data;
+    const parsedObject = parsedJson as Record<string, unknown>;
+    const hasOnlyKnownKeys = Object.keys(parsedObject).every((key) => SPEC_SCHEMA_KEYS.has(key));
+    if (hasOnlyKnownKeys) {
+      const candidate = { summary: defaultSummaryFromName(name), ...parsedObject };
+      const result = specSchema.safeParse(candidate);
+      if (result.success) return result.data;
+    }
   }
 
   return specSchema.parse({ summary: defaultSummaryFromName(name), details_md: raw });

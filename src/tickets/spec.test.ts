@@ -76,4 +76,40 @@ describe("parseSpecInput (D10: bare markdown -> details_md)", () => {
     expect(spec.details_md).toBe("");
     expect(spec.summary).toBe("Ticket name");
   });
+
+  it("a JSON object with an unknown top-level key never silently loses the value: falls through to markdown, verbatim", () => {
+    const raw = JSON.stringify({ details: "my writeup" });
+    const spec = parseSpecInput(raw, "Ticket name");
+    // The would-be-lost prose must still be present somewhere in the result.
+    expect(spec.details_md).toContain("my writeup");
+    expect(spec.details_md).toBe(raw);
+    expect(spec.summary).toBe("Ticket name");
+  });
+
+  it("a JSON object mixing known and unknown top-level keys also falls through to markdown, verbatim", () => {
+    const raw = JSON.stringify({ summary: "Custom summary", details: "my writeup" });
+    const spec = parseSpecInput(raw, "Ticket name");
+    expect(spec.details_md).toContain("my writeup");
+    expect(spec.details_md).toBe(raw);
+  });
+
+  it("a JSON object with only known top-level keys still parses structurally, unchanged", () => {
+    const spec = parseSpecInput(
+      JSON.stringify({
+        summary: "Custom summary",
+        details_md: "prose",
+        acceptance: ["a"],
+        context: ["c"],
+        meta: { k: "v" },
+        v: 1,
+      }),
+      "Ticket name",
+    );
+    expect(spec.summary).toBe("Custom summary");
+    expect(spec.details_md).toBe("prose");
+    expect(spec.acceptance).toEqual(["a"]);
+    expect(spec.context).toEqual(["c"]);
+    expect(spec.meta).toEqual({ k: "v" });
+    expect(spec.v).toBe(1);
+  });
 });
