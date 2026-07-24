@@ -1161,11 +1161,15 @@ describe("speculativeTranscriptCapture / resolveTranscriptCapture — the outsid
     expect(speculative?.result.transcriptRef).toBe(`transcripts/${session.id}.jsonl`);
   });
 
-  it("resolveTranscriptCapture reuses the speculative result outright when it's keyed to the SAME session id as the authoritative session", async () => {
+  it("resolveTranscriptCapture reuses the speculative result outright when it's keyed to the SAME session id AND the same transcript_ref baseline as the authoritative session", async () => {
     const paths = repoPaths(scratch);
     const session = makeSession();
     const speculative = {
       sessionId: session.id,
+      // Matches `session.transcript_ref` (default null via makeSession) —
+      // nothing committed a transcript_ref change to this session between
+      // the speculative read and the lock, so reuse is correct here.
+      baselineTranscriptRef: session.transcript_ref,
       result: {
         transcriptRef: `transcripts/${session.id}.jsonl`,
         warning: null,
@@ -1198,6 +1202,9 @@ describe("speculativeTranscriptCapture / resolveTranscriptCapture — the outsid
 
     const staleSpeculative = {
       sessionId: "session_01BADBADBADBADBADBADBADBAD" as SessionId,
+      // Irrelevant to this test — the session id mismatch alone already
+      // forces the in-lock fallback below, regardless of this value.
+      baselineTranscriptRef: null,
       result: {
         transcriptRef: "transcripts/wrong-session.jsonl",
         warning: null,
@@ -1236,6 +1243,51 @@ describe("speculativeTranscriptCapture / resolveTranscriptCapture — the outsid
     });
 
     expect(resolved.transcriptRef).toBe(`transcripts/${session.id}.jsonl`);
+  });
+
+  it("resolveTranscriptCapture falls back to an in-lock capture when the speculative baselineTranscriptRef is STALE — a concurrent command already committed a transcript_ref change to this SAME session (ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC)", async () => {
+    const paths = repoPaths(scratch);
+    // Simulates the exact race the ticket describes: a CONCURRENT `review
+    // --transcript` already committed a fresh ref to this exact session
+    // between this command's own speculative read (which observed
+    // transcript_ref: null, below) and this in-lock authoritative read.
+    const session = makeSession({
+      harness: harness("other"),
+      transcript_ref: "transcripts/concurrent-review-capture.jsonl",
+    });
+
+    const staleSpeculative = {
+      sessionId: session.id,
+      // The speculative read saw transcript_ref: null (BEFORE the
+      // concurrent review committed) and, with no --transcript of its own
+      // and harness "other" (no auto-detection), located nothing new —
+      // exactly a racing `done` call's own speculative result.
+      baselineTranscriptRef: null,
+      result: {
+        transcriptRef: null,
+        warning: "could not locate a transcript for this session (harness=other)",
+        sourcePath: null,
+      },
+    };
+
+    const resolved = await resolveTranscriptCapture(staleSpeculative, {
+      session,
+      paths,
+      cwd: scratch,
+      transcriptsMode: "local",
+      // No explicitTranscriptPath, same as the racing `done` call above —
+      // the in-lock fallback also finds nothing new.
+    });
+
+    // The OLD (session-id-only) reconciliation would have reused
+    // `staleSpeculative.result` outright here — transcriptRef: null —
+    // silently clobbering the concurrent review's fresh ref with no error
+    // and no event explaining it. The fix instead falls back to an
+    // in-lock `captureTranscript` call, whose own Fix 2 (this module's
+    // top-of-file doc) preserves `session.transcript_ref` when nothing
+    // new is located — so the concurrent review's ref survives.
+    expect(resolved.transcriptRef).toBe("transcripts/concurrent-review-capture.jsonl");
+    expect(resolved.warning).toMatch(/kept the previously-captured transcript/i);
   });
 });
 

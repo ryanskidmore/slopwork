@@ -160,14 +160,17 @@
  *     call) — this is where the slow, streamed I/O actually happens,
  *     entirely outside the lock. Once inside the lock, the caller reads
  *     the AUTHORITATIVE session as before and calls {@link
- *     resolveTranscriptCapture} to reconcile: same session id (the
- *     overwhelmingly common case — nothing else can retarget a
- *     specific ticket's active session without holding this same lock
- *     first) -> reuse the speculative result outright, zero extra I/O
- *     under the lock. Different id, or the speculative read failed
- *     outright (rare: a genuinely concurrent command on this SAME
- *     ticket) -> fall back to an in-lock `captureTranscript` call, same
- *     as before this fix, just no longer the common path.
+ *     resolveTranscriptCapture} to reconcile: same session id AND same
+ *     `transcript_ref` baseline (ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC
+ *     tightened this from session id alone — see that function's own doc
+ *     for the race a session-id-only check missed; the overwhelmingly
+ *     common case still holds, since nothing else can retarget a specific
+ *     ticket's active session OR its `transcript_ref` without holding
+ *     this same lock first) -> reuse the speculative result outright,
+ *     zero extra I/O under the lock. Either mismatch, or the speculative
+ *     read failed outright (rare: a genuinely concurrent command on this
+ *     SAME session) -> fall back to an in-lock `captureTranscript` call,
+ *     same as before this fix, just no longer the common path.
  *
  * ---------------------------------------------------------------------
  * Fix 2 (ticket_01KY9NVM1YRM1F7NX1QS5JJAW1) — a recapture that finds
@@ -1024,6 +1027,20 @@ export interface SpeculativeTranscriptCapture {
   result: CaptureTranscriptResult;
   /** The session id `result` is actually keyed to. */
   sessionId: SessionId;
+  /**
+   * `transcript_ref` of the session snapshot this capture was performed
+   * against — the PRE-mutation baseline observed at the speculative read
+   * (ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC): `resolveTranscriptCapture` below
+   * only reuses `result` when this STILL matches the AUTHORITATIVE
+   * session's own `transcript_ref`, read fresh in-lock. A mismatch means
+   * some OTHER command already committed a `transcript_ref` change to
+   * this exact session between this speculative read and the lock (e.g. a
+   * concurrent `review --transcript` capturing a real transcript, racing
+   * against this command's own speculative read that happened just
+   * before) — reusing `result` in that case would silently overwrite the
+   * other command's fresh ref with this command's stale one.
+   */
+  baselineTranscriptRef: string | null;
 }
 
 /**
@@ -1051,7 +1068,7 @@ export async function speculativeTranscriptCapture(
   try {
     const session = await readSession(paths, activeSessionId);
     const result = await captureTranscript({ ...options, session });
-    return { result, sessionId: session.id };
+    return { result, sessionId: session.id, baselineTranscriptRef: session.transcript_ref };
   } catch {
     return null;
   }
@@ -1060,22 +1077,43 @@ export async function speculativeTranscriptCapture(
 /**
  * Reconcile a {@link speculativeTranscriptCapture} result against
  * `options.session` — the AUTHORITATIVE session a caller reads once
- * INSIDE `withLock`. Reuses the speculative result outright when it was
- * keyed to the exact same session id (the overwhelmingly common case:
- * nothing can retarget a specific ticket's active session without
- * holding this same db lock first, so the session read speculatively and
- * the one read authoritatively are the same file with the same content).
- * Otherwise — a `null` speculative result, or one keyed to a DIFFERENT
- * session id (a genuinely concurrent command on this same ticket raced
- * between the speculative read and the lock) — falls back to an in-lock
- * `captureTranscript` call: still never throws, still streams, just no
- * longer overlapped with other commands in that narrow window.
+ * INSIDE `withLock`. Reuses the speculative result outright when BOTH:
+ *
+ *   - it was keyed to the exact same session id (nothing can retarget a
+ *     specific ticket's active session without holding this same db lock
+ *     first, so a session-id match alone used to be treated as proof the
+ *     two reads saw identical content); AND
+ *   - its `baselineTranscriptRef` still matches the authoritative
+ *     session's OWN `transcript_ref` (ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC —
+ *     the fix: session id alone is NOT sufficient, because a session's
+ *     `transcript_ref` can change WITHOUT its id changing. Concretely: a
+ *     `review --transcript X` and a plain `done` racing on the same
+ *     ticket both read the SAME active session id speculatively; if
+ *     `review` commits first (setting `transcript_ref`) after `done`'s
+ *     own speculative read already ran (and found nothing to capture,
+ *     since `done` passed no `--transcript`), `done`'s stale
+ *     `result.transcriptRef: null` would — under the old session-id-only
+ *     check — overwrite `review`'s freshly captured ref with `null`, a
+ *     silent regression with no error and no event explaining it).
+ *
+ * A mismatch on either condition — including a `null` speculative result
+ * — falls back to an in-lock `captureTranscript` call: still never
+ * throws, still streams, just no longer overlapped with other commands in
+ * that narrow window. Note this in-lock fallback naturally does the RIGHT
+ * thing for the race above: `captureTranscript`'s own Fix 2 (this
+ * module's top-of-file doc) preserves an already-set `transcript_ref`
+ * when nothing new is located, so `done`'s in-lock retry sees `review`'s
+ * committed ref on `options.session` and keeps it rather than clearing it.
  */
 export async function resolveTranscriptCapture(
   speculative: SpeculativeTranscriptCapture | null,
   options: CaptureTranscriptOptions,
 ): Promise<CaptureTranscriptResult> {
-  if (speculative !== null && speculative.sessionId === options.session.id) {
+  if (
+    speculative !== null &&
+    speculative.sessionId === options.session.id &&
+    speculative.baselineTranscriptRef === options.session.transcript_ref
+  ) {
     return speculative.result;
   }
   return captureTranscript(options);

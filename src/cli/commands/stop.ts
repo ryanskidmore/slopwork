@@ -56,6 +56,26 @@ export async function runStop(ref: string, opts: StopCommandOptions): Promise<vo
 
   const initialTicket = await resolveTicketRef(paths, ref);
 
+  // ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC: a fast, UNLOCKED pre-check against
+  // this same `initialTicket` read — same `assertStoppable` the lock below
+  // authoritatively enforces, run a second time, early, purely so a `stop`
+  // that's clearly going to fail (e.g. the ticket is already in `review`)
+  // never reaches the speculative capture below at all. Without this, the
+  // speculative capture — which physically copies bytes into
+  // `.slop/transcripts/<session.id>.jsonl` — ran unconditionally BEFORE
+  // any validation, so a doomed `stop` on a review-state ticket still
+  // mutated (or re-copied over) that file on disk and then exited CONFLICT
+  // with no event ever describing the change: a real, committed-nowhere
+  // side effect from a command that otherwise changed nothing. This catches
+  // the common, non-racing case for free; the AUTHORITATIVE check inside
+  // `withLock` below is unchanged and is what actually guards correctness
+  // — a ticket that changes state in the (narrow) window between this
+  // line and the lock is still caught there, same as before this fix,
+  // just with the ordinary "speculative capture ran, in-lock check saved
+  // us" behavior every other narrow race in this module already accepts
+  // (see transcript.ts's Fix 1 doc).
+  assertStoppable(initialTicket);
+
   // Fix 1 (ticket_01KY93E2ZK6Z3TFEBP86ATMW37): locate + copy the harness
   // transcript BEFORE acquiring the db lock — see transcript.ts's
   // top-of-file doc, "Fix 1", for the full rationale. `resolveTicketRef`

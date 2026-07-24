@@ -1,0 +1,44 @@
+{
+  "id": "session_01KYAVAGV52AEGJ57V54TQGYHZ",
+  "ticket": "ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "worktree-agent-a7ff845d6e02c1d0b",
+    "commit_at_start": "242daf32de1dbfa050a192039630393b94c1638e"
+  },
+  "started_at": "2026-07-24T19:58:32.293Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "add baselineTranscriptRef to SpeculativeTranscriptCapture; resolveTranscriptCapture compares it against the authoritative session's transcript_ref, not just session id",
+          "checked": true
+        },
+        {
+          "text": "stop.ts + review.ts: pre-validate state (assertStoppable / checkReviewEntry) against the unlocked initialTicket BEFORE speculativeTranscriptCapture runs, so a command that will fail validation never mutates .slop/transcripts/",
+          "checked": true
+        },
+        {
+          "text": "add regression tests: the race (transcript_ref reconciliation) in transcript.test.ts, and the never-mutate-on-failed-validation behavior in stop.test.ts/review.test.ts",
+          "checked": true
+        },
+        {
+          "text": "run full verification",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T19:58:41.615Z"
+    }
+  ],
+  "end_summary": null,
+  "transcript_ref": "transcripts/session_01KYAVAGV52AEGJ57V54TQGYHZ.jsonl"
+}

@@ -123,6 +123,25 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
 
   const initialTicket = await resolveTicketRef(paths, ref);
 
+  // ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC: a fast, UNLOCKED pre-check against
+  // this same `initialTicket` read — same `checkReviewEntry` the lock
+  // below authoritatively enforces, run a second time, early, purely so a
+  // `review` that's clearly going to fail (e.g. the ticket is ALREADY in
+  // review — `checkReviewEntry` rejects `review -> review`, and a
+  // review-state ticket still carries an active session per D15) never
+  // reaches the speculative capture below at all. See stop.ts's identical
+  // pre-check for the full rationale (the speculative capture physically
+  // mutates `.slop/transcripts/<session.id>.jsonl` on disk, so running it
+  // unconditionally before any validation left a doomed `review` mutating
+  // that file with no event ever describing the change). The
+  // AUTHORITATIVE check inside `withLock` below is unchanged and is what
+  // actually guards correctness against the narrow race this pre-check
+  // can't close on its own.
+  const initialCheck = checkReviewEntry(initialTicket.state);
+  if (!initialCheck.ok) {
+    throw new SlopError(initialCheck.reason ?? "illegal state transition", EXIT_CODES.CONFLICT);
+  }
+
   // Fix 1 (ticket_01KY93E2ZK6Z3TFEBP86ATMW37): locate + copy the harness
   // transcript BEFORE acquiring the db lock — see transcript.ts's
   // top-of-file doc, "Fix 1", and stop.ts's identical comment for the
