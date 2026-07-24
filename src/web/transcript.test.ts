@@ -89,6 +89,24 @@ describe("getTranscriptPage", () => {
     expect(page2.hasMore).toBe(false);
   });
 
+  // web-transcript-pager-newer-older: `total` is only authoritative when
+  // `hasMore` is false (the scan ran to completion) — see TranscriptPage's
+  // doc. transcript-view.ts's out-of-range-offset clamp depends on this.
+  it("total is the exact visible-record count once the scan completes (hasMore: false)", async () => {
+    const source = sourceFromRecords(records);
+    const page = await getTranscriptPage(source, { offset: 0, limit: 10, includeSystem: false });
+    expect(page.hasMore).toBe(false);
+    expect(page.total).toBe(4); // 4 user/assistant records among the 6 fixture records
+  });
+
+  it("an offset past the end returns zero records, hasMore: false, and the exact total", async () => {
+    const source = sourceFromRecords(records);
+    const page = await getTranscriptPage(source, { offset: 100, limit: 10, includeSystem: false });
+    expect(page.records).toEqual([]);
+    expect(page.hasMore).toBe(false);
+    expect(page.total).toBe(4);
+  });
+
   it("stops reading the underlying source once the page + lookahead is satisfied (streaming, not a full-file load)", async () => {
     const many = Array.from({ length: 10_000 }, (_, i) => ({
       type: i % 2 === 0 ? "user" : "assistant",

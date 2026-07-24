@@ -145,6 +145,19 @@ export interface TranscriptPage {
   offset: number;
   limit: number;
   hasMore: boolean;
+  /**
+   * web-transcript-pager-newer-older: the exact count of visible
+   * (type/includeSystem-matching) records in the transcript — but ONLY
+   * exact/authoritative when {@link hasMore} is `false`. The scan below
+   * stops the moment it knows `hasMore` (one record past the requested
+   * page), so when `hasMore` is `true` the source was never read to
+   * completion and this is just that same lookahead count
+   * (`offset + limit + 1`), not the real total. Callers that need the real
+   * total (to clamp an out-of-range `offset` back onto the last valid
+   * page, e.g.) must only trust this when `hasMore` is `false` — see
+   * `handleTranscriptView`'s use of it.
+   */
+  total: number;
 }
 
 export const DEFAULT_TRANSCRIPT_PAGE_SIZE = 40;
@@ -173,7 +186,7 @@ export async function getTranscriptPage(
     if (matched > offset + limit) break;
   }
 
-  return { records, offset, limit, hasMore: matched > offset + limit };
+  return { records, offset, limit, hasMore: matched > offset + limit, total: matched };
 }
 
 /** Best-effort plain-text extraction from a `tool_result` block's `content` (string, or an array of text-ish sub-blocks). */

@@ -147,16 +147,38 @@ export async function handleTranscriptView(
     if (includeSystem) params.set("all", "1");
     return `?${params.toString()}`;
   };
+
+  // web-transcript-pager-newer-older: an out-of-range `?offset` (past the
+  // last visible record) used to render a nonsense summary line ("records
+  // 100001–100000", zero records, pager still offering a next page). Once
+  // the scan below runs to completion (`hasMore: false`) `page.total` is
+  // the EXACT visible-record count (see TranscriptPage's doc) — clamp back
+  // onto the real last page instead of ever rendering that. `page.total >
+  // 0` excludes the legitimate "this transcript has no visible records at
+  // all" case (offset 0, nothing to clamp to).
+  if (offset > 0 && page.records.length === 0 && !page.hasMore && page.total > 0) {
+    const clampedOffset = Math.max(0, page.total - limit);
+    return new Response(null, { status: 302, headers: { location: qs(clampedOffset) } });
+  }
+
   const toggleQs = (() => {
     const params = new URLSearchParams({ offset: String(offset), limit: String(limit) });
     if (!includeSystem) params.set("all", "1");
     return `?${params.toString()}`;
   })();
 
+  // Records render oldest-first (`getTranscriptPage`'s stream order): a
+  // HIGHER offset moves toward NEWER records, a lower one toward OLDER —
+  // the pager labels below must follow that chronology, not the reverse
+  // (web-transcript-pager-newer-older — they used to be swapped).
   const pager = html`<div class="pager">
-  ${offset > 0 ? html`<a href="${qs(Math.max(0, offset - limit))}">← Newer</a>` : html`<span class="disabled">← Newer</span>`}
-  <span class="muted">records ${offset + 1}–${offset + page.records.length}</span>
-  ${page.hasMore ? html`<a href="${qs(offset + limit)}">Older →</a>` : html`<span class="disabled">Older →</span>`}
+  ${offset > 0 ? html`<a href="${qs(Math.max(0, offset - limit))}">← Older</a>` : html`<span class="disabled">← Older</span>`}
+  ${
+    page.records.length > 0
+      ? html`<span class="muted">records ${offset + 1}–${offset + page.records.length}</span>`
+      : html`<span class="muted">No records in this range.</span>`
+  }
+  ${page.hasMore ? html`<a href="${qs(offset + limit)}">Newer →</a>` : html`<span class="disabled">Newer →</span>`}
   <a href="${toggleQs}">${includeSystem ? "Hide" : "Show"} system records</a>
 </div>`;
 
