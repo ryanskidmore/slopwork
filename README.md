@@ -6,12 +6,41 @@ through a session, and leave an auditable trail — progress notes, plan checkpo
 transcript — ending in `done`. v0 is a local CLI backed by a flatfile JSONC database
 (`.slop/db/`) designed to be git-mergeable across parallel agent streams, plus a read-only local
 web explorer (`slop web`). See `design.md` for the full spec and `v0-implementation-plan.md` for
-how it's being built.
+how it was built.
 
-This repo is itself the implementation. **A1 (this scaffold) only registers the full v0 command
-surface and wires up build/test/lint tooling — command bodies are implemented by later work
-items** (see `v0-implementation-plan.md` §3) and currently print `not yet implemented (work item
-<ID>)` to stderr with exit code `3`.
+This repo is itself the implementation, and v0 ships complete: all 22 commands are implemented
+and covered by acceptance tests — setup (`init`, `instructions`, `reindex`), ticket shaping
+(`new`, `split`, `draft`, `undraft`, `edit`, `update`), the agent loop (`ready`, `start`,
+`context`, `plan`, `review`, `stop`, `done`, `drop`), and inspection (`status`, `show`, `search`,
+`events`, `web`). See `v0-implementation-plan.md` §3 for the work-item breakdown behind each one.
+
+## Installation
+
+Slopworks needs **Bun ≥ 1.3 at runtime** no matter which install channel you use — the CLI is
+Bun-native (`Bun.serve`, `Bun.file`, `Bun.YAML`, and text-imports throughout `src/`), so there is
+no pure-Node build.
+
+```sh
+# Bun (recommended — the tool needs Bun at runtime)
+curl -fsSL https://bun.sh/install | bash    # if Bun isn't installed
+bun add -g slopworks
+
+# Node users: works too, via a launcher that delegates to Bun
+npm i -g slopworks       # (still requires Bun installed; prints a clear message if missing)
+```
+
+## Quickstart
+
+```sh
+slop init --yes
+slop new "My first ticket"
+slop ready
+slop start <slug>        # -> plan -> update --progress -> review --mr -> done
+slop web                 # read-only explorer at http://localhost:4553
+```
+
+Run `slop instructions` for the full agent loop and house rules, or `slop <command> --help` for
+any command's options.
 
 ## Development
 
@@ -105,18 +134,25 @@ and `--version`).
 src/
   cli/                 CLI entrypoint + one module per command
     index.ts            entrypoint: builds the Commander program, top-level exit-code mapping
-    errors.ts            SlopError + reportError + notImplemented — shared by every command
+    errors.ts            SlopError + reportError — shared error-reporting used by every command
     commands/
       index.ts            registers all 22 commands, grouped as in design.md §4.2
       <command>.ts          one file per command (new.ts, start.ts, review.ts, ...)
       shared.ts             tiny option-parsing helpers (collect, parseIntegerOption)
-  core/                 entity types, schemas, ids, serialization (A2), exit codes (A1)
+  core/                 entity types, schemas, ids, serialization, exit codes
     exit-codes.ts         the exit-code table above
-    index.ts               module re-exports; A2 lands entity types/schemas/ULIDs/JSONC here
-  repo/                 flatfile store, locking, ref resolution, index, events (A3/A4)
-    index.ts               placeholder; nothing implemented yet
-  web/                  read-only local web explorer (D5)
-    index.ts               placeholder; nothing implemented yet
+    index.ts               module re-exports; entity types/schemas/ULIDs/JSONC live here
+  repo/                 flatfile store: atomic writes (tmp+rename), `.slop/db/.lock`, ref
+                        resolution, the derived index, and the event writer
+    index.ts               re-exports the repo layer (atomic-write, db-index, events, refs,
+                            sessions, tickets, ...); ticket/session CRUD is built on this
+  tickets/              ticket-domain logic on top of repo/: state machine, done-cascade,
+                        staleness, search, ancestry/tree, jira ref parsing
+  sessions/             session lifecycle: harness/git capture, plan versioning + diff,
+                        context pack, start/stop/finalize, transcript capture
+  web/                  read-only local web explorer (`slop web`)
+    index.ts               re-exports the HTTP server + data source; serves any real `.slop`
+                            directory (not just fixtures) at http://localhost:4553 by default
 tests/
   acceptance/            one file per work item — <ITEM-ID>.test.ts
 ```
