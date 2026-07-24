@@ -137,6 +137,50 @@ describe("runDrop (in-process)", () => {
     expect(ticket.active_session).toBeNull();
   });
 
+  it("ticket_01KYAPN9NXY6RPSV6WGR42CJHJ: warns on stderr (but still succeeds) when the acting actor differs from who started the session", async () => {
+    const root = await makeTempRepo("slop-drop-inproc-ownership-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Ownership-mismatch drop ticket");
+    const startOut = captureOutput();
+    try {
+      await withCwd(root, () => runStart(id, {})); // started as "ryan" (config user:)
+    } finally {
+      startOut.restore();
+    }
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runDrop(id, { reason: "someone else's call" }), {
+        SLOP_ACTOR: "someone-else",
+      });
+      expect(out.stderr()).toContain("someone-else");
+      expect(out.stderr()).toContain("ryan");
+      expect(out.stderr()).toMatch(/session ownership/i);
+      // Never a block — drop still succeeded.
+      expect(out.stdout()).toContain(`dropped ${id}`);
+    } finally {
+      out.restore();
+    }
+    const paths = repoPaths(root);
+    expect((await readTicket(paths, id)).state).toBe("dropped");
+  });
+
+  it("no ownership warning when dropping an open ticket with no active session — nothing to compare against", async () => {
+    const root = await makeTempRepo("slop-drop-inproc-ownership-noactive-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "No-session drop ticket");
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runDrop(id, { reason: "duplicate" }), {
+        SLOP_ACTOR: "someone-else",
+      });
+      expect(out.stderr()).toBe("");
+    } finally {
+      out.restore();
+    }
+  });
+
   it("rejects an empty/whitespace-only --reason with USAGE_ERROR (exit 2), even though Commander alone would let it through", async () => {
     const root = await makeTempRepo("slop-drop-inproc-usage-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });

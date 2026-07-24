@@ -32,7 +32,7 @@ import { checkDropEntry } from "../../tickets/state.js";
 import { formatZodIssuesForUsage } from "../../tickets/validate.js";
 import { loadConfig, resolveActor } from "../actor.js";
 import { SlopError } from "../errors.js";
-import { assertMaxLength, printWarning } from "./shared.js";
+import { assertMaxLength, printWarning, sessionOwnershipWarning } from "./shared.js";
 
 interface DropCommandOptions {
   reason: string;
@@ -128,12 +128,18 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
 
     let finalSession: Session | null = null;
     let transcriptWarning: string | null = null;
+    let ownershipWarning: string | null = null;
 
     // §2: "dropped (wontdo) from anywhere" — an open/draft ticket has no
     // active session at all, so there is nothing to finalize; only
     // in_progress/review tickets carry one.
     if (current.active_session !== null) {
       const session = await readSession(paths, current.active_session);
+      // ticket_01KYAPN9NXY6RPSV6WGR42CJHJ: session ownership is a
+      // warning, not an enforced gate — see sessionOwnershipWarning's own
+      // doc. `null` (never warned) when there's no session to compare
+      // against at all, same as `transcriptWarning` above.
+      ownershipWarning = sessionOwnershipWarning(session, actor);
       const finalizedSession = buildFinalizedSession(session, opts.reason);
 
       // C4's seam — see done.ts's identical comment for the full
@@ -192,10 +198,17 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
       lock,
     );
 
-    return { session: finalSession, ticket: droppedTicket, transcriptWarning, cascade };
+    return {
+      session: finalSession,
+      ticket: droppedTicket,
+      transcriptWarning,
+      ownershipWarning,
+      cascade,
+    };
   });
 
   if (result.transcriptWarning !== null) printWarning(result.transcriptWarning);
+  if (result.ownershipWarning !== null) printWarning(result.ownershipWarning);
   if (result.cascade.problems.length > 0) {
     process.stderr.write(`${formatIndexProblems(result.cascade.problems)}\n`);
   }

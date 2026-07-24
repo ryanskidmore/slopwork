@@ -225,29 +225,33 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
     );
     await lock.assertHeld();
 
-    const {
-      ticket: startedTicket,
-      stateChanged,
-      reEntry,
-    } = buildStartedTicket(current, session.id);
-    const ticketVerb: EventVerb = stateChanged ? "ticket.state_changed" : "ticket.updated";
-    const ticketPayload: Record<string, unknown> = {};
-    if (stateChanged) {
-      ticketPayload.from = current.state;
-      ticketPayload.to = startedTicket.state;
-      if (reEntry) ticketPayload.re_entry = true;
-    }
-    await updateTicket(
-      paths,
-      current.id,
-      diffTicketPatch(current, startedTicket, TICKET_FIELDS),
-      startedTicket,
-      { actor, session: session.id },
-      { verb: ticketVerb, payload: ticketPayload },
-    );
-
+    // ticket_01KYAPKRJ9RJRJRAV42WCTJET4: end the SUPERSEDED previous
+    // session (if any) BEFORE the ticket write below, not after. This used
+    // to run AFTER `updateTicket` — meaning a crash between the ticket
+    // write (which already points `active_session` at the brand-new
+    // `session` above) and this write left `previousSession` stranded:
+    // `ended_at: null` forever, no ticket referencing it any longer (the
+    // ticket now points to the NEW session), invisible to every
+    // session-aware invariant and never self-healing on retry. Closing it
+    // out FIRST instead means the ticket write below is now the ONLY
+    // write in this transaction that changes what an unlocked reader
+    // (`ready`/`show`/a future `start`'s own conflict check) sees — the
+    // "point of no return" — matching `stop.ts`'s already-safe ordering
+    // (session write(s) first, ticket write last, see that file's own
+    // comment). A crash between this write and the ticket write below
+    // now self-heals: the ticket still shows the OLD (now cleanly ended)
+    // session as active, so a retried `start` sees `existing.ended_at !==
+    // null` and proceeds as an ordinary fresh start, no --takeover needed
+    // — see `sessions/start.ts`'s conflict-detection branch.
+    //
+    // The brand-new `session` created above remains exposed to the SAME
+    // kind of window regardless of ordering (a crash between `createSession`
+    // and the ticket write leaves it "active forever", referenced by
+    // nothing) — that one is structural (the ticket write needs this
+    // session's freshly-minted id, so it can never come first) and is
+    // instead handled by detection + repair, not write-ordering: see
+    // `src/sessions/repair.ts` and `slop reindex --heal`.
     if (previousSession !== null) {
-      await lock.assertHeld();
       if (isReviewReentry) {
         const endedPrevious = buildReenteredSession(previousSession);
         await updateSession(
@@ -278,7 +282,29 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
           },
         );
       }
+      await lock.assertHeld();
     }
+
+    const {
+      ticket: startedTicket,
+      stateChanged,
+      reEntry,
+    } = buildStartedTicket(current, session.id);
+    const ticketVerb: EventVerb = stateChanged ? "ticket.state_changed" : "ticket.updated";
+    const ticketPayload: Record<string, unknown> = {};
+    if (stateChanged) {
+      ticketPayload.from = current.state;
+      ticketPayload.to = startedTicket.state;
+      if (reEntry) ticketPayload.re_entry = true;
+    }
+    await updateTicket(
+      paths,
+      current.id,
+      diffTicketPatch(current, startedTicket, TICKET_FIELDS),
+      startedTicket,
+      { actor, session: session.id },
+      { verb: ticketVerb, payload: ticketPayload },
+    );
 
     return {
       session,

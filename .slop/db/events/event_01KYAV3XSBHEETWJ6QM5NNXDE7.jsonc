@@ -1,0 +1,17 @@
+{
+  "id": "event_01KYAV3XSBHEETWJ6QM5NNXDE7",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYAPKRRE38SKMSFKF1GVQQTH"
+  },
+  "payload": {
+    "progress": "Verified the real encoding empirically: strings-searched the locally installed Claude Code CLI binary (v2.1.219, same version this session runs under) and found the actual minified function: cwd.replace(/[^a-zA-Z0-9]/g,'-'), with no OS-specific branching (confirms the ticket's claim and supersedes the old code's unverified separate win32 guess). Rewrote encodeClaudeCwd to match exactly; retired the win32-specific branch since the real rule is platform-agnostic. Also found: paths >200 chars get truncated+hashed by an internal, unreplicated hash fn -- documented as an accepted, graceful-degradation edge case (never a wrong file, just an occasional miss on pathological cwds), not implemented. Rewrote the win32 test describe block into a broader 'verified real algorithm' suite covering underscores/spaces per the acceptance criterion, plus a captureTranscript-level miss-degrades-to-warning test. 57/57 transcript tests pass; typecheck/lint/format clean."
+  },
+  "at": "2026-07-24T19:54:56.172Z"
+}

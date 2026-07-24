@@ -64,6 +64,40 @@ the durable, cross-project explanation of *why*.
    too); use `slop context <ref>` to reload your bearings after
    compaction instead of re-exploring the repo from scratch.
 
+## Session ownership
+
+`start` gates a ticket's active session behind house rule 3 above
+(`--takeover` required to seize one) — but `plan` (incl. `--check`/
+`--uncheck`), `stop`, `done`, and `drop` do not: each acts on whatever
+session is currently active on the ticket, resolved from the ticket
+itself, regardless of whether the acting actor is the one who started it.
+
+This is a deliberate decision, not an oversight. The coordinator pattern
+(one human, or one lead agent, running or reviewing several other agents'
+sessions) routinely needs to check off plan steps, hand off a stalled
+session, or close one out on someone else's behalf — requiring
+`--takeover`-style ceremony on four more commands would make that pattern
+unworkable, for a scenario (a legitimate coordinator acting on a session
+another actor started) that isn't actually misuse.
+
+What IS enforced: every mutation already records the *acting* actor in
+its own event (see [Concepts → event](concepts.md#event)) — the audit
+trail is never silent about who really did it, even when they aren't who
+started the session. On top of that, `plan`/`stop`/`done`/`drop` print a
+`warning:` line on stderr whenever the acting actor's name differs from
+the session's own recorded actor, e.g.:
+
+```
+warning: acting as "coordinator" (agent), but session session_01ABC... was
+started by "worker-3" (agent) — proceeding anyway (session ownership is
+not enforced by design; see docs/agent-workflow.md, "Session ownership").
+```
+
+This is informational, never a block — the command underneath it always
+still succeeds. If you see it and you're *not* deliberately coordinating
+another actor's session, that's worth a second look: it usually means
+you're operating on the wrong ticket, or a stale `<ref>`.
+
 ## Reference resolution
 
 Anywhere a `<ref>` is accepted: a full id (`ticket_01J9X7M3E8W2`), a unique

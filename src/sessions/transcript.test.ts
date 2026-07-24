@@ -221,28 +221,74 @@ describe("locateTranscript — claude-code", () => {
 });
 
 // ---------------------------------------------------------------------------
-// locateTranscript — claude-code cwd encoding on win32 (Windows portability,
-// best-effort/unverified — see encodeClaudeCwd's own doc in transcript.ts).
-// `encodeClaudeCwd` isn't exported (same as every other internal helper in
-// this module); this exercises it the same indirect way the POSIX encoding
-// tests above already do, through `locateTranscript`'s public surface, with
-// `process.platform` mocked since this suite runs on a Linux host.
+// locateTranscript — claude-code cwd encoding: verified real algorithm
+// (ticket_01KYAPKRRE38SKMSFKF1GVQQTH) — `cwd.replace(/[^a-zA-Z0-9]/g, "-")`,
+// unconditionally, no OS-specific branching (see encodeClaudeCwd's own doc
+// in transcript.ts for how this was verified against a real Claude Code
+// install). `encodeClaudeCwd` isn't exported (same as every other internal
+// helper in this module); this exercises it indirectly through
+// `locateTranscript`'s public surface, same as the POSIX encoding tests
+// above.
 // ---------------------------------------------------------------------------
 
-describe("locateTranscript — claude-code cwd encoding on win32", () => {
-  const originalPlatform = process.platform;
+describe("locateTranscript — claude-code cwd encoding: verified real algorithm", () => {
+  it("folds underscores to - (the exact gap this ticket closes: a repo named my_project used to miss entirely)", async () => {
+    const claudeHome = join(scratch, "fake-claude-home-underscore");
+    await mkdir(claudeHome, { recursive: true });
+    const cwd = "/home/ryan/my_project";
+    const encoded = "-home-ryan-my-project";
+    const projectDir = join(claudeHome, "projects", encoded);
+    await mkdir(projectDir, { recursive: true });
+    const target = join(projectDir, "session-id.jsonl");
+    await writeFile(target, "{}\n", "utf8");
 
-  afterEach(() => {
-    Object.defineProperty(process, "platform", {
-      value: originalPlatform,
-      configurable: true,
-    });
+    const roots: LocateTranscriptRoots = { claudeHome };
+    const found = locateTranscript(harness("claude-code", "session-id"), cwd, undefined, roots);
+    expect(found).toBe(target);
   });
 
-  it("also folds \\ and : to - (in addition to / and .), producing a stable encoding for a Windows-shaped cwd", async () => {
-    Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+  it("folds spaces and other punctuation to -, not just / and .", async () => {
+    const claudeHome = join(scratch, "fake-claude-home-spaces");
+    await mkdir(claudeHome, { recursive: true });
+    const cwd = "/home/ryan/My Project (v2)";
+    const encoded = "-home-ryan-My-Project--v2-";
+    const projectDir = join(claudeHome, "projects", encoded);
+    await mkdir(projectDir, { recursive: true });
+    const target = join(projectDir, "session-id.jsonl");
+    await writeFile(target, "{}\n", "utf8");
 
-    const claudeHome = join(scratch, "fake-claude-home-win32");
+    const roots: LocateTranscriptRoots = { claudeHome };
+    const found = locateTranscript(harness("claude-code", "session-id"), cwd, undefined, roots);
+    expect(found).toBe(target);
+  });
+
+  it("a cwd with _ and spaces that DOESN'T exist on disk degrades to null with a warning, never a wrong file (acceptance criterion's second clause)", async () => {
+    const paths = repoPaths(scratch);
+    const claudeHome = join(scratch, "fake-claude-home-underscore-miss");
+    await mkdir(claudeHome, { recursive: true });
+    const session = sessionSchema.parse({
+      id: newSessionId(),
+      ticket: newTicketId(),
+      actor: { name: "ryan", kind: "human" },
+      harness: harness("claude-code", "some-id"),
+      git: { branch: null, commit_at_start: null },
+      started_at: "2026-07-23T10:00:00.000Z",
+    });
+
+    const result = await captureTranscript({
+      session,
+      paths,
+      cwd: "/home/ryan/my_missing_project (draft)",
+      transcriptsMode: "local",
+      roots: { claudeHome },
+    });
+
+    expect(result.transcriptRef).toBeNull();
+    expect(result.warning).not.toBeNull();
+  });
+
+  it("also folds \\ and : to - on a Windows-shaped cwd (the real rule is the SAME on every platform, no OS branching)", async () => {
+    const claudeHome = join(scratch, "fake-claude-home-windows-shaped");
     await mkdir(claudeHome, { recursive: true });
     const cwd = "C:\\Users\\x\\proj";
     const encoded = "C--Users-x-proj";
@@ -256,17 +302,18 @@ describe("locateTranscript — claude-code cwd encoding on win32", () => {
     // (both gated on `sessionId !== null`), which would otherwise find the
     // file by scanning every project dir regardless of how the cwd was
     // encoded and mask a broken encoding — leaving ONLY step 3
-    // (newest-mtime inside the win32-encoded `projectDir`) as the path
-    // that can locate it, so this genuinely exercises `encodeClaudeCwd`'s
-    // win32 branch, not the glob safety net.
+    // (newest-mtime inside the encoded `projectDir`) as the path that can
+    // locate it, so this genuinely exercises `encodeClaudeCwd`, not the
+    // glob safety net. Deliberately does NOT mock `process.platform` —
+    // the verified real algorithm applies identically regardless of host
+    // OS, so this passes on the Linux host this suite actually runs on.
     const roots: LocateTranscriptRoots = { claudeHome };
     const found = locateTranscript(harness("claude-code", null), cwd, undefined, roots);
     expect(found).toBe(target);
   });
 
-  it("the win32 encoding is stable/deterministic across repeated calls for the same cwd", () => {
-    Object.defineProperty(process, "platform", { value: "win32", configurable: true });
-    const cwd = "C:\\Users\\x\\proj";
+  it("the encoding is stable/deterministic across repeated calls for the same cwd", () => {
+    const cwd = "/repo/my_weird project~name";
     const roots: LocateTranscriptRoots = { claudeHome: join(scratch, "unused") };
     // Two calls with no matching transcript both return null via the exact
     // same code path either way — this only proves no throw/crash and no
@@ -275,9 +322,7 @@ describe("locateTranscript — claude-code cwd encoding on win32", () => {
     expect(locateTranscript(harness("claude-code", null), cwd, undefined, roots)).toBeNull();
   });
 
-  it("does NOT affect the POSIX encoding when explicitly on linux (unchanged)", async () => {
-    Object.defineProperty(process, "platform", { value: "linux", configurable: true });
-
+  it("still encodes plain / and . correctly (unchanged for the already-covered common case)", async () => {
     const claudeHome = join(scratch, "fake-claude-home-posix-explicit");
     await mkdir(claudeHome, { recursive: true });
     const cwd = "/home/ryan/proj";
@@ -295,6 +340,128 @@ describe("locateTranscript — claude-code cwd encoding on win32", () => {
       roots,
     );
     expect(found).toBe(target);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// locateTranscript — claude-code Fix 3/4 (ticket_01KYAPHGCPNMMSZNE5TEK65ERC):
+// the step-3 newest-mtime fallback refuses to guess under genuine
+// same-project-dir ambiguity, mirroring codex's own Fix 3 test suite below.
+// ---------------------------------------------------------------------------
+
+describe("locateTranscript — claude-code Fix 3/4: ambiguity refusal", () => {
+  async function fakeClaudeHome(): Promise<string> {
+    const claudeHome = join(scratch, "fake-claude-home-fix4");
+    await mkdir(claudeHome, { recursive: true });
+    return claudeHome;
+  }
+
+  it("returns null (refuses to guess) when TWO .jsonl files in the project dir are both newer than the session's started_at, instead of silently picking the newest one", async () => {
+    const claudeHome = await fakeClaudeHome();
+    const cwd = "/concurrent/claude-code/project";
+    const projectDir = join(claudeHome, "projects", "-concurrent-claude-code-project");
+    await mkdir(projectDir, { recursive: true });
+    // Both files below are given mtimes well after this — the exact shape
+    // of two genuinely concurrent claude-code sessions racing in the same
+    // cwd with no session id captured for either (findings.md §1.2's
+    // documented gap).
+    const sessionStartedAt = "2020-01-01T00:00:00.000Z";
+
+    const fileA = join(projectDir, "session-aaaa.jsonl");
+    await writeFile(fileA, "{}\n", "utf8");
+    // mtimes are forced deterministically via `utimes` rather than a real
+    // wall-clock gap between writes (same reasoning as the codex Fix 3
+    // suite below) so ordering can't flake on filesystems/CI runners with
+    // coarse or contended mtime resolution.
+    const fileATime = new Date("2026-06-01T01:00:00.000Z");
+    await utimes(fileA, fileATime, fileATime);
+    const fileB = join(projectDir, "session-bbbb.jsonl");
+    await writeFile(fileB, "{}\n", "utf8");
+    const fileBTime = new Date(fileATime.getTime() + 60_000);
+    await utimes(fileB, fileBTime, fileBTime);
+
+    const roots: LocateTranscriptRoots = { claudeHome };
+    // Sanity check first: without the ambiguity check (no started_at
+    // passed), this exact fixture WOULD resolve to fileB (newest) —
+    // proving the null below comes from the new refusal, not from the
+    // fixture failing to match at all.
+    expect(locateTranscript(harness("claude-code", null), cwd, undefined, roots)).toBe(fileB);
+    expect(
+      locateTranscript(harness("claude-code", null), cwd, undefined, roots, sessionStartedAt),
+    ).toBeNull();
+  });
+
+  it("a SINGLE .jsonl newer than started_at still attaches (unambiguous), even alongside older files in the same project dir", async () => {
+    const claudeHome = await fakeClaudeHome();
+    const cwd = "/single-match/claude-code/project";
+    const projectDir = join(claudeHome, "projects", "-single-match-claude-code-project");
+    await mkdir(projectDir, { recursive: true });
+
+    const baseTime = new Date("2026-05-01T00:00:00.000Z");
+    const older = join(projectDir, "older.jsonl");
+    await writeFile(older, "{}\n", "utf8");
+    await utimes(older, baseTime, baseTime);
+
+    // started_at sits strictly between the older file above and the newer
+    // one below, so exactly ONE candidate ends up newer.
+    const sessionStartedAt = new Date(baseTime.getTime() + 60_000).toISOString();
+
+    const newer = join(projectDir, "newer.jsonl");
+    await writeFile(newer, "{}\n", "utf8");
+    const newerTime = new Date(baseTime.getTime() + 120_000);
+    await utimes(newer, newerTime, newerTime);
+
+    const roots: LocateTranscriptRoots = { claudeHome };
+    expect(
+      locateTranscript(harness("claude-code", null), cwd, undefined, roots, sessionStartedAt),
+    ).toBe(newer);
+  });
+
+  it("omitting sessionStartedAt entirely preserves the pre-fix newest-mtime-overall behaviour — no ambiguity check performed", async () => {
+    const claudeHome = await fakeClaudeHome();
+    const cwd = "/no-started-at/claude-code/project";
+    const projectDir = join(claudeHome, "projects", "-no-started-at-claude-code-project");
+    await mkdir(projectDir, { recursive: true });
+
+    const fileA = join(projectDir, "aaa.jsonl");
+    await writeFile(fileA, "{}\n", "utf8");
+    const fileATime = new Date("2026-06-01T01:00:00.000Z");
+    await utimes(fileA, fileATime, fileATime);
+    const fileB = join(projectDir, "bbb.jsonl");
+    await writeFile(fileB, "{}\n", "utf8");
+    const fileBTime = new Date(fileATime.getTime() + 60_000);
+    await utimes(fileB, fileBTime, fileBTime);
+
+    const roots: LocateTranscriptRoots = { claudeHome };
+    expect(locateTranscript(harness("claude-code", null), cwd, undefined, roots)).toBe(fileB);
+  });
+
+  it("a captured session id that matches exactly (step 1) is never subject to the ambiguity check, even with other newer files in the same project dir", async () => {
+    const claudeHome = await fakeClaudeHome();
+    const cwd = "/exact-match/claude-code/project";
+    const projectDir = join(claudeHome, "projects", "-exact-match-claude-code-project");
+    await mkdir(projectDir, { recursive: true });
+    const mySessionId = "my-own-session-id";
+    const mine = join(projectDir, `${mySessionId}.jsonl`);
+    await writeFile(mine, "{}\n", "utf8");
+
+    // A newer, unrelated file in the SAME project dir — if the ambiguity
+    // check applied to step 1 (it must not), started_at below would make
+    // this look ambiguous and return null instead of `mine`.
+    const other = join(projectDir, "someone-elses-session.jsonl");
+    await writeFile(other, "{}\n", "utf8");
+    const sessionStartedAt = "2020-01-01T00:00:00.000Z"; // predates both files
+
+    const roots: LocateTranscriptRoots = { claudeHome };
+    expect(
+      locateTranscript(
+        harness("claude-code", mySessionId),
+        cwd,
+        undefined,
+        roots,
+        sessionStartedAt,
+      ),
+    ).toBe(mine);
   });
 });
 
@@ -479,6 +646,111 @@ describe("locateTranscript — codex Fix 3: ambiguity refusal", () => {
 });
 
 // ---------------------------------------------------------------------------
+// locateTranscript — codex Fix 5 (ticket_01KYAPHG6Q4AJ7J5Z2B8G53QCS):
+// the "zero-newer" case (every cwd-matching rollout PREDATES started_at)
+// also refuses to guess, not just the ">1 newer" ambiguous case Fix 3 covers.
+// ---------------------------------------------------------------------------
+
+describe("locateTranscript — codex Fix 5: zero-newer (stale) refusal", () => {
+  async function fakeCodexHome(): Promise<string> {
+    const codexHome = join(scratch, "fake-codex-home-fix5");
+    await mkdir(codexHome, { recursive: true });
+    return codexHome;
+  }
+
+  function sessionMetaLine(cwd: string, id: string): string {
+    return `${JSON.stringify({ timestamp: "2026-01-01T00:00:00Z", type: "session_meta", payload: { id, cwd } })}\n`;
+  }
+
+  it("returns null (refuses to attach) when the ONLY cwd-matching rollout PREDATES the session's started_at, instead of silently attaching a previous session's leftover", async () => {
+    const codexHome = await fakeCodexHome();
+    const cwd = "/stale/codex/project";
+
+    const dayDir = join(codexHome, "sessions", "2026", "05", "01");
+    await mkdir(dayDir, { recursive: true });
+    const staleRollout = join(dayDir, "rollout-2026-05-01T00-00-00-old.jsonl");
+    await writeFile(staleRollout, sessionMetaLine(cwd, "old"), "utf8");
+    const staleTime = new Date("2026-05-01T00:00:00.000Z");
+    await utimes(staleRollout, staleTime, staleTime);
+
+    // started_at is AFTER the only matching rollout's mtime — zero
+    // candidates postdate it.
+    const sessionStartedAt = new Date(staleTime.getTime() + 60_000).toISOString();
+
+    const roots: LocateTranscriptRoots = { codexHome };
+    // Sanity check first: without the started_at check, this exact
+    // fixture WOULD resolve to the stale rollout — proving the null below
+    // comes from the new zero-newer refusal, not from the fixture failing
+    // to match at all.
+    expect(locateTranscript(harness("codex", null), cwd, undefined, roots)).toBe(staleRollout);
+    expect(
+      locateTranscript(harness("codex", null), cwd, undefined, roots, sessionStartedAt),
+    ).toBeNull();
+  });
+
+  it("also refuses when MULTIPLE cwd-matching rollouts all predate started_at, not just a single stale one", async () => {
+    const codexHome = await fakeCodexHome();
+    const cwd = "/multi-stale/codex/project";
+
+    const dayDir = join(codexHome, "sessions", "2026", "05", "01");
+    await mkdir(dayDir, { recursive: true });
+    const baseTime = new Date("2026-05-01T00:00:00.000Z");
+    const rolloutA = join(dayDir, "rollout-2026-05-01T00-00-00-aaa.jsonl");
+    await writeFile(rolloutA, sessionMetaLine(cwd, "aaa"), "utf8");
+    await utimes(rolloutA, baseTime, baseTime);
+    const rolloutBTime = new Date(baseTime.getTime() + 1_000);
+    const rolloutB = join(dayDir, "rollout-2026-05-01T00-00-01-bbb.jsonl");
+    await writeFile(rolloutB, sessionMetaLine(cwd, "bbb"), "utf8");
+    await utimes(rolloutB, rolloutBTime, rolloutBTime);
+
+    const sessionStartedAt = new Date(rolloutBTime.getTime() + 60_000).toISOString();
+
+    const roots: LocateTranscriptRoots = { codexHome };
+    expect(
+      locateTranscript(harness("codex", null), cwd, undefined, roots, sessionStartedAt),
+    ).toBeNull();
+  });
+
+  it("does NOT refuse when nothing matches the cwd at all — zero matches stays a plain 'nothing found' null, not a stale refusal", async () => {
+    const codexHome = await fakeCodexHome();
+    const roots: LocateTranscriptRoots = { codexHome };
+    const sessionStartedAt = "2026-01-01T00:00:00.000Z";
+
+    // No rollouts written at all — $CODEX_HOME/sessions doesn't even exist.
+    expect(() =>
+      locateTranscript(harness("codex", null), "/nothing/here", undefined, roots, sessionStartedAt),
+    ).not.toThrow();
+    expect(
+      locateTranscript(harness("codex", null), "/nothing/here", undefined, roots, sessionStartedAt),
+    ).toBeNull();
+  });
+
+  it("a single candidate newer than started_at still attaches — the zero-newer refusal only fires when NO candidate is newer, not merely 'not the newest overall'", async () => {
+    const codexHome = await fakeCodexHome();
+    const cwd = "/exactly-one-newer/codex/project";
+
+    const dayDir = join(codexHome, "sessions", "2026", "05", "01");
+    await mkdir(dayDir, { recursive: true });
+    const baseTime = new Date("2026-05-01T00:00:00.000Z");
+    const oldRollout = join(dayDir, "rollout-2026-05-01T00-00-00-old.jsonl");
+    await writeFile(oldRollout, sessionMetaLine(cwd, "old"), "utf8");
+    await utimes(oldRollout, baseTime, baseTime);
+
+    const sessionStartedAt = new Date(baseTime.getTime() + 60_000).toISOString();
+
+    const newRollout = join(dayDir, "rollout-2026-05-01T00-00-02-new.jsonl");
+    await writeFile(newRollout, sessionMetaLine(cwd, "new"), "utf8");
+    const newTime = new Date(baseTime.getTime() + 120_000);
+    await utimes(newRollout, newTime, newTime);
+
+    const roots: LocateTranscriptRoots = { codexHome };
+    expect(locateTranscript(harness("codex", null), cwd, undefined, roots, sessionStartedAt)).toBe(
+      newRollout,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // locateTranscript — opencode / other: no v0 auto-detection
 // ---------------------------------------------------------------------------
 
@@ -629,6 +901,73 @@ describe("captureTranscript", () => {
     // Distinguishes the ambiguity refusal from the generic "could not
     // locate" wording exercised by the test above.
     expect(result.warning).toMatch(/ambiguous|refus/i);
+    expect(result.warning).toContain("--transcript");
+  });
+
+  it("Fix 3/4 (ticket_01KYAPHGCPNMMSZNE5TEK65ERC): claude-code ambiguity refusal — null transcriptRef with a warning explaining WHY, suggesting --transcript", async () => {
+    const paths = repoPaths(scratch);
+    const claudeHome = join(scratch, "fake-claude-home-capture-fix4");
+    const cwd = "/concurrent/claude-code/capture-project";
+    const sessionStartedAt = "2020-01-01T00:00:00.000Z";
+    const session = makeSession({
+      harness: harness("claude-code", null),
+      started_at: sessionStartedAt,
+    });
+
+    const projectDir = join(claudeHome, "projects", "-concurrent-claude-code-capture-project");
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(projectDir, "aaa.jsonl"), "{}\n", "utf8");
+    await new Promise((r) => setTimeout(r, 5));
+    await writeFile(join(projectDir, "bbb.jsonl"), "{}\n", "utf8");
+
+    const result = await captureTranscript({
+      session,
+      paths,
+      cwd,
+      transcriptsMode: "local",
+      roots: { claudeHome },
+    });
+
+    expect(result.transcriptRef).toBeNull();
+    expect(result.sourcePath).toBeNull();
+    expect(result.warning).not.toBeNull();
+    // Distinguishes the ambiguity refusal from the generic "could not
+    // locate" wording exercised by the "not found" test above.
+    expect(result.warning).toMatch(/ambiguous|refus/i);
+    expect(result.warning).toContain("--transcript");
+  });
+
+  it("Fix 5 (ticket_01KYAPHG6Q4AJ7J5Z2B8G53QCS): codex zero-newer (stale) refusal — null transcriptRef with a warning distinguishing 'predates' from 'ambiguous'", async () => {
+    const paths = repoPaths(scratch);
+    const codexHome = join(scratch, "fake-codex-home-capture-fix5");
+    const cwd = "/stale/codex/capture-project";
+    const sessionStartedAt = "2030-01-01T00:00:00.000Z"; // well after the rollout below
+    const session = makeSession({ harness: harness("codex"), started_at: sessionStartedAt });
+
+    const dayDir = join(codexHome, "sessions", "2026", "06", "01");
+    await mkdir(dayDir, { recursive: true });
+    const metaLine = JSON.stringify({
+      timestamp: "2026-01-01T00:00:00Z",
+      type: "session_meta",
+      payload: { id: "old", cwd },
+    });
+    await writeFile(join(dayDir, "rollout-2026-06-01T01-00-00-old.jsonl"), `${metaLine}\n`, "utf8");
+
+    const result = await captureTranscript({
+      session,
+      paths,
+      cwd,
+      transcriptsMode: "local",
+      roots: { codexHome },
+    });
+
+    expect(result.transcriptRef).toBeNull();
+    expect(result.sourcePath).toBeNull();
+    expect(result.warning).not.toBeNull();
+    // Distinguishes the stale refusal from both the generic "could not
+    // locate" wording and the ">1 newer" ambiguous wording.
+    expect(result.warning).toMatch(/predate/i);
+    expect(result.warning).not.toMatch(/ambiguous/i);
     expect(result.warning).toContain("--transcript");
   });
 
@@ -822,11 +1161,15 @@ describe("speculativeTranscriptCapture / resolveTranscriptCapture — the outsid
     expect(speculative?.result.transcriptRef).toBe(`transcripts/${session.id}.jsonl`);
   });
 
-  it("resolveTranscriptCapture reuses the speculative result outright when it's keyed to the SAME session id as the authoritative session", async () => {
+  it("resolveTranscriptCapture reuses the speculative result outright when it's keyed to the SAME session id AND the same transcript_ref baseline as the authoritative session", async () => {
     const paths = repoPaths(scratch);
     const session = makeSession();
     const speculative = {
       sessionId: session.id,
+      // Matches `session.transcript_ref` (default null via makeSession) —
+      // nothing committed a transcript_ref change to this session between
+      // the speculative read and the lock, so reuse is correct here.
+      baselineTranscriptRef: session.transcript_ref,
       result: {
         transcriptRef: `transcripts/${session.id}.jsonl`,
         warning: null,
@@ -859,6 +1202,9 @@ describe("speculativeTranscriptCapture / resolveTranscriptCapture — the outsid
 
     const staleSpeculative = {
       sessionId: "session_01BADBADBADBADBADBADBADBAD" as SessionId,
+      // Irrelevant to this test — the session id mismatch alone already
+      // forces the in-lock fallback below, regardless of this value.
+      baselineTranscriptRef: null,
       result: {
         transcriptRef: "transcripts/wrong-session.jsonl",
         warning: null,
@@ -897,6 +1243,51 @@ describe("speculativeTranscriptCapture / resolveTranscriptCapture — the outsid
     });
 
     expect(resolved.transcriptRef).toBe(`transcripts/${session.id}.jsonl`);
+  });
+
+  it("resolveTranscriptCapture falls back to an in-lock capture when the speculative baselineTranscriptRef is STALE — a concurrent command already committed a transcript_ref change to this SAME session (ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC)", async () => {
+    const paths = repoPaths(scratch);
+    // Simulates the exact race the ticket describes: a CONCURRENT `review
+    // --transcript` already committed a fresh ref to this exact session
+    // between this command's own speculative read (which observed
+    // transcript_ref: null, below) and this in-lock authoritative read.
+    const session = makeSession({
+      harness: harness("other"),
+      transcript_ref: "transcripts/concurrent-review-capture.jsonl",
+    });
+
+    const staleSpeculative = {
+      sessionId: session.id,
+      // The speculative read saw transcript_ref: null (BEFORE the
+      // concurrent review committed) and, with no --transcript of its own
+      // and harness "other" (no auto-detection), located nothing new —
+      // exactly a racing `done` call's own speculative result.
+      baselineTranscriptRef: null,
+      result: {
+        transcriptRef: null,
+        warning: "could not locate a transcript for this session (harness=other)",
+        sourcePath: null,
+      },
+    };
+
+    const resolved = await resolveTranscriptCapture(staleSpeculative, {
+      session,
+      paths,
+      cwd: scratch,
+      transcriptsMode: "local",
+      // No explicitTranscriptPath, same as the racing `done` call above —
+      // the in-lock fallback also finds nothing new.
+    });
+
+    // The OLD (session-id-only) reconciliation would have reused
+    // `staleSpeculative.result` outright here — transcriptRef: null —
+    // silently clobbering the concurrent review's fresh ref with no error
+    // and no event explaining it. The fix instead falls back to an
+    // in-lock `captureTranscript` call, whose own Fix 2 (this module's
+    // top-of-file doc) preserves `session.transcript_ref` when nothing
+    // new is located — so the concurrent review's ref survives.
+    expect(resolved.transcriptRef).toBe("transcripts/concurrent-review-capture.jsonl");
+    expect(resolved.warning).toMatch(/kept the previously-captured transcript/i);
   });
 });
 

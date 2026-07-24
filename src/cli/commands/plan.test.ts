@@ -179,6 +179,45 @@ describe("runPlan (in-process)", () => {
     }
   });
 
+  it("ticket_01KYAPN9NXY6RPSV6WGR42CJHJ: warns on stderr (but still succeeds) when the acting actor differs from who started the session — a WARNING, never a block", async () => {
+    const root = await makeTempRepo("slop-plan-inproc-ownership-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Ownership-mismatch plan ticket");
+    // Started as "ryan" (bootstrapRepo's config user: — withCwd's default
+    // scrub removes SLOP_ACTOR, so D17 falls through to config).
+    await startTicket(root, id);
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runPlan(id, ["a step from a different actor"], {}), {
+        SLOP_ACTOR: "someone-else",
+      });
+      expect(out.stderr()).toMatch(/warning:/);
+      expect(out.stderr()).toContain("someone-else");
+      expect(out.stderr()).toContain("ryan");
+      expect(out.stderr()).toMatch(/session ownership/i);
+      // Never a block — the plan itself still succeeded.
+      expect(out.stdout()).toContain("plan v1 set");
+    } finally {
+      out.restore();
+    }
+  });
+
+  it("no ownership warning when the SAME actor plans their own session", async () => {
+    const root = await makeTempRepo("slop-plan-inproc-ownership-same-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Same-actor plan ticket");
+    await startTicket(root, id);
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runPlan(id, ["a step"], {}), { SLOP_ACTOR: "ryan" });
+      expect(out.stderr()).toBe("");
+    } finally {
+      out.restore();
+    }
+  });
+
   it("throws NOT_FOUND for an unresolvable ref", async () => {
     const root = await makeTempRepo("slop-plan-inproc-notfound-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });

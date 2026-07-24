@@ -518,6 +518,31 @@ async function startTicket(root: string, id: TicketId): Promise<void> {
 }
 
 describe("runDone (in-process)", () => {
+  it("ticket_01KYAPN9NXY6RPSV6WGR42CJHJ: warns on stderr (but still succeeds) when the acting actor differs from who started the session", async () => {
+    const root = await makeTempRepo("slop-done-inproc-ownership-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    // adhoc: true skips the separate "done without review" nag (D13), so
+    // the ownership warning is the only stderr content to assert on.
+    const id = await jsonNewTicket(root, "Ownership-mismatch done ticket", { adhoc: true });
+    await startTicket(root, id); // started as "ryan" (config user:)
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runDone(id, { note: "someone else's completion" }), {
+        SLOP_ACTOR: "someone-else",
+      });
+      expect(out.stderr()).toContain("someone-else");
+      expect(out.stderr()).toContain("ryan");
+      expect(out.stderr()).toMatch(/session ownership/i);
+      // Never a block — done still succeeded.
+      expect(out.stdout()).toContain("done ");
+    } finally {
+      out.restore();
+    }
+    const paths = repoPaths(root);
+    expect((await readTicket(paths, id)).state).toBe("done");
+  });
+
   it("completes review -> done with no nag, cascading an unblock", async () => {
     const root = await makeTempRepo("slop-done-inproc-review-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });

@@ -111,3 +111,46 @@ export async function listSessions(paths: RepoPaths): Promise<Session[]> {
   const ids = await listSessionIds(paths);
   return Promise.all(ids.map((id) => readSession(paths, id)));
 }
+
+/** One session file `listSessionsTolerant` could not read — path, id, and
+ * the exact high-quality error `readSession` would have thrown, captured
+ * instead of propagated. Mirrors db-index.ts's `TicketReadProblem`. */
+export interface SessionReadProblem {
+  id: SessionId;
+  path: string;
+  message: string;
+}
+
+export interface ListSessionsTolerantResult {
+  sessions: Session[];
+  problems: SessionReadProblem[];
+}
+
+/**
+ * Like {@link listSessions}, but never throws on a bad file — mirrors
+ * tickets.ts's `listTicketsTolerant` (see that function's doc for the full
+ * fault-tolerance rationale). Used by `sessions/repair.ts`'s orphaned
+ * -active-session scan (ticket_01KYAPKRJ9RJRJRAV42WCTJET4, `slop reindex
+ * --heal`'s repair path): one corrupt session file must not block
+ * detecting/healing every other orphan.
+ */
+export async function listSessionsTolerant(paths: RepoPaths): Promise<ListSessionsTolerantResult> {
+  const ids = await listSessionIds(paths);
+  const settled = await Promise.allSettled(ids.map((id) => readSession(paths, id)));
+
+  const sessions: Session[] = [];
+  const problems: SessionReadProblem[] = [];
+  for (let i = 0; i < settled.length; i++) {
+    const id = ids[i];
+    const outcome = settled[i];
+    if (id === undefined || outcome === undefined) continue; // unreachable: settled/ids are the same length
+    if (outcome.status === "fulfilled") {
+      sessions.push(outcome.value);
+    } else {
+      const message =
+        outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+      problems.push({ id, path: sessionFilePath(paths, id), message });
+    }
+  }
+  return { sessions, problems };
+}

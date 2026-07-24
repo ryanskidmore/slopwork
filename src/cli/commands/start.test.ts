@@ -361,6 +361,57 @@ describe("runStart (in-process)", () => {
     expect(afterTakeover.active_session).not.toBe(firstSessionId);
   });
 
+  it("ticket_01KYAPKRJ9RJRJRAV42WCTJET4: the superseded session's session.takeover write commits BEFORE the ticket write — the ticket write is the sole point of no return", async () => {
+    const root = await makeTempRepo("slop-start-inproc-takeover-order-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Takeover write-order ticket");
+    const first = captureOutput();
+    try {
+      await withCwd(root, () => runStart(id, { as: "first-actor" }));
+    } finally {
+      first.restore();
+    }
+    const paths = repoPaths(root);
+    const afterFirst = await readTicket(paths, id);
+    const firstSessionId = afterFirst.active_session as SessionId;
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runStart(id, { as: "second-actor", takeover: true }));
+    } finally {
+      out.restore();
+    }
+
+    // Events are written in cursor (= real write) order (events.ts's
+    // listEvents doc: ULIDs sort chronologically, monotonic even within
+    // the same millisecond) — this is the load-bearing proof that the
+    // previous session's session.takeover write really did commit BEFORE
+    // the ticket's own write, not just that both eventually happened.
+    // Before ticket_01KYAPKRJ9RJRJRAV42WCTJET4's fix, this order was
+    // reversed: the ticket write (already pointing active_session at the
+    // brand-new session) committed FIRST, leaving `firstSessionId`
+    // strandable by a crash before the takeover write that follows it.
+    const events = await listEvents(paths);
+    const takeoverIdx = events.findIndex(
+      (e) =>
+        e.verb === "session.takeover" &&
+        e.entity.kind === "session" &&
+        e.entity.id === firstSessionId,
+    );
+    // The SECOND `runStart` call's own ticket write: the ticket was
+    // already `in_progress` (that's what made this a takeover in the
+    // first place), so `buildStartedTicket` reports `stateChanged: false`
+    // and this write uses `ticket.updated`, not `ticket.state_changed` —
+    // unambiguously the second call's write, distinct from the FIRST
+    // call's own `ticket.state_changed` (open -> in_progress).
+    const ticketWriteIdx = events.findIndex(
+      (e) => e.verb === "ticket.updated" && e.entity.kind === "ticket" && e.entity.id === id,
+    );
+    expect(takeoverIdx).toBeGreaterThanOrEqual(0);
+    expect(ticketWriteIdx).toBeGreaterThanOrEqual(0);
+    expect(takeoverIdx).toBeLessThan(ticketWriteIdx);
+  });
+
   it("re-entering a review-state ticket via start closes the review session as a re-entry, not a takeover", async () => {
     const root = await makeTempRepo("slop-start-inproc-reentry-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });

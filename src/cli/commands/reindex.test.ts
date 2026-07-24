@@ -4,17 +4,44 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { type Ticket, newTicketId, ticketSchema } from "../../core/index.js";
+import {
+  newSessionId,
+  newTicketId,
+  type Session,
+  sessionSchema,
+  type Ticket,
+  ticketSchema,
+} from "../../core/index.js";
 import type { EventContext, MutationEventSpec } from "../../repo/events.js";
-import { createTicket, ensureDbDirs, ticketFilePath } from "../../repo/index.js";
+import {
+  createSession,
+  createTicket,
+  ensureDbDirs,
+  listEvents,
+  readSession,
+  ticketFilePath,
+} from "../../repo/index.js";
 import type { RepoPaths } from "../../repo/index.js";
-import { captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
+import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
 import { runReindex } from "./reindex.js";
 
-// A4: createTicket requires an EventContext + a MutationEventSpec —
-// these fixtures don't exercise event behavior.
+// A4: createTicket/createSession require an EventContext + a
+// MutationEventSpec — these fixtures don't exercise event behavior.
 const ctx: EventContext = { actor: { name: "ryan", kind: "human" }, session: null };
 const createdEvent: MutationEventSpec = { verb: "ticket.created" };
+const startedEvent: MutationEventSpec = { verb: "session.started" };
+
+function makeSession(overrides: Partial<Session> = {}): Session {
+  return sessionSchema.parse({
+    id: newSessionId(),
+    ticket: newTicketId(),
+    actor: { name: "ryan", kind: "human" },
+    harness: { kind: "other", session_id: null },
+    git: { branch: null, commit_at_start: null },
+    started_at: "2026-07-23T09:00:00.000Z",
+    ...overrides,
+  });
+}
 
 // src/cli/commands/reindex.test.ts -> ../../.. -> repo root -> src/cli/index.ts
 const cliEntry = join(dirname(fileURLToPath(import.meta.url)), "..", "index.ts");
@@ -222,6 +249,135 @@ describe("runReindex (in-process)", () => {
     try {
       await withCwd(scratch, () => runReindex({}));
       expect(out.stdout()).toMatch(/swept 1 stale temp file/);
+    } finally {
+      out.restore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Orphaned active-session scan + --heal (ticket_01KYAPKRJ9RJRJRAV42WCTJET4)
+// — sessions/repair.ts's own tests cover findOrphanedActiveSessions/
+// buildHealedSession as pure functions; these exercise the CLI wiring:
+// detection is always reported, --heal actually repairs, and a corrupt
+// ticket read disables the scan rather than risk a false positive.
+// ---------------------------------------------------------------------------
+describe("runReindex — orphaned active-session scan + --heal", () => {
+  it("reports an orphaned session (ended_at: null, no ticket references it) but does NOT touch it without --heal", async () => {
+    await bootstrapRepo(scratch, { project: "p", user: "ryan" });
+    const orphan = makeSession();
+    await createSession(paths, orphan, ctx, startedEvent);
+
+    const out = captureOutput();
+    try {
+      await withCwd(scratch, () => runReindex({}));
+      expect(out.stdout()).toMatch(/1 orphaned active session\(s\) found/);
+      expect(out.stdout()).toContain("--heal");
+    } finally {
+      out.restore();
+    }
+
+    const stillOnDisk = await readSession(paths, orphan.id);
+    expect(stillOnDisk.ended_at).toBeNull();
+    expect(stillOnDisk.end_summary).toBeNull();
+  });
+
+  it("--heal closes out the orphaned session: ended_at set, a synthesized end_summary, and a session.ended event with reason orphan_repair", async () => {
+    await bootstrapRepo(scratch, { project: "p", user: "ryan" });
+    const orphan = makeSession();
+    await createSession(paths, orphan, ctx, startedEvent);
+
+    const out = captureOutput();
+    try {
+      await withCwd(scratch, () => runReindex({ heal: true }));
+      expect(out.stdout()).toMatch(/healed 1 orphaned active session\(s\)/);
+    } finally {
+      out.restore();
+    }
+
+    const healed = await readSession(paths, orphan.id);
+    expect(healed.ended_at).not.toBeNull();
+    expect(healed.end_summary).toMatch(/auto-healed/i);
+
+    const events = await listEvents(paths);
+    const healEvent = events.find(
+      (e) =>
+        e.entity.kind === "session" &&
+        e.entity.id === orphan.id &&
+        e.verb === "session.ended" &&
+        e.payload.reason === "orphan_repair",
+    );
+    expect(healEvent).toBeDefined();
+  });
+
+  it("does NOT touch a session referenced by a ticket's active_session — only genuinely unreferenced ones are orphans", async () => {
+    await bootstrapRepo(scratch, { project: "p", user: "ryan" });
+    const session = makeSession();
+    await createSession(paths, session, ctx, startedEvent);
+    const ticket = makeTicket({
+      state: "in_progress",
+      active_session: session.id,
+    });
+    await createTicket(paths, ticket, ctx, createdEvent);
+
+    const out = captureOutput();
+    try {
+      await withCwd(scratch, () => runReindex({ heal: true }));
+      expect(out.stdout()).not.toMatch(/orphaned active session/);
+    } finally {
+      out.restore();
+    }
+
+    const stillReferenced = await readSession(paths, session.id);
+    expect(stillReferenced.ended_at).toBeNull();
+  });
+
+  it("does NOT touch (or count) an already-ended session, referenced or not", async () => {
+    await bootstrapRepo(scratch, { project: "p", user: "ryan" });
+    const ended = makeSession({ ended_at: "2026-07-23T10:00:00.000Z", end_summary: "wrapped up" });
+    await createSession(paths, ended, ctx, startedEvent);
+
+    const out = captureOutput();
+    try {
+      await withCwd(scratch, () => runReindex({ heal: true }));
+      expect(out.stdout()).not.toMatch(/orphaned active session/);
+    } finally {
+      out.restore();
+    }
+
+    const stillEnded = await readSession(paths, ended.id);
+    expect(stillEnded.end_summary).toBe("wrapped up");
+  });
+
+  it("skips the orphan scan entirely (with a warning) when the ticket read itself had unreadable file(s) — never risks a false positive", async () => {
+    await bootstrapRepo(scratch, { project: "p", user: "ryan" });
+    const orphan = makeSession();
+    await createSession(paths, orphan, ctx, startedEvent);
+    const badId = newTicketId();
+    await writeFile(ticketFilePath(paths, badId), "{ not even valid jsonc {{{");
+
+    const out = captureOutput();
+    try {
+      await expect(withCwd(scratch, () => runReindex({ heal: true }))).rejects.toThrow();
+      expect(out.stderr()).toMatch(/skipped the orphaned-active-session scan/i);
+    } finally {
+      out.restore();
+    }
+
+    // --heal never ran: the orphan is untouched.
+    const stillOnDisk = await readSession(paths, orphan.id);
+    expect(stillOnDisk.ended_at).toBeNull();
+  });
+
+  it("reports zero orphans cleanly (no extra note in the summary) when there are none", async () => {
+    await bootstrapRepo(scratch, { project: "p", user: "ryan" });
+    const t = makeTicket();
+    await createTicket(paths, t, ctx, createdEvent);
+
+    const out = captureOutput();
+    try {
+      await withCwd(scratch, () => runReindex({}));
+      expect(out.stdout()).not.toMatch(/orphaned active session/);
     } finally {
       out.restore();
     }

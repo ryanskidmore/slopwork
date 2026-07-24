@@ -1,6 +1,12 @@
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
-import { EXIT_CODES } from "../../core/index.js";
+import {
+  EXIT_CODES,
+  newSessionId,
+  newTicketId,
+  type Session,
+  sessionSchema,
+} from "../../core/index.js";
 import { SlopError } from "../errors.js";
 import {
   assertMaxLength,
@@ -9,6 +15,7 @@ import {
   parsePriority,
   printWarning,
   readStdin,
+  sessionOwnershipWarning,
 } from "./shared.js";
 
 // cli-input-validation-reject-truncated-numerics-fix-actor-fai:
@@ -144,6 +151,60 @@ describe("printWarning", () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+// ticket_01KYAPN9NXY6RPSV6WGR42CJHJ: session ownership is a WARNING, not
+// an enforced gate — see sessionOwnershipWarning's own doc for the full
+// decision (recorded there and in docs/agent-workflow.md, "Session
+// ownership").
+describe("sessionOwnershipWarning", () => {
+  function makeSession(overrides: Partial<Session> = {}): Session {
+    return sessionSchema.parse({
+      id: newSessionId(),
+      ticket: newTicketId(),
+      actor: { name: "ryan", kind: "human" },
+      harness: { kind: "claude-code", session_id: null },
+      git: { branch: null, commit_at_start: null },
+      started_at: "2026-07-23T09:00:00.000Z",
+      ...overrides,
+    });
+  }
+
+  it("returns null when the acting actor's name matches the session's own actor name", () => {
+    const session = makeSession({ actor: { name: "ryan", kind: "human" } });
+    expect(sessionOwnershipWarning(session, { name: "ryan", kind: "agent" })).toBeNull();
+  });
+
+  it("returns a non-null warning when the names differ", () => {
+    const session = makeSession({ actor: { name: "ryan", kind: "human" } });
+    const warning = sessionOwnershipWarning(session, { name: "someone-else", kind: "agent" });
+    expect(warning).not.toBeNull();
+  });
+
+  it("the warning names BOTH the acting actor and who started the session, plus the session id", () => {
+    const session = makeSession({ actor: { name: "first-actor", kind: "human" } });
+    const warning = sessionOwnershipWarning(session, { name: "second-actor", kind: "agent" });
+    expect(warning).toContain("second-actor");
+    expect(warning).toContain("first-actor");
+    expect(warning).toContain(session.id);
+  });
+
+  it("points at docs/agent-workflow.md's Session ownership section", () => {
+    const session = makeSession({ actor: { name: "a", kind: "human" } });
+    const warning = sessionOwnershipWarning(session, { name: "b", kind: "human" });
+    expect(warning).toMatch(/docs\/agent-workflow\.md/);
+    expect(warning).toMatch(/session ownership/i);
+  });
+
+  it("compares by name only, NOT kind — the same person can legitimately act as human in one invocation and agent in another", () => {
+    const session = makeSession({ actor: { name: "ryan", kind: "human" } });
+    expect(sessionOwnershipWarning(session, { name: "ryan", kind: "agent" })).toBeNull();
+  });
+
+  it("is case-sensitive — 'Ryan' and 'ryan' are different actors (matches D17's plain-string identity, no normalization elsewhere in this codebase)", () => {
+    const session = makeSession({ actor: { name: "ryan", kind: "human" } });
+    expect(sessionOwnershipWarning(session, { name: "Ryan", kind: "human" })).not.toBeNull();
   });
 });
 

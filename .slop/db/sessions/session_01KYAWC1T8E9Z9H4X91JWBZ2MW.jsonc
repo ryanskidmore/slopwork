@@ -1,0 +1,48 @@
+{
+  "id": "session_01KYAWC1T8E9Z9H4X91JWBZ2MW",
+  "ticket": "ticket_01KYAPN9NXY6RPSV6WGR42CJHJ",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "worktree-agent-a7ff845d6e02c1d0b",
+    "commit_at_start": "6eaf10e3199613098937d9af5caeb42bcfce59a5"
+  },
+  "started_at": "2026-07-24T20:16:51.016Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "implement sessionOwnershipWarning in shared.ts (name-only comparison, warning-not-block per human coordinator's decision)",
+          "checked": true
+        },
+        {
+          "text": "wire it into plan.ts, stop.ts, done.ts, drop.ts (compute against pre-mutation session, print after the transaction commits)",
+          "checked": true
+        },
+        {
+          "text": "add unit tests (shared.test.ts) and CLI-level regression tests (plan/stop/done/drop .test.ts) proving warn-not-block",
+          "checked": true
+        },
+        {
+          "text": "document the decision in docs/agent-workflow.md (new Session ownership section)",
+          "checked": true
+        },
+        {
+          "text": "run full verification",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T20:25:22.717Z"
+    }
+  ],
+  "end_summary": null,
+  "transcript_ref": "transcripts/session_01KYAWC1T8E9Z9H4X91JWBZ2MW.jsonl"
+}

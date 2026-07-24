@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
@@ -183,6 +183,62 @@ describe("runReview (in-process)", () => {
     const paths = repoPaths(root);
     // Zero side effects: the ticket is untouched (still in_progress).
     expect((await readTicket(paths, id)).state).toBe("in_progress");
+  });
+
+  it("ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC: a SECOND review on an already-review-state ticket is rejected (CONFLICT) WITHOUT overwriting the transcript the FIRST review already captured", async () => {
+    const root = await makeTempRepo("slop-review-inproc-double-no-mutate-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Double-review ticket, must not mutate transcript");
+    await startTicket(root, id);
+
+    const firstTranscript = join(root, "first-review-transcript.jsonl");
+    await writeFile(firstTranscript, '{"round":"first"}\n', "utf8");
+    const firstOut = captureOutput();
+    try {
+      await withCwd(root, () =>
+        runReview(id, { mr: "https://example.com/org/repo/pull/1", transcript: firstTranscript }),
+      );
+    } finally {
+      firstOut.restore();
+    }
+
+    const paths = repoPaths(root);
+    const ticketAfterFirst = await readTicket(paths, id);
+    const sessionId = ticketAfterFirst.active_session;
+    if (sessionId === null)
+      throw new Error("unreachable: review-state ticket has no active_session");
+    const transcriptPath = join(paths.slopDir, "transcripts", `${sessionId}.jsonl`);
+    const contentAfterFirst = await readFile(transcriptPath, "utf8");
+    expect(contentAfterFirst).toBe('{"round":"first"}\n');
+
+    // A SECOND review on the SAME (now review-state) ticket — checkReviewEntry
+    // rejects `review -> review` (D15: v0 stores one MR per review round).
+    // A real, findable "transcript" that the OLD (pre-fix) code would have
+    // unconditionally copied over the FIRST review's file before ever
+    // validating that a second review call is illegal here.
+    const secondTranscript = join(root, "second-review-transcript.jsonl");
+    await writeFile(secondTranscript, '{"round":"second-should-never-land"}\n', "utf8");
+    const secondOut = captureOutput();
+    try {
+      await expect(
+        withCwd(root, () =>
+          runReview(id, {
+            mr: "https://example.com/org/repo/pull/2",
+            transcript: secondTranscript,
+          }),
+        ),
+      ).rejects.toMatchObject({ exitCode: EXIT_CODES.CONFLICT });
+    } finally {
+      secondOut.restore();
+    }
+
+    // The fix: the FIRST review's transcript bytes are untouched, and the
+    // ticket's MR link is still the first round's — the doomed second
+    // review changed nothing.
+    const contentAfterSecond = await readFile(transcriptPath, "utf8");
+    expect(contentAfterSecond).toBe('{"round":"first"}\n');
+    const ticketAfterSecond = await readTicket(paths, id);
+    expect(ticketAfterSecond.review?.mr).toBe("https://example.com/org/repo/pull/1");
   });
 
   it("refuses to review an open (never-started) ticket (CONFLICT, exit 6)", async () => {

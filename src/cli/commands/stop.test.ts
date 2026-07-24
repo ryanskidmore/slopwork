@@ -1,5 +1,5 @@
 import { type SpawnSyncReturns, spawn, spawnSync } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +12,7 @@ import type { TicketId } from "../../core/index.js";
 import type { RepoPaths } from "../../repo/index.js";
 import { readTicket, repoPaths } from "../../repo/index.js";
 import { runNew } from "./new.js";
+import { runReview } from "./review.js";
 import { runStart } from "./start.js";
 import { runStop } from "./stop.js";
 
@@ -251,6 +252,34 @@ describe("runStop (in-process)", () => {
     expect(ticket.active_session).toBeNull();
   });
 
+  it("ticket_01KYAPN9NXY6RPSV6WGR42CJHJ: warns on stderr (but still succeeds) when the acting actor differs from who started the session", async () => {
+    const root = await makeTempRepo("slop-stop-inproc-ownership-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Ownership-mismatch stop ticket");
+    const startOut = captureOutput();
+    try {
+      await withCwd(root, () => runStart(id, {})); // started as "ryan" (config user:)
+    } finally {
+      startOut.restore();
+    }
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runStop(id, { note: "someone else's handoff" }), {
+        SLOP_ACTOR: "someone-else",
+      });
+      expect(out.stderr()).toContain("someone-else");
+      expect(out.stderr()).toContain("ryan");
+      expect(out.stderr()).toMatch(/session ownership/i);
+      // Never a block — the stop itself still succeeded.
+      expect(out.stdout()).toContain("stopped");
+    } finally {
+      out.restore();
+    }
+    const paths = repoPaths(root);
+    expect((await readTicket(paths, id)).state).toBe("open");
+  });
+
   it("warns on stderr when --note is omitted, but still succeeds", async () => {
     const root = await makeTempRepo("slop-stop-inproc-nonote-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });
@@ -286,6 +315,56 @@ describe("runStop (in-process)", () => {
     }
     const paths = repoPaths(root);
     expect((await readTicket(paths, id)).state).toBe("open");
+  });
+
+  it("ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC: refuses a review-state ticket (CONFLICT) WITHOUT ever touching .slop/transcripts/ — a doomed stop must not mutate the audit artifact it can't commit", async () => {
+    const root = await makeTempRepo("slop-stop-inproc-review-no-mutate-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Review-state ticket, stop must not mutate transcripts");
+    const startOut = captureOutput();
+    try {
+      await withCwd(root, () => runStart(id, {}));
+    } finally {
+      startOut.restore();
+    }
+    const reviewOut = captureOutput();
+    try {
+      await withCwd(root, () => runReview(id, {}));
+    } finally {
+      reviewOut.restore();
+    }
+
+    const paths = repoPaths(root);
+    // review — with no --transcript and no auto-detectable harness in this
+    // test env — captured nothing, so .slop/transcripts/ doesn't exist at
+    // all yet. This is what makes the assertion below unambiguous: ANY
+    // file appearing there after the doomed `stop` below can only have
+    // come from that `stop` call's own speculative capture.
+    await expect(readdir(join(paths.slopDir, "transcripts"))).rejects.toThrow();
+
+    // A real, findable "transcript" that the OLD (pre-fix) code would
+    // have unconditionally copied into .slop/transcripts/ before ever
+    // validating that `stop` can't act on a review-state ticket.
+    const fakeTranscript = join(root, "would-be-copied.jsonl");
+    await writeFile(fakeTranscript, '{"hello":"world"}\n', "utf8");
+
+    const out = captureOutput();
+    try {
+      await expect(
+        withCwd(root, () => runStop(id, { transcript: fakeTranscript })),
+      ).rejects.toMatchObject({ exitCode: EXIT_CODES.CONFLICT });
+    } finally {
+      out.restore();
+    }
+
+    // The fix: .slop/transcripts/ still doesn't exist — the doomed `stop`
+    // never got as far as the speculative capture that would have created
+    // it, let alone written into it.
+    await expect(readdir(join(paths.slopDir, "transcripts"))).rejects.toThrow();
+    // And the ticket/session state truly is untouched — still review, same
+    // active session, exactly as `review` left it.
+    const ticket = await readTicket(paths, id);
+    expect(ticket.state).toBe("review");
   });
 
   it("throws NOT_FOUND for an unresolvable ref", async () => {
