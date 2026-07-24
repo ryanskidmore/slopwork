@@ -11,13 +11,16 @@ import { makeTempRepo } from "../support/temp-repo.js";
 // or a schema-invalid config.yaml — every §4.4 view calls `getConfig()`, so
 // one bad merge/hand-edit of config.yaml took the ENTIRE web UI down with
 // an opaque 500 on every single page. This file spawns the real `slop web`
-// server (from source, same convention as tests/acceptance/D5.test.ts /
-// src/web/views/ticket-detail.test.ts's "real spawned server" block — Bun
+// server (from source, same convention as tests/acceptance/D5.test.ts — Bun
 // globals like `Bun.serve`/`Bun.YAML` aren't available inside vitest test
 // workers) against a real `slop init`-produced repo whose config.yaml has
-// been deleted or corrupted after the fact, and asserts every degraded page
-// still 200s with the fallback defaults and a visible warning banner,
-// instead of 500ing.
+// been deleted or corrupted after the fact, and asserts every degraded
+// `/api/*` route still 200s with the fallback defaults and a non-null
+// `config.warning`, instead of 500ing. (rewrite-slop-web-as-a: the warning
+// used to render as an HTML banner; it's now a `warning` field on every
+// JSON response's embedded `config` object — the SPA's AppShell renders it
+// as the same visible banner, see src/web/frontend/components/app-shell.tsx —
+// but this black-box HTTP suite asserts the API contract, not the DOM.)
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, "..", "..");
@@ -98,22 +101,40 @@ async function initRepo(): Promise<string> {
   return root;
 }
 
+interface ConfigBearing {
+  config: { warning: string | null };
+}
+
+/** `/api/config` returns the config projection flat (no wrapping `config` key); every other route nests it — see src/web/api/*.ts. */
+function extractWarning(
+  path: string,
+  body: ConfigBearing | { warning: string | null },
+): string | null {
+  return path === "/api/config"
+    ? (body as { warning: string | null }).warning
+    : (body as ConfigBearing).config.warning;
+}
+
 describe("web: corrupt or missing config.yaml degrades instead of 500ing", () => {
-  it("missing config.yaml: every §4.4 view still 200s, uses defaults, and shows a warning banner", async () => {
+  it("missing config.yaml: every §4.4 API route still 200s, uses defaults, and reports a warning", async () => {
     const root = await initRepo();
     await unlink(join(root, ".slop", "config.yaml"));
 
     server = await startWebServer(root);
-    for (const path of ["/tickets", "/tree", "/review", "/stale"]) {
+    for (const path of ["/api/tickets", "/api/tree", "/api/review", "/api/stale", "/api/config"]) {
       const res = await fetch(new URL(path, server.baseUrl));
       expect(res.status, `${path} should not 500`).toBe(200);
-      const body = await res.text();
-      expect(body).toContain("banner-warning");
-      expect(body).toMatch(/config\.yaml/);
+      const body = (await res.json()) as ConfigBearing | { warning: string | null };
+      const warning = extractWarning(path, body);
+      expect(warning, `${path}'s config warning should be set`).not.toBeNull();
+      expect(warning).toMatch(/config\.yaml/);
     }
+    // The SPA shell itself must also still 200 (it doesn't know about config at all — the AppShell fetches /api/config client-side).
+    const shell = await fetch(new URL("/tickets", server.baseUrl));
+    expect(shell.status).toBe(200);
   });
 
-  it("corrupt (invalid YAML) config.yaml: still 200s with a warning banner", async () => {
+  it("corrupt (invalid YAML) config.yaml: still 200s with a warning", async () => {
     const root = await initRepo();
     await writeFile(
       join(root, ".slop", "config.yaml"),
@@ -122,30 +143,30 @@ describe("web: corrupt or missing config.yaml degrades instead of 500ing", () =>
     );
 
     server = await startWebServer(root);
-    const res = await fetch(new URL("/tickets", server.baseUrl));
+    const res = await fetch(new URL("/api/tickets", server.baseUrl));
     expect(res.status).toBe(200);
-    const body = await res.text();
-    expect(body).toContain("banner-warning");
+    const body = (await res.json()) as ConfigBearing;
+    expect(body.config.warning).not.toBeNull();
   });
 
-  it("schema-invalid config.yaml (project missing): still 200s with a warning banner", async () => {
+  it("schema-invalid config.yaml (project missing): still 200s with a warning", async () => {
     const root = await initRepo();
     await writeFile(join(root, ".slop", "config.yaml"), 'remotes:\n  jira: ""\n', "utf8");
 
     server = await startWebServer(root);
-    const res = await fetch(new URL("/tickets", server.baseUrl));
+    const res = await fetch(new URL("/api/tickets", server.baseUrl));
     expect(res.status).toBe(200);
-    const body = await res.text();
-    expect(body).toContain("banner-warning");
+    const body = (await res.json()) as ConfigBearing;
+    expect(body.config.warning).not.toBeNull();
   });
 
-  it("valid config.yaml: no warning banner appears", async () => {
+  it("valid config.yaml: no warning", async () => {
     const root = await initRepo();
 
     server = await startWebServer(root);
-    const res = await fetch(new URL("/tickets", server.baseUrl));
+    const res = await fetch(new URL("/api/tickets", server.baseUrl));
     expect(res.status).toBe(200);
-    const body = await res.text();
-    expect(body).not.toContain("banner-warning");
+    const body = (await res.json()) as ConfigBearing;
+    expect(body.config.warning).toBeNull();
   });
 });

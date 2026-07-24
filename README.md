@@ -73,7 +73,7 @@ bun run test           # run the test suite (vitest)
 bun run lint            # lint src/ and tests/ (oxlint)
 bun run format          # apply formatting (oxfmt, in place)
 bun run format:check     # check formatting without writing
-bun run typecheck        # tsc --noEmit
+bun run typecheck        # tsc --noEmit (src/ + src/web/frontend/'s own tsconfig)
 bun run build            # compile the standalone binary to dist/slop
 bun run start            # run the CLI from source (bun src/cli/index.ts ...)
 ```
@@ -88,6 +88,34 @@ bun run start            # run the CLI from source (bun src/cli/index.ts ...)
 
 CI (`.github/workflows/ci.yml`) runs on every push and pull request: install → lint → format
 check → typecheck → test → build → smoke-test the compiled binary.
+
+### Web UI development
+
+`slop web` is a React + Tailwind v4 + shadcn/ui-style SPA (`src/web/frontend/`) served by the
+same `Bun.serve` instance as its read-only JSON API (`src/web/api/`). The SPA is bundled at build
+time — via `bun run build:web` (`scripts/build-frontend.ts`, a `bun-plugin-tailwind`-powered
+`Bun.build()` call) — into `src/web/generated/{app.js,app.css}`, which `src/web/server.ts` embeds
+into the binary the same way it always embedded static assets (Bun's `with { type: "text" }`
+import). Nothing is fetched from a CDN at build *or* run time: Tailwind compiles locally, and the
+one bundled webfont (JetBrains Mono, for identifiers/ids/code — see `src/web/frontend/index.css`)
+is base64-inlined straight into the generated CSS.
+
+```sh
+bun run build:web        # one-shot: regenerate src/web/generated/{app.js,app.css}
+bun run dev:web           # same, but rebuilds on every src/web/frontend/ change
+bun run typecheck:web      # tsc --noEmit against src/web/frontend/tsconfig.json (DOM libs, react-jsx —
+                            # deliberately separate from the root tsconfig's Bun-only setup)
+```
+
+`build:web` is also a `pretest`/`prebuild` hook (see `package.json`), so `bun run test` and
+`bun run build` always run against freshly generated assets — `src/web/generated/` and
+`src/web/frontend/fonts.generated.css` are build output, gitignored like `dist/`, never hand-edited.
+
+For the actual dev loop: run `bun run dev:web` in one terminal (rebuilds the SPA on every save)
+and `bun src/cli/index.ts web` in another. The server reads `src/web/generated/{app.js,app.css}`
+once, at its own startup (the same static import that lets `bun build --compile` embed them into
+the binary) — so after a frontend change, restart the `slop web` process to pick up the new
+bundle; a backend (`src/web/api/`) change needs the same restart, same as any other CLI command.
 
 ## Lifecycle: `review` → `done` (C3)
 
@@ -188,9 +216,16 @@ src/
                         staleness, search, ancestry/tree, jira ref parsing
   sessions/             session lifecycle: harness/git capture, plan versioning + diff,
                         context pack, start/stop/finalize, transcript capture
-  web/                  read-only local web explorer (`slop web`)
+  web/                  read-only local web explorer (`slop web`) — React SPA + JSON API
     index.ts               re-exports the HTTP server + data source; serves any real `.slop`
                             directory (not just fixtures) at http://localhost:4553 by default
+    server.ts               Bun.serve wiring: Host-header allowlist, HEAD support, reusePort:false,
+                            /api/* routes, static SPA-shell fallback for everything else
+    data-source.ts           the WebDataSource seam; fixture-data-source.ts is the disk-backed impl
+    api/                    read-only JSON API route handlers + the wire-contract types (types.ts)
+    frontend/                the React + Tailwind v4 + shadcn/ui-style SPA source (own tsconfig —
+                            see "Web UI development" above); bundled by scripts/build-frontend.ts
+    generated/                build output (gitignored): app.js/app.css, embedded into dist/slop
 tests/
   acceptance/            one file per work item — <ITEM-ID>.test.ts
 ```

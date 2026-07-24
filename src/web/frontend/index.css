@@ -1,0 +1,398 @@
+@import "tailwindcss";
+/* Generated at build time by scripts/build-frontend.ts — base64-inlined @font-face
+   rules for the bundled JetBrains Mono subset (latin, weights 400/600, woff2 only).
+   Never fetched from a CDN: the font bytes ship inside this CSS text, which itself
+   ships inside the compiled `slop` binary (server.ts's `with { type: "text" }`
+   import), so identifiers stay in a real monospace fully offline. */
+@import "./fonts.generated.css";
+
+/*
+ * Design tokens (design.md-adjacent — this is the "audit trail for AI-agent
+ * work" visual system, not stock shadcn defaults). Two ideas drive every
+ * choice here:
+ *
+ *  1. State is the design system: draft/open/in_progress/review/done/dropped
+ *     each get ONE fixed hue, used identically in every view (list row,
+ *     tree node, panels, detail header). blocked/stale are OVERLAYS, not
+ *     states — quieter, pattern-y, layered on top rather than competing for
+ *     the same color channel.
+ *  2. The audit spine (ticket detail's provenance timeline) is the one
+ *     place this UI spends real color boldness: `--spine` is a deliberately
+ *     saturated ink-teal that appears nowhere else, so the spine reads as
+ *     the signature element it is. Agent vs. human authorship on the spine
+ *     is encoded by SHAPE (diamond vs. circle marker), not color, so it
+ *     stays legible under any color-vision deficiency.
+ */
+@theme {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", Menlo, Consolas,
+    monospace;
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+
+  --animate-spine-pulse: spine-pulse 2.4s ease-in-out infinite;
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+
+    /* Paper/ink light palette — warm, not clinical white. */
+    --background: oklch(98.2% 0.004 90);
+    --foreground: oklch(20% 0.014 60);
+    --card: oklch(99.3% 0.003 90);
+    --card-foreground: var(--foreground);
+    --popover: oklch(99.3% 0.003 90);
+    --popover-foreground: var(--foreground);
+    --muted: oklch(94.5% 0.006 80);
+    --muted-foreground: oklch(42% 0.012 60);
+    --border: oklch(88% 0.008 80);
+    --input: oklch(88% 0.008 80);
+    --ring: oklch(55% 0.09 240);
+
+    --primary: oklch(30% 0.03 60);
+    --primary-foreground: oklch(98% 0.004 90);
+    --secondary: oklch(93% 0.008 80);
+    --secondary-foreground: var(--foreground);
+    --accent: oklch(93% 0.008 80);
+    --accent-foreground: var(--foreground);
+    --destructive: oklch(52% 0.19 25);
+    --destructive-foreground: oklch(98% 0.01 25);
+
+    /* The one bold accent — the audit spine's own color, unused elsewhere. */
+    --spine: oklch(52% 0.1 195);
+    --spine-foreground: oklch(98% 0.01 195);
+
+    /* Actor-kind marker fills on the spine (paired with shape, never the only signal). */
+    --actor-agent: oklch(56% 0.13 55);
+    --actor-human: oklch(50% 0.1 255);
+
+    /* State palette — one fixed hue per ticket state, used identically everywhere. */
+    --state-draft: oklch(55% 0.01 90);
+    --state-draft-foreground: oklch(98% 0.004 90);
+    --state-open: oklch(52% 0.13 250);
+    --state-open-foreground: oklch(98% 0.01 250);
+    --state-in_progress: oklch(62% 0.14 65);
+    --state-in_progress-foreground: oklch(20% 0.03 65);
+    --state-review: oklch(52% 0.15 305);
+    --state-review-foreground: oklch(98% 0.02 305);
+    --state-done: oklch(55% 0.12 150);
+    --state-done-foreground: oklch(98% 0.02 150);
+    --state-dropped: oklch(52% 0.09 20);
+    --state-dropped-foreground: oklch(98% 0.01 20);
+
+    /* Overlays — attention states, deliberately lower-chroma than the state palette. */
+    --overlay-blocked: oklch(55% 0.15 35);
+    --overlay-blocked-foreground: oklch(98% 0.02 35);
+    --overlay-stale: oklch(58% 0.07 75);
+    --overlay-stale-foreground: oklch(20% 0.02 75);
+
+    --priority-0: oklch(52% 0.19 25);
+    --priority-1: oklch(58% 0.14 55);
+    --priority-2: var(--muted-foreground);
+    --priority-3: oklch(65% 0.01 90);
+  }
+
+  [data-theme="dark"],
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+    }
+  }
+}
+
+/* Dark palette — deep ink-slate, not near-black. Applied whenever the root
+   carries data-theme="dark" (explicit toggle) OR the OS prefers dark AND no
+   explicit light override is set — see hooks/use-theme.ts for the toggle
+   logic that stamps `data-theme`. */
+@layer base {
+  :root[data-theme="dark"] {
+    --background: oklch(19% 0.012 250);
+    --foreground: oklch(92% 0.006 90);
+    --card: oklch(22% 0.013 250);
+    --card-foreground: var(--foreground);
+    --popover: oklch(22% 0.013 250);
+    --popover-foreground: var(--foreground);
+    --muted: oklch(27% 0.014 250);
+    --muted-foreground: oklch(68% 0.014 250);
+    --border: oklch(32% 0.016 250);
+    --input: oklch(32% 0.016 250);
+    --ring: oklch(65% 0.09 240);
+
+    --primary: oklch(92% 0.006 90);
+    --primary-foreground: oklch(19% 0.012 250);
+    --secondary: oklch(29% 0.015 250);
+    --secondary-foreground: var(--foreground);
+    --accent: oklch(29% 0.015 250);
+    --accent-foreground: var(--foreground);
+    --destructive: oklch(62% 0.19 25);
+    --destructive-foreground: oklch(15% 0.02 25);
+
+    --spine: oklch(70% 0.11 195);
+    --spine-foreground: oklch(15% 0.02 195);
+
+    --actor-agent: oklch(72% 0.13 55);
+    --actor-human: oklch(72% 0.1 255);
+
+    --state-draft: oklch(55% 0.012 90);
+    --state-draft-foreground: oklch(15% 0.01 90);
+    --state-open: oklch(68% 0.13 250);
+    --state-open-foreground: oklch(15% 0.02 250);
+    --state-in_progress: oklch(72% 0.14 65);
+    --state-in_progress-foreground: oklch(18% 0.03 65);
+    --state-review: oklch(70% 0.15 305);
+    --state-review-foreground: oklch(15% 0.02 305);
+    --state-done: oklch(68% 0.13 150);
+    --state-done-foreground: oklch(15% 0.02 150);
+    --state-dropped: oklch(65% 0.1 20);
+    --state-dropped-foreground: oklch(15% 0.02 20);
+
+    --overlay-blocked: oklch(68% 0.16 35);
+    --overlay-blocked-foreground: oklch(15% 0.02 35);
+    --overlay-stale: oklch(68% 0.07 75);
+    --overlay-stale-foreground: oklch(18% 0.02 75);
+
+    --priority-0: oklch(68% 0.19 25);
+    --priority-1: oklch(72% 0.14 55);
+    --priority-2: var(--muted-foreground);
+    --priority-3: oklch(55% 0.012 90);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]):not([data-theme="dark"]) {
+      --background: oklch(19% 0.012 250);
+      --foreground: oklch(92% 0.006 90);
+      --card: oklch(22% 0.013 250);
+      --card-foreground: oklch(92% 0.006 90);
+      --popover: oklch(22% 0.013 250);
+      --popover-foreground: oklch(92% 0.006 90);
+      --muted: oklch(27% 0.014 250);
+      --muted-foreground: oklch(68% 0.014 250);
+      --border: oklch(32% 0.016 250);
+      --input: oklch(32% 0.016 250);
+      --ring: oklch(65% 0.09 240);
+      --primary: oklch(92% 0.006 90);
+      --primary-foreground: oklch(19% 0.012 250);
+      --secondary: oklch(29% 0.015 250);
+      --secondary-foreground: oklch(92% 0.006 90);
+      --accent: oklch(29% 0.015 250);
+      --accent-foreground: oklch(92% 0.006 90);
+      --destructive: oklch(62% 0.19 25);
+      --destructive-foreground: oklch(15% 0.02 25);
+      --spine: oklch(70% 0.11 195);
+      --spine-foreground: oklch(15% 0.02 195);
+      --actor-agent: oklch(72% 0.13 55);
+      --actor-human: oklch(72% 0.1 255);
+      --state-draft: oklch(55% 0.012 90);
+      --state-draft-foreground: oklch(15% 0.01 90);
+      --state-open: oklch(68% 0.13 250);
+      --state-open-foreground: oklch(15% 0.02 250);
+      --state-in_progress: oklch(72% 0.14 65);
+      --state-in_progress-foreground: oklch(18% 0.03 65);
+      --state-review: oklch(70% 0.15 305);
+      --state-review-foreground: oklch(15% 0.02 305);
+      --state-done: oklch(68% 0.13 150);
+      --state-done-foreground: oklch(15% 0.02 150);
+      --state-dropped: oklch(65% 0.1 20);
+      --state-dropped-foreground: oklch(15% 0.02 20);
+      --overlay-blocked: oklch(68% 0.16 35);
+      --overlay-blocked-foreground: oklch(15% 0.02 35);
+      --overlay-stale: oklch(68% 0.07 75);
+      --overlay-stale-foreground: oklch(18% 0.02 75);
+      --priority-0: oklch(68% 0.19 25);
+      --priority-1: oklch(72% 0.14 55);
+      --priority-2: oklch(68% 0.014 250);
+      --priority-3: oklch(55% 0.012 90);
+    }
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-spine: var(--spine);
+  --color-spine-foreground: var(--spine-foreground);
+  --color-actor-agent: var(--actor-agent);
+  --color-actor-human: var(--actor-human);
+
+  --color-state-draft: var(--state-draft);
+  --color-state-draft-foreground: var(--state-draft-foreground);
+  --color-state-open: var(--state-open);
+  --color-state-open-foreground: var(--state-open-foreground);
+  --color-state-in_progress: var(--state-in_progress);
+  --color-state-in_progress-foreground: var(--state-in_progress-foreground);
+  --color-state-review: var(--state-review);
+  --color-state-review-foreground: var(--state-review-foreground);
+  --color-state-done: var(--state-done);
+  --color-state-done-foreground: var(--state-done-foreground);
+  --color-state-dropped: var(--state-dropped);
+  --color-state-dropped-foreground: var(--state-dropped-foreground);
+
+  --color-overlay-blocked: var(--overlay-blocked);
+  --color-overlay-blocked-foreground: var(--overlay-blocked-foreground);
+  --color-overlay-stale: var(--overlay-stale);
+  --color-overlay-stale-foreground: var(--overlay-stale-foreground);
+
+  --color-priority-0: var(--priority-0);
+  --color-priority-1: var(--priority-1);
+  --color-priority-2: var(--priority-2);
+  --color-priority-3: var(--priority-3);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+    outline-color: var(--color-ring);
+  }
+
+  html {
+    color-scheme: light dark;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Visible keyboard focus, everywhere, no exceptions — quality-floor requirement. */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  ::selection {
+    background-color: color-mix(in oklch, var(--color-spine) 35%, transparent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@keyframes spine-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Rendered markdown (spec details, resolution, transcript prose) — server
+   pre-sanitizes via src/web/markdown.ts, client only supplies typography. */
+@layer components {
+  .prose-slop {
+    max-width: 72ch;
+    line-height: 1.65;
+  }
+  .prose-slop :where(h1, h2, h3, h4) {
+    font-weight: 600;
+    margin-top: 1.4em;
+    margin-bottom: 0.5em;
+    line-height: 1.3;
+  }
+  .prose-slop :where(h1) {
+    font-size: 1.3em;
+  }
+  .prose-slop :where(h2) {
+    font-size: 1.15em;
+  }
+  .prose-slop :where(h3) {
+    font-size: 1.05em;
+  }
+  .prose-slop :where(p, ul, ol, blockquote, table, pre) {
+    margin-top: 0.6em;
+    margin-bottom: 0.6em;
+  }
+  .prose-slop :where(ul, ol) {
+    padding-left: 1.4em;
+  }
+  .prose-slop :where(ul) {
+    list-style: disc;
+  }
+  .prose-slop :where(ol) {
+    list-style: decimal;
+  }
+  .prose-slop :where(a) {
+    color: var(--color-spine);
+    text-underline-offset: 2px;
+    text-decoration: underline;
+  }
+  .prose-slop :where(code) {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    background: var(--color-muted);
+    padding: 0.1em 0.35em;
+    border-radius: var(--radius-sm);
+  }
+  .prose-slop :where(pre) {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    background: var(--color-muted);
+    padding: 0.75em 1em;
+    border-radius: var(--radius-md);
+    overflow-x: auto;
+  }
+  .prose-slop :where(pre code) {
+    background: transparent;
+    padding: 0;
+  }
+  .prose-slop :where(blockquote) {
+    border-left: 2px solid var(--color-border);
+    padding-left: 1em;
+    color: var(--color-muted-foreground);
+  }
+  .prose-slop :where(table) {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.9em;
+  }
+  .prose-slop :where(th, td) {
+    border: 1px solid var(--color-border);
+    padding: 0.35em 0.6em;
+    text-align: left;
+  }
+  .prose-slop :where(img) {
+    max-width: 100%;
+  }
+}

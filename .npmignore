@@ -1,0 +1,16 @@
+# Deliberately near-empty. Its mere PRESENCE stops npm from falling back to
+# .gitignore for `npm pack`/`npm publish` filtering (npm's documented
+# behavior: "if there is no .npmignore file, but a .gitignore file exists,
+# its contents are used instead"). That fallback would otherwise silently
+# strip `src/web/generated/**` and `src/web/frontend/fonts.generated.css`
+# from the published tarball — both are gitignored build output (this repo's
+# dev convention), but they are NOT optional for a package installed via
+# `npm i -g slopwork`/`npx slopwork`: bin/slop.mjs runs `bun src/cli/index.ts`
+# straight from the published `src/` (see that file's doc comment), and
+# `src/web/server.ts` statically imports the generated SPA bundle — so
+# `slop web` needs those files physically present in the published package.
+# `prepublishOnly` (package.json) runs `bun run build:web` before every
+# publish so they exist on disk when this file's (lack of) rules are
+# evaluated. The `files` allowlist in package.json is what actually scopes
+# the published tarball otherwise (node_modules/, tests/, dist/, etc. are
+# simply never listed there); this file has nothing further to exclude.

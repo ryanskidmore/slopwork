@@ -601,8 +601,95 @@ afterAll(async () => {
 
 // ---------------------------------------------------------------------------
 // Assertions — a focused smoke test, not a second D5.test.ts: a handful of
-// strong, real-data assertions per view.
+// strong, real-data assertions per API route.
+//
+// rewrite-slop-web-as-a: every assertion below now drives `/api/*` and
+// inspects parsed JSON, not server-rendered HTML strings — see D5.test.ts's
+// header comment for why (the SPA, not this black-box HTTP suite, owns
+// presentation now). Two categories of the OLD assertions here changed
+// shape rather than just moving:
+//
+//  - "escaped in the HTML" (progress notes, actor names): a JSON API has no
+//    HTML to escape into in the first place — `JSON.stringify` already
+//    makes arbitrary string content byte-safe on the wire, and the SPA
+//    renders plain-text fields through ordinary React children (which
+//    HTML-escapes by construction, the same guarantee `escapeHtml` used to
+//    provide by hand). What's left to prove at this layer is simpler and
+//    still real: the API must hand back the attacker-shaped string
+//    VERBATIM, never interpreted/stripped/mangled — proven below by exact
+//    equality checks.
+//  - markdown-derived fields (`spec.details_html`, `resolution_html`,
+//    transcript block `html`) keep the FULL old XSS-neutralisation
+//    assertions unchanged in spirit — these are still real, sanitized HTML
+//    strings (src/web/markdown.ts), so `javascript:`/`data:` neutralisation
+//    is exactly as testable, and exactly as load-bearing, as before.
 // ---------------------------------------------------------------------------
+
+interface TicketDetailLike {
+  ticket: {
+    id: string;
+    name: string;
+    handle: string;
+    state: string;
+    review: { mr: { url: string; safe_url: string | null } | null } | null;
+    overlay: {
+      blocked: boolean;
+      blocked_by: Array<{ name: string }>;
+      stale: boolean;
+      stale_reason: { state: string; threshold: string } | null;
+    };
+    parent: { kind: string; ref?: { kind: string; ref: { id: string; name: string } } };
+  };
+  children: Array<{ id: string; name: string }>;
+  relationships: {
+    blocks: Array<{ kind: string; ref: { id: string; name: string } }>;
+    blocked_by: Array<{ kind: string; ref: { id: string; name: string } }>;
+    relates_to: Array<{ kind: string; ref: { id: string; name: string } }>;
+    discovered_from: Array<{ kind: string; ref: { id: string; name: string } }>;
+    discovered_here: Array<{ kind: string; ref: { id: string; name: string } }>;
+  };
+  spec: { summary: string; details_html: string; acceptance: string[] };
+  resolution_html: string | null;
+  events: Array<{
+    verb: string;
+    label: string;
+    entity_kind: "ticket" | "session";
+    progress_note: string | null;
+    payload: Record<string, unknown>;
+  }>;
+  sessions: Array<{
+    id: string;
+    actor: { name: string };
+    harness: string;
+    end_summary: string | null;
+    has_transcript: boolean;
+    is_active: boolean;
+    plan: Array<{ version: number; steps: Array<{ text: string; checked: boolean }> }>;
+  }>;
+  provenance: { created_by: { name: string } };
+}
+
+async function getTicketDetail(id: string): Promise<{ status: number; body: TicketDetailLike }> {
+  const res = await get(`/api/tickets/${id}`);
+  return { status: res.status, body: (await res.json()) as TicketDetailLike };
+}
+
+interface TranscriptLike {
+  available: boolean;
+  records: Array<
+    | { kind: "system"; summary: string }
+    | {
+        kind: "turn";
+        role: "user" | "assistant";
+        blocks: Array<
+          | { type: "text" | "thinking"; html: string }
+          | { type: "tool_use"; name: string; input_json: string }
+          | { type: "tool_result"; text: string; is_error: boolean }
+          | { type: "unknown"; json: string }
+        >;
+      }
+  >;
+}
 
 describe("web against a real init/new/start/plan/review/done lifecycle", () => {
   // Every ticket this file's beforeAll creates — used wherever a test needs
@@ -620,141 +707,173 @@ describe("web against a real init/new/start/plan/review/done lifecycle", () => {
     reviewTicket,
   ];
 
-  describe("/tickets", () => {
+  describe("/api/tickets", () => {
     it("lists every real ticket by name and slug", async () => {
-      const res = await get("/tickets");
+      const res = await get("/api/tickets");
       expect(res.status).toBe(200);
-      const body = await res.text();
+      const body = (await res.json()) as {
+        total: number;
+        tickets: Array<{ name: string; slug: string }>;
+      };
       const tickets = allTickets();
-      expect(body).toContain(`${tickets.length} of ${tickets.length} ticket`);
+      expect(body.total).toBe(tickets.length);
+      const names = body.tickets.map((t) => t.name);
+      const slugs = body.tickets.map((t) => t.slug);
       for (const t of tickets) {
-        expect(body, `expected /tickets to list "${t.name}"`).toContain(t.name);
-        expect(body).toContain(t.slug);
+        expect(names, `expected /api/tickets to list "${t.name}"`).toContain(t.name);
+        expect(slugs).toContain(t.slug);
       }
     });
 
     it("state=done filters down to exactly the ticket that went through done", async () => {
-      const res = await get("/tickets?state=done");
+      const res = await get("/api/tickets?state=done");
       expect(res.status).toBe(200);
-      const body = await res.text();
-      expect(body).toContain(mainTicket.name);
-      expect(body).not.toContain(dependentTicket.name);
-      expect(body).not.toContain(blockerTicket.name);
+      const body = (await res.json()) as { tickets: Array<{ name: string }> };
+      const names = body.tickets.map((t) => t.name);
+      expect(names).toContain(mainTicket.name);
+      expect(names).not.toContain(dependentTicket.name);
+      expect(names).not.toContain(blockerTicket.name);
     });
 
-    it("shows a live Blocked badge on the real dependent ticket", async () => {
-      const res = await get("/tickets");
-      const body = await res.text();
-      // dependentTicket's row: state badge (open) immediately followed by
-      // the blocked badge — a crude but real assertion that the SAME row
-      // carries both, not just that "Blocked" appears somewhere on the page.
-      const rowRe = new RegExp(
-        `<tr data-search="[^"]*${dependentTicket.slug}[^"]*">[\\s\\S]*?class="badge blocked"`,
-      );
-      expect(body).toMatch(rowRe);
+    it("shows a live blocked overlay on the real dependent ticket's own row", async () => {
+      const res = await get("/api/tickets");
+      const body = (await res.json()) as {
+        tickets: Array<{ slug: string; overlay: { blocked: boolean } }>;
+      };
+      const row = body.tickets.find((t) => t.slug === dependentTicket.slug);
+      expect(row?.overlay.blocked).toBe(true);
     });
   });
 
-  describe("/tree", () => {
+  describe("/api/tree", () => {
     it("renders the real external jira: parent as a badge built from remotes.jira", async () => {
-      const res = await get("/tree");
+      const res = await get("/api/tree");
       expect(res.status).toBe(200);
-      const body = await res.text();
-      expect(body).toContain(blockerTicket.name);
-      expect(body).toContain(
-        `<a class="badge external-parent jira" href="${JIRA_BASE}/browse/PROJ-1"`,
-      );
+      const body = (await res.json()) as {
+        roots: Array<{
+          ticket: { name: string };
+          external_parent: { safe_url: string | null } | null;
+        }>;
+      };
+      const node = body.roots.find((r) => r.ticket.name === blockerTicket.name);
+      expect(node, "expected blockerTicket as a local root with an external parent").toBeDefined();
+      expect(node?.external_parent?.safe_url).toBe(`${JIRA_BASE}/browse/PROJ-1`);
     });
   });
 
   describe("ticket detail: the blocked dependent", () => {
-    it("200s and shows the Blocked badge on its own page", async () => {
-      const res = await get(`/tickets/${dependentTicket.id}`);
-      expect(res.status).toBe(200);
-      const body = await res.text();
-      expect(body).toContain(dependentTicket.name);
-      expect(body).toContain('class="badge blocked"');
+    it("200s and shows the blocked overlay on its own page", async () => {
+      const { status, body } = await getTicketDetail(dependentTicket.id);
+      expect(status).toBe(200);
+      expect(body.ticket.name).toBe(dependentTicket.name);
+      expect(body.ticket.overlay.blocked).toBe(true);
     });
   });
 
   describe("ticket detail: the real lifecycle ticket", () => {
-    it("renders the real spec: summary, details_md as markdown, acceptance[]", async () => {
-      const res = await get(`/tickets/${mainTicket.id}`);
-      expect(res.status).toBe(200);
-      const body = await res.text();
+    it("renders the real spec: summary, details_md as sanitized HTML, acceptance[]", async () => {
+      const { status, body } = await getTicketDetail(mainTicket.id);
+      expect(status).toBe(200);
 
-      expect(body).toContain(mainTicket.name);
-      expect(body).toContain(
+      expect(body.ticket.name).toBe(mainTicket.name);
+      expect(body.spec.summary).toContain(
         "Prove slop web renders exactly what a real CLI lifecycle produced, not a hand-built fixture.",
       );
-      expect(body).toContain("<h2>Why</h2>");
-      expect(body).not.toContain("## Why");
-      expect(body).toContain("slop web lists this ticket by name");
-      expect(body).toContain(
+      expect(body.spec.details_html).toContain("<h2>Why</h2>");
+      expect(body.spec.details_html).not.toContain("## Why");
+      expect(body.spec.acceptance).toContain("slop web lists this ticket by name");
+      expect(body.spec.acceptance).toContain(
         "the transcript view renders the transcript review/done actually captured",
       );
     });
 
     it("shows the real final state and the real --note as the session's end summary", async () => {
-      const res = await get(`/tickets/${mainTicket.id}`);
-      const body = await res.text();
-      expect(body).toContain('class="badge state-done"');
-      expect(body).toContain(DONE_NOTE);
+      const { body } = await getTicketDetail(mainTicket.id);
+      expect(body.ticket.state).toBe("done");
+      expect(body.sessions.some((s) => s.end_summary === DONE_NOTE)).toBe(true);
     });
 
     it("shows the real plan version with its real checked-step count and step text", async () => {
-      const res = await get(`/tickets/${mainTicket.id}`);
-      const body = await res.text();
-      expect(body).toContain("Plan v1 (2/4 checked)");
-      expect(body).toContain("Write the new acceptance test against the compiled binary");
+      const { body } = await getTicketDetail(mainTicket.id);
+      const v1 = body.sessions[0]?.plan.find((p) => p.version === 1);
+      expect(v1?.steps.filter((s) => s.checked).length).toBe(2);
+      expect(v1?.steps.length).toBe(4);
+      expect(
+        v1?.steps.some(
+          (s) => s.text === "Write the new acceptance test against the compiled binary",
+        ),
+      ).toBe(true);
     });
 
-    it("shows the real session's actor/harness and links to its real transcript", async () => {
-      const res = await get(`/tickets/${mainTicket.id}`);
-      const body = await res.text();
-      expect(body).toContain("ryan");
-      expect(body).toContain('<span class="badge">other</span>');
-      expect(body).toContain(`/tickets/${mainTicket.id}/sessions/${mainSessionId}/transcript`);
+    it("shows the real session's actor/harness and a transcript is available", async () => {
+      const { body } = await getTicketDetail(mainTicket.id);
+      const session = body.sessions[0];
+      expect(session?.actor.name).toBe("ryan");
+      expect(session?.harness).toBe("other");
+      expect(session?.id).toBe(mainSessionId);
+      expect(session?.has_transcript).toBe(true);
     });
 
-    it("shows the real updates timeline, including the real review MR link", async () => {
-      const res = await get(`/tickets/${mainTicket.id}`);
-      const body = await res.text();
-      expect(body).toContain("requested review");
-      expect(body).toContain("marked done");
-      expect(body).toContain(MR_URL);
-      expect(body).toContain(PROGRESS_NOTE);
+    it("shows the real updates timeline, including the real review MR (from the review.requested event's payload) and the progress note", async () => {
+      const { body } = await getTicketDetail(mainTicket.id);
+      // `review` (src/cli/commands/review.ts) emits TWO review.requested
+      // events — one on the session entity (transcript_ref bookkeeping,
+      // written first) and one on the ticket entity (carries `mr` — see
+      // that file's `buildReviewedTicket` write). Only the ticket-scoped
+      // one carries payload.mr.
+      const reviewEvent = body.events.find(
+        (e) => e.verb === "review.requested" && e.entity_kind === "ticket",
+      );
+      const doneEvent = body.events.find((e) => e.verb === "ticket.done");
+      expect(reviewEvent?.label).toBe("requested review");
+      expect(doneEvent?.label).toBe("marked done");
+      expect(reviewEvent?.payload.mr).toBe(MR_URL);
+      expect(body.events.some((e) => e.progress_note === PROGRESS_NOTE)).toBe(true);
     });
   });
 
   describe("transcript view: the real transcript review/done captured", () => {
-    it("200s and renders the real captured conversation, not raw JSONL", async () => {
-      const res = await get(`/tickets/${mainTicket.id}/sessions/${mainSessionId}/transcript`);
+    async function getTranscript(): Promise<TranscriptLike> {
+      const res = await get(`/api/tickets/${mainTicket.id}/sessions/${mainSessionId}/transcript`);
       expect(res.status).toBe(200);
-      const body = await res.text();
+      return (await res.json()) as TranscriptLike;
+    }
 
-      expect(body).toContain(TRANSCRIPT_USER_MARKER);
-      expect(body).toContain(TRANSCRIPT_ASSISTANT_MARKER);
-      expect(body).toContain("tool_use: Bash");
-      expect(body).toContain('class="turn role-user"');
-      expect(body).toContain('class="turn role-assistant"');
-      // Never dumps the raw record straight from disk (D5's own guard,
-      // re-checked here against a REAL captured file, not a hand-built one).
-      expect(body).not.toContain('{"type":"user"');
-      expect(body).not.toContain('{"type":"assistant"');
+    it("200s and classifies the real captured conversation, not raw JSONL", async () => {
+      const body = await getTranscript();
+      expect(body.available).toBe(true);
+
+      const raw = JSON.stringify(body.records);
+      expect(raw).toContain(TRANSCRIPT_USER_MARKER);
+      expect(raw).toContain(TRANSCRIPT_ASSISTANT_MARKER);
+      const toolUse = body.records
+        .flatMap((r) => (r.kind === "turn" ? r.blocks : []))
+        .find((b) => b.type === "tool_use");
+      expect(toolUse && toolUse.type === "tool_use" ? toolUse.name : null).toBe("Bash");
+      expect(body.records.some((r) => r.kind === "turn" && r.role === "user")).toBe(true);
+      expect(body.records.some((r) => r.kind === "turn" && r.role === "assistant")).toBe(true);
+      // Never dumps the raw record straight from disk (this project's own
+      // guard, re-checked here against a REAL captured file, not a
+      // hand-built one).
+      expect(raw).not.toContain('"parentUuid"');
+      expect(raw).not.toContain('"isSidechain"');
     });
 
     // ticket_01KY9S0172V8AYCYV9KWS6RC9P: "transcript text" is one of this
     // ticket's own named XSS-safety categories — a `javascript:` markdown
     // link inside a real captured transcript, neutralised the same way
-    // resolution/details_md are.
+    // resolution/details_md are (src/web/markdown.ts, reused verbatim by
+    // src/web/api/transcript.ts's `blockDto`).
     it("neutralises a javascript: link inside real transcript text, keeping the safe one live", async () => {
-      const res = await get(`/tickets/${mainTicket.id}/sessions/${mainSessionId}/transcript`);
-      const body = await res.text();
-      expect(body).toContain(TRANSCRIPT_XSS_MARKER);
-      expect(body).toContain(`href="${TRANSCRIPT_XSS_SAFE_URL}"`);
-      expect(body).not.toMatch(/href="javascript:/i);
-      expect(body).toContain("bad"); // the link's inert anchor text still shows
+      const body = await getTranscript();
+      const textBlocks = body.records
+        .flatMap((r) => (r.kind === "turn" ? r.blocks : []))
+        .filter((b): b is { type: "text" | "thinking"; html: string } => b.type === "text");
+      const html = textBlocks.map((b) => b.html).join("\n");
+      expect(html).toContain(TRANSCRIPT_XSS_MARKER);
+      expect(html).toContain(`href="${TRANSCRIPT_XSS_SAFE_URL}"`);
+      expect(html).not.toMatch(/href="javascript:/i);
+      expect(html).toContain("bad"); // the link's inert anchor text still shows
     });
   });
 
@@ -765,174 +884,163 @@ describe("web against a real init/new/start/plan/review/done lifecycle", () => {
   // ---------------------------------------------------------------------------
 
   describe("ticket detail: the short t-<code> handle", () => {
-    it("renders the derived handle for the real ticket id", async () => {
-      const res = await get(`/tickets/${mainTicket.id}`);
-      const body = await res.text();
-      expect(body).toContain(shortTicketCode(mainTicket.id));
+    it("returns the derived handle for the real ticket id", async () => {
+      const { body } = await getTicketDetail(mainTicket.id);
+      expect(body.ticket.handle).toBe(shortTicketCode(mainTicket.id));
     });
   });
 
   describe("ticket detail: parent/children (both directions)", () => {
-    it("childTicket's page links to its real parent", async () => {
-      const res = await get(`/tickets/${childTicket.id}`);
-      const body = await res.text();
-      expect(body).toContain(`href="/tickets/${parentTicket.id}"`);
-      expect(body).toContain(parentTicket.name);
+    it("childTicket's detail references its real parent", async () => {
+      const { body } = await getTicketDetail(childTicket.id);
+      expect(body.ticket.parent.kind).toBe("local");
+      expect(body.ticket.parent.ref?.ref.id).toBe(parentTicket.id);
+      expect(body.ticket.parent.ref?.ref.name).toBe(parentTicket.name);
     });
 
-    it("parentTicket's page lists the real child", async () => {
-      const res = await get(`/tickets/${parentTicket.id}`);
-      const body = await res.text();
-      expect(body).toContain(`href="/tickets/${childTicket.id}"`);
-      expect(body).toContain(childTicket.name);
+    it("parentTicket's detail lists the real child", async () => {
+      const { body } = await getTicketDetail(parentTicket.id);
+      expect(body.children.map((c) => c.id)).toContain(childTicket.id);
+      expect(body.children.map((c) => c.name)).toContain(childTicket.name);
     });
   });
 
   describe("ticket detail: blocks / blocked-by (both directions) + the blocked overlay reason", () => {
-    it("blockerTicket's page shows the real dependent under Blocks →", async () => {
-      const res = await get(`/tickets/${blockerTicket.id}`);
-      const body = await res.text();
-      expect(body).toContain("Blocks");
-      expect(body).toContain(`href="/tickets/${dependentTicket.id}"`);
+    it("blockerTicket's detail shows the real dependent under blocks →", async () => {
+      const { body } = await getTicketDetail(blockerTicket.id);
+      const ids = body.relationships.blocks.map((r) => r.ref.id);
+      expect(ids).toContain(dependentTicket.id);
     });
 
-    it("dependentTicket's page shows the real blocker under ← Blocked by, AND names it in the blocked-overlay reason", async () => {
-      const res = await get(`/tickets/${dependentTicket.id}`);
-      const body = await res.text();
-      expect(body).toContain("Blocked by");
-      expect(body).toContain(`href="/tickets/${blockerTicket.id}"`);
-      expect(body).toContain(blockerTicket.name);
-      // The reason line, not just the edge — see ticket-detail.ts's
-      // renderOverlayReasons.
-      expect(body).toContain("blocked by");
+    it("dependentTicket's detail shows the real blocker under ← blocked-by, AND names it in the blocked-overlay reason", async () => {
+      const { body } = await getTicketDetail(dependentTicket.id);
+      const ids = body.relationships.blocked_by.map((r) => r.ref.id);
+      expect(ids).toContain(blockerTicket.id);
+      // The overlay reason (overlay.blocked_by), not just the structural edge.
+      expect(body.ticket.overlay.blocked).toBe(true);
+      expect(body.ticket.overlay.blocked_by.map((b) => b.name)).toContain(blockerTicket.name);
     });
   });
 
   describe("ticket detail: relates-to (both directions, set via a scripted slop edit)", () => {
-    it("mainTicket's page shows relatesTarget under Relates to", async () => {
-      const res = await get(`/tickets/${mainTicket.id}`);
-      const body = await res.text();
-      expect(body).toContain("Relates to");
-      expect(body).toContain(`href="/tickets/${relatesTarget.id}"`);
-      expect(body).toContain(relatesTarget.name);
+    it("mainTicket's detail shows relatesTarget under relates_to", async () => {
+      const { body } = await getTicketDetail(mainTicket.id);
+      const ids = body.relationships.relates_to.map((r) => r.ref.id);
+      expect(ids).toContain(relatesTarget.id);
     });
 
-    it("relatesTarget's page shows mainTicket under Relates to (the derived reverse)", async () => {
-      const res = await get(`/tickets/${relatesTarget.id}`);
-      const body = await res.text();
-      expect(body).toContain("Relates to");
-      expect(body).toContain(`href="/tickets/${mainTicket.id}"`);
-      expect(body).toContain(mainTicket.name);
+    it("relatesTarget's detail shows mainTicket under relates_to (the derived reverse)", async () => {
+      const { body } = await getTicketDetail(relatesTarget.id);
+      const ids = body.relationships.relates_to.map((r) => r.ref.id);
+      expect(ids).toContain(mainTicket.id);
     });
   });
 
   describe("ticket detail: discovered-from / discovered-here (both directions)", () => {
-    it("discoveredTicket's page shows mainTicket under Discovered from →", async () => {
-      const res = await get(`/tickets/${discoveredTicket.id}`);
-      const body = await res.text();
-      expect(body).toContain("Discovered from");
-      expect(body).toContain(`href="/tickets/${mainTicket.id}"`);
+    it("discoveredTicket's detail shows mainTicket under discovered_from →", async () => {
+      const { body } = await getTicketDetail(discoveredTicket.id);
+      const ids = body.relationships.discovered_from.map((r) => r.ref.id);
+      expect(ids).toContain(mainTicket.id);
     });
 
-    it("mainTicket's page shows discoveredTicket under ← Discovered here", async () => {
-      const res = await get(`/tickets/${mainTicket.id}`);
-      const body = await res.text();
-      expect(body).toContain("Discovered here");
-      expect(body).toContain(`href="/tickets/${discoveredTicket.id}"`);
-      expect(body).toContain(discoveredTicket.name);
+    it("mainTicket's detail shows discoveredTicket under ← discovered_here", async () => {
+      const { body } = await getTicketDetail(mainTicket.id);
+      const ids = body.relationships.discovered_here.map((r) => r.ref.id);
+      expect(ids).toContain(discoveredTicket.id);
     });
   });
 
-  describe("ticket detail: the stale (in_progress) overlay reason + Active session deep link", () => {
-    it("shows the Stale badge, the reason text, and links Active session to the real session's own card", async () => {
-      const res = await get(`/tickets/${staleTicket.id}`);
-      expect(res.status).toBe(200);
-      const body = await res.text();
-      expect(body).toContain('class="badge stale"');
-      expect(body).toContain("no activity since");
-      expect(body).toContain("threshold 60m");
-      expect(body).toContain(`href="#session-${staleSessionId}"`);
-      expect(body).toContain(`id="session-${staleSessionId}"`);
+  describe("ticket detail: the stale (in_progress) overlay reason + active-session data", () => {
+    it("shows the stale overlay, the reason, and flags the real session as active", async () => {
+      const { status, body } = await getTicketDetail(staleTicket.id);
+      expect(status).toBe(200);
+      expect(body.ticket.overlay.stale).toBe(true);
+      expect(body.ticket.overlay.stale_reason?.state).toBe("in_progress");
+      expect(body.ticket.overlay.stale_reason?.threshold).toBe("60m");
+      const session = body.sessions.find((s) => s.id === staleSessionId);
+      expect(session?.is_active).toBe(true);
     });
   });
 
-  describe("ticket detail: the review-stale overlay reason + Review section with its real MR", () => {
-    it("shows the Stale badge, the review-anchored reason text, and the real MR link", async () => {
-      const res = await get(`/tickets/${reviewTicket.id}`);
-      expect(res.status).toBe(200);
-      const body = await res.text();
-      expect(body).toContain('class="badge stale"');
-      expect(body).toContain("awaiting review since");
-      expect(body).toContain("threshold 24h");
-      expect(body).toContain(`href="${REVIEW_TICKET_MR_URL}"`);
+  describe("ticket detail: the review-stale overlay reason + review section with its real MR", () => {
+    it("shows the stale overlay, the review-anchored reason, and the real MR link", async () => {
+      const { status, body } = await getTicketDetail(reviewTicket.id);
+      expect(status).toBe(200);
+      expect(body.ticket.overlay.stale).toBe(true);
+      expect(body.ticket.overlay.stale_reason?.state).toBe("review");
+      expect(body.ticket.overlay.stale_reason?.threshold).toBe("24h");
+      expect(body.ticket.review?.mr?.url).toBe(REVIEW_TICKET_MR_URL);
+      expect(body.ticket.review?.mr?.safe_url).toBe(REVIEW_TICKET_MR_URL);
     });
 
-    it("also shows up on the /review and /stale panels", async () => {
-      const reviewPanel = await (await get("/review")).text();
-      expect(reviewPanel).toContain(reviewTicket.name);
-      expect(reviewPanel).toContain(REVIEW_TICKET_MR_URL);
+    it("also shows up on /api/review and /api/stale", async () => {
+      const reviewPanel = (await (await get("/api/review")).json()) as {
+        tickets: Array<{ name: string; review: { mr: { url: string } | null } | null }>;
+      };
+      const row = reviewPanel.tickets.find((t) => t.name === reviewTicket.name);
+      expect(row?.review?.mr?.url).toBe(REVIEW_TICKET_MR_URL);
 
-      const stalePanel = await (await get("/stale")).text();
-      expect(stalePanel).toContain(reviewTicket.name);
-      expect(stalePanel).toContain(staleTicket.name);
+      const stalePanel = (await (await get("/api/stale")).json()) as {
+        rows: Array<{ ticket: { name: string } }>;
+      };
+      const names = stalePanel.rows.map((r) => r.ticket.name);
+      expect(names).toContain(reviewTicket.name);
+      expect(names).toContain(staleTicket.name);
     });
   });
 
-  describe("ticket detail: resolution (--outcome), rendered as markdown with XSS neutralised", () => {
+  describe("ticket detail: resolution (--outcome), rendered as sanitized markdown HTML", () => {
     it("renders the real markdown, keeps the safe link live, and neutralises both the javascript: link and the data: image", async () => {
-      const res = await get(`/tickets/${mainTicket.id}`);
-      const body = await res.text();
+      const { body } = await getTicketDetail(mainTicket.id);
+      const html = body.resolution_html ?? "";
 
-      expect(body).toContain("<h2>Resolution</h2>");
-      expect(body).toContain("<h2>Root cause</h2>");
-      expect(body).toContain("<strong>before</strong>");
-      expect(body).toContain("<li>verified from source</li>");
+      expect(html).toContain("<h2>Root cause</h2>");
+      expect(html).toContain("<strong>before</strong>");
+      expect(html).toContain("<li>verified from source</li>");
 
       // Safe link survives as a live href.
-      expect(body).toContain('href="https://example.com/resolution/9"');
+      expect(html).toContain('href="https://example.com/resolution/9"');
 
       // javascript: link neutralised — no live href, inert text still shows.
-      expect(body).not.toMatch(/href="javascript:/i);
-      expect(body).toContain("bad link");
+      expect(html).not.toMatch(/href="javascript:/i);
+      expect(html).toContain("bad link");
 
       // data: image neutralised — no live src.
-      expect(body).not.toMatch(/src="data:/i);
+      expect(html).not.toMatch(/src="data:/i);
 
       // Raw HTML neutralised (escaped, not a live tag).
-      expect(body).not.toContain('<img src=x onerror="alert(1)">plain text survives');
-      expect(body).toContain("plain text survives");
+      expect(html).not.toContain('<img src=x onerror="alert(1)">plain text survives');
+      expect(html).toContain("plain text survives");
     });
   });
 
-  describe("ticket detail: a lock-free progress note, escaped in the updates timeline", () => {
-    it("shows the progress note inline, HTML-escaped rather than live", async () => {
-      const res = await get(`/tickets/${mainTicket.id}`);
-      const body = await res.text();
-      expect(body).toContain("progress note:");
-      expect(body).not.toContain('<img src=x onerror="alert(1)">progress-note-xss-marker');
-      expect(body).toContain("progress-note-xss-marker");
-      expect(body).toContain(PROGRESS_NOTE); // the earlier, benign note is still present too
+  describe("ticket detail: a lock-free progress note carried through verbatim", () => {
+    it("returns the attacker-shaped note as inert string data, not interpreted in any way", async () => {
+      const { body } = await getTicketDetail(mainTicket.id);
+      const notes = body.events.map((e) => e.progress_note).filter((n): n is string => n !== null);
+      // Exact round-trip — never stripped, never rendered as live HTML server-side
+      // (there IS no server-side HTML rendering left to inject into; the SPA renders
+      // this through a plain React text child, which HTML-escapes by construction).
+      expect(notes).toContain(XSS_PROGRESS_NOTE);
+      expect(notes).toContain(PROGRESS_NOTE); // the earlier, benign note is still present too
     });
   });
 
-  describe("ticket detail: an attacker-shaped actor name (provenance.created_by), escaped", () => {
-    it("escapes the real SLOP_ACTOR-resolved name in the Provenance row", async () => {
-      const res = await get(`/tickets/${discoveredTicket.id}`);
-      const body = await res.text();
-      expect(body).toContain("Provenance");
-      expect(body).not.toContain('<img src=x onerror="alert(1)">xss-actor');
-      expect(body).toContain("xss-actor");
+  describe("ticket detail: an attacker-shaped actor name (provenance.created_by) carried through verbatim", () => {
+    it("returns the real SLOP_ACTOR-resolved name unmodified", async () => {
+      const { body } = await getTicketDetail(discoveredTicket.id);
+      expect(body.provenance.created_by.name).toBe(XSS_ACTOR_NAME);
     });
   });
 
   describe("read-only contract", () => {
-    it("POST to a real ticket detail route returns 405, not a mutation", async () => {
-      const res = await get(`/tickets/${mainTicket.id}`, { method: "POST" });
+    it("POST to a real ticket detail API route returns 405, not a mutation", async () => {
+      const res = await get(`/api/tickets/${mainTicket.id}`, { method: "POST" });
       expect(res.status).toBe(405);
     });
 
-    it("POST to /tickets (the list route) returns 405", async () => {
-      const res = await get("/tickets", { method: "POST" });
+    it("POST to /api/tickets (the list route) returns 405", async () => {
+      const res = await get("/api/tickets", { method: "POST" });
       expect(res.status).toBe(405);
     });
   });

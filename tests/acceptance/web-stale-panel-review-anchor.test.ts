@@ -152,14 +152,17 @@ describe("web: stale panel anchors review rows on review.requested_at, not last_
     expect(lastActivityAt > requestedAt).toBe(true);
 
     server = await startWebServer(root);
-    const res = await fetch(new URL("/stale", server.baseUrl));
+    const res = await fetch(new URL("/api/stale", server.baseUrl));
     expect(res.status).toBe(200);
-    const body = await res.text();
+    const body = (await res.json()) as {
+      rows: Array<{ ticket: { name: string }; since: string }>;
+    };
 
-    expect(body).toContain("Ticket with a rotting review");
-    // The idle-duration cell must be anchored on review.requested_at...
-    expect(body).toContain(`title="${requestedAt}"`);
-    // ...never on the later, unrelated last_activity_at.
-    expect(body).not.toContain(`title="${lastActivityAt}"`);
+    const row = body.rows.find((r) => r.ticket.name === "Ticket with a rotting review");
+    expect(row, "expected the rotting-review ticket on /api/stale").toBeDefined();
+    // The idle-duration anchor must be review.requested_at...
+    expect(row?.since).toBe(requestedAt);
+    // ...never the later, unrelated last_activity_at.
+    expect(row?.since).not.toBe(lastActivityAt);
   });
 });

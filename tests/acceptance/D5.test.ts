@@ -13,6 +13,15 @@ import {
   sessionSchema,
   ticketSchema,
 } from "../../src/core/index.js";
+import type {
+  ReviewResponseDTO,
+  StaleResponseDTO,
+  TicketDetailDTO,
+  TicketListResponseDTO,
+  TranscriptResponseDTO,
+  TreeNodeDTO,
+  TreeResponseDTO,
+} from "../../src/web/api/types.js";
 import { FIXTURE_NOW_ISO } from "../fixtures/web-db-meta.js";
 
 // D5: `slop web`
@@ -20,6 +29,17 @@ import { FIXTURE_NOW_ISO } from "../fixtures/web-db-meta.js";
 // Acceptance criterion, verbatim from v0-implementation-plan.md §3:
 //   "All §4.4 views against a seeded fixture db; transcript JSONL renders
 //   readably"
+//
+// rewrite-slop-web-as-a replaced the server-rendered HTML this file used to
+// assert on with a read-only JSON API (src/web/api/*) consumed by a React
+// SPA — every assertion below now drives `/api/*` and inspects parsed JSON
+// instead of scraping HTML strings. The "renders readably"/"collapsed by
+// default"/etc. DOM presentation concerns are now the SPA's job
+// (src/web/frontend/), which these black-box HTTP tests structurally
+// cannot exercise (there's no DOM here) — what these tests instead prove is
+// that the API hands the SPA everything it needs to render that, correctly
+// classified and pre-sanitized (markdown -> HTML, XSS-unsafe URLs
+// neutralised) server-side, exactly as before.
 //
 // This file starts the real server (from source, and separately from the
 // compiled binary) against the committed fixture db at
@@ -171,6 +191,11 @@ async function get(path: string, init?: RequestInit): Promise<Response> {
   return fetch(new URL(path, server.baseUrl), init);
 }
 
+async function getJson<T>(path: string): Promise<{ status: number; body: T }> {
+  const res = await get(path);
+  return { status: res.status, body: (await res.json()) as T };
+}
+
 beforeAll(async () => {
   server = await spawnAndWaitForUrl("bun", [cliEntry, "web", "--port", "0"], fixtureParentDir, {
     ...process.env,
@@ -218,153 +243,167 @@ describe("D5: slop web", () => {
   });
 
   // -------------------------------------------------------------------------
-  // §4.4 item 1: ticket list with filters.
+  // §4.4 item 1: ticket list with filters — GET /api/tickets.
   // -------------------------------------------------------------------------
   describe("1. Ticket list with filters", () => {
     it("lists every ticket with state/priority/name/slug/labels/owner/last-activity", async () => {
-      const res = await get("/tickets");
-      expect(res.status).toBe(200);
-      const body = await res.text();
-      expect(body).toContain(`${fixtureTickets.length} of ${fixtureTickets.length} ticket`);
+      const { status, body } = await getJson<TicketListResponseDTO>("/api/tickets");
+      expect(status).toBe(200);
+      expect(body.total).toBe(fixtureTickets.length);
+      const names = body.tickets.map((t) => t.name);
+      const slugs = body.tickets.map((t) => t.slug);
       for (const t of fixtureTickets) {
-        expect(body, `expected /tickets to list "${t.name}"`).toContain(t.name);
-        expect(body).toContain(t.slug);
+        expect(names, `expected /api/tickets to list "${t.name}"`).toContain(t.name);
+        expect(slugs).toContain(t.slug);
       }
+      // Every row carries what a human scanning work needs (design.md §4.4 item 1).
+      const first = body.tickets[0];
+      expect(first).toMatchObject({
+        state: expect.any(String),
+        priority: expect.any(Number),
+        name: expect.any(String),
+        slug: expect.any(String),
+        labels: expect.any(Array),
+      });
     });
 
     it("state filter really filters", async () => {
-      const res = await get("/tickets?state=done");
-      const body = await res.text();
+      const { body } = await getJson<TicketListResponseDTO>("/api/tickets?state=done");
+      const names = body.tickets.map((t) => t.name);
       const doneTickets = fixtureTickets.filter((t) => t.state === "done");
       const nonDoneTickets = fixtureTickets.filter((t) => t.state !== "done");
       expect(doneTickets.length).toBeGreaterThan(0);
-      for (const t of doneTickets) expect(body).toContain(t.name);
-      for (const t of nonDoneTickets) expect(body).not.toContain(t.name);
+      for (const t of doneTickets) expect(names).toContain(t.name);
+      for (const t of nonDoneTickets) expect(names).not.toContain(t.name);
     });
 
     it("label filter really filters", async () => {
-      const res = await get("/tickets?label=billing");
-      const body = await res.text();
+      const { body } = await getJson<TicketListResponseDTO>("/api/tickets?label=billing");
+      const names = body.tickets.map((t) => t.name);
       const billing = fixtureTickets.filter((t) => t.labels.includes("billing"));
       const nonBilling = fixtureTickets.filter((t) => !t.labels.includes("billing"));
       expect(billing.length).toBeGreaterThan(0);
-      for (const t of billing) expect(body).toContain(t.name);
-      for (const t of nonBilling) expect(body).not.toContain(t.name);
+      for (const t of billing) expect(names).toContain(t.name);
+      for (const t of nonBilling) expect(names).not.toContain(t.name);
     });
 
     it("priority filter really filters", async () => {
-      const res = await get("/tickets?priority=0");
-      const body = await res.text();
+      const { body } = await getJson<TicketListResponseDTO>("/api/tickets?priority=0");
+      const names = body.tickets.map((t) => t.name);
       const urgent = fixtureTickets.filter((t) => t.priority === 0);
       const nonUrgent = fixtureTickets.filter((t) => t.priority !== 0);
       expect(urgent.length).toBeGreaterThan(0);
-      for (const t of urgent) expect(body).toContain(t.name);
-      for (const t of nonUrgent) expect(body).not.toContain(t.name);
+      for (const t of urgent) expect(names).toContain(t.name);
+      for (const t of nonUrgent) expect(names).not.toContain(t.name);
     });
 
     it("owner filter really filters (including the unowned case)", async () => {
-      const res = await get("/tickets?owner=ryan");
-      const body = await res.text();
+      const { body } = await getJson<TicketListResponseDTO>("/api/tickets?owner=ryan");
+      const names = body.tickets.map((t) => t.name);
       const owned = fixtureTickets.filter((t) => t.owner?.name === "ryan");
       const unowned = fixtureTickets.filter((t) => t.owner === null);
       expect(owned.length).toBeGreaterThan(0);
       expect(unowned.length).toBeGreaterThan(0);
-      for (const t of owned) expect(body).toContain(t.name);
-      for (const t of unowned) expect(body).not.toContain(t.name);
+      for (const t of owned) expect(names).toContain(t.name);
+      for (const t of unowned) expect(names).not.toContain(t.name);
     });
 
     it("text filter really filters", async () => {
-      const res = await get("/tickets?q=billing");
-      const body = await res.text();
-      expect(body).toContain("Migrate billing to new provider");
-      expect(body).not.toContain("Fix flaky CI on windows runners");
+      const { body } = await getJson<TicketListResponseDTO>("/api/tickets?q=billing");
+      const names = body.tickets.map((t) => t.name);
+      expect(names).toContain("Migrate billing to new provider");
+      expect(names).not.toContain("Fix flaky CI on windows runners");
     });
 
     it("filters compose (state AND label)", async () => {
-      const res = await get("/tickets?state=dropped&label=research");
-      const body = await res.text();
-      expect(body).toContain("Prototype vector search for ticket search");
-      expect(body).not.toContain("Old idea: Slack integration"); // dropped, but not labelled research
+      const { body } = await getJson<TicketListResponseDTO>(
+        "/api/tickets?state=dropped&label=research",
+      );
+      const names = body.tickets.map((t) => t.name);
+      expect(names).toContain("Prototype vector search for ticket search");
+      expect(names).not.toContain("Old idea: Slack integration"); // dropped, but not labelled research
+    });
+
+    it("exposes label/owner facets for building filter controls", async () => {
+      const { body } = await getJson<TicketListResponseDTO>("/api/tickets");
+      expect(body.facets.labels).toContain("billing");
+      expect(body.facets.owners).toContain("ryan");
+      expect(body.facets.states).toContain("done");
     });
   });
 
   // -------------------------------------------------------------------------
-  // §4.4 item 2: tree view.
+  // §4.4 item 2: tree view — GET /api/tree.
   // -------------------------------------------------------------------------
   describe("2. Tree view", () => {
-    it("shows the multi-level local hierarchy in nested order", async () => {
-      const res = await get("/tree");
-      expect(res.status).toBe(200);
-      const body = await res.text();
-
-      const root = "Add authentication provider";
-      const child = "Implement OAuth provider";
-      const grandchild = "Add OAuth provider unit tests";
-      for (const name of [root, child, grandchild]) {
-        expect(body, `expected /tree to contain "${name}"`).toContain(name);
+    function findNode(nodes: TreeNodeDTO[], name: string): TreeNodeDTO | undefined {
+      for (const node of nodes) {
+        if (node.ticket.name === name) return node;
+        const found = findNode(node.children, name);
+        if (found) return found;
       }
-      // Structural nesting: root appears before its child, which appears
-      // before its own child (D1: parent/child hierarchy, 3 levels deep).
-      const rootIndex = body.indexOf(root);
-      const childIndex = body.indexOf(child);
-      const grandchildIndex = body.indexOf(grandchild);
-      expect(rootIndex).toBeGreaterThanOrEqual(0);
-      expect(childIndex).toBeGreaterThan(rootIndex);
-      expect(grandchildIndex).toBeGreaterThan(childIndex);
-      // At least two levels of <ul class="tree"> nesting (root's children, and their children).
-      expect(body.match(/<ul class="tree">/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+      return undefined;
+    }
+
+    it("shows the multi-level local hierarchy in nested order", async () => {
+      const { status, body } = await getJson<TreeResponseDTO>("/api/tree");
+      expect(status).toBe(200);
+
+      const root = findNode(body.roots, "Add authentication provider");
+      expect(root, "root ticket missing from /api/tree").toBeDefined();
+      const child = root?.children.find((c) => c.ticket.name === "Implement OAuth provider");
+      expect(child, "child ticket not nested under its parent").toBeDefined();
+      const grandchild = child?.children.find(
+        (c) => c.ticket.name === "Add OAuth provider unit tests",
+      );
+      expect(grandchild, "grandchild ticket not nested three levels deep").toBeDefined();
     });
 
     it("renders an external jira: parent as a badge linking to the URL built from remotes.jira, not as a traversable node", async () => {
-      const res = await get("/tree");
-      const body = await res.text();
-      expect(body).toContain("jira:PROJ-123");
+      const { body } = await getJson<TreeResponseDTO>("/api/tree");
+      // The ticket with the external parent is itself a *local root* (D1) — it must be a top-level tree node, not nested under anything.
+      const node = body.roots.find((r) => r.ticket.name === "Migrate billing to new provider");
+      expect(node, "ticket with an external jira: parent must be a local root").toBeDefined();
+      expect(node?.external_parent?.ref).toBe("jira:PROJ-123");
       // remotes.jira in the fixture config is https://fixtureorg.atlassian.net (§3: "<system>:<key>" -> "<remotes.jira>/browse/<key>").
-      expect(body).toContain(
-        '<a class="badge external-parent jira" href="https://fixtureorg.atlassian.net/browse/PROJ-123"',
+      expect(node?.external_parent?.safe_url).toBe(
+        "https://fixtureorg.atlassian.net/browse/PROJ-123",
       );
-      // The ticket with the external parent is itself a *local root* (D1) — it must be listed as a top-level tree node, not nested under anything.
-      expect(body).toContain("Migrate billing to new provider");
       // ...and it still has its own local child nested beneath it.
-      const parentIndex = body.indexOf("Migrate billing to new provider");
-      const childIndex = body.indexOf("Write billing migration runbook");
-      expect(childIndex).toBeGreaterThan(parentIndex);
+      expect(node?.children.some((c) => c.ticket.name === "Write billing migration runbook")).toBe(
+        true,
+      );
     });
   });
 
   // -------------------------------------------------------------------------
-  // §4.4 item 3: ticket detail.
+  // §4.4 item 3: ticket detail — GET /api/tickets/:ref.
   // -------------------------------------------------------------------------
   describe("3. Ticket detail", () => {
-    it("renders spec: summary, details_md as markdown, acceptance[], context[], meta", async () => {
+    it("renders spec: summary, details_md as sanitized markdown HTML, acceptance[], context[], meta", async () => {
       const root = ticketBySlug("add-authentication-provider");
-      const res = await get(`/tickets/${root.id}`);
-      expect(res.status).toBe(200);
-      const body = await res.text();
+      const { status, body } = await getJson<TicketDetailDTO>(`/api/tickets/${root.id}`);
+      expect(status).toBe(200);
 
-      // spec.summary is plain escaped text (not markdown) — the fixture's summary contains an
-      // apostrophe, which the page correctly HTML-escapes, so match on an apostrophe-free slice.
-      expect(body).toContain("Support pluggable auth providers so self-hosters");
-      // details_md contains "## Why" and a bullet list — markdown-rendered, not raw.
-      expect(body).toContain("<h2>Why</h2>");
-      expect(body).not.toContain("## Why");
-      expect(body).toContain("<li>Keep the built-in provider as the default</li>");
-      // acceptance[]
-      for (const item of root.spec.acceptance) expect(body).toContain(item);
-      // context[]
-      for (const item of root.spec.context) expect(body).toContain(item);
-      // meta
-      expect(body).toContain("estimated_days");
-      expect(body).toContain("epic");
+      expect(body.spec.summary).toContain("Support pluggable auth providers so self-hosters");
+      // details_md is markdown-rendered server-side into details_html, never left as raw markdown.
+      expect(body.spec.details_html).toContain("<h2>Why</h2>");
+      expect(body.spec.details_html).not.toContain("## Why");
+      expect(body.spec.details_html).toContain(
+        "<li>Keep the built-in provider as the default</li>",
+      );
+      for (const item of root.spec.acceptance) expect(body.spec.acceptance).toContain(item);
+      for (const item of root.spec.context) expect(body.spec.context).toContain(item);
+      expect(Object.keys(body.spec.meta)).toContain("estimated_days");
+      expect(Object.keys(body.spec.meta)).toContain("epic");
     });
 
     it("renders the updates timeline with more than one event", async () => {
       const root = ticketBySlug("add-authentication-provider");
-      const res = await get(`/tickets/${root.id}`);
-      const body = await res.text();
-      expect(body).toContain("Updates timeline");
-      expect(body).toContain("created");
-      // At least two distinct timestamps show up in the timeline for this ticket.
+      const { body } = await getJson<TicketDetailDTO>(`/api/tickets/${root.id}`);
+      const createdEvent = body.events.find((e) => e.verb === "ticket.created");
+      expect(createdEvent, "no ticket.created event in the timeline").toBeDefined();
+      expect(createdEvent?.label).toBe("created");
       const events = fixtureEvents.filter(
         (e) => e.entity.kind === "ticket" && e.entity.id === root.id,
       );
@@ -373,218 +412,236 @@ describe("D5: slop web", () => {
 
     it("renders sessions with actor/harness/git/plan-versions/checked-steps and a transcript link", async () => {
       const implementOauth = ticketBySlug("implement-oauth-provider");
-      const res = await get(`/tickets/${implementOauth.id}`);
-      expect(res.status).toBe(200);
-      const body = await res.text();
+      const { status, body } = await getJson<TicketDetailDTO>(`/api/tickets/${implementOauth.id}`);
+      expect(status).toBe(200);
 
-      expect(body).toContain("claude-agent-1");
-      expect(body).toContain("claude-code");
-      expect(body).toContain("feature/oauth-provider");
-      expect(body).toContain("a1b2c3d4");
-      // Multi-version plan, both versions rendered, with checked-step counts.
-      expect(body).toContain("Plan v1 (2/3 checked)");
-      expect(body).toContain("Plan v2 (3/5 checked)");
-      expect(body).toContain("Wire up openid-client");
-      // Link to the transcript viewer for this session.
-      const [session] = sessionsForTicket(implementOauth.id);
+      const [session] = body.sessions;
       expect(session).toBeDefined();
-      expect(body).toContain(`/tickets/${implementOauth.id}/sessions/${session?.id}/transcript`);
+      expect(session?.actor.name).toBe("claude-agent-1");
+      expect(session?.harness).toBe("claude-code");
+      expect(session?.git_branch).toBe("feature/oauth-provider");
+      expect(session?.git_commit_at_start).toBe("a1b2c3d4");
+      // Multi-version plan, both versions present, with checked-step counts.
+      const v1 = session?.plan.find((p) => p.version === 1);
+      const v2 = session?.plan.find((p) => p.version === 2);
+      expect(v1?.steps.filter((s) => s.checked).length).toBe(2);
+      expect(v1?.steps.length).toBe(3);
+      expect(v2?.steps.filter((s) => s.checked).length).toBe(3);
+      expect(v2?.steps.length).toBe(5);
+      expect(v2?.steps.some((s) => s.text.includes("Wire up openid-client"))).toBe(true);
+      // has_transcript flags a viewable transcript for this session (asserted end-to-end in section 4 below).
+      const [fixtureSession] = sessionsForTicket(implementOauth.id);
+      expect(fixtureSession).toBeDefined();
+      expect(session?.id).toBe(fixtureSession?.id);
+      expect(session?.has_transcript).toBe(true);
     });
 
     it("shows review info (MR link + review-staleness) for a ticket in review", async () => {
       const inReview = ticketBySlug("refactor-cli-error-reporting");
-      const res = await get(`/tickets/${inReview.id}`);
-      const body = await res.text();
-      expect(body).toContain("https://github.com/ryan/slopwork-fixture/pull/42");
-      expect(body).toContain("awaiting review for");
+      const { body } = await getJson<TicketDetailDTO>(`/api/tickets/${inReview.id}`);
+      expect(body.ticket.review?.mr?.url).toBe("https://github.com/ryan/slopwork-fixture/pull/42");
+      expect(body.ticket.review?.mr?.safe_url).toBe(
+        "https://github.com/ryan/slopwork-fixture/pull/42",
+      );
+      expect(typeof body.ticket.review?.awaiting_ms).toBe("number");
     });
 
     it("shows a blocked badge on a ticket with a live blocker", async () => {
       const blocked = ticketBySlug("add-oauth-provider-unit-tests");
-      const res = await get(`/tickets/${blocked.id}`);
-      const body = await res.text();
-      expect(body).toContain("Blocked");
+      const { body } = await getJson<TicketDetailDTO>(`/api/tickets/${blocked.id}`);
+      expect(body.ticket.overlay.blocked).toBe(true);
+      expect(body.ticket.overlay.blocked_by.length).toBeGreaterThan(0);
     });
 
     it("404s readably for an unknown ref", async () => {
-      const res = await get("/tickets/ticket_01DOESNOTEXIST0000000000");
+      const res = await get("/api/tickets/ticket_01DOESNOTEXIST0000000000");
       expect(res.status).toBe(404);
-      expect(await res.text()).toContain("Not found");
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toContain('No ticket matches "ticket_01DOESNOTEXIST0000000000"');
     });
   });
 
   // -------------------------------------------------------------------------
-  // §4.4 item 4: transcript viewer.
+  // §4.4 item 4: transcript viewer — GET /api/tickets/:ref/sessions/:sessionId/transcript.
   // -------------------------------------------------------------------------
   describe("4. Transcript viewer", () => {
     const implementOauth = () => ticketBySlug("implement-oauth-provider");
     const bigSession = () => sessionsForTicket(implementOauth().id)[0] as Session;
 
-    it("renders conversation turns readably: user text, assistant text, and the tool_use tool name", async () => {
+    it("classifies conversation turns readably: user text, assistant text, and the tool_use tool name", async () => {
       const ticket = implementOauth();
       const session = bigSession();
-      const res = await get(`/tickets/${ticket.id}/sessions/${session.id}/transcript`);
-      expect(res.status).toBe(200);
-      const body = await res.text();
-
-      expect(body).toContain(
-        "Let's implement the OAuth provider described in the ticket. Start by reading the provider interface.",
+      const { status, body } = await getJson<TranscriptResponseDTO>(
+        `/api/tickets/${ticket.id}/sessions/${session.id}/transcript`,
       );
-      expect(body).toContain("Working on wiring the authorize() flow");
-      expect(body).toContain("tool_use: Read");
-      expect(body).toContain('class="turn role-user"');
-      expect(body).toContain('class="turn role-assistant"');
+      expect(status).toBe(200);
+      expect(body.available).toBe(true);
+
+      // Apostrophe-free slice (matches the fixture's actual text; see markdown.ts —
+      // apostrophes aren't an HTML-escaped character, so this only avoids depending
+      // on exactly which literal/entity form the renderer happens to emit for it).
+      const rawText = JSON.stringify(body.records);
+      expect(rawText).toContain("implement the OAuth provider described in the ticket");
+      expect(rawText).toContain("Working on wiring the authorize() flow");
+      const toolUse = body.records
+        .flatMap((r) => (r.kind === "turn" ? r.blocks : []))
+        .find((b) => b.type === "tool_use");
+      expect(toolUse && toolUse.type === "tool_use" ? toolUse.name : null).toBe("Read");
+      expect(body.records.some((r) => r.kind === "turn" && r.role === "user")).toBe(true);
+      expect(body.records.some((r) => r.kind === "turn" && r.role === "assistant")).toBe(true);
     });
 
-    it("de-emphasises and collapses thinking blocks, and collapses tool_use/tool_result behind an expand affordance", async () => {
+    it("classifies thinking/tool_use/tool_result as distinct block types (collapsing them is the SPA's job, not the API's)", async () => {
       const ticket = implementOauth();
       const session = bigSession();
-      const res = await get(`/tickets/${ticket.id}/sessions/${session.id}/transcript`);
-      const body = await res.text();
-      expect(body).toContain('<details class="block-thinking">');
-      expect(body).toContain('<details class="block-tool_use">');
-      expect(body).toMatch(/<details class="block-tool_result/);
-      // Collapsed by default: no `open` attribute on these <details>.
-      expect(body).not.toMatch(/<details class="block-thinking" open>/);
-      expect(body).not.toMatch(/<details class="block-tool_use" open>/);
+      const { body } = await getJson<TranscriptResponseDTO>(
+        `/api/tickets/${ticket.id}/sessions/${session.id}/transcript`,
+      );
+      const blockTypes = new Set(
+        body.records.flatMap((r) => (r.kind === "turn" ? r.blocks.map((b) => b.type) : [])),
+      );
+      expect(blockTypes.has("thinking")).toBe(true);
+      expect(blockTypes.has("tool_use")).toBe(true);
+      expect(blockTypes.has("tool_result")).toBe(true);
     });
 
-    it("truncates a very long tool_result with a visible note, rather than dumping it whole", async () => {
+    it("truncates a very long tool_result and says so, rather than shipping it whole", async () => {
       const ticket = implementOauth();
       const session = bigSession();
-      const res = await get(`/tickets/${ticket.id}/sessions/${session.id}/transcript`);
-      const body = await res.text();
-      expect(body).toMatch(/Truncated: showing the first [\d,]+ of [\d,]+ characters\./);
+      const { body } = await getJson<TranscriptResponseDTO>(
+        `/api/tickets/${ticket.id}/sessions/${session.id}/transcript`,
+      );
+      const truncated = body.records
+        .flatMap((r) => (r.kind === "turn" ? r.blocks : []))
+        .find((b) => (b.type === "tool_result" || b.type === "tool_use") && b.truncated);
+      expect(truncated, "expected at least one truncated tool block on this fixture").toBeDefined();
+      if (truncated && (truncated.type === "tool_result" || truncated.type === "tool_use")) {
+        expect(truncated.total_chars).toBeGreaterThan(20_000);
+      }
     });
 
-    it("does NOT dump raw JSONL — no raw record fields ever appear in the HTML", async () => {
+    it("does NOT leak raw JSONL record fields — every record is transformed before it reaches the response", async () => {
       const ticket = implementOauth();
       const session = bigSession();
-      const res = await get(`/tickets/${ticket.id}/sessions/${session.id}/transcript`);
-      const body = await res.text();
-      for (const rawMarker of [
-        '"parentUuid"',
-        '"isSidechain"',
-        '"userType"',
-        '{"type":"assistant"',
-        '{"type":"user"',
-      ]) {
-        expect(body, `transcript view leaked raw JSONL marker ${rawMarker}`).not.toContain(
+      const res = await get(`/api/tickets/${ticket.id}/sessions/${session.id}/transcript`);
+      const rawBody = await res.text();
+      for (const rawMarker of ['"parentUuid"', '"isSidechain"', '"userType"', '"uuid"']) {
+        expect(rawBody, `transcript API leaked raw JSONL marker ${rawMarker}`).not.toContain(
           rawMarker,
         );
       }
     });
 
-    it("skips non-conversational record types by default, and paginates rather than rendering everything at once", async () => {
+    it("paginates rather than returning everything at once, and hides non-conversational records by default", async () => {
       const ticket = implementOauth();
       const session = bigSession();
-      const page1 = await (
-        await get(`/tickets/${ticket.id}/sessions/${session.id}/transcript`)
-      ).text();
-      // Hidden-by-default types never show up as their own turns.
-      expect(page1).not.toContain("— system");
-      // The transcript has more than the default page size (40) worth of conversational records — pagination must kick in.
-      expect(page1).toContain("records 1–40");
-      // web-transcript-pager-newer-older: records render oldest-first, so
-      // offset 0 has nowhere older to go (disabled) but a live link toward
-      // newer records.
-      expect(page1).toContain('<span class="disabled">← Older</span>');
-      expect(page1).toMatch(/<a href="[^"]*">Newer →<\/a>/);
+      const { body: page1 } = await getJson<TranscriptResponseDTO>(
+        `/api/tickets/${ticket.id}/sessions/${session.id}/transcript`,
+      );
+      expect(page1.records.every((r) => r.kind !== "system")).toBe(true);
+      expect(page1.offset).toBe(0);
+      expect(page1.limit).toBe(40);
+      expect(page1.records.length).toBe(40);
+      expect(page1.has_more).toBe(true);
 
-      const page2 = await (
-        await get(`/tickets/${ticket.id}/sessions/${session.id}/transcript?offset=40&limit=40`)
-      ).text();
-      // Off the start now — a live link back toward older records.
-      expect(page2).toMatch(/<a href="[^"]*">← Older<\/a>/);
-      // "(iteration 1)" is a unique marker for the very first loop message, which lands on page 1 — it must not reappear on page 2.
-      expect(page1).toContain("(iteration 1).");
-      expect(page2).not.toContain("(iteration 1).");
+      // "(iteration 1)." is a unique marker for the very first loop message, which lands on page 1 — it must not reappear on page 2.
+      expect(JSON.stringify(page1.records)).toContain("(iteration 1).");
+
+      const { body: page2 } = await getJson<TranscriptResponseDTO>(
+        `/api/tickets/${ticket.id}/sessions/${session.id}/transcript?offset=40&limit=40`,
+      );
+      expect(JSON.stringify(page2.records)).not.toContain("(iteration 1).");
     });
 
-    it("an out-of-range offset clamps onto the last real page instead of rendering a nonsense range", async () => {
+    it("an out-of-range offset clamps onto the last real page instead of returning a nonsense range", async () => {
       const ticket = implementOauth();
       const session = bigSession();
-      const res = await get(
-        `/tickets/${ticket.id}/sessions/${session.id}/transcript?offset=999999&limit=40`,
+      const { status, body } = await getJson<TranscriptResponseDTO>(
+        `/api/tickets/${ticket.id}/sessions/${session.id}/transcript?offset=999999&limit=40`,
       );
-      // fetch() follows the 302 redirect transparently — the final response is a normal 200 page.
-      expect(res.status).toBe(200);
-      const body = await res.text();
-      expect(body).toMatch(/records \d+–\d+/);
-      expect(body).not.toContain("records 1000000–999999");
-      expect(body).not.toContain("No conversation records in this range.");
+      expect(status).toBe(200);
+      expect(body.offset).toBeLessThan(999999);
+      expect(body.records.length).toBeGreaterThan(0);
     });
 
     it("shows system records only when explicitly toggled on", async () => {
       const ticket = implementOauth();
       const session = bigSession();
-      const body = await (
-        await get(`/tickets/${ticket.id}/sessions/${session.id}/transcript?all=1`)
-      ).text();
-      expect(body).toContain("system-divider");
-      expect(body).toContain("compact_boundary");
+      const { body } = await getJson<TranscriptResponseDTO>(
+        `/api/tickets/${ticket.id}/sessions/${session.id}/transcript?all=1`,
+      );
+      expect(body.include_system).toBe(true);
+      const systemRecord = body.records.find((r) => r.kind === "system");
+      expect(systemRecord, "expected at least one system record with all=1").toBeDefined();
+      expect(systemRecord?.kind === "system" ? systemRecord.summary : "").toContain(
+        "compact_boundary",
+      );
     });
 
     it("degrades readably when no transcript was captured for a session (D16/S2: expected, not an error)", async () => {
       const migrateBilling = ticketBySlug("migrate-billing-to-new-provider");
       const [session] = sessionsForTicket(migrateBilling.id);
       expect(session?.transcript_ref).toBeNull();
-      const res = await get(`/tickets/${migrateBilling.id}/sessions/${session?.id}/transcript`);
-      expect(res.status).toBe(200);
-      expect(await res.text()).toContain("No transcript was captured");
+      const { status, body } = await getJson<TranscriptResponseDTO>(
+        `/api/tickets/${migrateBilling.id}/sessions/${session?.id}/transcript`,
+      );
+      expect(status).toBe(200);
+      expect(body.available).toBe(false);
+      expect(body.records).toEqual([]);
     });
   });
 
   // -------------------------------------------------------------------------
-  // §4.4 item 5: review panel.
+  // §4.4 item 5: review panel — GET /api/review.
   // -------------------------------------------------------------------------
   describe("5. Review panel", () => {
     it("lists tickets in review with their MR links and marks the stale one, not the fresh one", async () => {
-      const res = await get("/review");
-      expect(res.status).toBe(200);
-      const body = await res.text();
+      const { status, body } = await getJson<ReviewResponseDTO>("/api/review");
+      expect(status).toBe(200);
 
-      expect(body).toContain("Refactor CLI error reporting");
-      expect(body).toContain("https://github.com/ryan/slopwork-fixture/pull/42");
-      expect(body).toContain("Add dark mode to slop web");
-      expect(body).toContain("https://github.com/ryan/slopwork-fixture/pull/37");
+      const names = body.tickets.map((t) => t.name);
+      expect(names).toContain("Refactor CLI error reporting");
+      expect(names).toContain("Add dark mode to slop web");
+      const mrUrls = body.tickets.map((t) => t.review?.mr?.url);
+      expect(mrUrls).toContain("https://github.com/ryan/slopwork-fixture/pull/42");
+      expect(mrUrls).toContain("https://github.com/ryan/slopwork-fixture/pull/37");
 
       // Exactly one of the two review tickets is stale (requested 3 days
       // ago vs. review_stale_after: 24h) — the other was requested 10
       // minutes ago and must NOT be marked stale.
-      const staleBadgeCount = (body.match(/class="badge stale"/g) ?? []).length;
-      expect(staleBadgeCount).toBe(1);
+      const staleCount = body.tickets.filter((t) => t.overlay.stale).length;
+      expect(staleCount).toBe(1);
     });
 
     it("excludes tickets that are not in review", async () => {
-      const res = await get("/review");
-      const body = await res.text();
-      expect(body).not.toContain("Implement OAuth provider");
-      expect(body).not.toContain("Fix flaky CI on windows runners");
+      const { body } = await getJson<ReviewResponseDTO>("/api/review");
+      const names = body.tickets.map((t) => t.name);
+      expect(names).not.toContain("Implement OAuth provider");
+      expect(names).not.toContain("Fix flaky CI on windows runners");
     });
   });
 
   // -------------------------------------------------------------------------
-  // §4.4 item 6: stale / resumable panel.
+  // §4.4 item 6: stale / resumable panel — GET /api/stale.
   // -------------------------------------------------------------------------
   describe("6. Stale / resumable panel", () => {
     it("lists stale in-progress and stale review tickets, and excludes fresh ones", async () => {
-      const res = await get("/stale");
-      expect(res.status).toBe(200);
-      const body = await res.text();
+      const { status, body } = await getJson<StaleResponseDTO>("/api/stale");
+      expect(status).toBe(200);
+      const names = body.rows.map((r) => r.ticket.name);
 
       // Stale (per config: stale_after 60m / review_stale_after 24h, against the pinned fixture clock):
-      expect(body).toContain("Migrate billing to new provider"); // in_progress, 5h idle
-      expect(body).toContain("Rewrite index builder for incremental updates"); // in_progress, 2d idle
-      expect(body).toContain("Add dark mode to slop web"); // review, 3d idle
+      expect(names).toContain("Migrate billing to new provider"); // in_progress, 5h idle
+      expect(names).toContain("Rewrite index builder for incremental updates"); // in_progress, 2d idle
+      expect(names).toContain("Add dark mode to slop web"); // review, 3d idle
 
       // Fresh — must be excluded:
-      expect(body).not.toContain("Implement OAuth provider"); // in_progress, 5m idle
-      expect(body).not.toContain("Refactor CLI error reporting"); // review, 10m idle
+      expect(names).not.toContain("Implement OAuth provider"); // in_progress, 5m idle
+      expect(names).not.toContain("Refactor CLI error reporting"); // review, 10m idle
 
       // Never-stale states, regardless of age:
-      expect(body).not.toContain("Old idea: Slack integration"); // dropped
-      expect(body).not.toContain("Add authentication provider"); // open
+      expect(names).not.toContain("Old idea: Slack integration"); // dropped
+      expect(names).not.toContain("Add authentication provider"); // open
     });
   });
 
@@ -593,31 +650,37 @@ describe("D5: slop web", () => {
   // table does not fall a HEAD request back onto a route's GET handler
   // automatically — a route with only a `GET:` entry 404s on HEAD, which
   // makes a health check (or `curl -I`, or anything else that HEADs before
-  // GETting) conclude the UI is dead even though it's fine.
+  // GETting) conclude the UI is dead even though it's fine. Carried forward
+  // for both the `/api/*` routes AND the SPA-shell fallback paths (new in
+  // this rewrite — the shell is served by the `fetch` catch-all, not a
+  // declarative route, so it needs its own coverage).
   // -------------------------------------------------------------------------
   describe("HEAD requests", () => {
     it.each([
-      "/tickets",
-      "/tree",
-      "/review",
-      "/stale",
-      "/assets/style.css",
+      "/api/tickets",
+      "/api/tree",
+      "/api/review",
+      "/api/stale",
+      "/api/config",
+      "/assets/app.css",
       "/assets/app.js",
+      "/",
+      "/tickets",
     ] as const)("HEAD %s returns 200 with an empty body", async (path) => {
       const res = await get(path, { method: "HEAD" });
       expect(res.status).toBe(200);
       expect(await res.text()).toBe("");
     });
 
-    it("HEAD on a ticket detail route returns 200 with an empty body", async () => {
+    it("HEAD on a ticket detail API route returns 200 with an empty body", async () => {
       const t = ticketBySlug("add-authentication-provider");
-      const res = await get(`/tickets/${t.id}`, { method: "HEAD" });
+      const res = await get(`/api/tickets/${t.id}`, { method: "HEAD" });
       expect(res.status).toBe(200);
       expect(await res.text()).toBe("");
     });
 
-    it("HEAD on an unknown route still 404s, never silently 200s", async () => {
-      const res = await get("/nope/at/all", { method: "HEAD" });
+    it("HEAD on an unknown API route still 404s, never silently 200s", async () => {
+      const res = await get("/api/nope/at/all", { method: "HEAD" });
       expect(res.status).toBe(404);
     });
   });
@@ -627,21 +690,26 @@ describe("D5: slop web", () => {
   // -------------------------------------------------------------------------
   describe("Read-only contract", () => {
     it.each(["POST", "PUT", "DELETE", "PATCH"] as const)(
-      "%s to a known route returns 405 (or 404), never a mutation",
+      "%s to a known API route returns 405, never a mutation",
       async (method) => {
-        const res = await get("/tickets", { method });
-        expect([404, 405]).toContain(res.status);
+        const res = await get("/api/tickets", { method });
+        expect(res.status).toBe(405);
       },
     );
 
     it.each(["POST", "PUT", "DELETE"] as const)(
-      "%s to a ticket detail route returns 405 (or 404)",
+      "%s to a ticket detail API route returns 405",
       async (method) => {
         const t = ticketBySlug("add-authentication-provider");
-        const res = await get(`/tickets/${t.id}`, { method });
-        expect([404, 405]).toContain(res.status);
+        const res = await get(`/api/tickets/${t.id}`, { method });
+        expect(res.status).toBe(405);
       },
     );
+
+    it("POST to a client-routed SPA path (e.g. /tickets) returns 405, never the app shell", async () => {
+      const res = await get("/tickets", { method: "POST" });
+      expect(res.status).toBe(405);
+    });
 
     it("POST to a totally unknown route returns 405, not a 500 or a silent 200", async () => {
       const res = await get("/nope/at/all", { method: "POST" });
@@ -654,9 +722,9 @@ describe("D5: slop web", () => {
       const before = readFileSync(path, "utf8");
       const beforeMtime = statSync(path).mtimeMs;
 
-      await get(`/tickets/${t.id}`, { method: "POST" });
-      await get(`/tickets/${t.id}`, { method: "DELETE" });
-      await get("/tickets", { method: "PUT" });
+      await get(`/api/tickets/${t.id}`, { method: "POST" });
+      await get(`/api/tickets/${t.id}`, { method: "DELETE" });
+      await get("/api/tickets", { method: "PUT" });
 
       expect(readFileSync(path, "utf8")).toBe(before);
       expect(statSync(path).mtimeMs).toBe(beforeMtime);
@@ -665,10 +733,14 @@ describe("D5: slop web", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Compiled-binary path: the check that catches assets missing from the
-// compiled binary (D5 architecture requirement).
+// Compiled-binary path: the build-artifact smoke test (rewrite-slop-web-as-a
+// acceptance criterion — "bun run build still emits the single
+// self-contained binary with the SPA embedded... a build-artifact smoke
+// test passes"). Proves the SPA (JS+CSS, including the bundled font) and
+// the JSON API both actually work from `dist/slop`, not just from source,
+// and that nothing in the served output reaches out to a CDN.
 // ---------------------------------------------------------------------------
-describe("D5: slop web — compiled binary", () => {
+describe("D5: slop web — compiled binary (build-artifact smoke test)", () => {
   let binServer: RunningServer | undefined;
 
   beforeAll(async () => {
@@ -688,18 +760,27 @@ describe("D5: slop web — compiled binary", () => {
     await stopServer(binServer);
   });
 
-  it("serves a real page from the compiled binary", async () => {
-    const res = await fetch(new URL("/tickets", binServer?.baseUrl));
+  it("serves the SPA shell at / with the mount point and asset tags", async () => {
+    const res = await fetch(new URL("/", binServer?.baseUrl));
     expect(res.status).toBe(200);
     const body = await res.text();
-    expect(body).toContain("Add authentication provider");
+    expect(body).toContain('<div id="root">');
+    expect(body).toContain("/assets/app.js");
+    expect(body).toContain("/assets/app.css");
+  });
+
+  it("serves real data from the compiled binary's JSON API", async () => {
+    const res = await fetch(new URL("/api/tickets", binServer?.baseUrl));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as TicketListResponseDTO;
+    expect(body.tickets.map((t) => t.name)).toContain("Add authentication provider");
   });
 
   it("serves the embedded CSS asset with a 200 (proves it's bundled into the binary, not read from a relative path that happens to exist)", async () => {
-    const res = await fetch(new URL("/assets/style.css", binServer?.baseUrl));
+    const res = await fetch(new URL("/assets/app.css", binServer?.baseUrl));
     expect(res.status).toBe(200);
     const body = await res.text();
-    expect(body).toContain(".badge");
+    expect(body).toContain("JetBrains Mono");
     expect(res.headers.get("content-type")).toContain("text/css");
   });
 
@@ -707,11 +788,29 @@ describe("D5: slop web — compiled binary", () => {
     const res = await fetch(new URL("/assets/app.js", binServer?.baseUrl));
     expect(res.status).toBe(200);
     const body = await res.text();
-    expect(body).toContain("data-live-filter");
+    expect(body.length).toBeGreaterThan(1000);
+    expect(res.headers.get("content-type")).toContain("text/javascript");
+  });
+
+  it("nothing served reaches out to a CDN — the bundled JS/CSS carry no external-host references (offline posture)", async () => {
+    const [js, css] = await Promise.all([
+      fetch(new URL("/assets/app.js", binServer?.baseUrl)).then((r) => r.text()),
+      fetch(new URL("/assets/app.css", binServer?.baseUrl)).then((r) => r.text()),
+    ]);
+    for (const host of [
+      "fonts.googleapis.com",
+      "fonts.gstatic.com",
+      "cdn.",
+      "unpkg.com",
+      "jsdelivr.net",
+    ]) {
+      expect(js, `app.js referenced ${host}`).not.toContain(host);
+      expect(css, `app.css referenced ${host}`).not.toContain(host);
+    }
   });
 
   it("still enforces the read-only contract from the compiled binary", async () => {
-    const res = await fetch(new URL("/tickets", binServer?.baseUrl), { method: "POST" });
+    const res = await fetch(new URL("/api/tickets", binServer?.baseUrl), { method: "POST" });
     expect(res.status).toBe(405);
   });
 });

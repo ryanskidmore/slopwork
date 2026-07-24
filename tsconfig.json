@@ -22,5 +22,12 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  // The browser SPA (src/web/frontend/) has its own tsconfig (DOM libs,
+  // react-jsx, no Bun ambient types — see that file's doc comment) checked
+  // separately via `bun run typecheck:web`; src/web/generated/ is build
+  // output (bun run build:web), not source. Both are excluded here so this
+  // config stays Bun-server-only, matching its `types: ["bun"]`/no-DOM-lib
+  // setup.
+  "exclude": ["src/web/frontend/**", "src/web/generated/**"]
 }

@@ -1,27 +1,37 @@
 /**
- * Wires the six §4.4 views onto Bun's native router. Read-only by
+ * Wires the `slop web` React SPA + its read-only JSON API onto Bun's native
+ * router (rewrite-slop-web-as-a — replaces the old server-rendered-HTML
+ * views with a bundled SPA fetching from `/api/*`). Read-only by
  * construction (design.md §4.6): every route below only ever registers a
  * `GET` handler — there is no other verb registered anywhere, on any
  * route, so nothing here can ever mutate. The `fetch` fallback (which Bun
  * calls both for genuinely unmatched paths *and* for a defined route hit
- * with a method it didn't register — verified against Bun 1.3.11) turns
- * that structural fact into an explicit, testable 405 for every
- * POST/PUT/DELETE/PATCH request, to any path, known or not.
+ * with a method it didn't register) turns that structural fact into an
+ * explicit, testable 405 for every POST/PUT/DELETE/PATCH request, to any
+ * path, known or not — and doubles as the SPA's client-side-routing
+ * fallback: any unmatched GET/HEAD outside `/api/`/`/assets/` gets the
+ * same app shell, so a deep link (`/tickets/abc123`) or a hard refresh on
+ * a client-routed page works exactly like `/` does.
  */
 import { type Clock, systemClock } from "../core/index.js";
-// Static assets, embedded into the compiled binary at build time (`bun build --compile`
-// bundles every statically-imported file reachable from the entrypoint — verified directly,
-// see this work item's report). Nothing here is fetched from a CDN or read from disk at
-// runtime, so `slop web` works fully offline from `dist/slop`.
-import appJs from "./assets/app.js" with { type: "text" };
-import styleCss from "./assets/style.css" with { type: "text" };
+// The compiled SPA bundle, embedded into the compiled binary at build time
+// (`bun build --compile` bundles every statically-imported file reachable
+// from the entrypoint — verified directly, see docs/web-ui.md). Nothing
+// here is fetched from a CDN or read from disk at runtime, so `slop web`
+// works fully offline from `dist/slop`. `scripts/build-frontend.ts`
+// (`bun run build:web`) produces these two files from `src/web/frontend/`
+// before this module is ever imported — see that script's doc comment and
+// package.json's `pretest`/`prebuild` wiring.
+import appCss from "./generated/app.css" with { type: "text" };
+import appJs from "./generated/app.js" with { type: "text" };
+import { handleConfig } from "./api/config.js";
+import { handleReviewPanel } from "./api/review.js";
+import { handleStalePanel } from "./api/stale.js";
+import { handleTicketDetail } from "./api/ticket-detail.js";
+import { handleTicketList } from "./api/tickets.js";
+import { handleTranscriptView } from "./api/transcript.js";
+import { handleTreeView } from "./api/tree.js";
 import type { WebDataSource } from "./data-source.js";
-import { handleReviewPanel } from "./views/review.js";
-import { handleStalePanel } from "./views/stale.js";
-import { handleTicketDetail } from "./views/ticket-detail.js";
-import { handleTicketList } from "./views/tickets.js";
-import { handleTranscriptView } from "./views/transcript-view.js";
-import { handleTreeView } from "./views/tree.js";
 
 const READ_METHODS = new Set(["GET", "HEAD"]);
 
@@ -41,7 +51,8 @@ const READ_METHODS = new Set(["GET", "HEAD"]);
  * straight to its own handler, bypassing the top-level `fetch` fallback
  * entirely (see this file's header comment) — so the check wraps every
  * route's handler individually via {@link guardHost}, and `fetch` re-checks
- * it too for defense in depth on genuinely unmatched paths/methods.
+ * it too for defense in depth on genuinely unmatched paths/methods (and for
+ * the SPA-shell fallback, which lives entirely in `fetch`).
  */
 const ALLOWED_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -83,7 +94,10 @@ function guardHost<Req extends Request>(
  * check (or curl -I, or anything else that HEADs before GETting) reading
  * that 404 has every reason to conclude the UI is dead. Every read route
  * registers the identical guarded handler under both keys so `HEAD`
- * genuinely works, not just gets dropped from the advertised Allow list.
+ * genuinely works, not just gets dropped from the advertised Allow list —
+ * Bun strips the response body for a HEAD request automatically at the
+ * protocol layer, so reusing the GET handler verbatim is correct, not
+ * just convenient.
  */
 function readMethods<Req extends Request>(
   handler: (req: Req) => Response | Promise<Response>,
@@ -93,6 +107,59 @@ function readMethods<Req extends Request>(
 } {
   const guarded = guardHost(handler);
   return { GET: guarded, HEAD: guarded };
+}
+
+/** A tiny, inline SVG favicon (audit-spine motif: a diamond agent-marker and
+ * a circle human-marker on a thread) — self-contained data URI, zero extra
+ * requests, so even the favicon honors constraint 1's "no CDN, nothing
+ * fetched at runtime" posture. Its own attributes use SINGLE quotes
+ * deliberately: this whole string is embedded inside a DOUBLE-quoted
+ * `href="data:image/svg+xml,...">` attribute in {@link shellHtml} below, so
+ * a literal `"` here would prematurely close that attribute and corrupt the
+ * page's `<head>`. */
+const FAVICON_SVG =
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>" +
+  "<line x1='16' y1='4' x2='16' y2='28' stroke='%2359a3a5' stroke-width='2.5'/>" +
+  "<circle cx='16' cy='9' r='4.5' fill='%233d6fd1'/>" +
+  "<rect x='11.5' y='18.5' width='9' height='9' rx='1.5' fill='%23c98a34' transform='rotate(45 16 23)'/>" +
+  "</svg>";
+
+function shellHtml(): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>slop web</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,${FAVICON_SVG}">
+<link rel="stylesheet" href="/assets/app.css">
+<script>
+  // Applied before first paint to avoid a flash of the wrong theme — reads
+  // the same localStorage key src/web/frontend/hooks/use-theme.ts writes.
+  // Deliberately inline (not a separate request): this is the one script
+  // that must run before /assets/app.css/app.js even finish loading.
+  (function () {
+    try {
+      var stored = localStorage.getItem("slop-web-theme");
+      if (stored === "light" || stored === "dark") {
+        document.documentElement.dataset.theme = stored;
+      }
+    } catch (_e) {
+      /* localStorage unavailable (privacy mode, etc.) — falls back to prefers-color-scheme */
+    }
+  })();
+</script>
+</head>
+<body>
+<div id="root"></div>
+<script type="module" src="/assets/app.js"></script>
+</body>
+</html>`;
+}
+
+function shellResponse(): Response {
+  return new Response(shellHtml(), { headers: { "content-type": "text/html; charset=utf-8" } });
 }
 
 export interface WebServerOptions {
@@ -151,38 +218,38 @@ export function createWebServer(
     // hatch back to the verbose page for local debugging.
     development: Boolean(process.env.SLOP_WEB_DEBUG),
     routes: {
-      "/": {
+      "/assets/app.css": {
         ...readMethods(
-          () => new Response(null, { status: 302, headers: { location: "/tickets" } }),
-        ),
-      },
-      "/assets/style.css": {
-        ...readMethods(
-          () => new Response(styleCss, { headers: { "content-type": "text/css; charset=utf-8" } }),
+          () => new Response(appCss, { headers: { "content-type": "text/css; charset=utf-8" } }),
         ),
       },
       "/assets/app.js": {
         ...readMethods(
           () =>
-            new Response(appJs, { headers: { "content-type": "text/javascript; charset=utf-8" } }),
+            new Response(appJs, {
+              headers: { "content-type": "text/javascript; charset=utf-8" },
+            }),
         ),
       },
-      "/tickets": {
+      "/api/config": {
+        ...readMethods((req) => handleConfig(req, dataSource)),
+      },
+      "/api/tickets": {
         ...readMethods((req) => handleTicketList(req, dataSource, now())),
       },
-      "/tree": {
+      "/api/tree": {
         ...readMethods((req) => handleTreeView(req, dataSource, now())),
       },
-      "/review": {
+      "/api/review": {
         ...readMethods((req) => handleReviewPanel(req, dataSource, now())),
       },
-      "/stale": {
+      "/api/stale": {
         ...readMethods((req) => handleStalePanel(req, dataSource, now())),
       },
-      "/tickets/:ref": {
+      "/api/tickets/:ref": {
         ...readMethods((req) => handleTicketDetail(req, dataSource, now())),
       },
-      "/tickets/:ref/sessions/:sessionId/transcript": {
+      "/api/tickets/:ref/sessions/:sessionId/transcript": {
         ...readMethods((req) => handleTranscriptView(req, dataSource)),
       },
     },
@@ -196,7 +263,18 @@ export function createWebServer(
           headers: { allow: "GET, HEAD" },
         });
       }
-      return new Response("Not Found\n", { status: 404 });
+      const { pathname } = new URL(req.url);
+      if (pathname.startsWith("/api/")) {
+        return Response.json({ error: "Not Found" }, { status: 404 });
+      }
+      if (pathname.startsWith("/assets/")) {
+        return new Response("Not Found\n", { status: 404 });
+      }
+      // Anything else is a client-routed SPA path (`/`, `/tickets`,
+      // `/tickets/<id>`, a deep link, a hard refresh, or a path the SPA
+      // router itself will render as a 404) — same shell either way; React
+      // Router (client-side) decides what to actually show.
+      return shellResponse();
     },
   });
 }
