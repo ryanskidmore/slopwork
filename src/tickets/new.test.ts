@@ -262,4 +262,72 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
       ).rejects.toMatchObject({ exitCode: 6 });
     });
   });
+
+  // D12: explicit `--slug` (short, branch-style handle, optionally with a
+  // single "<type>/" prefix) — validated/normalized rather than derived
+  // from `name`, but going through the SAME collision rule as the
+  // auto-generated path.
+  describe("D12: --slug (short, branch-style handle)", () => {
+    it("is accepted, normalized (lowercased), and stored verbatim otherwise", async () => {
+      const { ticket } = await buildNewTicket(
+        paths,
+        baseInput({ name: "Fix: UI not showing", slugRaw: "fix/ui-not-showing" }),
+        clock,
+      );
+      expect(ticket.slug).toBe("fix/ui-not-showing");
+    });
+
+    it("lowercases a mixed-case --slug", async () => {
+      const { ticket } = await buildNewTicket(
+        paths,
+        baseInput({ slugRaw: "FEAT/Add-Auth" }),
+        clock,
+      );
+      expect(ticket.slug).toBe("feat/add-auth");
+    });
+
+    it("wins over auto-generation from name — name is NOT slugified when --slug is given", async () => {
+      const { ticket } = await buildNewTicket(
+        paths,
+        baseInput({ name: "Completely different long name here", slugRaw: "short-handle" }),
+        clock,
+      );
+      expect(ticket.slug).toBe("short-handle");
+    });
+
+    it("an invalid --slug is rejected as a usage error (exit 2), before touching the disk", async () => {
+      await expect(
+        buildNewTicket(paths, baseInput({ slugRaw: "not a valid slug" }), clock),
+      ).rejects.toMatchObject({ exitCode: 2 });
+      await expect(
+        buildNewTicket(paths, baseInput({ slugRaw: "a/b/c" }), clock),
+      ).rejects.toMatchObject({ exitCode: 2 });
+      await expect(
+        buildNewTicket(paths, baseInput({ slugRaw: "/leading" }), clock),
+      ).rejects.toMatchObject({ exitCode: 2 });
+      await expect(buildNewTicket(paths, baseInput({ slugRaw: "" }), clock)).rejects.toMatchObject({
+        exitCode: 2,
+      });
+    });
+
+    it("uniqueness: a --slug colliding with an existing ticket gets a -2 suffix, never overwritten", async () => {
+      const existing = makeTicket({ slug: "fix/ui-not-showing" });
+      await createTicket(paths, existing, ctx, createdEvent);
+      const { ticket } = await buildNewTicket(
+        paths,
+        baseInput({ slugRaw: "fix/ui-not-showing" }),
+        clock,
+      );
+      expect(ticket.slug).toBe("fix/ui-not-showing-2");
+      expect(ticket.slug).not.toBe(existing.slug);
+    });
+
+    it("uniqueness: two auto-generated tickets that would slug the same get distinct slugs", async () => {
+      const first = await buildNewTicket(paths, baseInput({ name: "Same name" }), clock);
+      await createTicket(paths, first.ticket, ctx, createdEvent);
+      const second = await buildNewTicket(paths, baseInput({ name: "Same name" }), clock);
+      expect(second.ticket.slug).not.toBe(first.ticket.slug);
+      expect(second.ticket.slug).toBe("same-name-2");
+    });
+  });
 });

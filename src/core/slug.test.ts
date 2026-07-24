@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { SLUG_PATTERN, nextAvailableSlug, slugSchema, slugify } from "./slug.js";
+import {
+  AUTO_SLUG_MAX_CHARS,
+  AUTO_SLUG_MAX_WORDS,
+  SLUG_PATTERN,
+  nextAvailableSlug,
+  parseExplicitSlug,
+  slugSchema,
+  slugify,
+} from "./slug.js";
 
 describe("slugify", () => {
   it("lowercases and hyphenates a plain name", () => {
@@ -43,6 +51,111 @@ describe("slugify", () => {
         `slugify(${JSON.stringify(name)}) -> ${slug}`,
       ).toBe(true);
       expect(SLUG_PATTERN.test(slug)).toBe(true);
+    }
+  });
+});
+
+// D12: auto-slug shortened to a word-boundary-truncated, ~5-word/~40-char
+// cap (AUTO_SLUG_MAX_WORDS/AUTO_SLUG_MAX_CHARS) instead of the old
+// mid-word ~60-char cut. KEY CONSTRAINT the whole revision hinges on:
+// a name that already fits under the new cap must slugify to EXACTLY what
+// it did before this change — only a name long enough to need shortening
+// is allowed to come out different.
+describe("slugify — D12 short, branch-style auto-slug", () => {
+  it("already-short names are byte-identical to the pre-D12 generator (a handful of known cases)", () => {
+    // Every one of these was already <= AUTO_SLUG_MAX_CHARS (and none of
+    // them needed the old 60-char cut either), so nothing about this
+    // revision may touch their output.
+    expect(slugify("Adding new auth provider")).toBe("adding-new-auth-provider");
+    expect(slugify("Add auth provider")).toBe("add-auth-provider");
+    expect(slugify("Fix bug:  null   pointer!!  (again)")).toBe("fix-bug-null-pointer-again");
+    expect(slugify("Same name")).toBe("same-name");
+    expect(slugify("Ticket")).toBe("ticket");
+    expect(slugify("x")).toBe("x");
+  });
+
+  it("a many-word name whose full form still fits AUTO_SLUG_MAX_CHARS is untouched, even past AUTO_SLUG_MAX_WORDS", () => {
+    // 8 short words, 15 chars — well under the 40-char cap, so the char
+    // cap (not an independent word-count cap) is what gates truncation;
+    // this must NOT come out shortened to 5 words.
+    const slug = slugify("a b c d e f g h");
+    expect(slug).toBe("a-b-c-d-e-f-g-h");
+    expect(slug.split("-").length).toBe(8);
+  });
+
+  it("a long, many-word name is truncated at a word boundary — never mid-word", () => {
+    const long = "Refactor the entire authentication and authorization subsystem for v2 rollout";
+    const slug = slugify(long);
+    expect(slug.length).toBeLessThanOrEqual(AUTO_SLUG_MAX_CHARS);
+    expect(slug.split("-").length).toBeLessThanOrEqual(AUTO_SLUG_MAX_WORDS);
+    expect(slug.endsWith("-")).toBe(false);
+    // Every word boundary in the output is a genuine prefix of the full
+    // (untruncated) word sequence — i.e. the cut landed exactly on a "-",
+    // never inside a word.
+    const fullWords =
+      "refactor-the-entire-authentication-and-authorization-subsystem-for-v2-rollout".split("-");
+    expect(slug).toBe(fullWords.slice(0, slug.split("-").length).join("-"));
+  });
+
+  it("caps a long name to at most AUTO_SLUG_MAX_WORDS words, well short of the old 60-char cut", () => {
+    const long = "word ".repeat(40).trim();
+    const slug = slugify(long);
+    expect(slug).toBe("word-word-word-word-word");
+    expect(slug.split("-").length).toBe(AUTO_SLUG_MAX_WORDS);
+    expect(slug.length).toBeLessThan(60);
+  });
+
+  it("a single unbroken over-cap word (no boundary to cut at) still gets a hard, bounded cut", () => {
+    const slug = slugify("x".repeat(80));
+    expect(slug.length).toBe(AUTO_SLUG_MAX_CHARS);
+    expect(slug.endsWith("-")).toBe(false);
+  });
+});
+
+describe("parseExplicitSlug — D12 explicit `slop new --slug`", () => {
+  it("accepts a bare hyphenated handle unchanged", () => {
+    expect(parseExplicitSlug("ui-not-showing")).toBe("ui-not-showing");
+  });
+
+  it("accepts and lowercases a single type/ prefix", () => {
+    expect(parseExplicitSlug("fix/ui-not-showing")).toBe("fix/ui-not-showing");
+    expect(parseExplicitSlug("FEAT/Add-Auth")).toBe("feat/add-auth");
+  });
+
+  it("trims surrounding whitespace", () => {
+    expect(parseExplicitSlug("  fix/ui-not-showing  ")).toBe("fix/ui-not-showing");
+  });
+
+  it("rejects an empty or whitespace-only slug", () => {
+    expect(() => parseExplicitSlug("")).toThrow();
+    expect(() => parseExplicitSlug("   ")).toThrow();
+  });
+
+  it("rejects a slug with more than one type/ prefix", () => {
+    expect(() => parseExplicitSlug("a/b/c")).toThrow();
+  });
+
+  it("rejects leading/trailing separators", () => {
+    expect(() => parseExplicitSlug("/leading")).toThrow();
+    expect(() => parseExplicitSlug("trailing/")).toThrow();
+    expect(() => parseExplicitSlug("-leading")).toThrow();
+    expect(() => parseExplicitSlug("trailing-")).toThrow();
+  });
+
+  it("rejects disallowed characters (spaces, underscores, punctuation)", () => {
+    expect(() => parseExplicitSlug("bad slug")).toThrow();
+    expect(() => parseExplicitSlug("bad_slug")).toThrow();
+    expect(() => parseExplicitSlug("bad!slug")).toThrow();
+  });
+
+  it("rejects a slug over SLUG_MAX_LENGTH", () => {
+    expect(() => parseExplicitSlug("a".repeat(70))).toThrow();
+  });
+
+  it("every accepted result matches slugSchema (so it round-trips through ticketSchema unchanged)", () => {
+    for (const raw of ["ui-not-showing", "fix/ui-not-showing", "FEAT/Add-Auth"]) {
+      const slug = parseExplicitSlug(raw);
+      expect(slugSchema.safeParse(slug).success, `parseExplicitSlug(${raw}) -> ${slug}`).toBe(true);
     }
   });
 });

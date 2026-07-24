@@ -9,14 +9,21 @@
 import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import type { Actor, Ticket, TicketId } from "../core/index.js";
-import { EXIT_CODES, newTicketId, nowIso, ticketSchema } from "../core/index.js";
+import {
+  EXIT_CODES,
+  newTicketId,
+  nextAvailableSlug,
+  nowIso,
+  parseExplicitSlug,
+  ticketSchema,
+} from "../core/index.js";
 import type { RepoPaths } from "../repo/paths.js";
 import { resolveTicketRef } from "../repo/refs.js";
 import { listTickets } from "../repo/tickets.js";
 import { SlopError } from "../cli/errors.js";
 import { validateTicketEdges } from "./edges.js";
 import { ancestryFor, resolveParentRef } from "./parent.js";
-import { pickSlug } from "./slug.js";
+import { pickSlug, takenSlugs } from "./slug.js";
 import { defaultSpec, parseSpecInput } from "./spec.js";
 import { formatZodIssuesForUsage } from "./validate.js";
 
@@ -37,6 +44,15 @@ export interface NewTicketInput {
   ownerRaw?: string;
   priority: number;
   actor: Actor;
+  /**
+   * Raw `--slug` value (D12: short, branch-style handles), or `undefined`
+   * if omitted — the common case, where the slug is auto-generated from
+   * `name` (see {@link resolveSlug}). When given, it's validated/
+   * normalized by `parseExplicitSlug` (core/slug.ts) rather than derived
+   * from `name` at all: an explicit slug like `fix/ui-not-showing` is
+   * taken as the caller's chosen handle, not a name to slugify.
+   */
+  slugRaw?: string;
 }
 
 export interface NewTicketResult {
@@ -46,10 +62,38 @@ export interface NewTicketResult {
 }
 
 /**
+ * D12: the slug a new ticket gets — an explicit `--slug` when given,
+ * otherwise auto-generated from `name` (`pickSlug`, unchanged). Either way
+ * runs through the SAME collision rule (`nextAvailableSlug` against the
+ * real on-disk "taken" set): an explicit `--slug` that collides with an
+ * existing ticket is disambiguated with a `-2`/`-3`/... suffix exactly
+ * like an auto-generated one, never rejected and never silently
+ * overwriting — "uniqueness preserved" applies uniformly, not just to the
+ * auto-slug path. An invalid `--slug` (bad charset, more than one `/`,
+ * leading/trailing separators, too long, empty) is rejected as a
+ * USAGE_ERROR (exit 2) via `parseExplicitSlug` before uniqueness is even
+ * considered.
+ */
+async function resolveSlug(paths: RepoPaths, input: NewTicketInput): Promise<string> {
+  if (input.slugRaw === undefined) {
+    return pickSlug(paths, input.name);
+  }
+  let base: string;
+  try {
+    base = parseExplicitSlug(input.slugRaw);
+  } catch (err) {
+    throw new SlopError(err instanceof Error ? err.message : String(err), EXIT_CODES.USAGE_ERROR);
+  }
+  const taken = await takenSlugs(paths);
+  return nextAvailableSlug(base, taken);
+}
+
+/**
  * Build (but do not persist) the new ticket. Throws:
  *   - whatever `resolveTicketRef` throws (NOT_FOUND/AMBIGUOUS_REF/USAGE_ERROR)
  *     for an unresolvable `--parent`/`--blocks`/`--discovered-from` local ref;
- *   - a USAGE_ERROR `SlopError` if the assembled candidate fails
+ *   - a USAGE_ERROR `SlopError` if `--slug` is given but malformed (see
+ *     {@link resolveSlug}), or if the assembled candidate fails
  *     `ticketSchema` validation (bad priority, empty name, an over-long
  *     label, ...) — every field-level constraint funnels through one
  *     final validation pass rather than being hand-checked piecemeal;
@@ -100,7 +144,7 @@ export async function buildNewTicket(
 
   const id = newTicketId();
   const ancestry = ancestryFor(parentResolution, id);
-  const slug = await pickSlug(paths, input.name);
+  const slug = await resolveSlug(paths, input);
   const now = nowIso(clock);
 
   const candidate = {

@@ -22,6 +22,14 @@
  *      inconsistent, and strictly more surprising than being forgiving
  *      here too). This is strictly more permissive than before, never
  *      less: anything that resolved by exact-case slug still does.
+ *      D12 branch-style slugs (`fix/ui-not-showing`, an explicit `slop
+ *      new --slug`): this step needs no special-casing for the `/` —
+ *      `index.slugs` is keyed by the slug's full string (db-index.ts's
+ *      `buildIndex`), and a plain object-key lookup does not care whether
+ *      that string contains a `/`. It's still exactly one exact-match
+ *      lookup, not a path split. This also can never collide with step 1
+ *      (no ticket id contains `/`) or the external-ref check just above
+ *      this step (`EXTERNAL_REF_PATTERN` requires a `:`, not a `/`).
  *   3. **Short `t-<code>` handle** (`shortTicketCode`, core/ids.ts —
  *      ticket_01KY9RVF2DCG6TDQ8EBSGXQXT1): tried only when the
  *      (lowercased) ref has the exact `t-<5 lowercase base36 chars>`
@@ -125,7 +133,10 @@ export async function resolveTicketRef(paths: RepoPaths, ref: string): Promise<T
   // Slugs are lowercase by construction, so lowercasing the incoming ref
   // makes this lookup case-insensitive (adversarial-review Finding 5)
   // without risking any false match — a slug can never differ from its
-  // lowercased self.
+  // lowercased self. A D12 branch-style slug (`fix/ui-not-showing`)
+  // resolves here exactly like any other slug: `index.slugs` is keyed by
+  // the full slug string, `/` included, so this is one plain exact-match
+  // lookup either way, no path-aware handling needed.
   const refLower = ref.toLowerCase();
   const slugMatchId = index.slugs[refLower];
   if (slugMatchId !== undefined) {

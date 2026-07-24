@@ -27,7 +27,7 @@
 | D9 | **Sessions replace claims** — sessions are real harness sessions (Claude Code / opencode / Codex), with ids, git context, and transcripts | Extended per review |
 | D10 | **Specs = structured JSON, markdown inside** | |
 | D11 | **No fleet features** | |
-| D12 | **Slugs are first-class handles** everywhere ids work | |
+| D12 | **Slugs are first-class handles** everywhere ids work — short, branch-style: auto-generated slugs truncate at a word boundary (≈5 words / ≈40 chars, never mid-word); `slop new --slug` accepts an explicit handle, optionally with a single `type/` prefix (`fix/ui-not-showing`, `feat/add-auth`), which resolves as a ref like any other slug. Collisions (either path) still disambiguate git-style (`-2`, `-3`, ...) | Revised: shorter word-boundary auto-slug + explicit `--slug`, for branch-name alignment (F15) |
 | D13 | **`draft` + `adhoc` creation affordances**; drafts never `ready` | |
 | D14 | **index.jsonc gitignored** (pure derivative, auto-healed) | |
 | D15 | **`review` is a stored, OPTIONAL state carrying an MR link.** `slop review <ref> --mr <url>` moves in_progress → review; `done` closes review out — or completes directly from in_progress, skipping review entirely, nagging on stderr for non-`adhoc` tickets that skip it (`adhoc` never nags); changes-requested = `slop start` again (logged as re-entry) | Revised: review made optional, mirroring `--mr`'s own required-with-warning treatment |

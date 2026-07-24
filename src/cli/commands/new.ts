@@ -16,6 +16,7 @@ interface NewCommandOptions {
   adhoc?: boolean;
   owner?: string;
   priority?: number;
+  slug?: string;
   json?: boolean;
 }
 
@@ -40,6 +41,7 @@ async function runNew(name: string, opts: NewCommandOptions): Promise<void> {
     ownerRaw: opts.owner,
     priority: opts.priority ?? DEFAULT_PRIORITY,
     actor,
+    slugRaw: opts.slug,
   };
 
   // The slug-uniqueness check (via the index) and the ticket-file create
@@ -131,6 +133,11 @@ export function registerNewCommand(program: Command): void {
     .option("--adhoc", "mark as created outside normal planning")
     .option("--owner <actor>", "owning actor (roots require a human owner, D1)")
     .option("--priority <0-3>", "priority: 0 urgent .. 3 low, default 2", parsePriority)
+    .option(
+      "--slug <slug>",
+      'short, branch-style handle (e.g. "fix/ui-not-showing"); ' +
+        "auto-generated from the name when omitted",
+    )
     .option("--json", "machine-readable result (id, slug, name, state, priority, parent)")
     .action(runNew);
 }

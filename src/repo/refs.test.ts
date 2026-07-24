@@ -150,6 +150,49 @@ describe("resolveTicketRef — exact slug", () => {
   });
 });
 
+describe("resolveTicketRef — D12 branch-style slugs (a slug containing a single `/`)", () => {
+  it("resolves a slug with a type/ prefix, e.g. fix/ui-not-showing", async () => {
+    const t = makeTicket({ slug: "fix/ui-not-showing" });
+    await createTicket(paths, t, ctx, createdEvent);
+    await expect(resolveTicketRef(paths, "fix/ui-not-showing")).resolves.toEqual(t);
+  });
+
+  it("resolves a branch-style slug case-insensitively, same as any other slug", async () => {
+    const t = makeTicket({ slug: "feat/add-auth" });
+    await createTicket(paths, t, ctx, createdEvent);
+    await expect(resolveTicketRef(paths, "FEAT/Add-Auth")).resolves.toEqual(t);
+  });
+
+  it("a nonexistent branch-style ref is NOT_FOUND (exit 4), not confused for an external ref or a short prefix", async () => {
+    await expect(resolveTicketRef(paths, "fix/does-not-exist")).rejects.toMatchObject({
+      exitCode: 4,
+    });
+  });
+
+  it("does not disturb precedence: id/slug/t-<code> resolution for tickets that DON'T use a branch-style slug still works exactly as before", async () => {
+    const withSlash = makeTicket({ slug: "fix/ui-not-showing" });
+    const plain = makeTicket({ slug: "plain-ticket" });
+    await createTicket(paths, withSlash, ctx, createdEvent);
+    await createTicket(paths, plain, ctx, createdEvent);
+
+    // Full id still resolves.
+    await expect(resolveTicketRef(paths, plain.id)).resolves.toEqual(plain);
+    // Plain slug still resolves.
+    await expect(resolveTicketRef(paths, "plain-ticket")).resolves.toEqual(plain);
+    // t-<code> handle still resolves.
+    await expect(resolveTicketRef(paths, shortTicketCode(plain.id))).resolves.toEqual(plain);
+    // Both tickets' own branch-style/plain slugs keep resolving to the
+    // right one, side by side (no cross-contamination from the `/`).
+    await expect(resolveTicketRef(paths, "fix/ui-not-showing")).resolves.toEqual(withSlash);
+  });
+
+  // Short-id-prefix resolution itself (idMatchesRef, step 4) is untouched
+  // by D12 and already exhaustively covered by the "unique short prefix,
+  // ambiguous prefix" describe block below — not re-derived here to avoid
+  // a flaky same-millisecond ULID-prefix collision between two tickets
+  // created back-to-back in one test.
+});
+
 describe("resolveTicketRef — unique short prefix, ambiguous prefix (git-style)", () => {
   it("resolves a unique short prefix", async () => {
     const t = makeTicket();
