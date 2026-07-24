@@ -131,9 +131,14 @@ scraping output:
 | 1    | `GENERIC_ERROR`   | Unexpected runtime error (I/O failure, bug, etc).           |
 | 2    | `USAGE_ERROR`     | Bad invocation — missing/invalid arguments or flags.        |
 | 3    | `NOT_IMPLEMENTED` | Command is registered but its body isn't built yet.         |
-| 4    | `NOT_FOUND`       | A `<ref>` did not resolve to any entity.                    |
+| 4    | `NOT_FOUND`       | A `<ref>` did not resolve to any entity, or no `.slop/` repo was found (see below). |
 | 5    | `AMBIGUOUS_REF`   | A short-prefix or slug `<ref>` matched more than one entity.|
 | 6    | `CONFLICT`        | Illegal state transition or other conflicting operation.    |
+
+`NOT_FOUND` (4) also covers "not a slopwork repo" — every command that needs `.slop/` (including
+`slop web`) discovers it via the shared `requireRepoRoot` walk-up (`src/repo/paths.ts`, the same
+convention `git` uses for `.git/`) and throws exit 4 if none is found before the filesystem root,
+never a bare `GENERIC_ERROR` (1).
 
 Command implementations should throw a `SlopError` (`src/cli/errors.ts`) carrying one of these
 codes rather than calling `process.exit()` directly; the top-level handler in `src/cli/index.ts`

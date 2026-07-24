@@ -12,7 +12,8 @@
  * | 1    | GENERIC_ERROR  | Unexpected runtime error (I/O failure, bug, etc.).       |
  * | 2    | USAGE_ERROR    | Bad invocation — missing/invalid args or flags.          |
  * | 3    | NOT_IMPLEMENTED| Command is registered but its body isn't built yet.      |
- * | 4    | NOT_FOUND      | A `<ref>` did not resolve to any entity.                 |
+ * | 4    | NOT_FOUND      | A `<ref>` did not resolve to any entity, or no `.slop/`  |
+ * |      |                | repo was found (`requireRepoRoot`, src/repo/paths.ts).   |
  * | 5    | AMBIGUOUS_REF  | A short-prefix or slug `<ref>` matched more than one.    |
  * | 6    | CONFLICT       | Illegal state transition / conflicting operation.        |
  *

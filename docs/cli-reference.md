@@ -43,9 +43,14 @@ so a driving agent can branch on `$?` instead of scraping output:
 | 1 | `GENERIC_ERROR` | Unexpected runtime error (I/O failure, bug, etc). |
 | 2 | `USAGE_ERROR` | Bad invocation — missing/invalid arguments or flags. |
 | 3 | `NOT_IMPLEMENTED` | Command is registered but its body isn't built yet. |
-| 4 | `NOT_FOUND` | A `<ref>` did not resolve to any entity. |
+| 4 | `NOT_FOUND` | A `<ref>` did not resolve to any entity, or no `.slop/` repo was found. |
 | 5 | `AMBIGUOUS_REF` | A short-prefix or slug `<ref>` matched more than one entity. |
 | 6 | `CONFLICT` | Illegal state transition or other conflicting operation. |
+
+`NOT_FOUND` (4) is also what every command throws when it can't find a `.slop/` repo — walking up
+from the cwd the same way `git` looks for `.git/` (`requireRepoRoot`, `src/repo/paths.ts`). This
+includes `slop web`, which used to run its own separate discovery and exit `1` instead; it now
+shares the same discovery and exit code as every other command.
 
 ---
 

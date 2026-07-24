@@ -1,7 +1,6 @@
-import { existsSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
 import type { Command } from "commander";
 import { type Clock, EXIT_CODES, fixedClock } from "../../core/index.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { FixtureDataSource, PortInUseError, startWebServer } from "../../web/index.js";
 import { SlopError } from "../errors.js";
 import { parseIntegerOption } from "./shared.js";
@@ -21,25 +20,6 @@ function resolveClock(): Clock | undefined {
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) return undefined;
   return fixedClock(parsed);
-}
-
-/**
- * Walk upward from `startDir` looking for a `.slop` directory — the same
- * convention `.git` discovery uses. Returns the `.slop` directory's own
- * path (not its parent), or `null` if none is found before the filesystem
- * root.
- */
-function findSlopRoot(startDir: string): string | null {
-  let dir = startDir;
-  for (;;) {
-    const candidate = join(dir, ".slop");
-    if (existsSync(candidate) && statSync(candidate).isDirectory()) {
-      return candidate;
-    }
-    const parent = dirname(dir);
-    if (parent === dir) return null;
-    dir = parent;
-  }
 }
 
 /**
@@ -71,12 +51,14 @@ export function registerWebCommand(program: Command): void {
     )
     .option("--port <n>", "port to listen on (0 = pick a free port)", parsePort, 4553)
     .action((opts: { port: number }) => {
-      const slopRoot = findSlopRoot(process.cwd());
-      if (!slopRoot) {
-        throw new SlopError(
-          "no .slop directory found here or in any parent directory — run `slop init` first.",
-        );
-      }
+      // Shared repo-root discovery (src/repo/paths.ts) — the same walk-up
+      // every other command uses, and the same exit code: NOT_FOUND (4).
+      // `slop web` used to run its own local copy of this walk and throw
+      // a bare SlopError (defaulting to GENERIC_ERROR, exit 1) instead —
+      // exit-code-4-is-overloaded unified the two so "not a slopwork repo"
+      // means the same thing (message + exit code) everywhere.
+      const root = requireRepoRoot(process.cwd());
+      const slopRoot = repoPaths(root).slopDir;
 
       // src/web/'s data-source seam doesn't need the real repo layer's
       // locking/atomic-write machinery for a read-only viewer (see

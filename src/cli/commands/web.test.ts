@@ -118,18 +118,19 @@ describe("slop web --port bound-check (0-65535)", () => {
   it("accepts 0 (its documented 'pick a free port' meaning), failing later only for lack of a .slop dir", () => {
     const result = runSlop(["web", "--port", "0"], scratch);
     // No `slop init` in `scratch`, so this still fails — but on the
-    // "no .slop directory found" check inside the action, which only runs
-    // AFTER option parsing succeeded, proving `--port 0` itself parsed and
-    // was accepted rather than rejected by the bound-check.
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain("no .slop directory found");
+    // shared `requireRepoRoot` "not a slopwork repo" check inside the
+    // action, which only runs AFTER option parsing succeeded, proving
+    // `--port 0` itself parsed and was accepted rather than rejected by
+    // the bound-check.
+    expect(result.status).toBe(4);
+    expect(result.stderr).toContain("not a slopwork repo");
     expect(result.stderr).not.toContain("--port");
   });
 
   it("accepts a normal port, failing later only for lack of a .slop dir", () => {
     const result = runSlop(["web", "--port", "4553"], scratch);
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain("no .slop directory found");
+    expect(result.status).toBe(4);
+    expect(result.stderr).toContain("not a slopwork repo");
     expect(result.stderr).not.toContain("--port");
   });
 });
