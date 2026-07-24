@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { newTicketId } from "../ids.js";
-import { mrUrlSchema, TICKET_STATES, ticketSchema } from "./ticket.js";
+import { mrUrlSchema, RESOLUTION_MAX_LENGTH, TICKET_STATES, ticketSchema } from "./ticket.js";
 
 function baseTicket() {
   const id = newTicketId();
@@ -91,6 +91,45 @@ describe("ticketSchema — review (D15: present iff state === review)", () => {
       },
     };
     expect(ticketSchema.safeParse(input).success).toBe(true);
+  });
+});
+
+// `resolution` (ticket_01KY9RWFGVDQNDH1XN43A0GH1M): optional, OMITTED
+// entirely when absent (never null/"") so an existing ticket/fixture with
+// no resolution parses byte-identically before and after this field's
+// introduction — the same "smuggle it in, check it never sticks" style as
+// the D5 blocked/stale test above, but the other way round: this key
+// SHOULD be absent by default, and should round-trip when actually set.
+describe("ticketSchema — resolution (optional, omitted when absent)", () => {
+  it("has no `resolution` key at all when the input doesn't carry one", () => {
+    const parsed = ticketSchema.parse(baseTicket());
+    expect(parsed.resolution).toBeUndefined();
+    expect(parsed as Record<string, unknown>).not.toHaveProperty("resolution");
+  });
+
+  it("round-trips a multi-line resolution", () => {
+    const resolution = "## Findings\n\nRoot cause was X.\n\n- step one\n- step two\n\nFixed in Y.";
+    const parsed = ticketSchema.parse({ ...baseTicket(), resolution });
+    expect(parsed.resolution).toBe(resolution);
+  });
+
+  it("trims surrounding whitespace", () => {
+    const parsed = ticketSchema.parse({ ...baseTicket(), resolution: "  padded body  \n" });
+    expect(parsed.resolution).toBe("padded body");
+  });
+
+  it("rejects a blank (whitespace-only) resolution rather than silently storing it", () => {
+    expect(ticketSchema.safeParse({ ...baseTicket(), resolution: "   " }).success).toBe(false);
+  });
+
+  it("rejects a resolution over the max length", () => {
+    const tooLong = "x".repeat(RESOLUTION_MAX_LENGTH + 1);
+    expect(ticketSchema.safeParse({ ...baseTicket(), resolution: tooLong }).success).toBe(false);
+  });
+
+  it("accepts a resolution right at the max length", () => {
+    const atLimit = "x".repeat(RESOLUTION_MAX_LENGTH);
+    expect(ticketSchema.safeParse({ ...baseTicket(), resolution: atLimit }).success).toBe(true);
   });
 });
 

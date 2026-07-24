@@ -77,6 +77,25 @@ export const reviewSchema = z.object({
 });
 export type Review = z.infer<typeof reviewSchema>;
 
+/**
+ * Reasonable ceiling for a `resolution` writeup — generous enough for a
+ * genuine investigation/adhoc-ticket report (multi-paragraph, multi-line)
+ * without leaving the field unbounded.
+ */
+export const RESOLUTION_MAX_LENGTH = 20_000;
+
+/**
+ * The durable outcome/resolution writeup (design.md-adjacent: a place for
+ * an investigation's findings that today only fits in a one-line
+ * `latest_note`). Set via `slop done --outcome` (see
+ * cli/commands/done.ts's `buildDoneTicket`); rendered as markdown by both
+ * `slop show` (tickets/detail.ts) and `slop web` (web/views/ticket-detail.ts),
+ * same convention as `spec.details_md`. `.trim().min(1)` mirrors
+ * `specSchema.summary`/`labelSchema`: an explicitly-passed but blank
+ * `--outcome` is a usage mistake to surface, not silently ignore.
+ */
+export const resolutionSchema = z.string().trim().min(1).max(RESOLUTION_MAX_LENGTH);
+
 export const ticketSchema = z
   .object({
     id: ticketIdSchema,
@@ -106,6 +125,10 @@ export const ticketSchema = z
     active_session: sessionIdSchema.nullable().default(null),
     last_activity_at: isoTimestampSchema,
     latest_note: z.string().nullable().default(null),
+    /** Optional — OMITTED entirely when absent (never `null`/""), so a
+     * ticket that never got a `--outcome` parses byte-identically to
+     * before this field existed. See `resolutionSchema`'s doc comment. */
+    resolution: resolutionSchema.optional(),
     owner: actorSchema.nullable().default(null),
     provenance: provenanceSchema,
     created_at: isoTimestampSchema,

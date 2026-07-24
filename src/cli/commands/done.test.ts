@@ -37,7 +37,7 @@ describe("buildDoneTicket", () => {
 
   it("moves state to done and clears review + active_session", () => {
     const ticket = makeTicket();
-    const done = buildDoneTicket(ticket, "shipped", clock);
+    const done = buildDoneTicket(ticket, "shipped", undefined, clock);
     expect(done.state).toBe("done");
     expect(done.review).toBeUndefined();
     expect(done.active_session).toBeNull();
@@ -45,21 +45,70 @@ describe("buildDoneTicket", () => {
 
   it("sets latest_note from --note when given", () => {
     const ticket = makeTicket({ latest_note: "old note" });
-    const done = buildDoneTicket(ticket, "final note", clock);
+    const done = buildDoneTicket(ticket, "final note", undefined, clock);
     expect(done.latest_note).toBe("final note");
   });
 
   it("leaves latest_note untouched when no --note was given", () => {
     const ticket = makeTicket({ latest_note: "old note" });
-    const done = buildDoneTicket(ticket, undefined, clock);
+    const done = buildDoneTicket(ticket, undefined, undefined, clock);
     expect(done.latest_note).toBe("old note");
   });
 
   it("bumps last_activity_at/updated_at", () => {
     const ticket = makeTicket({ last_activity_at: "2020-01-01T00:00:00.000Z" });
-    const done = buildDoneTicket(ticket, undefined, clock);
+    const done = buildDoneTicket(ticket, undefined, undefined, clock);
     expect(done.last_activity_at).toBe("2026-07-23T12:00:00.000Z");
     expect(done.updated_at).toBe("2026-07-23T12:00:00.000Z");
+  });
+});
+
+// `resolution` (ticket_01KY9RWFGVDQNDH1XN43A0GH1M): `--outcome` stores it
+// on the ticket, mirroring how `--note` stores `latest_note` above —
+// "given wins, else leave whatever was already there" (buildDoneTicket's
+// doc comment), and absent stays absent (never coerced to null/"").
+describe("buildDoneTicket — resolution (--outcome)", () => {
+  const clock = fixedClock(new Date("2026-07-23T12:00:00.000Z"));
+
+  it("stores resolution when given", () => {
+    const ticket = makeTicket();
+    const done = buildDoneTicket(ticket, undefined, "Root cause: X. Fixed by Y.", clock);
+    expect(done.resolution).toBe("Root cause: X. Fixed by Y.");
+  });
+
+  it("round-trips a multi-line resolution", () => {
+    const ticket = makeTicket();
+    const resolution = "## Investigation\n\nline one\nline two\n\n- a\n- b";
+    const done = buildDoneTicket(ticket, undefined, resolution, clock);
+    expect(done.resolution).toBe(resolution);
+  });
+
+  it("leaves resolution undefined when no --outcome was given (same convention as `review` above)", () => {
+    const ticket = makeTicket();
+    const done = buildDoneTicket(ticket, "just a note", undefined, clock);
+    expect(done.resolution).toBeUndefined();
+  });
+
+  it("--note and --outcome coexist: both are stored independently", () => {
+    const ticket = makeTicket();
+    const done = buildDoneTicket(ticket, "short note", "long-form writeup", clock);
+    expect(done.latest_note).toBe("short note");
+    expect(done.resolution).toBe("long-form writeup");
+  });
+
+  it("a resolution already on the ticket survives a done call that omits --outcome", () => {
+    const ticket = makeTicket({ resolution: "earlier writeup" });
+    const done = buildDoneTicket(ticket, undefined, undefined, clock);
+    expect(done.resolution).toBe("earlier writeup");
+  });
+
+  it("existing done behavior (state/session-independent fields) is unchanged when --outcome is used", () => {
+    const ticket = makeTicket();
+    const done = buildDoneTicket(ticket, "shipped", "writeup", clock);
+    expect(done.state).toBe("done");
+    expect(done.review).toBeUndefined();
+    expect(done.active_session).toBeNull();
+    expect(done.last_activity_at).toBe("2026-07-23T12:00:00.000Z");
   });
 });
 
@@ -96,6 +145,15 @@ function runSlop(args: string[], cwd: string): SpawnSyncReturns<string> {
   const env: Record<string, string | undefined> = { ...process.env, SLOP_ACTOR: "done-test-actor" };
   for (const key of STRIPPED_ENV_KEYS) env[key] = undefined;
   return spawnSync("bun", [cliEntry, ...args], { cwd, encoding: "utf8", env });
+}
+
+/** Same as {@link runSlop}, but pipes `input` in on stdin — for exercising
+ * `--outcome -` (reads stdin, mirroring `--spec -`) as a real spawned
+ * process rather than unit-testing `readStdin` in isolation. */
+function runSlopWithStdin(args: string[], cwd: string, input: string): SpawnSyncReturns<string> {
+  const env: Record<string, string | undefined> = { ...process.env, SLOP_ACTOR: "done-test-actor" };
+  for (const key of STRIPPED_ENV_KEYS) env[key] = undefined;
+  return spawnSync("bun", [cliEntry, ...args], { cwd, encoding: "utf8", env, input });
 }
 
 const scratchDirs: string[] = [];
@@ -289,5 +347,122 @@ describe("done — review made optional (ticket_01KY9RWFDR9QEWQ5B1ZACQJ338)", ()
 
     const ticketAfterDone = await readTicket(paths, id);
     expect(ticketAfterDone.state).toBe("done");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ticket_01KY9RWFGVDQNDH1XN43A0GH1M: `done --outcome` stores a durable
+// `resolution` writeup on the ticket. Real spawned processes (same style as
+// the suites above) so `--outcome -`'s stdin read is exercised for real,
+// not just unit-tested against `buildDoneTicket`, and so the full done
+// write (state/session finalize/cascade) is proven undisturbed alongside it.
+// ---------------------------------------------------------------------------
+
+describe("done — resolution (ticket_01KY9RWFGVDQNDH1XN43A0GH1M): --outcome <text>", () => {
+  it("stores --outcome as the ticket's resolution", async () => {
+    const { root, paths } = await makeFixtureRepo();
+    const { id, slug } = createTicket(root, "Investigation ticket");
+
+    const started = runSlop(["start", slug], root);
+    expect(started.status, started.stderr).toBe(0);
+
+    const done = runSlop(
+      [
+        "done",
+        slug,
+        "--note",
+        "done",
+        "--outcome",
+        "Root cause: stale cache. Fixed by invalidating on write.",
+      ],
+      root,
+    );
+    expect(done.status, done.stderr).toBe(0);
+
+    const ticketAfterDone = await readTicket(paths, id);
+    expect(ticketAfterDone.resolution).toBe(
+      "Root cause: stale cache. Fixed by invalidating on write.",
+    );
+    // state/session/cascade machinery is unaffected by --outcome.
+    expect(ticketAfterDone.state).toBe("done");
+    expect(ticketAfterDone.active_session).toBeNull();
+  });
+
+  it("reads --outcome - from stdin, mirroring --spec -", async () => {
+    const { root, paths } = await makeFixtureRepo();
+    const { id, slug } = createTicket(root, "Stdin outcome ticket");
+
+    const started = runSlop(["start", slug], root);
+    expect(started.status, started.stderr).toBe(0);
+
+    const multiline = "## Findings\n\nline one\nline two\n\n- step a\n- step b\n";
+    const done = runSlopWithStdin(["done", slug, "--outcome", "-"], root, multiline);
+    expect(done.status, done.stderr).toBe(0);
+
+    const ticketAfterDone = await readTicket(paths, id);
+    // resolutionSchema trims — compare against the trimmed form.
+    expect(ticketAfterDone.resolution).toBe(multiline.trim());
+  });
+
+  it("leaves resolution absent when --outcome is not given", async () => {
+    const { root, paths } = await makeFixtureRepo();
+    const { id, slug } = createTicket(root, "No outcome ticket");
+
+    const started = runSlop(["start", slug], root);
+    expect(started.status, started.stderr).toBe(0);
+
+    const done = runSlop(["done", slug, "--note", "shipped, no writeup"], root);
+    expect(done.status, done.stderr).toBe(0);
+    expect(done.stdout).toContain("resolution: (none)");
+
+    const ticketAfterDone = await readTicket(paths, id);
+    expect(ticketAfterDone.resolution).toBeUndefined();
+    expect(ticketAfterDone as Record<string, unknown>).not.toHaveProperty("resolution");
+  });
+
+  it("--note and --outcome coexist: session end_summary and ticket resolution are stored independently", async () => {
+    const { root, paths } = await makeFixtureRepo();
+    const { id, slug } = createTicket(root, "Note and outcome ticket");
+
+    const started = runSlop(["start", slug], root);
+    expect(started.status, started.stderr).toBe(0);
+    const ticketAfterStart = await readTicket(paths, id);
+    const sessionId = ticketAfterStart.active_session;
+    if (sessionId === null) throw new Error("expected an active session after start");
+
+    const done = runSlop(
+      ["done", slug, "--note", "short handoff note", "--outcome", "the full writeup"],
+      root,
+    );
+    expect(done.status, done.stderr).toBe(0);
+    expect(done.stdout).toContain("resolution: (set)");
+
+    const sessionAfterDone = await readSession(paths, sessionId);
+    expect(sessionAfterDone.end_summary).toBe("short handoff note");
+
+    const ticketAfterDone = await readTicket(paths, id);
+    expect(ticketAfterDone.latest_note).toBe("short handoff note");
+    expect(ticketAfterDone.resolution).toBe("the full writeup");
+  });
+
+  it("done-cascade still fires (unblocked dependent) when --outcome is used", async () => {
+    const { root, paths } = await makeFixtureRepo();
+    const dependent = createTicket(root, "Dependent on an --outcome done ticket");
+    const { id, slug } = createTicket(root, "Blocking ticket with outcome", [
+      "--blocks",
+      dependent.slug,
+    ]);
+
+    const started = runSlop(["start", slug], root);
+    expect(started.status, started.stderr).toBe(0);
+
+    const done = runSlop(["done", slug, "--outcome", "closed out the investigation"], root);
+    expect(done.status, done.stderr).toBe(0);
+    expect(done.stdout).toContain(dependent.id);
+
+    const ticketAfterDone = await readTicket(paths, id);
+    expect(ticketAfterDone.resolution).toBe("closed out the investigation");
+    const dependentAfter = await readTicket(paths, dependent.id);
+    expect(dependentAfter.state).toBe("open");
   });
 });

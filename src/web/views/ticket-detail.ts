@@ -78,6 +78,24 @@ export function renderMrLink(mr: string | undefined): RawHtml {
     : html`<span class="muted" title="Unsafe URL scheme — shown as text, not a link">${mr}</span>`;
 }
 
+/**
+ * The `resolution` (outcome writeup, set via `slop done --outcome`)
+ * section — present iff `ticket.resolution` is set, rendered through the
+ * exact same markdown path as `spec.details_md` (`renderMarkdownToString`
+ * -> `sanitizeMarkdownHtml`, markdown.ts): `resolution` is free-form prose
+ * that could itself carry a `javascript:`/`data:` link, so it gets the
+ * identical guard — never a raw interpolation. Exported (only) so
+ * `ticket-detail.test.ts` can exercise it directly, same convention as
+ * {@link renderMrLink}.
+ */
+export function renderResolutionSection(ticket: Ticket): RawHtml {
+  if (!ticket.resolution) return html``;
+  return html`<section class="section">
+  <h2>Resolution</h2>
+  <div class="details-md">${raw(renderMarkdownToString(ticket.resolution))}</div>
+</section>`;
+}
+
 function renderPayload(payload: Record<string, unknown>): RawHtml {
   const keys = Object.keys(payload);
   if (keys.length === 0) return html``;
@@ -196,6 +214,8 @@ export async function handleTicketDetail(
   }
 </section>`;
 
+  const resolutionSection = renderResolutionSection(ticket);
+
   const reviewSection =
     ticket.state === "review" && ticket.review
       ? html`<section class="section">
@@ -231,6 +251,7 @@ export async function handleTicketDetail(
 
 ${reviewSection}
 ${specSection}
+${resolutionSection}
 
 <section class="section">
   <h2>Updates timeline</h2>

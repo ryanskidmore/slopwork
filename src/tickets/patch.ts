@@ -37,6 +37,7 @@ const TICKET_FIELD_MARKERS: Record<keyof Ticket, true> = {
   active_session: true,
   last_activity_at: true,
   latest_note: true,
+  resolution: true,
   owner: true,
   provenance: true,
   created_at: true,

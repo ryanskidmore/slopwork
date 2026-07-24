@@ -26,11 +26,12 @@ import { checkDoneEntry } from "../../tickets/state.js";
 import { formatZodIssuesForUsage } from "../../tickets/validate.js";
 import { loadConfig, resolveActor } from "../actor.js";
 import { SlopError } from "../errors.js";
-import { printWarning } from "./shared.js";
+import { printWarning, readStdin } from "./shared.js";
 
 interface DoneCommandOptions {
   note?: string;
   transcript?: string;
+  outcome?: string;
 }
 
 /**
@@ -50,13 +51,17 @@ const DONE_SESSION_FIELDS = [
  * `checkDoneEntry` decides legality, the nag decision lives in `runDone`
  * below, both before this is ever called), `review` cleared (already
  * absent on the `in_progress` path; the schema requires it absent outside
- * `state === "review"`), `active_session` cleared, and `latest_note`
- * updated from `--note` when given (same convention `stop`'s
- * `buildStoppedTicket` uses for its handoff note).
+ * `state === "review"`), `active_session` cleared, `latest_note` updated
+ * from `--note` when given (same convention `stop`'s `buildStoppedTicket`
+ * uses for its handoff note), and `resolution` updated from `--outcome`
+ * when given — same "given wins, else leave whatever was already there"
+ * convention as `latest_note`, so a `resolution` never regresses to
+ * absent just because a later `done` call omitted `--outcome`.
  */
 export function buildDoneTicket(
   current: Ticket,
   note: string | undefined,
+  resolution: string | undefined,
   clock: Clock = systemClock,
 ): Ticket {
   const now = nowIso(clock);
@@ -66,6 +71,7 @@ export function buildDoneTicket(
     review: undefined,
     active_session: null,
     latest_note: note ?? current.latest_note,
+    resolution: resolution ?? current.resolution,
     last_activity_at: now,
     updated_at: now,
   };
@@ -86,6 +92,17 @@ async function runDone(ref: string, opts: DoneCommandOptions): Promise<void> {
   const actor = resolveActor({ config, cwd: root });
 
   const initialTicket = await resolveTicketRef(paths, ref);
+
+  // `--outcome -` reads stdin, mirroring `--spec -` (new/update — see
+  // shared.ts's `readStdin` doc). Read OUTSIDE the lock, same rationale as
+  // the transcript capture just below: I/O that isn't part of the
+  // transactional write shouldn't hold the db lock open.
+  const outcomeRaw =
+    opts.outcome === undefined
+      ? undefined
+      : opts.outcome === "-"
+        ? await readStdin()
+        : opts.outcome;
 
   // Fix 1 (ticket_01KY93E2ZK6Z3TFEBP86ATMW37): locate + copy the harness
   // transcript BEFORE acquiring the db lock — see transcript.ts's
@@ -184,7 +201,7 @@ async function runDone(ref: string, opts: DoneCommandOptions): Promise<void> {
     );
     await lock.assertHeld();
 
-    const doneTicket = buildDoneTicket(current, opts.note);
+    const doneTicket = buildDoneTicket(current, opts.note, outcomeRaw);
     await updateTicket(
       paths,
       current.id,
@@ -230,6 +247,7 @@ async function runDone(ref: string, opts: DoneCommandOptions): Promise<void> {
       `  ${result.ticket.name}\n` +
       `  state: ${result.ticket.state}\n` +
       `  note: ${result.session.end_summary ?? "(none)"}\n` +
+      `  resolution: ${result.ticket.resolution !== undefined ? "(set)" : "(none)"}\n` +
       `  transcript: ${result.session.transcript_ref ?? "(none)"}\n` +
       (result.cascade.unblocked.length > 0
         ? `  unblocked: ${result.cascade.unblocked.join(", ")}\n`
@@ -257,6 +275,10 @@ export function registerDoneCommand(program: Command): void {
     )
     .argument("<ref>", "ticket to complete")
     .option("--note <text>", "completion note")
+    .option(
+      "--outcome <text>",
+      'long-form resolution/outcome writeup, stored on the ticket; pass "-" to read from stdin',
+    )
     .option(
       "--transcript <path>",
       "manual transcript path (works for any harness; overrides auto-detection when the file exists)",

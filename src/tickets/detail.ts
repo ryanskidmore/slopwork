@@ -4,6 +4,11 @@
  * timestamps, latest note — design.md §4.1 item 1's full field list.
  * Explicit acceptance clause: a `jira:` parent must render here, browse
  * URL included when `remotes.jira` is configured.
+ *
+ * `resolution` (optional, set via `slop done --outcome`) renders as its
+ * own clearly-labeled section, right after `spec`, when present — omitted
+ * entirely otherwise, same "absent means nothing to show" convention as
+ * every other optional section here.
  */
 import type { Config, Ticket } from "../core/index.js";
 import { isTicketId } from "../core/index.js";
@@ -64,6 +69,12 @@ export function formatTicketDetail(ticket: Ticket, config: Config): string {
     for (const c of ticket.spec.context) lines.push(`    - ${c}`);
   }
   lines.push(...formatMetaLines(ticket.spec.meta));
+
+  if (ticket.resolution !== undefined) {
+    lines.push("");
+    lines.push("resolution:");
+    for (const l of ticket.resolution.split("\n")) lines.push(`  ${l}`);
+  }
 
   lines.push("");
   lines.push("edges:");

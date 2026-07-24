@@ -92,6 +92,25 @@ describe("formatTicketDetail", () => {
     expect(text).toMatch(/parent: \(none/);
   });
 
+  // `resolution` (ticket_01KY9RWFGVDQNDH1XN43A0GH1M): clearly-labeled
+  // section, present iff `ticket.resolution` is set.
+  it("renders a multi-line resolution as its own labeled section when present", () => {
+    const t = makeTicket({
+      state: "done",
+      resolution: "## Findings\n\nRoot cause was X.\n\nFixed by Y.",
+    });
+    const text = formatTicketDetail(t, config);
+    expect(text).toContain("resolution:");
+    expect(text).toContain("Root cause was X.");
+    expect(text).toContain("Fixed by Y.");
+  });
+
+  it("omits the resolution section entirely when absent", () => {
+    const t = makeTicket();
+    const text = formatTicketDetail(t, config);
+    expect(text).not.toContain("resolution:");
+  });
+
   it("renders the review sub-object when present", () => {
     const t = makeTicket({
       state: "review",

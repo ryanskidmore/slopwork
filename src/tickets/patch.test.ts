@@ -39,7 +39,8 @@ describe("TICKET_FIELDS", () => {
     expect(TICKET_FIELDS).toContain("id");
     expect(TICKET_FIELDS).toContain("review");
     expect(TICKET_FIELDS).toContain("provenance");
-    expect(TICKET_FIELDS.length).toBe(22);
+    expect(TICKET_FIELDS).toContain("resolution");
+    expect(TICKET_FIELDS.length).toBe(23);
   });
 });
 
