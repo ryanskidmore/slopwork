@@ -18,7 +18,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "in_progress",
   "priority": 2,
   "labels": [
     "area:bench"
@@ -29,8 +29,8 @@
   "discovered_from": [],
   "root_id": "ticket_01KYAR4C0BQ3WD3QR93GQZY8V4",
   "path": [],
-  "active_session": null,
-  "last_activity_at": "2026-07-24T19:02:45.038Z",
+  "active_session": "session_01KYB18JSEMZ6K8MD8BXNJB2W1",
+  "last_activity_at": "2026-07-24T21:42:20.223Z",
   "latest_note": null,
   "owner": {
     "name": "ryan",
@@ -44,5 +44,5 @@
     }
   },
   "created_at": "2026-07-24T19:02:45.038Z",
-  "updated_at": "2026-07-24T19:02:45.038Z"
+  "updated_at": "2026-07-24T21:42:20.223Z"
 }

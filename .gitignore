@@ -44,3 +44,6 @@ npm-debug.log*
 .slop/db/*/.tmp-*
 .slop/transcripts/
 # --- end slopwork ---
+
+# benchmark fixtures (bench/run.ts --dir)
+.bench-work/

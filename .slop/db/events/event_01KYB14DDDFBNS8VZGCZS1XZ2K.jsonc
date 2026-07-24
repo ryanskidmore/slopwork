@@ -1,0 +1,19 @@
+{
+  "id": "event_01KYB14DDDFBNS8VZGCZS1XZ2K",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": "session_01KYB0M6SS7PE71CSRCYJ51EAB",
+  "verb": "session.ended",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KYB0M6SS7PE71CSRCYJ51EAB"
+  },
+  "payload": {
+    "reason": "done",
+    "note": "oxfmt adopted, Biome removed. Two hazards found+documented (.slop db fixtures; html`` template reflow changing web output). Gate green at 1950 tests.",
+    "transcript_ref": "transcripts/session_01KYB0M6SS7PE71CSRCYJ51EAB.jsonl"
+  },
+  "at": "2026-07-24T21:40:03.629Z"
+}

@@ -20,7 +20,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "in_progress",
+  "state": "done",
   "priority": 2,
   "labels": [
     "area:tooling"
@@ -31,9 +31,9 @@
   "discovered_from": [],
   "root_id": "ticket_01KYAZVFZE1GWMQS6JB51N82J5",
   "path": [],
-  "active_session": "session_01KYB0M6SS7PE71CSRCYJ51EAB",
-  "last_activity_at": "2026-07-24T21:31:12.609Z",
-  "latest_note": null,
+  "active_session": null,
+  "last_activity_at": "2026-07-24T21:40:03.638Z",
+  "latest_note": "oxfmt adopted, Biome removed. Two hazards found+documented (.slop db fixtures; html`` template reflow changing web output). Gate green at 1950 tests.",
   "owner": {
     "name": "ryan",
     "kind": "human"
@@ -46,5 +46,5 @@
     }
   },
   "created_at": "2026-07-24T21:17:42.807Z",
-  "updated_at": "2026-07-24T21:31:12.609Z"
+  "updated_at": "2026-07-24T21:40:03.638Z"
 }

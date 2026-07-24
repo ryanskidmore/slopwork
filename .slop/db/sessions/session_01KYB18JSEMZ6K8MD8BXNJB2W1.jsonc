@@ -1,0 +1,48 @@
+{
+  "id": "session_01KYB18JSEMZ6K8MD8BXNJB2W1",
+  "ticket": "ticket_01KYAR4C0BQ3WD3QR93GQZY8V4",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "main",
+    "commit_at_start": "52ae2415395d6f57600071020b3ac301875ddcbf"
+  },
+  "started_at": "2026-07-24T21:42:20.206Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Build bench/ harness: seeder (direct repo-layer writes) + phase runner + JSON output",
+          "checked": true
+        },
+        {
+          "text": "Scale ladder 1k/10k/100k/1M: cold index build, warm reads, ref resolution, write latency",
+          "checked": false
+        },
+        {
+          "text": "Concurrency phases: lock-free progress, parallel new, contended start, wide cascade",
+          "checked": false
+        },
+        {
+          "text": "Run on real disk when machine is quiet; capture machine specs",
+          "checked": false
+        },
+        {
+          "text": "Write docs/benchmarks.md with tables, degradation analysis, honest ceiling, repro commands",
+          "checked": false
+        }
+      ],
+      "created_at": "2026-07-24T21:42:20.425Z"
+    }
+  ],
+  "end_summary": null,
+  "transcript_ref": null
+}
