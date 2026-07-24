@@ -432,6 +432,20 @@ describe("update --relates-to <±ref>: add/remove a relates-to edge (ticket_01KY
     expect(result.status).toBe(2);
   });
 
+  it("rejects a self relates-to edge (exit 6, CONFLICT), leaving the ticket untouched (regression: ticket edges-self-relates-to-is)", async () => {
+    const { dir } = await makeCliRepo();
+    const main = newTicketCli(dir, "ryan", "Main ticket");
+    const paths = repoPaths(dir);
+    const before = await readTicket(paths, main.id);
+
+    const result = runSlopSource(["update", main.id, "--relates-to", `+${main.slug}`], dir, "ryan");
+    expect(result.status).toBe(6);
+    expect(result.stderr).toMatch(/relates-to/);
+
+    const after = await readTicket(paths, main.id);
+    expect(after).toEqual(before);
+  });
+
   it("a redundant +ref on an already-present target is a no-op: no new event, ticket unchanged", async () => {
     const { dir } = await makeCliRepo();
     const main = newTicketCli(dir, "ryan", "Main ticket");

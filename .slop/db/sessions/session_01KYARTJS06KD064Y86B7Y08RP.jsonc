@@ -1,0 +1,48 @@
+{
+  "id": "session_01KYARTJS06KD064Y86B7Y08RP",
+  "ticket": "ticket_01KYAPN9978T914TSPK5JR5XZC",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "da132467-f993-4ed6-9a8f-e74486782eb6"
+  },
+  "git": {
+    "branch": "worktree-agent-a78cb9bddc320a52f",
+    "commit_at_start": "42075a55a6f55c9653563bedbb5af8202fe50fed"
+  },
+  "started_at": "2026-07-24T19:14:52.832Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Confirm repro: update --relates-to +self succeeds today",
+          "checked": true
+        },
+        {
+          "text": "Add assertNoSelfEdges for relates_to/discovered_from in edges.ts",
+          "checked": true
+        },
+        {
+          "text": "Wire into validateTicketEdges",
+          "checked": true
+        },
+        {
+          "text": "Add regression tests (unit + CLI update.test.ts if applicable)",
+          "checked": true
+        },
+        {
+          "text": "Run full test/lint/typecheck/format suite",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T19:15:42.770Z"
+    }
+  ],
+  "end_summary": null,
+  "transcript_ref": "transcripts/session_01KYARTJS06KD064Y86B7Y08RP.jsonl"
+}

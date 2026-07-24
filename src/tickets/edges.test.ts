@@ -7,6 +7,7 @@ import {
   assertEdgeTargetsExist,
   assertNoBlocksCycle,
   assertNoParentCycle,
+  assertNoSelfEdges,
   detectCycle,
   validateTicketEdges,
 } from "./edges.js";
@@ -208,6 +209,48 @@ describe("assertNoBlocksCycle", () => {
     const candidate = { ...last, blocks: [first.id] };
     const others = chain.slice(0, n - 1);
     expect(() => assertNoBlocksCycle(candidate, others)).toThrowError(/blocking cycle/);
+  });
+});
+
+describe("assertNoSelfEdges (regression: ticket edges-self-relates-to-is)", () => {
+  it("rejects a self relates-to edge (exit 6, CONFLICT)", () => {
+    const a = makeTicket();
+    const candidate = { ...a, relates_to: [a.id] };
+    let thrown: unknown;
+    try {
+      assertNoSelfEdges(candidate);
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toMatchObject({ exitCode: 6 });
+    expect((thrown as Error).message).toMatch(/relates-to/);
+    expect((thrown as Error).message).toContain(a.slug);
+  });
+
+  it("rejects a self discovered-from edge (exit 6, CONFLICT)", () => {
+    const a = makeTicket();
+    const candidate = { ...a, discovered_from: [a.id] };
+    let thrown: unknown;
+    try {
+      assertNoSelfEdges(candidate);
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toMatchObject({ exitCode: 6 });
+    expect((thrown as Error).message).toMatch(/discovered-from/);
+  });
+
+  it("accepts relates-to/discovered-from edges to a DIFFERENT ticket", () => {
+    const a = makeTicket();
+    const other = newTicketId();
+    const candidate = { ...a, relates_to: [other], discovered_from: [other] };
+    expect(() => assertNoSelfEdges(candidate)).not.toThrow();
+  });
+
+  it("validateTicketEdges rejects a self relates-to end to end", () => {
+    const a = makeTicket();
+    const candidate = { ...a, relates_to: [a.id] };
+    expect(() => validateTicketEdges(candidate, [])).toThrowError(/relates-to/);
   });
 });
 
