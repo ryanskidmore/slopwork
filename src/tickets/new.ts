@@ -18,7 +18,7 @@ import {
   ticketSchema,
 } from "../core/index.js";
 import type { RepoPaths } from "../repo/paths.js";
-import { resolveTicketRef } from "../repo/refs.js";
+import { resolveTicketRef, resolveTicketRefs } from "../repo/refs.js";
 import { listTickets } from "../repo/tickets.js";
 import { SlopError } from "../cli/errors.js";
 import { validateTicketEdges } from "./edges.js";
@@ -177,10 +177,12 @@ export async function buildNewTicket(
   // repeated `--blocks` naming the same ticket twice is deduped here
   // rather than surfaced as a creation-time error, which would be a
   // needlessly hostile reaction to a harmless repeated flag/copy-paste.
+  // One index load for the whole batch, not one per ref — see
+  // `repo/refs.ts`'s `resolveTicketRefs` for why the loop form was
+  // O(refs x tickets). Dedup below is unchanged.
   const blocks: TicketId[] = [];
   const seenBlocks = new Set<TicketId>();
-  for (const ref of input.blocksRaw) {
-    const target = await resolveTicketRef(paths, ref);
+  for (const target of await resolveTicketRefs(paths, input.blocksRaw)) {
     if (!seenBlocks.has(target.id)) {
       seenBlocks.add(target.id);
       blocks.push(target.id);
@@ -192,8 +194,7 @@ export async function buildNewTicket(
   // ticket field the resolved ids land in.
   const relatesTo: TicketId[] = [];
   const seenRelatesTo = new Set<TicketId>();
-  for (const ref of input.relatesToRaw) {
-    const target = await resolveTicketRef(paths, ref);
+  for (const target of await resolveTicketRefs(paths, input.relatesToRaw)) {
     if (!seenRelatesTo.has(target.id)) {
       seenRelatesTo.add(target.id);
       relatesTo.push(target.id);

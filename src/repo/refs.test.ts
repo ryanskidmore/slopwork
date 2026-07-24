@@ -2,10 +2,16 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { newTicketId, shortTicketCode, type Ticket, ticketSchema } from "../core/index.js";
+import {
+  newTicketId,
+  shortTicketCode,
+  type Ticket,
+  type TicketId,
+  ticketSchema,
+} from "../core/index.js";
 import type { IndexTicketRow } from "./db-index.js";
 import type { EventContext, MutationEventSpec } from "./events.js";
-import { ambiguousRefMessage, resolveTicketRef } from "./refs.js";
+import { ambiguousRefMessage, resolveTicketRef, resolveTicketRefs } from "./refs.js";
 import { ensureDbDirs } from "./paths.js";
 import type { RepoPaths } from "./paths.js";
 import { createTicket } from "./tickets.js";
@@ -355,5 +361,78 @@ describe("resolveTicketRef — auto-heals the index (exercises the A3 self-heal 
     // paths.indexFile deliberately never created — a fresh clone, or a
     // repo where reindex has never run.
     await expect(resolveTicketRef(paths, t.slug)).resolves.toEqual(t);
+  });
+});
+
+// CI-was-red root cause: `buildNewTicket` resolved each `--blocks`/`--relates-to`
+// ref with its own `resolveTicketRef`, and every one of those re-ran the index
+// fingerprint scan + parse — O(refs x tickets). `resolveTicketRefs` shares one
+// load across the batch. These assert the batched form stays behaviourally
+// identical to the loop it replaced, since a faster resolver that resolves
+// differently would be worse than the slow one.
+describe("resolveTicketRefs (batched — one index load for many refs)", () => {
+  it("resolves a mix of slug, full id and short prefix identically to the one-at-a-time form", async () => {
+    // Explicit, deliberately-divergent ids: `newTicketId()` is monotonic, so
+    // ids minted in one millisecond share almost their whole prefix (see
+    // docs/benchmarks.md) — a naive `id.slice(0, 20)` here is genuinely
+    // ambiguous, which is correct behaviour but not what this test is about.
+    const alpha = makeTicket({
+      id: "ticket_01AAAAAAAAAAAAAAAAAAAAAAAA" as TicketId,
+      slug: "alpha",
+    });
+    const beta = makeTicket({ id: "ticket_01BBBBBBBBBBBBBBBBBBBBBBBB" as TicketId, slug: "beta" });
+    const gamma = makeTicket({
+      id: "ticket_01CCCCCCCCCCCCCCCCCCCCCCCC" as TicketId,
+      slug: "gamma",
+    });
+    for (const t of [alpha, beta, gamma]) await createTicket(paths, t, ctx, createdEvent);
+
+    const refs = ["alpha", beta.id, "ticket_01C"];
+    const batched = await resolveTicketRefs(paths, refs);
+
+    const oneByOne: Ticket[] = [];
+    for (const r of refs) oneByOne.push(await resolveTicketRef(paths, r));
+
+    expect(batched.map((t) => t.id)).toEqual(oneByOne.map((t) => t.id));
+    expect(batched.map((t) => t.id)).toEqual([alpha.id, beta.id, gamma.id]);
+  });
+
+  it("preserves order, including duplicate refs (dedup is the caller's job, not this function's)", async () => {
+    const a = makeTicket({ slug: "dup-a" });
+    const b = makeTicket({ slug: "dup-b" });
+    for (const t of [a, b]) await createTicket(paths, t, ctx, createdEvent);
+
+    const resolved = await resolveTicketRefs(paths, ["dup-b", "dup-a", "dup-b"]);
+    expect(resolved.map((t) => t.id)).toEqual([b.id, a.id, b.id]);
+  });
+
+  it("throws on the first unresolvable ref, exactly as the loop did (NOT_FOUND, exit 4)", async () => {
+    const a = makeTicket({ slug: "present" });
+    await createTicket(paths, a, ctx, createdEvent);
+    await expect(resolveTicketRefs(paths, ["present", "no-such-ticket"])).rejects.toMatchObject({
+      exitCode: 4,
+    });
+  });
+
+  it("an ambiguous ref still reports AMBIGUOUS_REF (exit 5) from inside a batch", async () => {
+    // Two ids sharing the "ticket_01D" prefix — the batch path must surface
+    // ambiguity exactly like the single-ref path, not quietly pick one.
+    const one = makeTicket({
+      id: "ticket_01DAAAAAAAAAAAAAAAAAAAAAAA" as TicketId,
+      slug: "amb-one",
+    });
+    const two = makeTicket({
+      id: "ticket_01DBBBBBBBBBBBBBBBBBBBBBBB" as TicketId,
+      slug: "amb-two",
+    });
+    await createTicket(paths, one, ctx, createdEvent);
+    await createTicket(paths, two, ctx, createdEvent);
+    await expect(resolveTicketRefs(paths, ["ticket_01D"])).rejects.toMatchObject({
+      exitCode: 5,
+    });
+  });
+
+  it("returns [] for an empty ref list", async () => {
+    expect(await resolveTicketRefs(paths, [])).toEqual([]);
   });
 });

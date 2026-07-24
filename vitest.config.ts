@@ -43,6 +43,21 @@ export default defineConfig({
       // is excluded, and it must never become excluded as a shortcut.
       exclude: [
         "src/**/*.test.ts",
+        // rewrite-slop-web-as-a: the SPA. `src/web/frontend/**` is browser
+        // code (React/TSX) that this suite cannot execute at all — vitest runs
+        // under Bun with no DOM, and `slop web` is verified black-box over
+        // HTTP instead (see the D5 entries in docs/DECISIONS.md).
+        // `src/web/generated/**` is BUILD OUTPUT: the compiled ~500KB bundle
+        // emitted by `bun run build:web`.
+        //
+        // Both must be excluded for two separate reasons. Correctness: v8's
+        // provider crashes with a PARSE_ERROR trying to remap coverage for
+        // them as "uncovered files". Meaningfulness: counting a half-megabyte
+        // generated bundle as uncovered source dragged the reported totals to
+        // ~20% functions/statements and failed every threshold — a number that
+        // described the bundler's output, not this project's test coverage.
+        "src/web/frontend/**",
+        "src/web/generated/**",
         // Bundled/embedded browser-side assets — plain CSS/JS meant to run
         // in a browser, not Node/Bun-executed code at all. Imported into
         // server.ts only via Bun's `with { type: "text" }` text-loader

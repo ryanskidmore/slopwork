@@ -1,10 +1,10 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { fixedClock } from "../core/clock.js";
 import type { Ticket } from "../core/index.js";
-import { EXIT_CODES, newTicketId, ticketSchema } from "../core/index.js";
+import { EXIT_CODES, newTicketId, ticketSchema, writeCanonical } from "../core/index.js";
 import type { EventContext, MutationEventSpec } from "../repo/events.js";
 import { ensureDbDirs } from "../repo/paths.js";
 import type { RepoPaths } from "../repo/paths.js";
@@ -32,6 +32,37 @@ function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
     updated_at: "2026-07-23T10:00:00.000Z",
     ...overrides,
   });
+}
+
+/**
+ * Write `count` resolvable fixture tickets as cheaply as possible.
+ *
+ * The degree-cap tests below need 501 EXISTING tickets purely so there are
+ * enough valid edge targets to push a candidate past `EDGE_DEGREE_CAP`; how
+ * those tickets got onto disk is irrelevant to what they assert. Creating them
+ * via `createTicket` costs ~2,000 fsync-bound file operations (every ticket is
+ * an atomic tmp+fsync+rename, and each also emits an event file the same way),
+ * which took ~29s under coverage on two cores — over vitest's 30s limit on
+ * CI's slower runners, and the reason this suite was red there while passing
+ * locally on a fast many-core machine.
+ *
+ * Writing the files directly is the same end state minus the durability
+ * ceremony and the events: `loadIndex` fingerprints the tickets directory and
+ * rebuilds automatically, so slug resolution inside `buildNewTicket` sees them
+ * exactly as it would have. Tests that actually care about the create path
+ * (events emitted, atomicity) still use `createTicket` — this is only for bulk
+ * fixture.
+ */
+async function seedResolvableTickets(count: number, slugPrefix: string): Promise<Ticket[]> {
+  const tickets = Array.from({ length: count }, (_, i) =>
+    makeTicket({ slug: `${slugPrefix}-${i}` }),
+  );
+  await Promise.all(
+    tickets.map((t) =>
+      writeFile(join(paths.ticketsDir, `${t.id}.jsonc`), writeCanonical(t), "utf8"),
+    ),
+  );
+  return tickets;
 }
 
 function baseInput(overrides: Partial<NewTicketInput> = {}): NewTicketInput {
@@ -353,12 +384,7 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
     });
 
     it("rejects --blocks past the per-ticket per-edge-kind cap (exit 6)", async () => {
-      const blockers: Ticket[] = [];
-      for (let i = 0; i < 501; i++) {
-        const t = makeTicket({ slug: `blocker-${i}` });
-        await createTicket(paths, t, ctx, createdEvent);
-        blockers.push(t);
-      }
+      const blockers = await seedResolvableTickets(501, "blocker");
       await expect(
         buildNewTicket(paths, baseInput({ blocksRaw: blockers.map((b) => b.slug) }), clock),
       ).rejects.toMatchObject({ exitCode: 6 });
@@ -378,12 +404,7 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
     });
 
     it("rejects --relates-to past the per-ticket per-edge-kind cap (exit 6)", async () => {
-      const relateds: Ticket[] = [];
-      for (let i = 0; i < 501; i++) {
-        const t = makeTicket({ slug: `related-${i}` });
-        await createTicket(paths, t, ctx, createdEvent);
-        relateds.push(t);
-      }
+      const relateds = await seedResolvableTickets(501, "related");
       await expect(
         buildNewTicket(paths, baseInput({ relatesToRaw: relateds.map((r) => r.slug) }), clock),
       ).rejects.toMatchObject({ exitCode: 6 });

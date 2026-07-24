@@ -62,7 +62,7 @@ import { EXTERNAL_REF_PATTERN } from "../core/entities/ref.js";
 import { EXIT_CODES } from "../core/exit-codes.js";
 import { SlopError } from "../cli/errors.js";
 import { loadIndex } from "./db-index.js";
-import type { IndexTicketRow } from "./db-index.js";
+import type { DbIndex, IndexTicketRow } from "./db-index.js";
 import type { RepoPaths } from "./paths.js";
 import { readTicket } from "./tickets.js";
 
@@ -112,6 +112,50 @@ function externalRefNotResolvableError(ref: string): SlopError {
  * is structurally an external ref.
  */
 export async function resolveTicketRef(paths: RepoPaths, ref: string): Promise<Ticket> {
+  return resolveWithIndex(paths, ref, null);
+}
+
+/**
+ * Resolve MANY refs against ONE index load.
+ *
+ * {@link resolveTicketRef} loads the index on every call, which is right for a
+ * single lookup and quadratic for a batch: resolving N refs re-ran the
+ * fingerprint scan (a `readdir` plus a `stat` per ticket file) and re-parsed
+ * `index.jsonc` N times, so a command like
+ * `slop new --blocks a --blocks b …` cost O(refs x tickets). That is not
+ * hypothetical at scale — `docs/benchmarks.md` measures a single warm index
+ * load at ~1.3s on 100k tickets, so ten `--blocks` refs there would have meant
+ * ~13 seconds of pure re-scanning.
+ *
+ * Loading once is safe precisely because these lookups are independent reads:
+ * nothing in a resolution loop writes, so every ref would have observed the
+ * same index anyway. Resolution precedence is untouched — both this and the
+ * single-ref form share {@link resolveWithIndex}, so there is exactly one copy
+ * of the id/slug/`t-`code/prefix rules.
+ *
+ * Refs are resolved in order and the first failure throws, matching what a
+ * caller looping over {@link resolveTicketRef} already saw.
+ */
+export async function resolveTicketRefs(paths: RepoPaths, refs: string[]): Promise<Ticket[]> {
+  if (refs.length === 0) return [];
+  if (refs.length === 1) {
+    const only = refs[0];
+    return only === undefined ? [] : [await resolveTicketRef(paths, only)];
+  }
+  // One load, shared by every ref below.
+  const { index } = await loadIndex(paths);
+  const out: Ticket[] = [];
+  for (const ref of refs) out.push(await resolveWithIndex(paths, ref, index));
+  return out;
+}
+
+/** Shared implementation — see {@link resolveTicketRefs} for why `preloaded`
+ * exists. `null` means "load it yourself" (the single-ref path). */
+async function resolveWithIndex(
+  paths: RepoPaths,
+  ref: string,
+  preloaded: DbIndex | null,
+): Promise<Ticket> {
   if (isTicketId(ref)) {
     try {
       return await readTicket(paths, ref);
@@ -127,7 +171,7 @@ export async function resolveTicketRef(paths: RepoPaths, ref: string): Promise<T
     throw externalRefNotResolvableError(ref);
   }
 
-  const { index } = await loadIndex(paths);
+  const index = preloaded ?? (await loadIndex(paths)).index;
 
   // Exact slug always wins over a prefix interpretation (see module doc).
   // Slugs are lowercase by construction, so lowercasing the incoming ref

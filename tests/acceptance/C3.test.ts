@@ -54,7 +54,10 @@ afterEach(async () => {
     const dir = scratchDirs.pop();
     if (dir) await rm(dir, { recursive: true, force: true });
   }
-});
+  // The property test above leaves one scratch repo per run to delete, so this
+  // hook is doing real I/O work, not bookkeeping — it blew the default 30s on
+  // CI's slower disk.
+}, 300_000);
 
 /** Every harness-identity env var a real harness sets — stripped so this
  * suite's own ambient environment never leaks into detection. */
@@ -390,7 +393,15 @@ describe("C3: Lifecycle", () => {
           { numRuns: PROPERTY_RUNS },
         );
       },
-      120_000,
+      // 150 runs, each spawning the compiled binary through a whole operation
+      // sequence, is inherently minutes of work — and CI's shared 2-core
+      // runners are several times slower than a dev machine, where this takes
+      // ~40s. 120s was enough locally and timed out there, which is why this
+      // suite was red on CI while green for everyone running it by hand.
+      // Generous headroom is the right lever: the run count is tuned for
+      // bug-catching power (see PROPERTY_RUNS above), so trimming it to fit a
+      // clock would trade real coverage for a green tick.
+      600_000,
     );
   });
 
