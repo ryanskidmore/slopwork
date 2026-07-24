@@ -1,0 +1,43 @@
+{
+  "id": "ticket_01KYAPKRRE38SKMSFKF1GVQQTH",
+  "name": "transcript: encodeClaudeCwd only encodes / and . — underscores etc. resolve to wrong project dir",
+  "slug": "transcript-encodeclaudecwd-only-encodes",
+  "spec": {
+    "summary": "transcript: encodeClaudeCwd only encodes / and . — underscores etc. resolve to wrong project dir",
+    "details_md": "src/sessions/transcript.ts:386-391: Claude Code folds all non-alphanumerics to - but we only encode / and .; a repo named my_project with no CLAUDE_CODE_SESSION_ID env silently fails capture; lossy encoding can even collide sibling paths into another project's dir. Verify real encoding and match it.",
+    "acceptance": [
+      "cwd with _ and spaces resolves to the correct project dir (or capture returns null with warning, never a wrong file)"
+    ],
+    "context": [
+      "src/sessions/transcript.ts:386"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "area:sessions"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPKRRE38SKMSFKF1GVQQTH",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:36:12.432Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:36:12.432Z",
+  "updated_at": "2026-07-24T18:36:12.432Z"
+}

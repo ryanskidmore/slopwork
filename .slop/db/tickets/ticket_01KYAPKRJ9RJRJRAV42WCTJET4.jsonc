@@ -1,0 +1,45 @@
+{
+  "id": "ticket_01KYAPKRJ9RJRJRAV42WCTJET4",
+  "name": "session-end transactions have crash windows that strand orphan active sessions",
+  "slug": "session-end-transactions-have-crash",
+  "spec": {
+    "summary": "session-end transactions have crash windows that strand orphan active sessions",
+    "details_md": "start/stop perform 2-4 independent writes under one lock with no journal: crash after createSession but before updateTicket leaves an ended_at:null session no ticket references (renders active forever); takeover ends the previous session LAST, so a crash strands the seized session too. stop's window self-heals; these two do not. Consider write-ordering (ticket last) + a repair path in reindex.",
+    "acceptance": [
+      "orphaned ended_at:null sessions are detectable/repairable (reindex --heal or similar)",
+      "takeover write order closes the old session before the point of no return"
+    ],
+    "context": [
+      "src/cli/commands/start.ts:202",
+      "src/cli/commands/stop.ts:111"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "area:sessions"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPKRJ9RJRJRAV42WCTJET4",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:36:12.236Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:36:12.236Z",
+  "updated_at": "2026-07-24T18:36:12.236Z"
+}

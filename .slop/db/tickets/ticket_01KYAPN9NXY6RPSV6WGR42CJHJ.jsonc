@@ -1,0 +1,43 @@
+{
+  "id": "ticket_01KYAPN9NXY6RPSV6WGR42CJHJ",
+  "name": "policy: session ownership not enforced — any actor can plan/stop/done another actor's session",
+  "slug": "policy-session-ownership-not-enforced",
+  "spec": {
+    "summary": "policy: session ownership not enforced — any actor can plan/stop/done another actor's session",
+    "details_md": "start gates on a live session via --takeover but plan/--check/stop/done/drop mutate another actor's active session silently (events do record the acting actor). May be intended for the coordinator pattern — decide and document, or warn when acting actor != session actor.",
+    "acceptance": [
+      "explicit decision recorded; warning added if enforcement chosen"
+    ],
+    "context": [
+      "src/cli/commands/plan.ts:72"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 3,
+  "labels": [
+    "area:sessions"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KYANPD8BPY8RB7G8K4ENV6YW"
+  ],
+  "root_id": "ticket_01KYAPN9NXY6RPSV6WGR42CJHJ",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T18:37:02.528Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T18:37:02.528Z",
+  "updated_at": "2026-07-24T18:37:02.528Z"
+}
