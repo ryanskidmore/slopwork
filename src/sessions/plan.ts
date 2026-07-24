@@ -53,7 +53,7 @@ export function assertHasActiveSession(ticket: Ticket): void {
  * that function reports as "kept, unchanged" always agree.
  */
 export function buildPlanSteps(stepTexts: readonly string[], previous?: PlanVersion): PlanStep[] {
-  const claimed = new Array<boolean>(previous?.steps.length ?? 0).fill(false);
+  const claimed = Array.from({ length: previous?.steps.length ?? 0 }, () => false);
   return stepTexts.map((text) => {
     if (previous === undefined) return { text, checked: false };
     const idx = previous.steps.findIndex((s, i) => !claimed[i] && s.text === text);

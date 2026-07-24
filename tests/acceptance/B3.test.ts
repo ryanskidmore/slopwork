@@ -252,7 +252,7 @@ describe("B3: Edges", () => {
     it("a long chain closed at the end (blocks): exit 6, every link's slug appears in the path, db unchanged", async () => {
       const fixture = await makeFixture();
       const n = 8;
-      const ids: string[] = new Array(n).fill("");
+      const ids: string[] = Array.from({ length: n }, () => "");
       // Create back-to-front so each --blocks target already exists,
       // producing the forward chain T0 -> T1 -> ... -> T(n-1).
       for (let i = n - 1; i >= 0; i--) {
@@ -451,7 +451,9 @@ describe("B3: Edges", () => {
       n: number,
       edges: ReadonlyArray<readonly [number, number]>,
     ): boolean[][] {
-      const reach: boolean[][] = Array.from({ length: n }, () => new Array<boolean>(n).fill(false));
+      const reach: boolean[][] = Array.from({ length: n }, () =>
+        Array.from({ length: n }, () => false),
+      );
       for (const [a, b] of edges) at(reach, a)[b] = true;
       for (let k = 0; k < n; k++) {
         for (let i = 0; i < n; i++) {

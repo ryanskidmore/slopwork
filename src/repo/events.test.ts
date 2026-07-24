@@ -324,7 +324,7 @@ describe("queryEvents — bounded reads (perf: since/limit bound what gets read,
     }
 
     const page = await queryEvents(paths, { since: cursor });
-    expect(page.map((e) => e.id)).toEqual([...good.map((e) => e.id)].sort());
+    expect(page.map((e) => e.id)).toEqual(good.map((e) => e.id).sort());
   });
 
   it("`limit` (no ticket filter) stops before ever reading a later file", async () => {
@@ -340,7 +340,7 @@ describe("queryEvents — bounded reads (perf: since/limit bound what gets read,
     await writeFile(eventFilePath(paths, poisonedId), "{ this is not valid jsonc", "utf8");
 
     const page = await queryEvents(paths, { limit: 5 });
-    expect(page.map((e) => e.id)).toEqual([...good.map((e) => e.id)].sort());
+    expect(page.map((e) => e.id)).toEqual(good.map((e) => e.id).sort());
   });
 
   it("`ticket` + `limit` together stop as soon as the limit is satisfied, never reading past the last match", async () => {

@@ -59,7 +59,7 @@ export interface PlanDiff {
  * this doesn't pretend to guess one.
  */
 export function diffPlanVersions(before: PlanVersion, after: PlanVersion): PlanDiff {
-  const claimed = new Array<boolean>(before.steps.length).fill(false);
+  const claimed = Array.from({ length: before.steps.length }, () => false);
   const entries: PlanDiffEntry[] = [];
 
   after.steps.forEach((afterStep, afterIndex) => {
