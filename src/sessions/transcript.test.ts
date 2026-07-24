@@ -1,10 +1,24 @@
-import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { Harness, Session } from "../core/index.js";
-import { ensureDbDirs, repoPaths } from "../repo/index.js";
-import { captureTranscript, type LocateTranscriptRoots, locateTranscript } from "./transcript.js";
+import {
+  type Harness,
+  newSessionId,
+  newTicketId,
+  type Session,
+  type SessionId,
+  sessionSchema,
+} from "../core/index.js";
+import type { EventContext, MutationEventSpec } from "../repo/index.js";
+import { createSession, ensureDbDirs, repoPaths } from "../repo/index.js";
+import {
+  captureTranscript,
+  type LocateTranscriptRoots,
+  locateTranscript,
+  resolveTranscriptCapture,
+  speculativeTranscriptCapture,
+} from "./transcript.js";
 
 let scratch: string;
 
@@ -18,6 +32,24 @@ afterEach(async () => {
 
 function harness(kind: Harness["kind"], sessionId: string | null = null): Harness {
   return { kind, session_id: sessionId };
+}
+
+/** Shared fixture-session builder — module-scoped so both the original
+ * `captureTranscript` suite and the Fix 1/Fix 2 suites below can use it. */
+function makeSession(overrides: Partial<Session> = {}): Session {
+  return {
+    id: "session_01ARZ3NDEKTSV4RRFFQ69G5FAV" as Session["id"],
+    ticket: "ticket_01ARZ3NDEKTSV4RRFFQ69G5FAW" as Session["ticket"],
+    actor: { name: "fixture", kind: "human" },
+    harness: harness("other"),
+    git: { branch: null, commit_at_start: null },
+    started_at: "2026-07-23T10:00:00.000Z",
+    ended_at: null,
+    plan: [],
+    end_summary: null,
+    transcript_ref: null,
+    ...overrides,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -282,22 +314,6 @@ describe("locateTranscript — never throws under weird input", () => {
 // ---------------------------------------------------------------------------
 
 describe("captureTranscript", () => {
-  function makeSession(overrides: Partial<Session> = {}): Session {
-    return {
-      id: "session_01ARZ3NDEKTSV4RRFFQ69G5FAV" as Session["id"],
-      ticket: "ticket_01ARZ3NDEKTSV4RRFFQ69G5FAW" as Session["ticket"],
-      actor: { name: "fixture", kind: "human" },
-      harness: harness("other"),
-      git: { branch: null, commit_at_start: null },
-      started_at: "2026-07-23T10:00:00.000Z",
-      ended_at: null,
-      plan: [],
-      end_summary: null,
-      transcript_ref: null,
-      ...overrides,
-    };
-  }
-
   it("transcripts: off skips capture entirely — clean null, no warning, no file written", async () => {
     const paths = await ensureDbDirs(scratch);
     const session = makeSession();
@@ -451,5 +467,266 @@ describe("captureTranscript", () => {
       // Restore permissions so the scratch dir can be cleaned up in afterEach.
       await chmod(unreadable, 0o644);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fix 1 (ticket_01KY93E2ZK6Z3TFEBP86ATMW37) — streams the copy instead of
+// buffering, and the outside-the-lock speculative/reconcile seam.
+// ---------------------------------------------------------------------------
+
+describe("captureTranscript — Fix 1: streams the copy (tmp+rename), no full-file buffering", () => {
+  it("copies a multi-MB transcript byte-for-byte via the streamed tmp+rename path", async () => {
+    const paths = repoPaths(scratch);
+    const source = join(scratch, "large-source.jsonl");
+    const line = `${JSON.stringify({
+      type: "user",
+      message: { role: "user", content: "x".repeat(200) },
+    })}\n`;
+    // ~4.5MB — small enough to keep the test fast, large enough that a
+    // naive buffered readFile+atomicWriteFile would still "work" here too
+    // (this asserts correctness of the NEW streamed path, not a size
+    // ceiling — see stop.test.ts for the outside-the-lock timing proof).
+    const content = line.repeat(20_000);
+    await writeFile(source, content, "utf8");
+    const session = makeSession();
+
+    const result = await captureTranscript({
+      session,
+      paths,
+      cwd: scratch,
+      transcriptsMode: "local",
+      explicitTranscriptPath: source,
+    });
+
+    expect(result.warning).toBeNull();
+    const target = join(paths.slopDir, "transcripts", `${session.id}.jsonl`);
+    const written = await readFile(target, "utf8");
+    expect(written.length).toBe(content.length);
+    expect(written).toBe(content);
+  });
+
+  it("leaves no leftover .tmp- file behind in the transcripts dir after a successful capture", async () => {
+    const paths = repoPaths(scratch);
+    const source = join(scratch, "src-for-tmp-check.jsonl");
+    await writeFile(source, "{}\n", "utf8");
+    const session = makeSession();
+
+    await captureTranscript({
+      session,
+      paths,
+      cwd: scratch,
+      transcriptsMode: "local",
+      explicitTranscriptPath: source,
+    });
+
+    const entries = await readdir(join(paths.slopDir, "transcripts"));
+    expect(entries).toEqual([`${session.id}.jsonl`]);
+    expect(entries.some((name) => name.startsWith(".tmp-"))).toBe(false);
+  });
+});
+
+describe("speculativeTranscriptCapture / resolveTranscriptCapture — the outside-the-lock seam", () => {
+  const actor = { name: "ryan", kind: "human" } as const;
+  const ctx: EventContext = { actor, session: null };
+  const startedEvent: MutationEventSpec = { verb: "session.started" };
+
+  function realSession(overrides: Partial<Session> = {}): Session {
+    return sessionSchema.parse({
+      id: newSessionId(),
+      ticket: newTicketId(),
+      actor,
+      harness: harness("other"),
+      git: { branch: null, commit_at_start: null },
+      started_at: "2026-07-23T10:00:00.000Z",
+      ...overrides,
+    });
+  }
+
+  it("returns null (nothing to do speculatively) when there is no active session", async () => {
+    const paths = await ensureDbDirs(scratch);
+    const result = await speculativeTranscriptCapture(paths, null, {
+      paths,
+      cwd: scratch,
+      transcriptsMode: "local",
+    });
+    expect(result).toBeNull();
+  });
+
+  it("returns null — never throws — when the given session id doesn't resolve to a real on-disk session", async () => {
+    const paths = await ensureDbDirs(scratch);
+    const result = await speculativeTranscriptCapture(
+      paths,
+      "session_01ARZ3NDEKTSV4RRFFQ69G5FAV" as SessionId,
+      { paths, cwd: scratch, transcriptsMode: "local" },
+    );
+    expect(result).toBeNull();
+  });
+
+  it("captures against the real on-disk session and reports the exact session id it captured against", async () => {
+    const paths = await ensureDbDirs(scratch);
+    const source = join(scratch, "spec-source.jsonl");
+    await writeFile(source, "{}\n", "utf8");
+    const session = realSession();
+    await createSession(paths, session, ctx, startedEvent);
+
+    const speculative = await speculativeTranscriptCapture(paths, session.id, {
+      paths,
+      cwd: scratch,
+      transcriptsMode: "local",
+      explicitTranscriptPath: source,
+    });
+
+    expect(speculative).not.toBeNull();
+    expect(speculative?.sessionId).toBe(session.id);
+    expect(speculative?.result.transcriptRef).toBe(`transcripts/${session.id}.jsonl`);
+  });
+
+  it("resolveTranscriptCapture reuses the speculative result outright when it's keyed to the SAME session id as the authoritative session", async () => {
+    const paths = repoPaths(scratch);
+    const session = makeSession();
+    const speculative = {
+      sessionId: session.id,
+      result: {
+        transcriptRef: `transcripts/${session.id}.jsonl`,
+        warning: null,
+        sourcePath: "/speculative/source/never/actually/read/again.jsonl",
+      },
+    };
+
+    // Deliberately no explicitTranscriptPath and harness "other" — if this
+    // were actually RE-run against `options` alone it would find nothing.
+    // Getting the speculative transcriptRef back proves reuse, not a
+    // fresh in-lock capture.
+    const resolved = await resolveTranscriptCapture(speculative, {
+      session,
+      paths,
+      cwd: scratch,
+      transcriptsMode: "local",
+    });
+
+    expect(resolved).toEqual(speculative.result);
+    await expect(
+      readFile(join(paths.slopDir, "transcripts", `${session.id}.jsonl`)),
+    ).rejects.toThrow();
+  });
+
+  it("resolveTranscriptCapture falls back to an in-lock capture when the speculative result is keyed to a DIFFERENT session id (stale/racy speculative read)", async () => {
+    const paths = repoPaths(scratch);
+    const authoritativeSource = join(scratch, "authoritative-source.jsonl");
+    await writeFile(authoritativeSource, '{"authoritative":true}\n', "utf8");
+    const session = makeSession();
+
+    const staleSpeculative = {
+      sessionId: "session_01BADBADBADBADBADBADBADBAD" as SessionId,
+      result: {
+        transcriptRef: "transcripts/wrong-session.jsonl",
+        warning: null,
+        sourcePath: "/wrong",
+      },
+    };
+
+    const resolved = await resolveTranscriptCapture(staleSpeculative, {
+      session,
+      paths,
+      cwd: scratch,
+      transcriptsMode: "local",
+      explicitTranscriptPath: authoritativeSource,
+    });
+
+    expect(resolved.transcriptRef).toBe(`transcripts/${session.id}.jsonl`);
+    const written = await readFile(
+      join(paths.slopDir, "transcripts", `${session.id}.jsonl`),
+      "utf8",
+    );
+    expect(written).toBe('{"authoritative":true}\n');
+  });
+
+  it("resolveTranscriptCapture falls back to an in-lock capture when there was no speculative result at all", async () => {
+    const paths = repoPaths(scratch);
+    const source = join(scratch, "null-speculative-source.jsonl");
+    await writeFile(source, "{}\n", "utf8");
+    const session = makeSession();
+
+    const resolved = await resolveTranscriptCapture(null, {
+      session,
+      paths,
+      cwd: scratch,
+      transcriptsMode: "local",
+      explicitTranscriptPath: source,
+    });
+
+    expect(resolved.transcriptRef).toBe(`transcripts/${session.id}.jsonl`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fix 2 (ticket_01KY9NVM1YRM1F7NX1QS5JJAW1) — a recapture that finds
+// nothing preserves an existing transcript_ref rather than clearing it.
+// ---------------------------------------------------------------------------
+
+describe("captureTranscript — Fix 2: a recapture that locates nothing preserves an existing transcript_ref", () => {
+  it("keeps session.transcript_ref, with a 'kept the previously-captured transcript' warning, when nothing new is located", async () => {
+    const paths = repoPaths(scratch);
+    const session = makeSession({
+      harness: harness("other"),
+      transcript_ref: "transcripts/some-earlier-capture.jsonl",
+    });
+
+    // harness "other" + no --transcript => locateTranscript always
+    // returns null (no auto-detection in v0).
+    const result = await captureTranscript({
+      session,
+      paths,
+      cwd: scratch,
+      transcriptsMode: "local",
+    });
+
+    expect(result.transcriptRef).toBe("transcripts/some-earlier-capture.jsonl");
+    expect(result.warning).not.toBeNull();
+    expect(result.warning).toMatch(/kept the previously-captured transcript/i);
+    expect(result.warning).not.toMatch(/could not locate/i);
+  });
+
+  it("still returns null with the original 'could not locate' warning when the session never had a transcript_ref to begin with (unchanged regression guard)", async () => {
+    const paths = repoPaths(scratch);
+    const session = makeSession({ harness: harness("other"), transcript_ref: null });
+
+    const result = await captureTranscript({
+      session,
+      paths,
+      cwd: scratch,
+      transcriptsMode: "local",
+    });
+
+    expect(result.transcriptRef).toBeNull();
+    expect(result.warning).toMatch(/could not locate a transcript/i);
+  });
+
+  it("does NOT mask a genuinely NEW transcript: a located file overrides the previously-captured ref rather than keeping the stale one", async () => {
+    const paths = repoPaths(scratch);
+    const newSource = join(scratch, "genuinely-new.jsonl");
+    await writeFile(newSource, '{"new":"content"}\n', "utf8");
+    const session = makeSession({
+      harness: harness("other"),
+      transcript_ref: "transcripts/stale-old-ref.jsonl",
+    });
+
+    const result = await captureTranscript({
+      session,
+      paths,
+      cwd: scratch,
+      transcriptsMode: "local",
+      explicitTranscriptPath: newSource,
+    });
+
+    expect(result.transcriptRef).toBe(`transcripts/${session.id}.jsonl`);
+    expect(result.transcriptRef).not.toBe("transcripts/stale-old-ref.jsonl");
+    expect(result.warning).toBeNull();
+    const written = await readFile(
+      join(paths.slopDir, "transcripts", `${session.id}.jsonl`),
+      "utf8",
+    );
+    expect(written).toBe('{"new":"content"}\n');
   });
 });

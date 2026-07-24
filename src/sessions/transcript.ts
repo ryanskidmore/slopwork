@@ -122,14 +122,82 @@
  * way, just without setting `ended_at`/`end_summary`, and use whatever
  * verb `review --mr` already emits (`review.requested`) for the one
  * `updateSession` write instead of inventing a new one.
+ *
+ * ---------------------------------------------------------------------
+ * Fix 1 (ticket_01KY93E2ZK6Z3TFEBP86ATMW37) — capture runs OUTSIDE the db
+ * lock, and streams instead of buffering
+ * ---------------------------------------------------------------------
+ *
+ * Step 2 above used to run `captureTranscript` INSIDE `withLock`, before
+ * any `lock.assertHeld()` — for a large (tens-to-hundreds-of-MB)
+ * transcript this held the exclusive `.slop/db/.lock` long enough to
+ * time out a DIFFERENT concurrent command (default 5s acquire timeout,
+ * lock.ts) into a CONFLICT, and buffered the whole file as one in-memory
+ * string (a silent size ceiling -> `transcript_ref: null`). Both are
+ * fixed structurally, not per-caller:
+ *
+ *   - {@link captureTranscript}'s own copy now streams source -> temp
+ *     file (same directory as the destination) -> `rename`, mirroring
+ *     `atomic-write.ts`'s own tmp+rename discipline (see
+ *     `streamCopyFileAtomic` below) instead of `readFile` + a buffered
+ *     `atomicWriteFile` — no full-file string buffering, no size
+ *     ceiling.
+ *   - Every caller now performs the locate+copy TWICE in the general
+ *     shape, but only ever actually pays for it once in the common
+ *     case: a {@link speculativeTranscriptCapture} call BEFORE
+ *     `withLock`, keyed to whatever session is active on the
+ *     already-unlocked-read `initialTicket` (`resolveTicketRef`'s
+ *     result, which every caller already reads before its `withLock`
+ *     call) — this is where the slow, streamed I/O actually happens,
+ *     entirely outside the lock. Once inside the lock, the caller reads
+ *     the AUTHORITATIVE session as before and calls {@link
+ *     resolveTranscriptCapture} to reconcile: same session id (the
+ *     overwhelmingly common case — nothing else can retarget a
+ *     specific ticket's active session without holding this same lock
+ *     first) -> reuse the speculative result outright, zero extra I/O
+ *     under the lock. Different id, or the speculative read failed
+ *     outright (rare: a genuinely concurrent command on this SAME
+ *     ticket) -> fall back to an in-lock `captureTranscript` call, same
+ *     as before this fix, just no longer the common path.
+ *
+ * ---------------------------------------------------------------------
+ * Fix 2 (ticket_01KY9NVM1YRM1F7NX1QS5JJAW1) — a recapture that finds
+ * nothing preserves an existing `transcript_ref`
+ * ---------------------------------------------------------------------
+ *
+ * `review` and `done` (and `stop`/`drop`, for a session already reviewed
+ * then dropped) each independently call `captureTranscript` against the
+ * same session over its lifetime. Previously, a recapture that located
+ * NOTHING new (e.g. harness `other`, no `--transcript` re-passed at
+ * `done` after `review` DID capture one) unconditionally wrote
+ * `transcript_ref: null`, silently discarding the earlier capture and
+ * losing the audit trail. `captureTranscript`'s own "nothing located"
+ * branch now checks `session.transcript_ref` (the PRE-mutation value,
+ * always what every caller passes in per step 2 above): non-null ->
+ * return that existing ref unchanged, with a warning that says "kept
+ * the previously-captured transcript", not "could not locate"; null (a
+ * transcript was never captured for this session) -> the original
+ * "could not locate" behaviour, unchanged. This lives entirely inside
+ * `captureTranscript` itself, so all four callers get it for free and
+ * cannot drift out of sync with each other.
  */
-import { closeSync, openSync, readdirSync, readSync, statSync } from "node:fs";
-import { mkdir, readFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import {
+  closeSync,
+  createReadStream,
+  createWriteStream,
+  openSync,
+  readdirSync,
+  readSync,
+  statSync,
+} from "node:fs";
+import { mkdir, open, rename, rm } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
-import type { Harness, Session, TranscriptsMode } from "../core/index.js";
-import { atomicWriteFile } from "../repo/atomic-write.js";
+import { basename, dirname, join } from "node:path";
+import { pipeline } from "node:stream/promises";
+import type { Harness, Session, SessionId, TranscriptsMode } from "../core/index.js";
 import type { RepoPaths } from "../repo/paths.js";
+import { readSession } from "../repo/sessions.js";
 
 /** The `<root>/.slop/transcripts/` subdirectory name (design.md §3). */
 export const TRANSCRIPTS_SUBDIR = "transcripts";
@@ -451,6 +519,85 @@ export interface CaptureTranscriptResult {
  * simply `await`s this function and writes whatever it returns can never
  * have its own state transition broken by a transcript problem.
  */
+/**
+ * Test-only artificial delay for {@link streamCopyFileAtomic}, in
+ * milliseconds — lets a test simulate a large (tens-to-hundreds-of-MB)
+ * transcript's copy taking real wall-clock time WITHOUT actually writing
+ * a huge file to disk (a genuinely large file copies far faster on local
+ * disk/tmpfs than it would over whatever real filesystem a harness's
+ * transcript directory lives on, so a size-based test alone would not
+ * reliably distinguish "the copy ran outside the db lock" from "it ran
+ * inside it and just finished before anything could time out"). Read
+ * once via `SLOP_TEST_TRANSCRIPT_COPY_DELAY_MS`; unset (0, a no-op) on
+ * every real invocation — mirrors `atomic-write.ts`'s own
+ * `SLOP_TEST_ATOMIC_WRITE_DELAY_MS` / this module's own
+ * `SLOP_TEST_CLAUDE_HOME` test-knob convention.
+ */
+const TEST_COPY_DELAY_MS = (() => {
+  const raw = process.env.SLOP_TEST_TRANSCRIPT_COPY_DELAY_MS;
+  if (!raw) return 0;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+})();
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * fsync `path` — a plain file OR a directory. Opening a directory
+ * read-only and syncing its fd is the standard POSIX trick for making a
+ * `rename`'s directory-entry update durable, not just visible — the same
+ * one `atomic-write.ts`'s own (unexported) `fsyncDir` uses; reimplemented
+ * here rather than imported since it isn't part of that module's public
+ * surface.
+ */
+async function fsyncPath(path: string): Promise<void> {
+  const handle = await open(path, "r");
+  try {
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
+ * Stream `sourcePath` -> `targetPath`: a temp file in `targetPath`'s own
+ * directory, fsynced, `rename`d into place, then the containing directory
+ * is fsynced too — mirroring `atomic-write.ts`'s own tmp+rename
+ * discipline (see that module's doc) but for a filesystem-to-filesystem
+ * copy instead of a string write. This is what lets {@link
+ * captureTranscript} handle a tens-to-hundreds-of-MB transcript without
+ * ever buffering the whole thing as one in-memory string (Fix 1,
+ * ticket_01KY93E2ZK6Z3TFEBP86ATMW37 — see this module's top-of-file doc).
+ * A reader of `targetPath` only ever observes complete old content or
+ * complete new content, never a partial copy — `rename` is atomic within
+ * one filesystem, which is why the temp file must live alongside the
+ * target rather than in some other (possibly different-filesystem) temp
+ * directory.
+ */
+async function streamCopyFileAtomic(sourcePath: string, targetPath: string): Promise<void> {
+  const dir = dirname(targetPath);
+  await mkdir(dir, { recursive: true });
+  const tmpPath = join(dir, `.tmp-${randomUUID()}-${basename(targetPath)}`);
+  let renamed = false;
+  try {
+    await pipeline(createReadStream(sourcePath), createWriteStream(tmpPath, { flags: "wx" }));
+    if (TEST_COPY_DELAY_MS > 0) {
+      await sleep(TEST_COPY_DELAY_MS);
+    }
+    await fsyncPath(tmpPath);
+    await rename(tmpPath, targetPath);
+    renamed = true;
+    await fsyncPath(dir);
+  } catch (err) {
+    if (!renamed) {
+      await rm(tmpPath, { force: true }).catch(() => {});
+    }
+    throw err;
+  }
+}
+
 export async function captureTranscript(
   options: CaptureTranscriptOptions,
 ): Promise<CaptureTranscriptResult> {
@@ -481,6 +628,25 @@ export async function captureTranscript(
       const explicitNote = hadExplicit
         ? ` (the given --transcript path "${explicitTranscriptPath}" does not exist or is not a readable file)`
         : "";
+
+      // Fix 2 (ticket_01KY9NVM1YRM1F7NX1QS5JJAW1): a RECAPTURE that finds
+      // nothing new must not clobber a transcript_ref an EARLIER capture
+      // on this exact session already set — `session` here is always the
+      // PRE-mutation session every caller passes in (this module's
+      // top-of-file doc, step 2), so `session.transcript_ref` is the
+      // value already on disk. Only genuinely "never captured anything
+      // for this session" still returns null.
+      if (session.transcript_ref !== null) {
+        return {
+          transcriptRef: session.transcript_ref,
+          sourcePath: null,
+          warning:
+            `no new transcript located for session ${session.id} on this recapture ` +
+            `(harness=${session.harness.kind})${explicitNote} — kept the previously-captured ` +
+            `transcript (${session.transcript_ref}) rather than resetting it to null.`,
+        };
+      }
+
       return {
         transcriptRef: null,
         sourcePath: null,
@@ -498,8 +664,10 @@ export async function captureTranscript(
     await mkdir(transcriptsDir, { recursive: true });
 
     const fileName = `${session.id}.jsonl`;
-    const contents = await readFile(sourcePath, "utf8");
-    await atomicWriteFile(join(transcriptsDir, fileName), contents);
+    // Fix 1 (ticket_01KY93E2ZK6Z3TFEBP86ATMW37): stream source -> temp ->
+    // rename instead of `readFile` (whole file, buffered as one string)
+    // + `atomicWriteFile` — see `streamCopyFileAtomic`'s own doc.
+    await streamCopyFileAtomic(sourcePath, join(transcriptsDir, fileName));
 
     return {
       transcriptRef: `${TRANSCRIPTS_SUBDIR}/${fileName}`,
@@ -516,4 +684,81 @@ export async function captureTranscript(
         "never blocking.",
     };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Fix 1 (ticket_01KY93E2ZK6Z3TFEBP86ATMW37) — running the locate+copy
+// OUTSIDE the db lock. See this module's top-of-file doc, "Fix 1", for the
+// full rationale; this is the pair of functions every stop/review/done/
+// drop caller uses to do it, so all four stay identical rather than each
+// growing its own copy of this logic.
+// ---------------------------------------------------------------------------
+
+/**
+ * A {@link captureTranscript} result performed speculatively, OUTSIDE the
+ * db lock, keyed to whichever session was active on a ticket at the time
+ * of an UNLOCKED read (see {@link speculativeTranscriptCapture}). Never
+ * persist `result` directly — always reconcile it against the
+ * AUTHORITATIVE in-lock session via {@link resolveTranscriptCapture}
+ * first, since the two reads are not atomic with each other.
+ */
+export interface SpeculativeTranscriptCapture {
+  result: CaptureTranscriptResult;
+  /** The session id `result` is actually keyed to. */
+  sessionId: SessionId;
+}
+
+/**
+ * Best-effort, UNLOCKED locate+copy for `activeSessionId` — the session
+ * id off of a ticket a caller already read BEFORE acquiring `withLock`
+ * (every `stop`/`review`/`done`/`drop` caller already does this via
+ * `resolveTicketRef`, so this needs no extra ticket read of its own).
+ * This is what actually moves the slow, streamed transcript I/O out from
+ * under the exclusive db lock.
+ *
+ * Returns `null` — never throws — when `activeSessionId` is `null` (no
+ * active session to capture against yet) or the speculative session read
+ * itself fails for any reason (e.g. a genuinely concurrent command on
+ * this exact ticket already ended that session and moved the ticket on
+ * by the time this runs). Either way, {@link resolveTranscriptCapture}'s
+ * in-lock fallback covers it — a `null` here never blocks the caller's
+ * own state transition.
+ */
+export async function speculativeTranscriptCapture(
+  paths: RepoPaths,
+  activeSessionId: SessionId | null,
+  options: Omit<CaptureTranscriptOptions, "session">,
+): Promise<SpeculativeTranscriptCapture | null> {
+  if (activeSessionId === null) return null;
+  try {
+    const session = await readSession(paths, activeSessionId);
+    const result = await captureTranscript({ ...options, session });
+    return { result, sessionId: session.id };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reconcile a {@link speculativeTranscriptCapture} result against
+ * `options.session` — the AUTHORITATIVE session a caller reads once
+ * INSIDE `withLock`. Reuses the speculative result outright when it was
+ * keyed to the exact same session id (the overwhelmingly common case:
+ * nothing can retarget a specific ticket's active session without
+ * holding this same db lock first, so the session read speculatively and
+ * the one read authoritatively are the same file with the same content).
+ * Otherwise — a `null` speculative result, or one keyed to a DIFFERENT
+ * session id (a genuinely concurrent command on this same ticket raced
+ * between the speculative read and the lock) — falls back to an in-lock
+ * `captureTranscript` call: still never throws, still streams, just no
+ * longer overlapped with other commands in that narrow window.
+ */
+export async function resolveTranscriptCapture(
+  speculative: SpeculativeTranscriptCapture | null,
+  options: CaptureTranscriptOptions,
+): Promise<CaptureTranscriptResult> {
+  if (speculative !== null && speculative.sessionId === options.session.id) {
+    return speculative.result;
+  }
+  return captureTranscript(options);
 }

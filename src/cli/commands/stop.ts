@@ -12,7 +12,10 @@ import {
 } from "../../repo/index.js";
 import { diffSessionPatch, SESSION_END_FIELDS } from "../../sessions/patch.js";
 import { assertStoppable, buildStoppedSession, buildStoppedTicket } from "../../sessions/stop.js";
-import { captureTranscript } from "../../sessions/transcript.js";
+import {
+  resolveTranscriptCapture,
+  speculativeTranscriptCapture,
+} from "../../sessions/transcript.js";
 import { diffTicketPatch, TICKET_FIELDS } from "../../tickets/patch.js";
 import { loadConfig, resolveActor } from "../actor.js";
 import { printWarning } from "./shared.js";
@@ -53,6 +56,23 @@ async function runStop(ref: string, opts: StopCommandOptions): Promise<void> {
 
   const initialTicket = await resolveTicketRef(paths, ref);
 
+  // Fix 1 (ticket_01KY93E2ZK6Z3TFEBP86ATMW37): locate + copy the harness
+  // transcript BEFORE acquiring the db lock — see transcript.ts's
+  // top-of-file doc, "Fix 1", for the full rationale. `resolveTicketRef`
+  // above already read `initialTicket` unlocked, so this needs no extra
+  // ticket read of its own. Reconciled against the AUTHORITATIVE session
+  // below via `resolveTranscriptCapture`.
+  const speculativeCapture = await speculativeTranscriptCapture(
+    paths,
+    initialTicket.active_session,
+    {
+      paths,
+      cwd: root,
+      transcriptsMode: config.transcripts,
+      explicitTranscriptPath: opts.transcript,
+    },
+  );
+
   const result = await withLock(paths.lockFile, async (lock) => {
     const current = await readTicket(paths, initialTicket.id);
     assertStoppable(current);
@@ -73,8 +93,10 @@ async function runStop(ref: string, opts: StopCommandOptions): Promise<void> {
     // itself never throws (structural never-block guarantee, design.md
     // §4.3 / spikes/findings.md §6) — a missing/unfindable transcript
     // degrades to `transcript_ref: null` + a warning printed below, and
-    // this `stop` still succeeds.
-    const capture = await captureTranscript({
+    // this `stop` still succeeds. Reuses `speculativeCapture` (captured
+    // OUTSIDE this lock, above) when it's still keyed to this exact
+    // session; otherwise falls back to an in-lock capture.
+    const capture = await resolveTranscriptCapture(speculativeCapture, {
       session,
       paths,
       cwd: root,

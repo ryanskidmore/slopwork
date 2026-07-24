@@ -16,7 +16,10 @@ import {
 } from "../../repo/index.js";
 import { buildFinalizedSession } from "../../sessions/finalize.js";
 import { diffSessionPatch, SESSION_END_FIELDS } from "../../sessions/patch.js";
-import { captureTranscript } from "../../sessions/transcript.js";
+import {
+  resolveTranscriptCapture,
+  speculativeTranscriptCapture,
+} from "../../sessions/transcript.js";
 import { cascadeOnClose } from "../../tickets/cascade.js";
 import { diffTicketPatch, TICKET_FIELDS } from "../../tickets/patch.js";
 import { checkDropEntry } from "../../tickets/state.js";
@@ -89,6 +92,25 @@ async function runDrop(ref: string, opts: DropCommandOptions): Promise<void> {
 
   const initialTicket = await resolveTicketRef(paths, ref);
 
+  // Fix 1 (ticket_01KY93E2ZK6Z3TFEBP86ATMW37): locate + copy the harness
+  // transcript BEFORE acquiring the db lock — see transcript.ts's
+  // top-of-file doc, "Fix 1", and stop.ts's identical comment for the
+  // full rationale. `null` when `initialTicket` has no active session
+  // (an open/draft ticket being dropped) — `speculativeTranscriptCapture`
+  // degrades to `null` itself in that case, same as the in-lock path
+  // below skipping capture entirely. Reconciled against the
+  // AUTHORITATIVE session below via `resolveTranscriptCapture`.
+  const speculativeCapture = await speculativeTranscriptCapture(
+    paths,
+    initialTicket.active_session,
+    {
+      paths,
+      cwd: root,
+      transcriptsMode: config.transcripts,
+      explicitTranscriptPath: opts.transcript,
+    },
+  );
+
   const result = await withLock(paths.lockFile, async (lock) => {
     const current = await readTicket(paths, initialTicket.id);
 
@@ -107,8 +129,10 @@ async function runDrop(ref: string, opts: DropCommandOptions): Promise<void> {
       const session = await readSession(paths, current.active_session);
       const finalizedSession = buildFinalizedSession(session, opts.reason);
 
-      // C4's seam — see done.ts's identical comment for the full rationale.
-      const capture = await captureTranscript({
+      // C4's seam — see done.ts's identical comment for the full
+      // rationale. Reuses `speculativeCapture` (captured OUTSIDE this
+      // lock, above) when it's still keyed to this exact session.
+      const capture = await resolveTranscriptCapture(speculativeCapture, {
         session,
         paths,
         cwd: root,
