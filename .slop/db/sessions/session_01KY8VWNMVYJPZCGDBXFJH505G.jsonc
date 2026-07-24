@@ -1,0 +1,40 @@
+{
+  "id": "session_01KY8VWNMVYJPZCGDBXFJH505G",
+  "ticket": "ticket_01KY8NSSF750VM85A0WF5GWYAR",
+  "actor": {
+    "name": "coordinator",
+    "kind": "human"
+  },
+  "harness": {
+    "kind": "other",
+    "session_id": null
+  },
+  "git": {
+    "branch": "main",
+    "commit_at_start": "1eb35a879855169a2c8ca2b4411083eec9c6b517"
+  },
+  "started_at": "2026-07-24T01:29:58.171Z",
+  "ended_at": "2026-07-24T01:29:58.863Z",
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "implement via subagent",
+          "checked": true
+        },
+        {
+          "text": "coordinator verifies",
+          "checked": true
+        },
+        {
+          "text": "commit to main",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T01:29:58.284Z"
+    }
+  ],
+  "end_summary": "merged to main",
+  "transcript_ref": null
+}

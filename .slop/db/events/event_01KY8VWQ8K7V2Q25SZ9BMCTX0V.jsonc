@@ -1,0 +1,18 @@
+{
+  "id": "event_01KY8VWQ8K7V2Q25SZ9BMCTX0V",
+  "actor": {
+    "name": "coordinator",
+    "kind": "human"
+  },
+  "session": "session_01KY8VWQ7V5FMQYMM38G8TP8Z0",
+  "verb": "ticket.state_changed",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KY8NSSMRGSB30R7STMJKHB7C"
+  },
+  "payload": {
+    "from": "open",
+    "to": "in_progress"
+  },
+  "at": "2026-07-24T01:29:59.827Z"
+}

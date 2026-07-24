@@ -10,7 +10,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "done",
   "priority": 1,
   "labels": [
     "lane:E"
@@ -22,8 +22,8 @@
   "root_id": "ticket_01KY8NSS4KJ0FJANT5ND51SYM3",
   "path": [],
   "active_session": null,
-  "last_activity_at": "2026-07-23T23:43:31.999Z",
-  "latest_note": null,
+  "last_activity_at": "2026-07-24T01:29:56.433Z",
+  "latest_note": "merged to main",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -33,5 +33,5 @@
     }
   },
   "created_at": "2026-07-23T23:43:31.999Z",
-  "updated_at": "2026-07-23T23:43:31.999Z"
+  "updated_at": "2026-07-24T01:29:56.433Z"
 }

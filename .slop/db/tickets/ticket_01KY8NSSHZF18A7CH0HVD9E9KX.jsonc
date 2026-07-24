@@ -10,7 +10,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "done",
   "priority": 2,
   "labels": [
     "kind:chore"
@@ -22,8 +22,8 @@
   "root_id": "ticket_01KY8NSSHZF18A7CH0HVD9E9KX",
   "path": [],
   "active_session": null,
-  "last_activity_at": "2026-07-23T23:43:32.430Z",
-  "latest_note": null,
+  "last_activity_at": "2026-07-24T01:29:59.695Z",
+  "latest_note": "merged to main",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -33,5 +33,5 @@
     }
   },
   "created_at": "2026-07-23T23:43:32.430Z",
-  "updated_at": "2026-07-23T23:43:32.430Z"
+  "updated_at": "2026-07-24T01:29:59.695Z"
 }

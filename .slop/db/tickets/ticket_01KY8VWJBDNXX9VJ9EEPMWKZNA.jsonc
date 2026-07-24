@@ -1,0 +1,37 @@
+{
+  "id": "ticket_01KY8VWJBDNXX9VJ9EEPMWKZNA",
+  "name": "F5: MCP server exposing the core slop tools (spec §6 feature menu)",
+  "slug": "f5-mcp-server-exposing-the-core-slop-tools-spec-6-feature-me",
+  "spec": {
+    "summary": "F5: MCP server exposing the core slop tools (spec §6 feature menu)",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 3,
+  "labels": [
+    "lane:F-menu"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KY8VWJBDNXX9VJ9EEPMWKZNA",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T01:29:54.814Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-07-24T01:29:54.814Z",
+  "updated_at": "2026-07-24T01:29:54.814Z"
+}

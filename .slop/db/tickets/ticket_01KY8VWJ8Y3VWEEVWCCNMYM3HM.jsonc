@@ -1,0 +1,39 @@
+{
+  "id": "ticket_01KY8VWJ8Y3VWEEVWCCNMYM3HM",
+  "name": "Derive ticket.updated_at from the event log so same-ticket different-field edits merge with zero conflicts (post-v0; E2 finding)",
+  "slug": "derive-ticket-updated-at-from-the-event-log-so-same-ticket-d",
+  "spec": {
+    "summary": "Derive ticket.updated_at from the event log so same-ticket different-field edits merge with zero conflicts (post-v0; E2 finding)",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "lane:post-v0"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KY8NSS4KJ0FJANT5ND51SYM3"
+  ],
+  "root_id": "ticket_01KY8VWJ8Y3VWEEVWCCNMYM3HM",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T01:29:54.719Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-07-24T01:29:54.719Z",
+  "updated_at": "2026-07-24T01:29:54.719Z"
+}

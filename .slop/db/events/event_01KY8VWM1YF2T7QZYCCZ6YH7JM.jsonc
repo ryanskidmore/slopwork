@@ -1,0 +1,18 @@
+{
+  "id": "event_01KY8VWM1YF2T7QZYCCZ6YH7JM",
+  "actor": {
+    "name": "coordinator",
+    "kind": "human"
+  },
+  "session": "session_01KY8VWM1REW898APQNQ38SNYT",
+  "verb": "session.started",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KY8VWM1REW898APQNQ38SNYT"
+  },
+  "payload": {
+    "harness": "other",
+    "takeover": false
+  },
+  "at": "2026-07-24T01:29:56.542Z"
+}

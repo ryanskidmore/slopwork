@@ -1,0 +1,21 @@
+{
+  "id": "session_01KY8VWQ7V5FMQYMM38G8TP8Z0",
+  "ticket": "ticket_01KY8NSSMRGSB30R7STMJKHB7C",
+  "actor": {
+    "name": "coordinator",
+    "kind": "human"
+  },
+  "harness": {
+    "kind": "other",
+    "session_id": null
+  },
+  "git": {
+    "branch": "main",
+    "commit_at_start": "1eb35a879855169a2c8ca2b4411083eec9c6b517"
+  },
+  "started_at": "2026-07-24T01:29:59.803Z",
+  "ended_at": null,
+  "plan": [],
+  "end_summary": null,
+  "transcript_ref": null
+}

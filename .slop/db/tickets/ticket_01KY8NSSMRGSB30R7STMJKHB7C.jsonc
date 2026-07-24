@@ -10,7 +10,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "in_progress",
   "priority": 2,
   "labels": [
     "kind:release"
@@ -21,8 +21,8 @@
   "discovered_from": [],
   "root_id": "ticket_01KY8NSSMRGSB30R7STMJKHB7C",
   "path": [],
-  "active_session": null,
-  "last_activity_at": "2026-07-23T23:43:32.522Z",
+  "active_session": "session_01KY8VWQ7V5FMQYMM38G8TP8Z0",
+  "last_activity_at": "2026-07-24T01:29:59.819Z",
   "latest_note": null,
   "owner": null,
   "provenance": {
@@ -33,5 +33,5 @@
     }
   },
   "created_at": "2026-07-23T23:43:32.522Z",
-  "updated_at": "2026-07-23T23:43:32.522Z"
+  "updated_at": "2026-07-24T01:29:59.819Z"
 }

@@ -10,7 +10,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "done",
   "priority": 1,
   "labels": [
     "kind:bug"
@@ -22,8 +22,8 @@
   "root_id": "ticket_01KY8NSS9N93MD3G28B3YZTFB7",
   "path": [],
   "active_session": null,
-  "last_activity_at": "2026-07-23T23:43:32.154Z",
-  "latest_note": null,
+  "last_activity_at": "2026-07-24T01:29:57.231Z",
+  "latest_note": "merged to main",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -33,5 +33,5 @@
     }
   },
   "created_at": "2026-07-23T23:43:32.154Z",
-  "updated_at": "2026-07-23T23:43:32.154Z"
+  "updated_at": "2026-07-24T01:29:57.231Z"
 }
