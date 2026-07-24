@@ -1,12 +1,12 @@
 import { type SpawnSyncReturns, execFileSync, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { newTicketId } from "../../src/core/index.js";
 import { repoPaths } from "../../src/repo/index.js";
+import { makeTempRepo } from "../support/temp-repo.js";
 
 // D2: search
 //
@@ -44,15 +44,6 @@ beforeAll(() => {
 // Fixture + spawn helpers
 // ---------------------------------------------------------------------------
 
-const scratchDirs: string[] = [];
-
-afterEach(async () => {
-  while (scratchDirs.length > 0) {
-    const dir = scratchDirs.pop();
-    if (dir) await rm(dir, { recursive: true, force: true });
-  }
-});
-
 /** `spawnSync` against the compiled binary, with `CLAUDECODE`/`OPENCODE`/
  * `CODEX_SANDBOX*` stripped (not just "not set") so actor-kind-dependent
  * behavior is deterministic even when this suite itself runs inside a
@@ -75,8 +66,7 @@ function runSlop(args: string[], cwd: string, input?: string): SpawnSyncReturns<
 }
 
 async function makeFixture(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "slop-d2-"));
-  scratchDirs.push(root);
+  const root = await makeTempRepo("slop-d2-");
   const init = runSlop(["init", "--yes", "--project", "d2-fixture", "--user", "ryan"], root);
   expect(init.status, init.stderr).toBe(0);
   return root;

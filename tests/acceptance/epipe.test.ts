@@ -1,11 +1,10 @@
 import { type SpawnSyncReturns, execFileSync, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { EXIT_CODES } from "../../src/core/exit-codes.js";
+import { makeTempRepo } from "../support/temp-repo.js";
 
 // EPIPE: a downstream reader closing `slop`'s stdout early (`slop ready |
 // head -1`, `slop show <ref> | less` then quitting, `slop events | head`,
@@ -39,22 +38,12 @@ beforeAll(() => {
   }
 }, 60_000);
 
-const scratchDirs: string[] = [];
-
-afterEach(async () => {
-  while (scratchDirs.length > 0) {
-    const dir = scratchDirs.pop();
-    if (dir) await rm(dir, { recursive: true, force: true });
-  }
-});
-
 function runSlop(args: string[], cwd: string): SpawnSyncReturns<string> {
   return spawnSync(binaryPath, args, { cwd, encoding: "utf8" });
 }
 
 async function makeCliFixture(project: string): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "slop-epipe-"));
-  scratchDirs.push(root);
+  const root = await makeTempRepo("slop-epipe-");
   const init = runSlop(["init", "--yes", "--project", project, "--user", "epipe-tester"], root);
   expect(init.status, init.stderr).toBe(0);
   return root;

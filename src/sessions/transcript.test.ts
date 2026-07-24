@@ -1,4 +1,14 @@
-import { chmod, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  symlink,
+  utimes,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -307,22 +317,33 @@ describe("locateTranscript — codex", () => {
     const codexHome = await fakeCodexHome();
     const cwd = "/my/codex/project";
 
+    // mtime ordering is forced deterministically via `utimes` (same
+    // pattern as tests/acceptance/A3.test.ts's mtime-fingerprint tests)
+    // rather than relying on real wall-clock gaps between writes, which
+    // was flaky on filesystems/CI runners with coarse or contended mtime
+    // resolution — the timestamps below, not write order, drive the
+    // assertion.
+    const baseTime = new Date("2026-05-26T01:00:00.000Z");
+
     const dayDirA = join(codexHome, "sessions", "2026", "05", "26");
     await mkdir(dayDirA, { recursive: true });
     const wrongCwd = join(dayDirA, "rollout-2026-05-26T01-00-00-aaa.jsonl");
     await writeFile(wrongCwd, sessionMetaLine("/some/other/project", "aaa"), "utf8");
+    await utimes(wrongCwd, baseTime, baseTime);
 
-    await new Promise((r) => setTimeout(r, 5));
     const dayDirB = join(codexHome, "sessions", "2026", "05", "27");
     await mkdir(dayDirB, { recursive: true });
     const rightCwdOld = join(dayDirB, "rollout-2026-05-27T01-00-00-bbb.jsonl");
     await writeFile(rightCwdOld, sessionMetaLine(cwd, "bbb"), "utf8");
+    const rightCwdOldTime = new Date(baseTime.getTime() + 60_000);
+    await utimes(rightCwdOld, rightCwdOldTime, rightCwdOldTime);
 
-    await new Promise((r) => setTimeout(r, 5));
     const dayDirC = join(codexHome, "sessions", "2026", "05", "28");
     await mkdir(dayDirC, { recursive: true });
     const rightCwdNew = join(dayDirC, "rollout-2026-05-28T01-00-00-ccc.jsonl");
     await writeFile(rightCwdNew, sessionMetaLine(cwd, "ccc"), "utf8");
+    const rightCwdNewTime = new Date(baseTime.getTime() + 120_000);
+    await utimes(rightCwdNew, rightCwdNewTime, rightCwdNewTime);
 
     const roots: LocateTranscriptRoots = { codexHome };
     expect(locateTranscript(harness("codex", null), cwd, undefined, roots)).toBe(rightCwdNew);
@@ -367,17 +388,25 @@ describe("locateTranscript — codex Fix 3: ambiguity refusal", () => {
   it("returns null (refuses to guess) when TWO cwd-matching rollouts are both newer than the session's started_at, instead of silently picking the newest one", async () => {
     const codexHome = await fakeCodexHome();
     const cwd = "/concurrent/codex/project";
-    // Both rollouts below are written well after this — the exact shape
-    // of two genuinely concurrent Codex sessions racing in the same cwd.
+    // Both rollouts below are given mtimes well after this — the exact
+    // shape of two genuinely concurrent Codex sessions racing in the same
+    // cwd.
     const sessionStartedAt = "2020-01-01T00:00:00.000Z";
 
     const dayDir = join(codexHome, "sessions", "2026", "06", "01");
     await mkdir(dayDir, { recursive: true });
     const rolloutA = join(dayDir, "rollout-2026-06-01T01-00-00-aaa.jsonl");
     await writeFile(rolloutA, sessionMetaLine(cwd, "aaa"), "utf8");
-    await new Promise((r) => setTimeout(r, 5));
+    // mtimes are forced deterministically via `utimes` rather than a real
+    // wall-clock gap between writes (same reasoning as the "finds the
+    // newest rollout ..." test above) so ordering can't flake on
+    // filesystems/CI runners with coarse or contended mtime resolution.
+    const rolloutATime = new Date("2026-06-01T01:00:00.000Z");
+    await utimes(rolloutA, rolloutATime, rolloutATime);
     const rolloutB = join(dayDir, "rollout-2026-06-01T02-00-00-bbb.jsonl");
     await writeFile(rolloutB, sessionMetaLine(cwd, "bbb"), "utf8");
+    const rolloutBTime = new Date(rolloutATime.getTime() + 60_000);
+    await utimes(rolloutB, rolloutBTime, rolloutBTime);
 
     const roots: LocateTranscriptRoots = { codexHome };
     // Sanity check first: without the ambiguity check (no started_at
@@ -395,25 +424,31 @@ describe("locateTranscript — codex Fix 3: ambiguity refusal", () => {
     const cwd = "/single-match/codex/project";
 
     // Real mtimes (not the date-partitioned directory names, which are
-    // just a path convention) drive the ambiguity check, so this uses
-    // actual wall-clock ordering with a small sleep either side of the
-    // `started_at` cutoff, same as every other mtime-ordering test in
-    // this file (e.g. the "finds the newest rollout ..." test above).
+    // just a path convention) drive the ambiguity check. Every timestamp
+    // below is forced via `utimes` against a fixed base time rather than
+    // real wall-clock gaps between writes, so ordering relative to
+    // `started_at` can't flake on filesystems/CI runners with coarse or
+    // contended mtime resolution (same reasoning as every other
+    // mtime-ordering test in this file, e.g. the "finds the newest
+    // rollout ..." test above).
+    const baseTime = new Date("2026-05-01T00:00:00.000Z");
+
     const oldDayDir = join(codexHome, "sessions", "2026", "05", "01");
     await mkdir(oldDayDir, { recursive: true });
     const oldRollout = join(oldDayDir, "rollout-2026-05-01T00-00-00-old.jsonl");
     await writeFile(oldRollout, sessionMetaLine(cwd, "old"), "utf8");
+    await utimes(oldRollout, baseTime, baseTime);
 
     // started_at sits strictly between the old rollout above and the new
     // one below, so exactly ONE cwd-matching candidate ends up newer.
-    await new Promise((r) => setTimeout(r, 5));
-    const sessionStartedAt = new Date().toISOString();
-    await new Promise((r) => setTimeout(r, 5));
+    const sessionStartedAt = new Date(baseTime.getTime() + 60_000).toISOString();
 
     const newDayDir = join(codexHome, "sessions", "2026", "07", "23");
     await mkdir(newDayDir, { recursive: true });
     const newRollout = join(newDayDir, "rollout-2026-07-23T00-00-00-new.jsonl");
     await writeFile(newRollout, sessionMetaLine(cwd, "new"), "utf8");
+    const newRolloutTime = new Date(baseTime.getTime() + 120_000);
+    await utimes(newRollout, newRolloutTime, newRolloutTime);
 
     const roots: LocateTranscriptRoots = { codexHome };
     expect(locateTranscript(harness("codex", null), cwd, undefined, roots, sessionStartedAt)).toBe(
@@ -427,14 +462,16 @@ describe("locateTranscript — codex Fix 3: ambiguity refusal", () => {
 
     const dayDir = join(codexHome, "sessions", "2026", "06", "01");
     await mkdir(dayDir, { recursive: true });
-    await writeFile(
-      join(dayDir, "rollout-2026-06-01T01-00-00-aaa.jsonl"),
-      sessionMetaLine(cwd, "aaa"),
-      "utf8",
-    );
-    await new Promise((r) => setTimeout(r, 5));
+    const rolloutA = join(dayDir, "rollout-2026-06-01T01-00-00-aaa.jsonl");
+    await writeFile(rolloutA, sessionMetaLine(cwd, "aaa"), "utf8");
+    // mtimes forced deterministically via `utimes` — see the "finds the
+    // newest rollout ..." test above for why.
+    const rolloutATime = new Date("2026-06-01T01:00:00.000Z");
+    await utimes(rolloutA, rolloutATime, rolloutATime);
     const rolloutB = join(dayDir, "rollout-2026-06-01T02-00-00-bbb.jsonl");
     await writeFile(rolloutB, sessionMetaLine(cwd, "bbb"), "utf8");
+    const rolloutBTime = new Date(rolloutATime.getTime() + 60_000);
+    await utimes(rolloutB, rolloutBTime, rolloutBTime);
 
     const roots: LocateTranscriptRoots = { codexHome };
     expect(locateTranscript(harness("codex", null), cwd, undefined, roots)).toBe(rolloutB);

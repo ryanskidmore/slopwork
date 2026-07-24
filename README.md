@@ -132,6 +132,15 @@ and `--version`).
   land its `tests/acceptance/<ID>.test.ts` alongside its implementation.
 - The test runner is **vitest** (`bun run test` → `vitest run`), which runs cleanly under Bun; no
   fallback to `bun test` was needed. See `vitest.config.ts`.
+- **Sandboxing**: every test runs against an isolated `mkdtemp()` temp directory, never this repo's
+  own root, and a `globalSetup` hook (`tests/support/repo-slop-guard.ts`) hashes this repo's own
+  `.slop/` before and after the whole suite, failing the run loudly if anything touched it.
+- **Coverage**: `bun run test:coverage` (`vitest run --coverage`, v8 provider) enforces the
+  thresholds in `vitest.config.ts` — a global floor plus stricter per-directory floors for
+  `src/core/`, `src/repo/`, `src/sessions/`, and `src/tickets/`; reports land in `coverage/`
+  (gitignored). `src/cli/commands/**` reads as ~0% there on purpose — those are exercised via
+  spawned-subprocess acceptance tests (see `tests/acceptance/`), which v8 can't instrument across a
+  process boundary, not because they're untested.
 
 ## Source layout
 

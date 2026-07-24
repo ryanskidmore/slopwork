@@ -32,15 +32,21 @@ describe("computeGitignoreLines", () => {
     // `.slop/db/.tmp-*` should match a temp file written directly in db/
     // (e.g. index.jsonc's own atomic write).
     const dbGlob = lines.find((l) => l === ".slop/db/.tmp-*");
-    expect(dbGlob).toBeDefined();
-    const dbGlobRegex = new RegExp(`^${dbGlob!.replace(/\*/g, ".*")}$`);
+    if (dbGlob === undefined) {
+      throw new Error("expected '.slop/db/.tmp-*' to be present in the generated gitignore lines");
+    }
+    const dbGlobRegex = new RegExp(`^${dbGlob.replace(/\*/g, ".*")}$`);
     expect(dbGlobRegex.test(".slop/db/.tmp-abc123-index.jsonc")).toBe(true);
 
     // `.slop/db/*/.tmp-*` should match a temp file left in a subdirectory
     // (tickets/sessions/events) next to its target.
     const subdirGlob = lines.find((l) => l === ".slop/db/*/.tmp-*");
-    expect(subdirGlob).toBeDefined();
-    const subdirGlobRegex = new RegExp(`^${subdirGlob!.replace(/\*/g, "[^/]*")}$`);
+    if (subdirGlob === undefined) {
+      throw new Error(
+        "expected '.slop/db/*/.tmp-*' to be present in the generated gitignore lines",
+      );
+    }
+    const subdirGlobRegex = new RegExp(`^${subdirGlob.replace(/\*/g, "[^/]*")}$`);
     expect(subdirGlobRegex.test(".slop/db/tickets/.tmp-abc-x.jsonc")).toBe(true);
     expect(subdirGlobRegex.test(".slop/db/sessions/.tmp-def-y.jsonc")).toBe(true);
   });
