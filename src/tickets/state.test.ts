@@ -2,25 +2,44 @@ import { describe, expect, it } from "vitest";
 import { checkDoneEntry, checkDropEntry, checkReviewEntry, checkStateTransition } from "./state.js";
 
 describe("checkStateTransition (design.md §2's state diagram)", () => {
-  it("same-state is always a legal no-op", () => {
+  it("same-state is always a legal no-op, including on a terminal ticket", () => {
     for (const s of ["draft", "open", "in_progress", "review", "done", "dropped"] as const) {
       expect(checkStateTransition(s, s)).toEqual({ ok: true });
     }
   });
 
-  it("allows the diagram's simple edges", () => {
+  it("allows ONLY D13's draft <-> open edges directly — every other §2 edge needs a dedicated command", () => {
     expect(checkStateTransition("draft", "open")).toEqual({ ok: true });
     expect(checkStateTransition("open", "draft")).toEqual({ ok: true });
-    expect(checkStateTransition("open", "in_progress")).toEqual({ ok: true });
-    expect(checkStateTransition("in_progress", "open")).toEqual({ ok: true });
-    // review -> in_progress (changes-requested re-entry, D15) needs no
-    // extra data (just clearing `review`), so it's directly legal here.
-    expect(checkStateTransition("review", "in_progress")).toEqual({ ok: true });
   });
 
-  it("dropped is legal from any non-terminal state", () => {
+  // Adversarial-review fix: these four used to be legal directly via
+  // `update --state` (the pre-fix `RAW_STATE_TRANSITIONS` table). Each is
+  // now rejected because it needs session-lifecycle machinery this
+  // generic, side-effect-free mutator doesn't have.
+  it("rejects open -> in_progress: creating a session is `slop start`'s job, not update's", () => {
+    const result = checkStateTransition("open", "in_progress");
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/slop start/);
+  });
+
+  it("rejects in_progress -> open: ending the active session is `slop stop`'s job, not update's (the ORPHANING hole)", () => {
+    const result = checkStateTransition("in_progress", "open");
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/slop stop/);
+  });
+
+  it("rejects review -> in_progress: this is D15's changes-requested re-entry, which needs a FRESH session + a logged re_entry — `slop start`'s job, not update's (the unlogged-re-entry hole)", () => {
+    const result = checkStateTransition("review", "in_progress");
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/slop done|slop start/);
+  });
+
+  it('rejects "-> dropped" from every non-terminal state: finalizing the session + B4\'s cascade is `slop drop`\'s job, not update\'s (the resurrection hole)', () => {
     for (const s of ["draft", "open", "in_progress", "review"] as const) {
-      expect(checkStateTransition(s, "dropped").ok).toBe(true);
+      const result = checkStateTransition(s, "dropped");
+      expect(result.ok, s).toBe(false);
+      expect(result.reason, s).toMatch(/slop drop/);
     }
   });
 
@@ -45,15 +64,55 @@ describe("checkStateTransition (design.md §2's state diagram)", () => {
     expect(checkStateTransition("dropped", "open").ok).toBe(false);
   });
 
-  it("rejects skipping straight from draft to in_progress", () => {
+  it("rejects skipping straight from draft to in_progress, naming `slop start` (the dedicated-command message, not the generic table one)", () => {
     const result = checkStateTransition("draft", "in_progress");
     expect(result.ok).toBe(false);
-    expect(result.reason).toMatch(/illegal transition/);
+    expect(result.reason).toMatch(/slop start/);
   });
 
   it("rejects skipping straight from open to review-adjacent illegal shapes (e.g. draft -> dropped is fine, but open -> review is the dedicated-command case above, already covered)", () => {
-    // Sanity check that a clearly-illegal, non-review/done edge is also caught by the table.
+    // Sanity check that a clearly-illegal, non-review/done edge is also caught.
     expect(checkStateTransition("in_progress", "draft").ok).toBe(false);
+  });
+
+  // Adversarial-review finding 6 (minor, C3 review): the terminal-state
+  // check must run BEFORE the dedicated-command messages, so a genuinely
+  // terminal ticket gets the accurate "terminal state" reason rather than
+  // a misleading "use `slop review`/`slop done`/`slop start`/`slop drop`"
+  // that implies the dedicated command would succeed from this state (it
+  // wouldn't — checkReviewEntry/checkDoneEntry reject `done`/`dropped` too).
+  describe("terminal-state check runs before the dedicated-command messages (ordering fix)", () => {
+    it.each(["done", "dropped"] as const)("update <%s-ticket> --state review names the terminal state, not \"use slop review\"", (s) => {
+      const result = checkStateTransition(s, "review");
+      expect(result.ok).toBe(false);
+      expect(result.reason).toMatch(/terminal state/);
+      expect(result.reason).not.toMatch(/slop review/);
+    });
+
+    // Only "dropped" -> "done" here (NOT "done" -> "done" — that's the
+    // legal same-state no-op, a different case entirely, already covered
+    // above in "same-state is always a legal no-op").
+    it('update <dropped-ticket> --state done names the terminal state, not "use slop done"', () => {
+      const result = checkStateTransition("dropped", "done");
+      expect(result.ok).toBe(false);
+      expect(result.reason).toMatch(/terminal state/);
+      expect(result.reason).not.toMatch(/slop done/);
+    });
+
+    // Only "done" -> "dropped" here, for the same same-state-no-op reason.
+    it('update <done-ticket> --state dropped names the terminal state, not "use slop drop"', () => {
+      const result = checkStateTransition("done", "dropped");
+      expect(result.ok).toBe(false);
+      expect(result.reason).toMatch(/terminal state/);
+      expect(result.reason).not.toMatch(/slop drop/);
+    });
+
+    it.each(["done", "dropped"] as const)("update <%s-ticket> --state in_progress names the terminal state, not \"use slop start\"", (s) => {
+      const result = checkStateTransition(s, "in_progress");
+      expect(result.ok).toBe(false);
+      expect(result.reason).toMatch(/terminal state/);
+      expect(result.reason).not.toMatch(/slop start/);
+    });
   });
 });
 

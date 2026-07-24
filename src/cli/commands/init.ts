@@ -5,8 +5,12 @@
  * writes agent onboarding (`.slop/AGENTS.md`, and
  * `.claude/skills/slopworks/SKILL.md` when a Claude Code setup is
  * detected — all rendered from the single canonical source in
- * src/cli/onboarding/), and maintains a clearly-labelled, idempotent
- * section of `.gitignore` (D14/D16).
+ * src/cli/onboarding/), maintains a clearly-labelled, idempotent section of
+ * `.gitignore` (D14/D16), and (Fix 4, adversarial review / E2 Defect 2)
+ * lays down a tracked `.gitkeep` placeholder in each of `db/tickets/`,
+ * `db/sessions/`, `db/events/` so the directory skeleton is always
+ * complete and committable, even before any entity of that kind exists —
+ * see `writeDbDirPlaceholders`'s doc below.
  *
  * Safety contract this file must uphold end to end: re-running `init`
  * against an already-initialized repo never touches `config.yaml` or any
@@ -151,6 +155,38 @@ async function loadOrCreateConfig(
   const config = configSchema.parse(parseConfigYamlText(yamlText));
   await atomicWriteFile(configPath, yamlText);
   return { config, wasExisting: false };
+}
+
+// ---------------------------------------------------------------------------
+// Fix 4 (adversarial review / E2 Defect 2), part 2: tracked `.gitkeep`
+// placeholders in each db entity directory
+// ---------------------------------------------------------------------------
+
+/**
+ * Git does not track empty directories — a freshly-initialized repo's
+ * `tickets/`/`sessions/`/`events/` (created bare by `ensureDbDirs`, above)
+ * would otherwise stay entirely absent from git history until the first
+ * entity of that kind is created, exactly the gap that let a fresh clone
+ * crash on its first write before {@link atomicWriteFile}'s own
+ * self-healing fix (`repo/atomic-write.ts`). Part 1 of that fix (the
+ * self-heal) makes a missing directory harmless everywhere; THIS is part
+ * 2, belt-and-suspenders at the source: every `slop init` now lays down an
+ * empty, tracked `.gitkeep` in each of the three directories, so the full
+ * db skeleton is always present and committable from the moment a repo is
+ * initialized, before any ticket/session/event ever exists. Idempotent —
+ * only writes when the file doesn't already exist, so re-running `init`
+ * against an already-populated repo (which never needs this) doesn't
+ * touch anything. Harmless to real entity reads: `entity-file.ts`'s
+ * `listEntityIds` only recognizes `<kind>_<ULID>.jsonc` names, so
+ * `.gitkeep` is invisible to every ticket/session/event listing.
+ */
+async function writeDbDirPlaceholders(paths: RepoPaths): Promise<void> {
+  for (const dir of [paths.ticketsDir, paths.sessionsDir, paths.eventsDir]) {
+    const gitkeepPath = join(dir, ".gitkeep");
+    if (!existsSync(gitkeepPath)) {
+      await atomicWriteFile(gitkeepPath, "");
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -300,6 +336,7 @@ async function runInit(opts: InitOptions): Promise<void> {
 
   const paths = await ensureDbDirs(root);
   await mkdir(join(paths.slopDir, "transcripts"), { recursive: true });
+  await writeDbDirPlaceholders(paths);
 
   const { config, wasExisting } = await loadOrCreateConfig(paths, root, opts);
 

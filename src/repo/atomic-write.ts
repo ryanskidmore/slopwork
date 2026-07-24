@@ -2,6 +2,9 @@
  * Atomic writes (design.md §3: "Atomic writes (tmp+rename) everywhere").
  *
  * Algorithm, per A3's brief:
+ *   0. Self-heal a missing target directory (Fix 4, adversarial
+ *      review/E2 Defect 2 — see below) — `mkdir(dir, {recursive: true})`
+ *      before anything else.
  *   1. Write to a temp file in the *same directory* as the target (rename
  *      is only atomic within a filesystem — a cross-directory or
  *      cross-filesystem temp dir would silently downgrade this to a copy).
@@ -21,9 +24,39 @@
  * file is never mistaken for an entity — it just doesn't match. A crash
  * between steps 2 and 3 leaves a complete-but-unrenamed temp file behind;
  * {@link sweepStaleTempFiles} cleans those up later.
+ *
+ * ---------------------------------------------------------------------
+ * Fix 4 (adversarial review / E2 Defect 2): self-heal a missing target
+ * directory, rather than crashing with a raw ENOENT
+ * ---------------------------------------------------------------------
+ *
+ * Git does not track empty directories. A committed `.slop/db` can
+ * therefore be missing `tickets/`/`sessions/`/`events/` entirely at
+ * commit time (e.g. no session has EVER been created in that repo) — a
+ * fresh `git clone` of it then has no such directory on disk at all,
+ * until the first write of that kind. Before this fix, `atomicWriteFile`
+ * never `mkdir`ed the target's directory, so `open(tmpPath, "wx")` threw a
+ * raw ENOENT — the first `slop start` (or any other first-of-its-kind
+ * write) in a fresh clone crashed outright, exit 1, no actionable
+ * message, instead of either succeeding or failing with a clean
+ * `SlopError`. `mkdir(dir, {recursive: true})` is idempotent and cheap
+ * when the directory already exists (the overwhelmingly common case, one
+ * extra `stat`-class syscall per write) — this is EVERY entity write's
+ * shared choke point (`entity-file.ts`'s `createEntityFileCanonical`/
+ * `updateEntityFile`, `lock.ts`'s lock-file write, `transcript.ts`'s
+ * capture write, `init.ts`'s config/docs writes), so fixing it exactly
+ * here makes every one of those call sites self-heal for free, without
+ * threading "does this directory exist yet" through each of them
+ * individually. `slop init` (Fix 4 part 2, `cli/commands/init.ts`) also
+ * now lays down a tracked `.gitkeep` placeholder in each of `tickets/`/
+ * `sessions/`/`events/`, so a freshly-initialized repo's directory
+ * skeleton is always complete and committable — this self-heal is the
+ * defense-in-depth backstop for every OTHER way an entity directory can
+ * still end up missing (an older repo initialized before this fix, a
+ * hand-deleted directory, etc.), not a replacement for it.
  */
 import { randomUUID } from "node:crypto";
-import { open, rename, rm } from "node:fs/promises";
+import { mkdir, open, rename, rm } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { isEnoent, readDirSafe } from "./fs-utils.js";
 
@@ -89,9 +122,15 @@ async function fsyncDir(dir: string): Promise<void> {
  * survives on disk past this function returning/throwing if the process
  * is killed outright (SIGKILL), which no in-process cleanup can catch —
  * that's what {@link sweepStaleTempFiles} is for.
+ *
+ * Self-heals a missing target directory first (Fix 4 — see module doc,
+ * "self-heal a missing target directory"): a fresh clone missing
+ * `.slop/db/sessions/` (git doesn't track empty directories) must never
+ * crash on its first write of that kind.
  */
 export async function atomicWriteFile(targetPath: string, contents: string): Promise<void> {
   const dir = dirname(targetPath);
+  await mkdir(dir, { recursive: true });
   const tmpPath = tempFilePathFor(targetPath);
   let renamed = false;
   try {

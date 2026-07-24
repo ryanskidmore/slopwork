@@ -19,18 +19,21 @@
  *     `RAW_STATE_TRANSITIONS`), so `assertDraftable` below can never
  *     diverge from that table. It exists purely to give `draft` its own
  *     actionable error text instead of `update`'s more generic one.
- *   - `checkStateTransition(from, "open")` is legal from THREE states:
- *     `"draft"` (this IS undraft), `"open"` (a no-op), and — separately —
- *     `"in_progress"` (that's `stop`'s edge, `sessions/stop.ts`, a
- *     different command with different side effects, session
- *     finalization included). Reusing `buildUpdate` alone for `undraft`
- *     would therefore silently also accept `in_progress -> open`, letting
- *     `slop undraft <ref>` masquerade as a half-working `stop`. This is
- *     the one place this module's guard is NOT redundant with the table —
- *     `assertUndraftable` below rules that case out explicitly, the same
- *     way `sessions/stop.ts`'s `assertStoppable` layers its own
- *     precondition (`active_session !== null`) in front of the generic
- *     machinery rather than trusting it alone.
+ *   - `checkStateTransition(from, "open")` is legal from exactly `"draft"`
+ *     (this IS undraft) and the same-state `"open"` no-op —
+ *     `state.ts`'s adversarial-review fix closed the third case this
+ *     comment used to warn about (`"in_progress" -> "open"`, `stop`'s
+ *     edge: `checkStateTransition` itself now rejects it, pointing at
+ *     `slop stop`/`slop done`, since leaving `in_progress` this way would
+ *     orphan the active session). `assertUndraftable` below is therefore
+ *     no longer load-bearing against THAT specific case — but it stays,
+ *     both for defense-in-depth (a second, independent guard against the
+ *     exact same mistake) and because it gives `undraft` its own
+ *     actionable, ticket-specific error text instead of `update`'s more
+ *     generic one, the same rationale `assertDraftable` above already
+ *     has. Mirrors `sessions/stop.ts`'s `assertStoppable`, which layers
+ *     its own precondition (`active_session !== null`) in front of the
+ *     generic machinery rather than trusting it alone.
  */
 import type { Ticket } from "../core/index.js";
 import { EXIT_CODES } from "../core/index.js";
@@ -61,10 +64,12 @@ export function assertDraftable(ticket: Ticket): void {
 
 /**
  * `slop undraft <ref>`: legal only from `"draft"`, or a same-state no-op
- * on an already-`"open"` ticket. See this module's doc for why this guard
- * — unlike {@link assertDraftable}'s — is load-bearing: without it,
- * `undraft` on an `"in_progress"` ticket would silently succeed via the
- * generic transition table, masquerading as `stop`.
+ * on an already-`"open"` ticket. `state.ts`'s `checkStateTransition`
+ * itself now also rejects `"in_progress" -> "open"` (see this module's
+ * doc), so this guard is defense-in-depth rather than the last line of
+ * defense it used to be — but it still gives `undraft` its own
+ * ticket-specific, actionable error text instead of `update`'s generic
+ * one, exactly like {@link assertDraftable}'s.
  */
 export function assertUndraftable(ticket: Ticket): void {
   if (ticket.state === "draft" || ticket.state === "open") return;

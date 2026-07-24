@@ -439,7 +439,11 @@ describe("B2: split + draft/undraft", () => {
     it("illegal draft/undraft against a terminal (dropped) ticket: both exit 6", async () => {
       const fixture = await makeFixture();
       const ticket = await createTicketViaCli(fixture, "Dropped ticket");
-      const dropResult = runSlop(["update", ticket.slug, "--state", "dropped"], fixture.root);
+      // `update --state dropped` is rejected (C3's adversarial-review fix
+      // closed this escape hatch — see src/tickets/state.ts): use the
+      // dedicated `slop drop` command, which finalizes the session (none
+      // here) and cascades unblocks, to reach the terminal state instead.
+      const dropResult = runSlop(["drop", ticket.slug, "--reason", "not needed"], fixture.root);
       expect(dropResult.status, dropResult.stderr).toBe(0);
 
       const draftResult = runSlop(["draft", ticket.slug], fixture.root);

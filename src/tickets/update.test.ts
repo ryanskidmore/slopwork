@@ -111,12 +111,12 @@ describe("buildUpdate", () => {
   });
 
   describe("--state", () => {
-    it("performs a legal direct transition (open -> in_progress), verb ticket.state_changed", () => {
+    it("performs a legal direct transition (open -> draft, D13), verb ticket.state_changed", () => {
       const before = makeTicket({ state: "open" });
-      const result = buildUpdate(before, baseInput({ state: "in_progress" }), clock);
-      expect(result.ticket.state).toBe("in_progress");
+      const result = buildUpdate(before, baseInput({ state: "draft" }), clock);
+      expect(result.ticket.state).toBe("draft");
       expect(result.verb).toBe("ticket.state_changed");
-      expect(result.payload).toMatchObject({ from: "open", to: "in_progress" });
+      expect(result.payload).toMatchObject({ from: "open", to: "draft" });
       // A state change is activity: last_activity_at bumps too.
       expect(result.ticket.last_activity_at).toBe("2026-07-23T12:00:00.000Z");
     });
@@ -134,6 +134,22 @@ describe("buildUpdate", () => {
         thrown = err;
       }
       expect(thrown).toMatchObject({ exitCode: 6 });
+    });
+
+    // Fix 1 (adversarial-review, C3 escape-hatch hole): `update --state`
+    // is now restricted to D13's side-effect-free `draft <-> open` edges
+    // ONLY — every session-carrying/session-creating/cascading edge is
+    // rejected here, each with a message naming the dedicated command.
+
+    it("rejects setting in_progress directly (needs a fresh session — slop start), exit 6", () => {
+      let thrown: unknown;
+      try {
+        buildUpdate(makeTicket({ state: "open" }), baseInput({ state: "in_progress" }), clock);
+      } catch (err) {
+        thrown = err;
+      }
+      expect(thrown).toMatchObject({ exitCode: 6 });
+      expect((thrown as Error).message).toMatch(/slop start/);
     });
 
     it("rejects setting review directly (needs slop review --mr), exit 6", () => {
@@ -160,14 +176,42 @@ describe("buildUpdate", () => {
       expect(thrown).toMatchObject({ exitCode: 6 });
     });
 
-    it("review -> in_progress clears the review sub-object (D15 changes-requested re-entry)", () => {
+    it("rejects setting dropped directly — the escape hatch that used to resurrect a dropped ticket via a later `stop` (needs slop drop --reason, which finalizes the session and cascades), exit 6", () => {
+      const before = makeTicket({ state: "in_progress", active_session: null });
+      let thrown: unknown;
+      try {
+        buildUpdate(before, baseInput({ state: "dropped" }), clock);
+      } catch (err) {
+        thrown = err;
+      }
+      expect(thrown).toMatchObject({ exitCode: 6 });
+      expect((thrown as Error).message).toMatch(/slop drop/);
+    });
+
+    it("rejects review -> in_progress directly — the escape hatch that used to be an unlogged, session-less changes-requested path (needs slop start: fresh session + logged re_entry), exit 6", () => {
       const before = makeTicket({
         state: "review",
         review: { requested_at: "2026-07-23T09:00:00.000Z", by: { name: "ryan", kind: "human" } },
       });
-      const result = buildUpdate(before, baseInput({ state: "in_progress" }), clock);
-      expect(result.ticket.state).toBe("in_progress");
-      expect(result.ticket.review).toBeUndefined();
+      let thrown: unknown;
+      try {
+        buildUpdate(before, baseInput({ state: "in_progress" }), clock);
+      } catch (err) {
+        thrown = err;
+      }
+      expect(thrown).toMatchObject({ exitCode: 6 });
+    });
+
+    it("rejects in_progress -> open directly — the escape hatch that used to orphan the active session (needs slop stop, which ends it), exit 6", () => {
+      const before = makeTicket({ state: "in_progress" });
+      let thrown: unknown;
+      try {
+        buildUpdate(before, baseInput({ state: "open" }), clock);
+      } catch (err) {
+        thrown = err;
+      }
+      expect(thrown).toMatchObject({ exitCode: 6 });
+      expect((thrown as Error).message).toMatch(/slop stop/);
     });
 
     it("same-state is a legal no-op (verb stays ticket.updated if nothing else changed... here progress also given to have something to do)", () => {
@@ -187,7 +231,7 @@ describe("buildUpdate", () => {
         priority: 0,
         labelOps: ["+y"],
         name: "Renamed",
-        state: "in_progress",
+        state: "draft",
       }),
       clock,
     );
@@ -195,7 +239,7 @@ describe("buildUpdate", () => {
     expect(result.ticket.priority).toBe(0);
     expect(result.ticket.labels.sort()).toEqual(["x", "y"].sort());
     expect(result.ticket.name).toBe("Renamed");
-    expect(result.ticket.state).toBe("in_progress");
+    expect(result.ticket.state).toBe("draft");
     expect(result.verb).toBe("ticket.state_changed");
   });
 

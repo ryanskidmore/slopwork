@@ -149,12 +149,16 @@ export function buildUpdate(
         ? parseSpecInput(input.specRaw, input.name ?? current.name)
         : current.spec,
     state: targetState ?? current.state,
-    // review -> * (any legal target, since review -> review is a same
-    // -state no-op handled above) always clears `review`: this is exactly
-    // the "changes requested" re-entry design.md D15 describes, and it is
-    // the one review/done-adjacent transition that needs no extra data
-    // (state.ts's module doc) — clearing the field is the whole
-    // transition.
+    // Defensive only, not reachable via this command today: `checkStateTransition`
+    // (above) now rejects every `from === "review"` transition except the
+    // same-state no-op (state.ts's adversarial-review fix — leaving
+    // "review" needs a dedicated command, `slop done`/`slop start`, since
+    // it still carries an active session), so `stateChanged` can never be
+    // `true` here while `current.state === "review"`. Left in place —
+    // harmless, and correct in spirit (the schema requires `review`
+    // absent outside `state === "review"` regardless) — as a second,
+    // independent guard against ever persisting a ticket with `review`
+    // set but `state !== "review"`.
     review: current.state === "review" && stateChanged ? undefined : current.review,
     priority: input.priority ?? current.priority,
     labels: applyLabelOps(current.labels, labelOps),

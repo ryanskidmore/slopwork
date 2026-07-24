@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import fc from "fast-check";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { TICKET_STATES } from "../../src/core/index.js";
 import type { TicketId, TicketState } from "../../src/core/index.js";
 import type { RepoPaths } from "../../src/repo/index.js";
 import { queryEvents, readSession, readTicket, repoPaths } from "../../src/repo/index.js";
@@ -127,11 +128,54 @@ function newTicket(
  * `Op -> (fromState -> toState)`; an absent entry for a given
  * `(op, fromState)` pair means the CLI MUST reject that call with exit 6
  * (CONFLICT) and leave the ticket's state unchanged.
+ *
+ * `"update"` (Fix 2, adversarial review of C3: the property test's original
+ * operation vocabulary omitted `update --state` entirely, which is exactly
+ * why it missed the escape-hatch class of bug B1's generic mutator opened
+ * — see `src/tickets/state.ts`'s "adversarial-review fix") is modeled
+ * SEPARATELY, not via `ORACLE`: unlike every other op here, its legal
+ * target isn't a fixed function of `fromState` alone — the CLI caller
+ * picks an arbitrary target state via `--state <target>`, and legality
+ * depends on BOTH `fromState` and the chosen target. `isUpdateStateLegal`
+ * below is that second, hand-written oracle for it — same "don't import
+ * the implementation" discipline as `ORACLE` itself.
  */
-type Op = "draft" | "undraft" | "start" | "stop" | "review" | "done" | "drop";
-const OPS: readonly Op[] = ["draft", "undraft", "start", "stop", "review", "done", "drop"];
+type Op = "draft" | "undraft" | "start" | "stop" | "review" | "done" | "drop" | "update";
+const OPS: readonly Op[] = [
+  "draft",
+  "undraft",
+  "start",
+  "stop",
+  "review",
+  "done",
+  "drop",
+  "update",
+];
 
-const ORACLE: Record<Op, Partial<Record<TicketState, TicketState>>> = {
+/**
+ * Independent oracle for `update --state <target>` — hand-transcribed from
+ * design.md §2/D13, NOT imported from `src/tickets/state.ts`'s
+ * `checkStateTransition` (same discipline `ORACLE` above follows): legal
+ * iff `target === fromState` (an idempotent no-op, legal from ANY state
+ * including terminal ones — `update` mutates nothing when the target is
+ * already current), or the transition is exactly one of D13's two
+ * side-effect-free `draft <-> open` edges. Every other target — including
+ * `in_progress`/`review`/`done`/`dropped`, and leaving `in_progress`/
+ * `review` for anything other than a same-state no-op — requires a
+ * dedicated command (session creation/finalization, MR data, or the
+ * done-cascade) this generic mutator doesn't have, and must be rejected.
+ */
+function isUpdateStateLegal(from: TicketState, target: TicketState): boolean {
+  if (from === target) return true;
+  return (from === "draft" && target === "open") || (from === "open" && target === "draft");
+}
+
+// `"update"` is deliberately excluded from this Record's key type — its
+// legal target isn't a fixed function of `fromState` alone, so it can't be
+// expressed as one entry here; see `isUpdateStateLegal` above, and
+// `runPropertyCase`'s special-cased lookup below (which narrows `op` away
+// from `"update"` before ever indexing into this object).
+const ORACLE: Record<Exclude<Op, "update">, Partial<Record<TicketState, TicketState>>> = {
   // draft <-> open (D13); draft on an already-draft ticket is a documented no-op (B2).
   draft: { open: "draft", draft: "draft" },
   undraft: { draft: "open", open: "open" },
@@ -158,7 +202,7 @@ const ORACLE: Record<Op, Partial<Record<TicketState, TicketState>>> = {
 const MR_URL = "https://example.com/pr/1";
 const DROP_REASON = "property-test drop";
 
-function argsFor(op: Op, slug: string, mrPresent: boolean): string[] {
+function argsFor(op: Op, slug: string, mrPresent: boolean, updateTarget: TicketState): string[] {
   switch (op) {
     case "draft":
       return ["draft", slug];
@@ -174,12 +218,18 @@ function argsFor(op: Op, slug: string, mrPresent: boolean): string[] {
       return ["done", slug, "--note", "done note"];
     case "drop":
       return ["drop", slug, "--reason", DROP_REASON];
+    case "update":
+      return ["update", slug, "--state", updateTarget];
   }
 }
 
 interface Step {
   op: Op;
   mrPresent: boolean;
+  /** Only consulted when `op === "update"` — the `--state <target>` this
+   * step's `update` call passes. Generated for every op (simplest
+   * arbitrary shape) but ignored by the other six. */
+  updateTarget: TicketState;
 }
 
 async function assertCoherentTicket(paths: RepoPaths, id: TicketId, expectedState: TicketState) {
@@ -207,7 +257,7 @@ async function runPropertyCase(
   let expectedState: TicketState = startState;
   await assertCoherentTicket(paths, id, expectedState);
 
-  for (const { op, mrPresent } of steps) {
+  for (const { op, mrPresent, updateTarget } of steps) {
     // `start` on an already-in_progress ticket is the --takeover path, a
     // different feature (its own dedicated legality, not a plain legal
     // /illegal binary) — C1.test.ts covers it directly. Skipping it here
@@ -215,8 +265,16 @@ async function runPropertyCase(
     // two different mechanisms.
     if (op === "start" && expectedState === "in_progress") continue;
 
-    const legalTo = ORACLE[op][expectedState];
-    const args = argsFor(op, slug, mrPresent);
+    // `update --state` (Fix 2): legality is a function of BOTH
+    // `expectedState` and the generated target, via `isUpdateStateLegal`
+    // above, not a lookup into the per-op-fixed-target `ORACLE`.
+    const legalTo: TicketState | undefined =
+      op === "update"
+        ? isUpdateStateLegal(expectedState, updateTarget)
+          ? updateTarget
+          : undefined
+        : ORACLE[op][expectedState];
+    const args = argsFor(op, slug, mrPresent, updateTarget);
     const result = runSlop(args, root);
 
     if (legalTo !== undefined) {
@@ -253,11 +311,42 @@ describe("C3: Lifecycle", () => {
     // coverage within a reasonable wall-clock budget; still enough runs
     // to exercise every op from every reachable state many times over
     // via fast-check's own shrinking/distribution.
-    const PROPERTY_RUNS = 20;
+    //
+    // Fix 2 (adversarial review): raised from 20 to 150, AND `update`
+    // added to `OPS`/`isUpdateStateLegal` above — the op vocabulary at 20
+    // runs didn't even include `update --state`, so the escape-hatch class
+    // of bug Fix 1 closes (e.g. `update <ref> --state dropped` from
+    // `in_progress`) was entirely UNREACHABLE by this test, regardless of
+    // run count: 0/N by construction, not bad luck. Measured directly
+    // (temporarily re-seeding each mutation in a scratch copy of
+    // `src/tickets/state.ts`, rebuilding, and re-running this test's `-t
+    // "every transition"` selector repeatedly — see this work item's
+    // report for the full methodology):
+    //   - the `update --state dropped` escape hatch (Fix 1's headline
+    //     finding): with the OLD vocabulary (no `update` op) at 20 runs,
+    //     0/5 repeat invocations caught it (confirms the structural miss
+    //     above). With `update` added AND numRuns raised to 150, 12/12
+    //     (100%) repeat invocations caught it.
+    //   - the pre-existing `in_progress -> done` regression in
+    //     `checkDoneEntry` (reachable via the plain `done` op, no `update`
+    //     needed) — this work item's own reported baseline was ~4/15
+    //     (~27%) at the old numRuns=20. At numRuns=150 (new vocabulary),
+    //     13/16 (~81%) of repeat invocations caught it; at numRuns=200,
+    //     11/12 (~92%). 150 is chosen as the number that reliably (100% in
+    //     local measurement) catches Fix 1's own class of bug — the
+    //     concrete motivation for this work item — while keeping this
+    //     file's own wall-clock time in a similar ballpark to this
+    //     project's other subprocess-spawning acceptance suites (tens of
+    //     seconds, not minutes); pushing numRuns further to chase a
+    //     three-nines catch rate on every possible single-rule mutation
+    //     was judged not worth roughly doubling this file's run time for a
+    //     property test that already reliably catches its target bug class.
+    const PROPERTY_RUNS = 150;
 
     const stepArb: fc.Arbitrary<Step> = fc.record({
       op: fc.constantFrom(...OPS),
       mrPresent: fc.boolean(),
+      updateTarget: fc.constantFrom(...TICKET_STATES),
     });
     const caseArb = fc.record({
       startDraft: fc.boolean(),
@@ -333,6 +422,56 @@ describe("C3: Lifecycle", () => {
       expect(runSlop(["done", doneTicket.slug], root).status).toBe(0);
       const doneResult = runSlop(["review", doneTicket.slug, "--mr", MR_URL], root);
       expect(doneResult.status).toBe(6);
+    });
+
+    // Fix 3 (adversarial review): `review --mr <invalid-url>` must fail
+    // atomically — no session write, no event, no wasted transcript
+    // capture — BEFORE this fix, the invalid `--mr` was only caught deep
+    // inside `buildReviewedTicket`'s schema validation, AFTER the
+    // transaction had already folded `transcript_ref` into the active
+    // session (an `updateSession` write + a `review.requested` session
+    // event), leaving that write behind for an operation that then failed
+    // anyway.
+    it("review <ref> --mr <invalid-url>: fails fast as a usage error (exit 2), with NO session write, NO event, and the ticket left exactly as it was", async () => {
+      const { root, paths } = await makeFixtureRepo();
+      const { id, slug } = newTicket(root, "Bad MR ticket");
+      expect(runSlop(["start", slug], root).status).toBe(0);
+
+      const before = await readTicket(paths, id);
+      const sessionIdBefore = before.active_session;
+      expect(sessionIdBefore).not.toBeNull();
+      const sessionBefore = await readSession(
+        paths,
+        sessionIdBefore as NonNullable<typeof sessionIdBefore>,
+      );
+      const eventsBefore = await queryEvents(paths, {});
+
+      const result = runSlop(["review", slug, "--mr", "not-a-valid-url"], root);
+      expect(result.status).toBe(2); // USAGE_ERROR — a bad argument, not a state CONFLICT
+      expect(result.stderr).toMatch(/--mr/i);
+      expect(result.stderr).toMatch(/not a valid url/i);
+
+      // Ticket completely untouched: still in_progress, no review object,
+      // same active_session, same updated_at (no write happened at all).
+      const after = await readTicket(paths, id);
+      expect(after.state).toBe("in_progress");
+      expect(after.review).toBeUndefined();
+      expect(after.active_session).toBe(sessionIdBefore);
+      expect(after.updated_at).toBe(before.updated_at);
+
+      // Session completely untouched: same transcript_ref (still null —
+      // captureTranscript/updateSession never ran), no ended_at.
+      const sessionAfter = await readSession(
+        paths,
+        sessionIdBefore as NonNullable<typeof sessionIdBefore>,
+      );
+      expect(sessionAfter).toEqual(sessionBefore);
+
+      // No new event of ANY kind was written for this failed call — not
+      // just "no review.requested", the event log is byte-for-byte the
+      // same set of ids as before.
+      const eventsAfter = await queryEvents(paths, {});
+      expect(eventsAfter.map((e) => e.id)).toEqual(eventsBefore.map((e) => e.id));
     });
   });
 

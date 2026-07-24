@@ -700,3 +700,138 @@ throws a `SlopError(..., EXIT_CODES.USAGE_ERROR)` instead, landing on the
 documented 2 regardless of which layer's `catch` actually handles it.
 Found via this work item's own exit-code audit, not a pre-existing bug
 report — `tests/acceptance/E1.test.ts`'s usage-error matrix now guards it.
+
+## Adversarial-review fixes (post-E2): `update --state` escape hatch, C3 property-test vocabulary, `review --mr` atomicity, fresh-clone crash, `updated_at` merge behaviour
+
+Five findings from an adversarial review of C3 plus the E2 merge
+simulation, fixed together (all touch the same lifecycle/merge surface).
+
+**Fix 1 (CRITICAL) — `update --state` was an unguarded escape hatch around
+the lifecycle.** B1's original guard (`src/tickets/state.ts`'s
+`checkStateTransition`) only excluded `to === "review"`/`to === "done"`
+(the two edges needing data the mutator doesn't have) but still let
+`update --state` perform `open -> in_progress`, `in_progress -> open`,
+`review -> in_progress`, and `-> dropped` directly — every one of which
+ALSO needs session-lifecycle machinery this generic, side-effect-free
+mutator doesn't have. Concretely exploitable: `start X` (in_progress,
+`active_session: S`) → `update X --state dropped` left the ticket
+`dropped` with `active_session` STILL `S` and no B4 cascade (dependents
+never got `ticket.ready`); a later `stop X` then performed `dropped ->
+open`, RESURRECTING a terminal ticket — `stop`'s own guard
+(`sessions/stop.ts`'s `assertStoppable`) had never needed to consider
+"already dropped" because no legal path to that combination existed
+before this hole. Separately, `update X --state open` on an `in_progress`
+ticket orphaned the session (state moves to `open`, `active_session`
+stays set — invisible to `ready`, which requires `active_session ===
+null`, yet unable to be `start`ed again without `--takeover`); and
+`update X --state in_progress` on a `review` ticket was a second,
+UNLOGGED "changes-requested" path — no fresh session, no `re_entry` flag
+— parallel to and inconsistent with `slop start`'s D15 re-entry.
+
+**Fix:** `RAW_STATE_TRANSITIONS` narrowed to exactly D13's `draft ⇄ open`
+edge (`draft: ["open"], open: ["draft"], in_progress: [], review: []`),
+and `checkStateTransition` extended with dedicated rejections for `to ===
+"dropped"`/`to === "in_progress"` and for leaving `in_progress`/`review`
+at all (even to `"open"`) — each naming the dedicated command
+(`slop start`/`slop stop`/`slop review`/`slop done`/`slop drop`) that
+actually has the session/lock-aware machinery the transition needs. Same
+-state is still always a legal no-op (mutates nothing, so it can never
+desync the db), checked first, before anything else — including on a
+terminal ticket, which is also the adversarial review's minor finding 6:
+the terminal-state check now runs BEFORE the dedicated-command messages,
+so `update <done-ticket> --state review` reports "terminal state," not
+the misleading "use `slop review --mr`" (implying the command would
+succeed from `done`, which `checkReviewEntry` also rejects). Nothing else
+in the codebase calls `checkStateTransition` directly — `draft`/`undraft`
+(`src/tickets/draft.ts`) pre-narrow their own legal `from` states via
+`assertDraftable`/`assertUndraftable` before ever reaching `buildUpdate`,
+so both still work unchanged; `start`/`stop` have always used their own
+separate `assertStartable`/`assertStoppable`, never this table.
+
+**Fix 2 (test) — C3's property test didn't even generate `update --state`
+calls, which is exactly why it missed Fix 1's class of bug**, and at
+`numRuns: 20` a seeded single-rule regression was caught only ~4/15
+repeat invocations (~27%). `tests/acceptance/C3.test.ts`'s op vocabulary
+now includes `"update"` (with a randomly generated `--state <target>`,
+legality checked by a second hand-written oracle, `isUpdateStateLegal`,
+independent of the implementation exactly like `ORACLE` itself), and
+`numRuns` raised from 20 to 150. Measured directly (temporarily
+re-seeding each mutation in a scratch copy of `state.ts`, rebuilding, and
+re-running the property test's own `-t` selector repeatedly): the `update
+--state dropped` escape hatch was 0/5 catchable with the OLD vocabulary
+at 20 runs (structurally unreachable — no `update` op existed) and 12/12
+(100%) with the NEW vocabulary at 150 runs; the pre-existing
+`in_progress -> done` regression (`checkDoneEntry`, reachable via the
+plain `done` op, unrelated to `update`) went from the reported ~27% at 20
+runs to ~81-92% (13/16, 11/12 in two separate measured batches) at
+150-200 runs. 150 was kept as the final number — 100% in local
+measurement on Fix 1's own bug class, the concrete motivation for this
+change, while keeping the file's wall-clock cost in the same ballpark as
+this project's other subprocess-spawning acceptance suites.
+
+**Fix 3 — `review --mr <invalid-url>` wasn't atomic.**
+`src/cli/commands/review.ts` used to fold `transcript_ref` into the
+active session (an `updateSession` write + a `review.requested` session
+event) BEFORE `buildReviewedTicket` validated `--mr` via `reviewSchema`'s
+`z.url()` — an invalid URL left that write behind (an orphaned
+session-side event, a wasted transcript capture) for an operation that
+then failed anyway (exit 1, GENERIC_ERROR — a bad argument reported as an
+internal error, the wrong exit code besides). Fixed by validating `--mr`'s
+shape up front, before the lock, before resolving `<ref>`, before any
+read or write, via a new shared `mrUrlSchema` (`core/entities/ticket.ts`
+— the exact schema `reviewSchema.mr` already used, factored out so the
+two can never drift), failing with `USAGE_ERROR` (exit 2 — this is a bad
+argument, not a state CONFLICT) on a malformed non-empty `--mr`. An
+empty/whitespace-only `--mr` is still treated as omitted (D15's
+required-with-warning), unchanged.
+
+**Fix 4 — a fresh clone could crash writing into a git-untracked empty
+db directory.** Git does not track empty directories, so a committed
+`.slop/db` missing e.g. `sessions/` (no session ever created there) has
+that directory entirely ABSENT after a fresh clone — and
+`atomicWriteFile` (`src/repo/atomic-write.ts`) never `mkdir`ed the
+target's directory, so the first write of that kind threw a raw ENOENT.
+Confirmed this affected THIS repo's own committed `.slop/db` (`tickets/`
+and `events/` present, `sessions/` empty and untracked — a fresh clone
+would have crashed on the first `slop start`). Two-part fix: **(1)**
+`atomicWriteFile` now calls `mkdir(dir, {recursive: true})` before
+opening the temp file — self-healing at the single lowest-level write
+primitive every entity write, the lock file, transcript capture, and
+`init`'s own config/doc writes all already funnel through, rather than
+threading "does this directory exist yet" through each call site
+individually. **(2)** `slop init` (`src/cli/commands/init.ts`) now also
+writes a tracked, empty `.gitkeep` placeholder into each of `tickets/`,
+`sessions/`, `events/` (idempotent — only when absent), so a freshly
+-initialized repo's db skeleton is always complete and committable from
+the start; this repo's own `.slop/db/sessions/.gitkeep` was added
+alongside this change. The E2 merge simulation's `slop init --yes` re-run
+workaround on both clones (`tests/acceptance/e2-merge-sim.ts`) is removed
+— no longer needed — and E2's `it.fails` regression test for this defect
+(`tests/acceptance/E2.test.ts`) is now a normal passing test, plus a
+second test that isolates fix (1) alone (deletes the tracked `.gitkeep`
+before committing, to prove the self-heal — not just the placeholder —
+independently prevents the crash).
+
+**Fix 5 — `updated_at`'s merge behaviour is documented, accepted v0
+behaviour, not a defect to chase.** E2's `it.fails` asserted that two
+clones editing DIFFERENT fields of the SAME ticket merge with zero
+conflicts; today they conflict on the trailing `updated_at` line (bumped
+on every write, always the file's last field). That assertion read the
+acceptance bar too literally: the SAME goal condition explicitly allows
+"zero manual conflicts *except same-ticket edits*," and a different-field
+edit is still a same-ticket edit — the carve-out applies. The principled
+fix (deriving `updated_at` from the immutable event log instead of
+stamping it on every write, so even this bookkeeping field stops
+colliding) is a schema change judged too risky this late in v0 — NOT
+done here. Instead, `tests/acceptance/E2.test.ts`'s `it.fails` is now a
+normal passing test asserting the actual, acceptable shape: create/close
+and different-*ticket* edits merge with zero conflicts (already covered
+by this file's very first test in the same describe block), and a
+same-ticket different-field edit conflicts on EXACTLY the `updated_at`
+line — one hunk, both clones' real edits present and unconflicted
+everywhere else in the file (the pre-existing "characterizes..." test,
+kept, now reframed as characterizing accepted behavior rather than an
+open defect). `tests/acceptance/e2-merge-sim.ts`'s module doc and
+`formatReport()` output were reworded to match (`KNOWN ISSUE` /
+`real defect` → `KNOWN BEHAVIOR` / documented, accepted). The ticket
+schema and `updated_at` bumping are untouched by this fix.

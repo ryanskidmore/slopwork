@@ -42,6 +42,16 @@ export const provenanceSchema = z.object({
 export type Provenance = z.infer<typeof provenanceSchema>;
 
 /**
+ * The MR/PR link's URL shape — shared by {@link reviewSchema} (`review.mr`
+ * on the persisted ticket) AND `src/cli/commands/review.ts`'s own up-front
+ * `--mr` validation (Fix 3, adversarial review: `slop review --mr
+ * <invalid-url>` must fail before any side effect, not after the session
+ * write — see that file's module doc), so the two never drift on what
+ * counts as a valid MR URL.
+ */
+export const mrUrlSchema = z.url();
+
+/**
  * `{mr, requested_at, by}`, present if and only if `state === "review"`
  * (D15). `mr` is itself optional *within* that: design.md D15 / §8.1 item
  * 3 — "review --mr required-with-warning (can enter review without an MR
@@ -49,7 +59,7 @@ export type Provenance = z.infer<typeof provenanceSchema>;
  * `review` and an optional inner `mr`, not one flag that means both.
  */
 export const reviewSchema = z.object({
-  mr: z.url().optional(),
+  mr: mrUrlSchema.optional(),
   requested_at: isoTimestampSchema,
   by: actorSchema,
 });

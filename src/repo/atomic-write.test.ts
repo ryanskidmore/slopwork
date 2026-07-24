@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -65,15 +65,56 @@ describe("atomicWriteFile", () => {
   });
 
   it("cleans up its own temp file when the write fails before rename (normal error path, not a crash)", async () => {
-    // A directory that doesn't exist as a write target's parent forces
-    // `open(tmpPath, "wx")` to fail with ENOENT before anything is
-    // written, exercising the catch-and-cleanup path.
-    const missingDir = join(scratch, "does-not-exist");
-    const target = join(missingDir, "ticket_x.jsonc");
-    await expect(atomicWriteFile(target, "{}\n")).rejects.toThrow();
-    // Nothing leaked into `scratch` itself.
-    const names = await readdir(scratch);
-    expect(names.filter(isTempFileName)).toHaveLength(0);
+    // A read-only directory lets `mkdir` (a no-op — the directory already
+    // exists) succeed, but forces `open(tmpPath, "wx")` to fail with
+    // EACCES before anything is written, exercising the catch-and-cleanup
+    // path. (A MISSING directory no longer forces a failure here at all —
+    // see the self-healing tests below, Fix 4.)
+    const readonlyDir = join(scratch, "readonly");
+    await mkdir(readonlyDir);
+    await chmod(readonlyDir, 0o555);
+    try {
+      const target = join(readonlyDir, "ticket_x.jsonc");
+      await expect(atomicWriteFile(target, "{}\n")).rejects.toThrow();
+      // Nothing leaked into `readonlyDir` itself.
+      const names = await readdir(readonlyDir);
+      expect(names.filter(isTempFileName)).toHaveLength(0);
+    } finally {
+      // Restore write permission so `afterEach`'s `rm(scratch, ...)` can
+      // actually remove this directory.
+      await chmod(readonlyDir, 0o755);
+    }
+  });
+
+  // Fix 4 (adversarial review / E2 Defect 2): git does not track empty
+  // directories, so a freshly cloned repo can be missing `.slop/db/
+  // sessions/` (or `events/`) entirely until the first write of that
+  // kind — `atomicWriteFile` must self-heal, never crash with a raw
+  // ENOENT on a fresh clone's first write.
+  describe("self-heals a missing target directory (Fix 4 / E2 Defect 2)", () => {
+    it("creates a missing parent directory on demand and writes successfully", async () => {
+      const missingDir = join(scratch, "sessions");
+      const target = join(missingDir, "session_x.jsonc");
+      await atomicWriteFile(target, '{"a":1}\n');
+      expect(await readFile(target, "utf8")).toBe('{"a":1}\n');
+    });
+
+    it("self-heals a deeply nested missing directory chain too", async () => {
+      const missingDir = join(scratch, "a", "b", "c");
+      const target = join(missingDir, "ticket_x.jsonc");
+      await atomicWriteFile(target, "{}\n");
+      expect(await readFile(target, "utf8")).toBe("{}\n");
+    });
+
+    it("a second write into the same self-healed directory is a normal overwrite, no leftover temp files", async () => {
+      const missingDir = join(scratch, "events");
+      const target = join(missingDir, "event_x.jsonc");
+      await atomicWriteFile(target, '{"v":1}\n');
+      await atomicWriteFile(target, '{"v":2}\n');
+      expect(await readFile(target, "utf8")).toBe('{"v":2}\n');
+      const names = await readdir(missingDir);
+      expect(names).toEqual(["event_x.jsonc"]);
+    });
   });
 });
 

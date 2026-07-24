@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import type { Clock } from "../../core/clock.js";
 import { systemClock } from "../../core/clock.js";
 import type { Actor, Session, Ticket } from "../../core/index.js";
-import { EXIT_CODES, nowIso, sessionSchema, ticketSchema } from "../../core/index.js";
+import { EXIT_CODES, mrUrlSchema, nowIso, sessionSchema, ticketSchema } from "../../core/index.js";
 import {
   readSession,
   readTicket,
@@ -80,6 +80,29 @@ async function runReview(ref: string, opts: ReviewCommandOptions): Promise<void>
   // same as an omitted one throughout, rather than failing schema
   // validation later on `reviewSchema`'s `z.url()`.
   const mr = opts.mr !== undefined && opts.mr.trim().length > 0 ? opts.mr.trim() : undefined;
+
+  // Fix 3 (adversarial review): validate --mr's URL shape UP FRONT — before
+  // the lock, before resolving <ref>, before any read or write — so a
+  // malformed (but non-empty) --mr fails as a plain USAGE_ERROR (exit 2)
+  // with zero side effects. Previously this validation only happened
+  // inside `buildReviewedTicket`'s `ticketSchema.safeParse` call, which
+  // runs AFTER the transaction below already folds `transcript_ref` into
+  // the active session (an `updateSession` write + a `review.requested`
+  // session event) — an invalid --mr left that write behind (an orphaned
+  // session-side event, a wasted transcript capture) for an operation that
+  // then failed anyway. `mrUrlSchema` (core/entities/ticket.ts) is the
+  // exact same schema `reviewSchema.mr` uses, so this can never be
+  // stricter or looser than what would eventually be persisted.
+  if (mr !== undefined) {
+    const parsedMr = mrUrlSchema.safeParse(mr);
+    if (!parsedMr.success) {
+      throw new SlopError(
+        `--mr "${mr}" is not a valid URL — pass a real merge/pull request link, e.g. ` +
+          "https://github.com/org/repo/pull/123",
+        EXIT_CODES.USAGE_ERROR,
+      );
+    }
+  }
 
   // D15/§8.1 item 3: --mr is required-WITH-WARNING, not required-with
   // -block — nag on stderr, but still let the transition through (below).

@@ -519,17 +519,21 @@ describe("B1: new / show / edit / update", () => {
       );
     });
 
-    it("--state performs a legal transition; an illegal one rejects with exit 6", async () => {
+    it("--state performs a legal transition (D13's draft <-> open); an illegal one rejects with exit 6", async () => {
       const fixture = await makeFixture();
       const { id } = await createTicketViaCli(fixture, "State ticket");
 
-      const ok = runSlop(["update", id, "--state", "in_progress"], fixture.root);
+      const ok = runSlop(["update", id, "--state", "draft"], fixture.root);
       expect(ok.status, ok.stderr).toBe(0);
-      expect((await readTicketFile(fixture.paths, id)).state).toBe("in_progress");
+      expect((await readTicketFile(fixture.paths, id)).state).toBe("draft");
 
-      const illegal = runSlop(["update", id, "--state", "draft"], fixture.root);
+      // `update --state` is restricted to D13's side-effect-free draft <->
+      // open edges (see C3's adversarial-review fix, src/tickets/state.ts):
+      // `in_progress` creates a session `update` has no way to supply, so
+      // it's rejected with exit 6 pointing at the dedicated command.
+      const illegal = runSlop(["update", id, "--state", "in_progress"], fixture.root);
       expect(illegal.status).toBe(6); // CONFLICT
-      expect(illegal.stderr).toMatch(/illegal transition/);
+      expect(illegal.stderr).toMatch(/slop start/);
     });
 
     // Coordinator smoke-test bug: `--label +x -y` — the EXACT form
