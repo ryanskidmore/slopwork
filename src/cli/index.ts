@@ -39,7 +39,47 @@ function buildProgram(): Command {
   return program;
 }
 
+/**
+ * Treat a downstream reader closing early (`slop ready | head -1`, `slop
+ * show <ref> | less` then quitting, ...) as a normal "reader went away"
+ * signal, not a crash. Without this, a write to a closed stdout/stderr
+ * pipe surfaces as EPIPE and — verified empirically against the compiled
+ * `dist/slop` binary — Bun's fast stdout/stderr write path (`writeFast`)
+ * raises it as an unhandled rejection that dumps a raw stack trace plus a
+ * "Bun vX.Y.Z" banner and exits 1, bypassing the try/catch in {@link main}
+ * entirely (it's not a normal thrown error the command's promise chain
+ * propagates — Node/Bun's stream `error` event is the only place this is
+ * observable). Installing an `error` listener on the stream is what
+ * suppresses that: it turns the same event into a listener call instead of
+ * an unhandled rejection, so it must be installed on both streams before
+ * `parseAsync` runs any command's action, not added to the catch block
+ * below.
+ *
+ * On EPIPE specifically, exit 0 (SUCCESS): the command's actual work had
+ * already succeeded, and it's the reader (e.g. `head`) that chose to stop,
+ * not `slop` that failed — this is the conventional treatment (e.g. npm's
+ * own long-standing `stdout.on('error', ...)` guard). Any other stream
+ * error code is a genuine I/O failure and is deliberately rethrown so it
+ * still surfaces (as an unhandled exception) rather than being swallowed.
+ *
+ * This only ever fires on an EPIPE that actually happens; a `SlopError`
+ * thrown for an unrelated reason still flows through `main`'s catch ->
+ * {@link reportError} -> its own `process.exit` untouched, since no EPIPE
+ * event occurs on that path.
+ */
+function installEpipeGuards(): void {
+  const onStreamError = (err: NodeJS.ErrnoException): void => {
+    if (err.code === "EPIPE") {
+      process.exit(EXIT_CODES.SUCCESS);
+    }
+    throw err;
+  };
+  process.stdout.on("error", onStreamError);
+  process.stderr.on("error", onStreamError);
+}
+
 async function main(): Promise<void> {
+  installEpipeGuards();
   const program = buildProgram();
 
   try {
