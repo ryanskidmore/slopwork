@@ -73,6 +73,28 @@ function guardHost<Req extends Request>(
   return (req) => (isAllowedHost(req.headers.get("host")) ? handler(req) : forbiddenHostResponse());
 }
 
+/**
+ * web-head-returns-404-despite: Bun's declarative `routes` table does NOT
+ * fall a `HEAD` request back onto a route's `GET` handler the way the
+ * underlying HTTP spec (and this file's own `fetch` fallback's `Allow:
+ * GET, HEAD`) implies — verified directly against Bun 1.3.11: a route
+ * with only a `GET:` entry 404s on `HEAD`, it never reaches the `fetch`
+ * fallback's "known route, wrong method" 405 branch either. A health
+ * check (or curl -I, or anything else that HEADs before GETting) reading
+ * that 404 has every reason to conclude the UI is dead. Every read route
+ * registers the identical guarded handler under both keys so `HEAD`
+ * genuinely works, not just gets dropped from the advertised Allow list.
+ */
+function readMethods<Req extends Request>(
+  handler: (req: Req) => Response | Promise<Response>,
+): {
+  GET: (req: Req) => Response | Promise<Response>;
+  HEAD: (req: Req) => Response | Promise<Response>;
+} {
+  const guarded = guardHost(handler);
+  return { GET: guarded, HEAD: guarded };
+}
+
 export interface WebServerOptions {
   port: number;
   /** @default "127.0.0.1" — see createWebServer's doc: this must never be reachable off-machine. */
@@ -130,38 +152,38 @@ export function createWebServer(
     development: Boolean(process.env.SLOP_WEB_DEBUG),
     routes: {
       "/": {
-        GET: guardHost(
+        ...readMethods(
           () => new Response(null, { status: 302, headers: { location: "/tickets" } }),
         ),
       },
       "/assets/style.css": {
-        GET: guardHost(
+        ...readMethods(
           () => new Response(styleCss, { headers: { "content-type": "text/css; charset=utf-8" } }),
         ),
       },
       "/assets/app.js": {
-        GET: guardHost(
+        ...readMethods(
           () =>
             new Response(appJs, { headers: { "content-type": "text/javascript; charset=utf-8" } }),
         ),
       },
       "/tickets": {
-        GET: guardHost((req) => handleTicketList(req, dataSource, now())),
+        ...readMethods((req) => handleTicketList(req, dataSource, now())),
       },
       "/tree": {
-        GET: guardHost((req) => handleTreeView(req, dataSource, now())),
+        ...readMethods((req) => handleTreeView(req, dataSource, now())),
       },
       "/review": {
-        GET: guardHost((req) => handleReviewPanel(req, dataSource, now())),
+        ...readMethods((req) => handleReviewPanel(req, dataSource, now())),
       },
       "/stale": {
-        GET: guardHost((req) => handleStalePanel(req, dataSource, now())),
+        ...readMethods((req) => handleStalePanel(req, dataSource, now())),
       },
       "/tickets/:ref": {
-        GET: guardHost((req) => handleTicketDetail(req, dataSource, now())),
+        ...readMethods((req) => handleTicketDetail(req, dataSource, now())),
       },
       "/tickets/:ref/sessions/:sessionId/transcript": {
-        GET: guardHost((req) => handleTranscriptView(req, dataSource)),
+        ...readMethods((req) => handleTranscriptView(req, dataSource)),
       },
     },
     fetch(req) {

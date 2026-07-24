@@ -589,6 +589,40 @@ describe("D5: slop web", () => {
   });
 
   // -------------------------------------------------------------------------
+  // HEAD requests (web-head-returns-404-despite): Bun's declarative `routes`
+  // table does not fall a HEAD request back onto a route's GET handler
+  // automatically — a route with only a `GET:` entry 404s on HEAD, which
+  // makes a health check (or `curl -I`, or anything else that HEADs before
+  // GETting) conclude the UI is dead even though it's fine.
+  // -------------------------------------------------------------------------
+  describe("HEAD requests", () => {
+    it.each([
+      "/tickets",
+      "/tree",
+      "/review",
+      "/stale",
+      "/assets/style.css",
+      "/assets/app.js",
+    ] as const)("HEAD %s returns 200 with an empty body", async (path) => {
+      const res = await get(path, { method: "HEAD" });
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe("");
+    });
+
+    it("HEAD on a ticket detail route returns 200 with an empty body", async () => {
+      const t = ticketBySlug("add-authentication-provider");
+      const res = await get(`/tickets/${t.id}`, { method: "HEAD" });
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe("");
+    });
+
+    it("HEAD on an unknown route still 404s, never silently 200s", async () => {
+      const res = await get("/nope/at/all", { method: "HEAD" });
+      expect(res.status).toBe(404);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Read-only contract (§4.6: "web mutations are explicitly out of scope").
   // -------------------------------------------------------------------------
   describe("Read-only contract", () => {
