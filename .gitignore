@@ -36,3 +36,6 @@ npm-debug.log*
 .slop/db/index.jsonc
 .slop/transcripts/
 # --- end slopwork ---
+
+# agent worktrees (temporary, isolated)
+.claude/worktrees/

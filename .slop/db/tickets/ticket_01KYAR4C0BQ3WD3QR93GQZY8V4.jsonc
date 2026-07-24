@@ -1,0 +1,48 @@
+{
+  "id": "ticket_01KYAR4C0BQ3WD3QR93GQZY8V4",
+  "name": "Extreme benchmark: push slopwork to its limits (1M tickets, thousands of concurrent writers), reproducible, results in docs",
+  "slug": "extreme-benchmark-push-slopwork-to",
+  "spec": {
+    "summary": "Extreme benchmark: push slopwork to its limits (1M tickets, thousands of concurrent writers), reproducible, results in docs",
+    "details_md": "Build a reproducible benchmark harness in the repo (bench/) that finds the real limits of the flatfile design. Scale ladder: 1k / 10k / 100k / 1M tickets (seeded via the repo layer directly, not CLI spawns); measure cold index rebuild, warm reads (status/ready/search/show), per-op CLI latency (new/start/done), done-cascade with wide blocks fan-out, and event-log growth effects. Concurrency: hundreds-to-thousands of parallel writers exercising the lock-free progress path, parallel new, and contended parallel start on one ticket (lock behavior under pressure). Report degradation curves and the practical ceiling honestly. Results land in a markdown file (docs/benchmarks.md) with machine specs, methodology, and exact repro commands. DO THIS LAST — after all open fix tickets are merged, so numbers reflect the fixed code.",
+    "acceptance": [
+      "bench/ harness runs end-to-end with one command and a configurable scale",
+      "results doc in docs/ with tables, degradation analysis, and repro instructions",
+      "concurrent-writer phase exercises lock contention and the lock-free event path"
+    ],
+    "context": [
+      "src/repo/db-index.ts (rebuild cost)",
+      "src/repo/lock.ts (contention)",
+      "docs/concurrency-and-merging.md"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "area:bench"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYAR4C0BQ3WD3QR93GQZY8V4",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T19:02:45.038Z",
+  "latest_note": null,
+  "owner": {
+    "name": "ryan",
+    "kind": "human"
+  },
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T19:02:45.038Z",
+  "updated_at": "2026-07-24T19:02:45.038Z"
+}
