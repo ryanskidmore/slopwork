@@ -10,13 +10,20 @@
 import type { BunRequest } from "bun";
 import { TICKET_STATES, type Ticket, type TicketState } from "../../core/index.js";
 import type { WebDataSource } from "../data-source.js";
-import { type RawHtml, html } from "../html.js";
-import { computeBlockedTicketIds, formatRelative } from "../overlays.js";
+import { html, type RawHtml } from "../html.js";
+import {
+  computeBlockedTicketIds,
+  deriveEffectiveTickets,
+  formatRelative,
+  isTicketStale,
+  staleThresholdsFromConfig,
+} from "../overlays.js";
 import {
   blockedBadge,
   labelChips,
   pageResponse,
   priorityBadge,
+  staleBadge,
   stateBadge,
   ticketLink,
 } from "./shared.js";
@@ -72,8 +79,18 @@ export async function handleTicketList(
   };
   if (filters.state && !isTicketState(filters.state)) filters.state = "";
 
-  const [tickets, config] = await Promise.all([dataSource.listTickets(), dataSource.getConfig()]);
+  const [rawTickets, config, events] = await Promise.all([
+    dataSource.listTickets(),
+    dataSource.getConfig(),
+    dataSource.listEvents(),
+  ]);
+  // ticket_01KY9S0172V8AYCYV9KWS6RC9P: effective `last_activity_at` (see
+  // overlays.ts's `deriveEffectiveTickets` doc) — a lock-free `update
+  // --progress` note must show up here, and reset staleness, exactly like
+  // it does on `slop show`/the ticket detail page.
+  const tickets = deriveEffectiveTickets(rawTickets, events);
   const blockedIds = computeBlockedTicketIds(tickets);
+  const thresholds = staleThresholdsFromConfig(config);
 
   const allLabels = [...new Set(tickets.flatMap((t) => t.labels))].sort();
   const allOwners = [
@@ -92,7 +109,7 @@ export async function handleTicketList(
       .join(" ")
       .toLowerCase();
     return html`<tr data-search="${searchBlob}">
-      <td>${stateBadge(ticket.state)} ${blockedIds.has(ticket.id) ? blockedBadge() : ""}</td>
+      <td>${stateBadge(ticket.state)} ${blockedIds.has(ticket.id) ? blockedBadge() : ""} ${isTicketStale(ticket, thresholds, now) ? staleBadge() : ""}</td>
       <td>${priorityBadge(ticket.priority)}</td>
       <td>${ticketLink(ticket)}</td>
       <td class="mono muted">${ticket.slug}</td>

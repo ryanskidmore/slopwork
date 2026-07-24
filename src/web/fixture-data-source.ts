@@ -32,17 +32,17 @@ import { readdir } from "node:fs/promises";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import {
   type Config,
-  type Event,
-  type Session,
-  type SessionId,
-  type Ticket,
-  type TicketId,
   configSchema,
+  type Event,
   eventSchema,
   idMatchesRef,
   isSessionId,
   parseJsonc,
+  type Session,
+  type SessionId,
   sessionSchema,
+  type Ticket,
+  type TicketId,
   ticketSchema,
 } from "../core/index.js";
 import type { TranscriptHandle, WebDataSource } from "./data-source.js";
@@ -236,11 +236,18 @@ export class FixtureDataSource implements WebDataSource {
     return parseEntity(sessionSchema, await file.text(), path);
   }
 
+  /** The full `db/events/` directory, fault-tolerantly read — shared by
+   * {@link listEventsForTicket} and {@link listEvents} so the two never
+   * drift on what counts as a readable event file. */
+  private readAllEvents(): Promise<Event[]> {
+    return readJsoncDir(join(this.slopRoot, "db", "events"), (text, path) =>
+      parseEntity(eventSchema, text, path),
+    );
+  }
+
   async listEventsForTicket(ticketId: TicketId): Promise<Event[]> {
     const [events, sessions] = await Promise.all([
-      readJsoncDir(join(this.slopRoot, "db", "events"), (text, path) =>
-        parseEntity(eventSchema, text, path),
-      ),
+      this.readAllEvents(),
       this.listSessionsForTicket(ticketId),
     ]);
     const sessionIds = new Set<string>(sessions.map((s) => s.id));
@@ -251,6 +258,10 @@ export class FixtureDataSource implements WebDataSource {
     );
     // Event ids are ULIDs (D6): lexicographic order is chronological order.
     return relevant.sort((a, b) => a.id.localeCompare(b.id));
+  }
+
+  async listEvents(): Promise<Event[]> {
+    return this.readAllEvents();
   }
 
   async openTranscript(transcriptRef: string): Promise<TranscriptHandle | null> {

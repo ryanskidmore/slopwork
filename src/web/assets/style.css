@@ -507,3 +507,9 @@ details[open] > summary {
   font-size: 0.8rem;
   margin-top: 0.35rem;
 }
+
+.reason {
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+  margin: 0.3rem 0;
+}

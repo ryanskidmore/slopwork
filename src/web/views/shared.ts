@@ -5,7 +5,7 @@
  */
 import type { Config, Ticket, TicketState } from "../../core/index.js";
 import { parseParentRef } from "../../core/index.js";
-import { type HtmlValue, type RawHtml, escapeAttr, html, joinHtml, raw } from "../html.js";
+import { escapeAttr, type HtmlValue, html, joinHtml, type RawHtml, raw } from "../html.js";
 
 export type NavKey = "tickets" | "tree" | "review" | "stale" | null;
 

@@ -1,7 +1,7 @@
 import {
   type ChildProcess,
-  type SpawnSyncReturns,
   execFileSync,
+  type SpawnSyncReturns,
   spawn,
   spawnSync,
 } from "node:child_process";
@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { shortTicketCode } from "../../src/core/index.js";
 
 // web-real-repo: closes the coverage gap ticket_01KY93E35ZXWBQ64QMXSVRTCKB
 // flags — "test gap: exercise slop web against a real-CLI-produced repo,
@@ -43,6 +44,25 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 // D5.test.ts's compiled-binary block. A deliberate smoke test, not a
 // second copy of D5's exhaustive per-view coverage: a few strong,
 // real-data assertions per view are enough to catch a write/read drift.
+//
+// ticket_01KY9S0172V8AYCYV9KWS6RC9P extends this same real-CLI-produced
+// repo with: a parent/child pair, a `relates-to` edge (set via a scripted
+// `slop edit` — see `editRelatesTo` below; there is no `--relates-to` flag
+// on any mutating command today, so this is the one place this file steps
+// outside pure CLI-flag-driven mutation, and it still goes through the
+// real `slop edit` command + its real schema/edge validation, just with a
+// scripted $EDITOR instead of a human one), a `discovered-from` edge, a
+// ticket left `in_progress` (never advanced) to exercise the `stale`
+// overlay + "Active session" deep link, a ticket left `review` (never
+// `done`) to exercise review-staleness, and a `done --outcome` resolution
+// containing both a `javascript:` link and raw HTML — the read-side half
+// of D5's "no field rendered raw/unescaped" acceptance criterion, now
+// proven against real CLI output rather than only a hand-built fixture.
+// `SLOP_WEB_FAKE_NOW` (src/cli/commands/web.ts's testing-only clock
+// override, same convention D5.test.ts uses) pins the server's "now" far
+// enough past every ticket's real activity timestamp to make the
+// intentionally-stalled tickets read as stale without this file actually
+// sleeping for an hour.
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, "..", "..");
@@ -72,24 +92,39 @@ beforeAll(() => {
 // actually running this suite.
 // ---------------------------------------------------------------------------
 
-function runSlop(args: string[], cwd: string, input?: string): SpawnSyncReturns<string> {
+const STRIPPED_HARNESS_ENV: NodeJS.ProcessEnv = {
+  CLAUDECODE: undefined,
+  CLAUDE_CODE_CHILD_SESSION: undefined,
+  CLAUDE_CODE_SESSION_ID: undefined,
+  OPENCODE: undefined,
+  OPENCODE_PID: undefined,
+  CODEX_SANDBOX: undefined,
+  CODEX_SANDBOX_NETWORK_DISABLED: undefined,
+  CODEX_HOME: undefined,
+  SLOP_TEST_CLAUDE_HOME: undefined,
+};
+
+/** {@link runSlop}'s general form — same harness-env stripping, plus
+ * caller-supplied overrides layered on top (e.g. `SLOP_ACTOR` for an
+ * actor-identity test, or `EDITOR` to script `slop edit` — see
+ * `editRelatesTo` below). `extraEnv`'s keys win over both `process.env`
+ * and the stripped harness vars, applied last. */
+function runSlopWithEnv(
+  args: string[],
+  cwd: string,
+  extraEnv: NodeJS.ProcessEnv,
+  input?: string,
+): SpawnSyncReturns<string> {
   return spawnSync(binaryPath, args, {
     cwd,
     encoding: "utf8",
     input,
-    env: {
-      ...process.env,
-      CLAUDECODE: undefined,
-      CLAUDE_CODE_CHILD_SESSION: undefined,
-      CLAUDE_CODE_SESSION_ID: undefined,
-      OPENCODE: undefined,
-      OPENCODE_PID: undefined,
-      CODEX_SANDBOX: undefined,
-      CODEX_SANDBOX_NETWORK_DISABLED: undefined,
-      CODEX_HOME: undefined,
-      SLOP_TEST_CLAUDE_HOME: undefined,
-    },
+    env: { ...process.env, ...STRIPPED_HARNESS_ENV, ...extraEnv },
   });
+}
+
+function runSlop(args: string[], cwd: string, input?: string): SpawnSyncReturns<string> {
+  return runSlopWithEnv(args, cwd, {}, input);
 }
 
 interface NewTicketJson {
@@ -129,6 +164,58 @@ function newTicketWithSpec(
   return JSON.parse(result.stdout) as NewTicketJson;
 }
 
+/** Same as {@link newTicket}, with caller-supplied env overrides — used
+ * once, below, to set `SLOP_ACTOR` to an attacker-shaped string so
+ * `provenance.created_by.name`'s render-time escaping (ticket-detail.ts's
+ * "Provenance" row) is proven against something the real actor-resolution
+ * path (D17) actually produced, not just a hand-built `Ticket` object. */
+function newTicketWithEnv(
+  root: string,
+  name: string,
+  extraArgs: string[],
+  extraEnv: NodeJS.ProcessEnv,
+): NewTicketJson {
+  const result = runSlopWithEnv(["new", name, "--json", ...extraArgs], root, extraEnv);
+  expect(result.status, result.stderr).toBe(0);
+  return JSON.parse(result.stdout) as NewTicketJson;
+}
+
+/**
+ * `relates-to` (ticket_01KY9S0172V8AYCYV9KWS6RC9P) has no `--relates-to`
+ * flag on any mutating command (`new`'s `--blocks`/`--discovered-from`
+ * cover the other two array edge kinds; `relates-to` was simply never
+ * given one) — so the only real-CLI path to setting it is `slop edit`
+ * (opens `$VISUAL`/`$EDITOR` on the ticket's raw JSONC file). This scripts
+ * that editor with a tiny Bun program instead of a human, writing
+ * `relates_to` directly and exiting 0 — `slop edit` still does everything
+ * it always does afterward (reparse, re-validate against `ticketSchema`,
+ * `validateTicketEdges`, `updateTicket`'s comment-preserving rewrite), so
+ * this exercises the real write path, not a hand-poked file the CLI never
+ * touched. `VISUAL` is explicitly cleared so a stray interactive-shell
+ * `$VISUAL` in the host environment can never win over the scripted
+ * `EDITOR` (`pickEditorCommand`'s own precedence, edit.ts).
+ */
+async function editRelatesTo(root: string, ref: string, targetId: string): Promise<void> {
+  const scriptPath = join(root, `edit-relates-to-${ref}.mjs`);
+  await writeFile(
+    scriptPath,
+    [
+      'import { readFileSync, writeFileSync } from "node:fs";',
+      "const path = process.argv[2];",
+      'const data = JSON.parse(readFileSync(path, "utf8"));',
+      `data.relates_to = ${JSON.stringify([targetId])};`,
+      "writeFileSync(path, JSON.stringify(data, null, 2));",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  const result = runSlopWithEnv(["edit", ref], root, {
+    VISUAL: undefined,
+    EDITOR: `bun ${scriptPath}`,
+  });
+  expect(result.status, result.stderr).toBe(0);
+}
+
 interface StartJson {
   session: {
     id: string;
@@ -166,8 +253,16 @@ function review(root: string, ref: string, mr: string, transcriptPath: string): 
   expect(result.status, result.stderr).toBe(0);
 }
 
-function done(root: string, ref: string, note: string, transcriptPath: string): void {
-  const result = runSlop(["done", ref, "--note", note, "--transcript", transcriptPath], root);
+function done(
+  root: string,
+  ref: string,
+  note: string,
+  transcriptPath: string,
+  outcome?: string,
+): void {
+  const args = ["done", ref, "--note", note, "--transcript", transcriptPath];
+  if (outcome !== undefined) args.push("--outcome", outcome);
+  const result = runSlop(args, root);
   expect(result.status, result.stderr).toBe(0);
 }
 
@@ -251,20 +346,60 @@ async function stopServer(server: RunningServer | undefined): Promise<void> {
 let root: string;
 let server: RunningServer | undefined;
 
-// The three tickets this lifecycle produces:
+// The three original tickets this lifecycle produces:
 let dependentTicket: NewTicketJson; // blocked by blockerTicket the whole time — never started.
 let blockerTicket: NewTicketJson; // external jira: parent; blocks dependentTicket; never started.
 let mainTicket: NewTicketJson; // driven through the full start/plan/review/done lifecycle.
 let mainSessionId: string;
 
+// ticket_01KY9S0172V8AYCYV9KWS6RC9P additions — relationships/overlays the
+// original three tickets above don't exercise on their own:
+let parentTicket: NewTicketJson; // has one local child.
+let childTicket: NewTicketJson; // --parent parentTicket.
+let relatesTarget: NewTicketJson; // relates-to mainTicket, set via a scripted `slop edit` (no --relates-to flag exists).
+let discoveredTicket: NewTicketJson; // --discovered-from mainTicket; created by an actor name with an XSS payload.
+let staleTicket: NewTicketJson; // started, then left in_progress forever — stale under SLOP_WEB_FAKE_NOW below.
+let staleSessionId: string;
+let reviewTicket: NewTicketJson; // started, reviewed, then left in review forever — review-stale under SLOP_WEB_FAKE_NOW below.
+
 const JIRA_BASE = "https://real-repo-fixture.atlassian.net";
 const MR_URL = "https://github.com/real-repo-fixture/real-repo-fixture/pull/7";
+const REVIEW_TICKET_MR_URL = "https://github.com/real-repo-fixture/real-repo-fixture/pull/9";
 const PROGRESS_NOTE = "confirmed the web read path renders real CLI output end to end";
 const DONE_NOTE = "web-real-repo smoke coverage landed; verified against a genuine CLI lifecycle";
 const TRANSCRIPT_USER_MARKER =
   "please prove slop web can render a transcript that review and done actually captured";
 const TRANSCRIPT_ASSISTANT_MARKER =
   "Captured. Running the verification command now before handing this back.";
+
+// XSS-shaped strings, one per attacker-influenced field category this
+// ticket's brief names ("names, spec, notes, resolution, transcript text,
+// actor names, MR/urls") that has a real CLI write path — MR itself is
+// EXCLUDED (`mrUrlSchema`, core/entities/ticket.ts, rejects a non-http(s)
+// scheme at write time, so `slop review --mr javascript:...` can never
+// even reach the db through the real CLI; that render-time backstop is
+// covered directly by `renderMrLink`'s own unit tests instead).
+const XSS_MARK = '<img src=x onerror="alert(1)">';
+const RESOLUTION_MD = [
+  "## Root cause",
+  "",
+  "Fixed by validating config **before** startup.",
+  "",
+  "- verified from source",
+  "- verified against the compiled binary",
+  "",
+  "[bad link](javascript:alert('resolution-xss'))",
+  "",
+  "![bad image](data:image/png;base64,QQ==)",
+  "",
+  "[safe link](https://example.com/resolution/9)",
+  "",
+  `${XSS_MARK}plain text survives`,
+].join("\n");
+const XSS_PROGRESS_NOTE = `${XSS_MARK}progress-note-xss-marker`;
+const XSS_ACTOR_NAME = `${XSS_MARK}xss-actor`;
+const TRANSCRIPT_XSS_MARKER = "transcript-xss-marker";
+const TRANSCRIPT_XSS_SAFE_URL = "https://example.com/transcript/safe";
 
 async function get(path: string, init?: RequestInit): Promise<Response> {
   if (!server) throw new Error("server not started");
@@ -334,6 +469,13 @@ beforeAll(async () => {
   planCheck(root, mainTicket.slug, 2);
 
   updateProgress(root, mainTicket.slug, PROGRESS_NOTE);
+  // A second, lock-free progress note (ticket_01KY9S0172V8AYCYV9KWS6RC9P) —
+  // carries raw HTML, proving the updates timeline's inline "progress
+  // note: ..." rendering (ticket-detail.ts's renderTimelineEntry) escapes
+  // it rather than rendering it live. Both notes remain in the immutable
+  // event timeline (events are append-only — only `latest_note` itself
+  // ends up as whichever was written last).
+  updateProgress(root, mainTicket.slug, XSS_PROGRESS_NOTE);
 
   // A real transcript file (C4.test.ts's `--transcript <path>` fallback —
   // "works for any harness ... including 'other', the default
@@ -362,12 +504,85 @@ beforeAll(async () => {
           ],
         },
       }),
+      // ticket_01KY9S0172V8AYCYV9KWS6RC9P: a `text` block whose markdown
+      // carries a `javascript:` link alongside a safe one — transcript
+      // text renders through the exact same `renderMarkdownToString` ->
+      // `sanitizeMarkdownHtml` path as spec.details_md/resolution
+      // (transcript-view.ts's `renderBlock`), so this is "transcript text"
+      // from this ticket's XSS-safety brief, proven against a transcript a
+      // real `review`/`done --transcript` call actually captured.
+      JSON.stringify({
+        type: "assistant",
+        message: {
+          role: "assistant",
+          model: "claude-sonnet-5",
+          content: [
+            {
+              type: "text",
+              text: `${TRANSCRIPT_XSS_MARKER}: [bad](javascript:alert('t')) vs [safe](${TRANSCRIPT_XSS_SAFE_URL})`,
+            },
+          ],
+        },
+      }),
     ].join("\n")}\n`,
     "utf8",
   );
 
   review(root, mainTicket.slug, MR_URL, transcriptPath);
-  done(root, mainTicket.slug, DONE_NOTE, transcriptPath);
+  // `--outcome`: the resolution writeup (RESOLUTION_MD) carries the same
+  // javascript:/raw-HTML XSS shapes ticket-detail.test.ts's dedicated
+  // resolution test already covers in isolation — proven here against a
+  // ticket that also has a full real session/plan/review history around
+  // it, not just a bare `done` call.
+  done(root, mainTicket.slug, DONE_NOTE, transcriptPath, RESOLUTION_MD);
+
+  // --- ticket_01KY9S0172V8AYCYV9KWS6RC9P: relationships beyond blocks/blocked-by ---
+
+  parentTicket = newTicket(root, "Parent ticket for relationship coverage");
+  childTicket = newTicket(root, "Child ticket for relationship coverage", [
+    "--parent",
+    parentTicket.id,
+  ]);
+
+  // relates-to: no `--relates-to` flag exists on any mutating command
+  // today (see `editRelatesTo`'s own doc) — set via a scripted `slop edit`
+  // instead, still the real write path.
+  relatesTarget = newTicket(root, "Relates to the main ticket");
+  await editRelatesTo(root, mainTicket.slug, relatesTarget.id);
+
+  // discovered-from, AND an actor-name XSS check in one call: the actor
+  // who creates this ticket resolves via SLOP_ACTOR (D17, highest
+  // precedence), landing in `provenance.created_by.name` — rendered on
+  // discoveredTicket's own detail page's "Provenance" row.
+  discoveredTicket = newTicketWithEnv(
+    root,
+    "Discovered while working the main ticket",
+    ["--discovered-from", mainTicket.id],
+    { SLOP_ACTOR: XSS_ACTOR_NAME },
+  );
+
+  // --- stale/review-stale overlays: two tickets deliberately left mid-flight ---
+
+  staleTicket = newTicket(root, "Left in_progress to go stale");
+  const staleStarted = startTicket(root, staleTicket.slug);
+  staleSessionId = staleStarted.session.id;
+  // Never stopped/reviewed/done — stays in_progress, active_session set,
+  // for the lifetime of this fixture.
+
+  reviewTicket = newTicket(root, "Left in review to go review-stale");
+  startTicket(root, reviewTicket.slug);
+  review(root, reviewTicket.slug, REVIEW_TICKET_MR_URL, transcriptPath);
+  // Never done — stays in review for the lifetime of this fixture.
+
+  // SLOP_WEB_FAKE_NOW (src/cli/commands/web.ts's testing-only clock
+  // override, same convention D5.test.ts uses): every OTHER ticket in
+  // this fixture ends in a terminal or never-started state (done/open),
+  // which `isTicketStale` never flags regardless of the clock — only
+  // staleTicket (in_progress) and reviewTicket (review) actually move
+  // under this. +25h clears both the default `stale_after` (60m) and
+  // `review_stale_after` (24h) thresholds without this file sleeping for
+  // either.
+  const fakeNowIso = new Date(Date.now() + 25 * 60 * 60 * 1000).toISOString();
 
   server = await spawnAndWaitForUrl(binaryPath, ["web", "--port", "0"], root, {
     ...process.env,
@@ -375,8 +590,9 @@ beforeAll(async () => {
     OPENCODE: undefined,
     CODEX_SANDBOX: undefined,
     CODEX_SANDBOX_NETWORK_DISABLED: undefined,
+    SLOP_WEB_FAKE_NOW: fakeNowIso,
   });
-}, 60_000);
+}, 90_000);
 
 afterAll(async () => {
   await stopServer(server);
@@ -389,13 +605,29 @@ afterAll(async () => {
 // ---------------------------------------------------------------------------
 
 describe("web against a real init/new/start/plan/review/done lifecycle", () => {
+  // Every ticket this file's beforeAll creates — used wherever a test needs
+  // "every real ticket", so the count/list here never drifts out of sync
+  // with however many `newTicket*` calls beforeAll happens to make.
+  const allTickets = (): NewTicketJson[] => [
+    dependentTicket,
+    blockerTicket,
+    mainTicket,
+    parentTicket,
+    childTicket,
+    relatesTarget,
+    discoveredTicket,
+    staleTicket,
+    reviewTicket,
+  ];
+
   describe("/tickets", () => {
-    it("lists all three real tickets by name and slug", async () => {
+    it("lists every real ticket by name and slug", async () => {
       const res = await get("/tickets");
       expect(res.status).toBe(200);
       const body = await res.text();
-      expect(body).toContain("3 of 3 tickets");
-      for (const t of [dependentTicket, blockerTicket, mainTicket]) {
+      const tickets = allTickets();
+      expect(body).toContain(`${tickets.length} of ${tickets.length} ticket`);
+      for (const t of tickets) {
         expect(body, `expected /tickets to list "${t.name}"`).toContain(t.name);
         expect(body).toContain(t.slug);
       }
@@ -510,6 +742,198 @@ describe("web against a real init/new/start/plan/review/done lifecycle", () => {
       // re-checked here against a REAL captured file, not a hand-built one).
       expect(body).not.toContain('{"type":"user"');
       expect(body).not.toContain('{"type":"assistant"');
+    });
+
+    // ticket_01KY9S0172V8AYCYV9KWS6RC9P: "transcript text" is one of this
+    // ticket's own named XSS-safety categories — a `javascript:` markdown
+    // link inside a real captured transcript, neutralised the same way
+    // resolution/details_md are.
+    it("neutralises a javascript: link inside real transcript text, keeping the safe one live", async () => {
+      const res = await get(`/tickets/${mainTicket.id}/sessions/${mainSessionId}/transcript`);
+      const body = await res.text();
+      expect(body).toContain(TRANSCRIPT_XSS_MARKER);
+      expect(body).toContain(`href="${TRANSCRIPT_XSS_SAFE_URL}"`);
+      expect(body).not.toMatch(/href="javascript:/i);
+      expect(body).toContain("bad"); // the link's inert anchor text still shows
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // ticket_01KY9S0172V8AYCYV9KWS6RC9P: everything the ticket-detail page adds
+  // — handle, both-direction relationships, overlay reasons, resolution, and
+  // the XSS-neutralisation guarantee — against this real CLI-produced repo.
+  // ---------------------------------------------------------------------------
+
+  describe("ticket detail: the short t-<code> handle", () => {
+    it("renders the derived handle for the real ticket id", async () => {
+      const res = await get(`/tickets/${mainTicket.id}`);
+      const body = await res.text();
+      expect(body).toContain(shortTicketCode(mainTicket.id));
+    });
+  });
+
+  describe("ticket detail: parent/children (both directions)", () => {
+    it("childTicket's page links to its real parent", async () => {
+      const res = await get(`/tickets/${childTicket.id}`);
+      const body = await res.text();
+      expect(body).toContain(`href="/tickets/${parentTicket.id}"`);
+      expect(body).toContain(parentTicket.name);
+    });
+
+    it("parentTicket's page lists the real child", async () => {
+      const res = await get(`/tickets/${parentTicket.id}`);
+      const body = await res.text();
+      expect(body).toContain(`href="/tickets/${childTicket.id}"`);
+      expect(body).toContain(childTicket.name);
+    });
+  });
+
+  describe("ticket detail: blocks / blocked-by (both directions) + the blocked overlay reason", () => {
+    it("blockerTicket's page shows the real dependent under Blocks →", async () => {
+      const res = await get(`/tickets/${blockerTicket.id}`);
+      const body = await res.text();
+      expect(body).toContain("Blocks");
+      expect(body).toContain(`href="/tickets/${dependentTicket.id}"`);
+    });
+
+    it("dependentTicket's page shows the real blocker under ← Blocked by, AND names it in the blocked-overlay reason", async () => {
+      const res = await get(`/tickets/${dependentTicket.id}`);
+      const body = await res.text();
+      expect(body).toContain("Blocked by");
+      expect(body).toContain(`href="/tickets/${blockerTicket.id}"`);
+      expect(body).toContain(blockerTicket.name);
+      // The reason line, not just the edge — see ticket-detail.ts's
+      // renderOverlayReasons.
+      expect(body).toContain("blocked by");
+    });
+  });
+
+  describe("ticket detail: relates-to (both directions, set via a scripted slop edit)", () => {
+    it("mainTicket's page shows relatesTarget under Relates to", async () => {
+      const res = await get(`/tickets/${mainTicket.id}`);
+      const body = await res.text();
+      expect(body).toContain("Relates to");
+      expect(body).toContain(`href="/tickets/${relatesTarget.id}"`);
+      expect(body).toContain(relatesTarget.name);
+    });
+
+    it("relatesTarget's page shows mainTicket under Relates to (the derived reverse)", async () => {
+      const res = await get(`/tickets/${relatesTarget.id}`);
+      const body = await res.text();
+      expect(body).toContain("Relates to");
+      expect(body).toContain(`href="/tickets/${mainTicket.id}"`);
+      expect(body).toContain(mainTicket.name);
+    });
+  });
+
+  describe("ticket detail: discovered-from / discovered-here (both directions)", () => {
+    it("discoveredTicket's page shows mainTicket under Discovered from →", async () => {
+      const res = await get(`/tickets/${discoveredTicket.id}`);
+      const body = await res.text();
+      expect(body).toContain("Discovered from");
+      expect(body).toContain(`href="/tickets/${mainTicket.id}"`);
+    });
+
+    it("mainTicket's page shows discoveredTicket under ← Discovered here", async () => {
+      const res = await get(`/tickets/${mainTicket.id}`);
+      const body = await res.text();
+      expect(body).toContain("Discovered here");
+      expect(body).toContain(`href="/tickets/${discoveredTicket.id}"`);
+      expect(body).toContain(discoveredTicket.name);
+    });
+  });
+
+  describe("ticket detail: the stale (in_progress) overlay reason + Active session deep link", () => {
+    it("shows the Stale badge, the reason text, and links Active session to the real session's own card", async () => {
+      const res = await get(`/tickets/${staleTicket.id}`);
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      expect(body).toContain('class="badge stale"');
+      expect(body).toContain("no activity since");
+      expect(body).toContain("threshold 60m");
+      expect(body).toContain(`href="#session-${staleSessionId}"`);
+      expect(body).toContain(`id="session-${staleSessionId}"`);
+    });
+  });
+
+  describe("ticket detail: the review-stale overlay reason + Review section with its real MR", () => {
+    it("shows the Stale badge, the review-anchored reason text, and the real MR link", async () => {
+      const res = await get(`/tickets/${reviewTicket.id}`);
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      expect(body).toContain('class="badge stale"');
+      expect(body).toContain("awaiting review since");
+      expect(body).toContain("threshold 24h");
+      expect(body).toContain(`href="${REVIEW_TICKET_MR_URL}"`);
+    });
+
+    it("also shows up on the /review and /stale panels", async () => {
+      const reviewPanel = await (await get("/review")).text();
+      expect(reviewPanel).toContain(reviewTicket.name);
+      expect(reviewPanel).toContain(REVIEW_TICKET_MR_URL);
+
+      const stalePanel = await (await get("/stale")).text();
+      expect(stalePanel).toContain(reviewTicket.name);
+      expect(stalePanel).toContain(staleTicket.name);
+    });
+  });
+
+  describe("ticket detail: resolution (--outcome), rendered as markdown with XSS neutralised", () => {
+    it("renders the real markdown, keeps the safe link live, and neutralises both the javascript: link and the data: image", async () => {
+      const res = await get(`/tickets/${mainTicket.id}`);
+      const body = await res.text();
+
+      expect(body).toContain("<h2>Resolution</h2>");
+      expect(body).toContain("<h2>Root cause</h2>");
+      expect(body).toContain("<strong>before</strong>");
+      expect(body).toContain("<li>verified from source</li>");
+
+      // Safe link survives as a live href.
+      expect(body).toContain('href="https://example.com/resolution/9"');
+
+      // javascript: link neutralised — no live href, inert text still shows.
+      expect(body).not.toMatch(/href="javascript:/i);
+      expect(body).toContain("bad link");
+
+      // data: image neutralised — no live src.
+      expect(body).not.toMatch(/src="data:/i);
+
+      // Raw HTML neutralised (escaped, not a live tag).
+      expect(body).not.toContain('<img src=x onerror="alert(1)">plain text survives');
+      expect(body).toContain("plain text survives");
+    });
+  });
+
+  describe("ticket detail: a lock-free progress note, escaped in the updates timeline", () => {
+    it("shows the progress note inline, HTML-escaped rather than live", async () => {
+      const res = await get(`/tickets/${mainTicket.id}`);
+      const body = await res.text();
+      expect(body).toContain("progress note:");
+      expect(body).not.toContain('<img src=x onerror="alert(1)">progress-note-xss-marker');
+      expect(body).toContain("progress-note-xss-marker");
+      expect(body).toContain(PROGRESS_NOTE); // the earlier, benign note is still present too
+    });
+  });
+
+  describe("ticket detail: an attacker-shaped actor name (provenance.created_by), escaped", () => {
+    it("escapes the real SLOP_ACTOR-resolved name in the Provenance row", async () => {
+      const res = await get(`/tickets/${discoveredTicket.id}`);
+      const body = await res.text();
+      expect(body).toContain("Provenance");
+      expect(body).not.toContain('<img src=x onerror="alert(1)">xss-actor');
+      expect(body).toContain("xss-actor");
+    });
+  });
+
+  describe("read-only contract", () => {
+    it("POST to a real ticket detail route returns 405, not a mutation", async () => {
+      const res = await get(`/tickets/${mainTicket.id}`, { method: "POST" });
+      expect(res.status).toBe(405);
+    });
+
+    it("POST to /tickets (the list route) returns 405", async () => {
+      const res = await get("/tickets", { method: "POST" });
+      expect(res.status).toBe(405);
     });
   });
 });

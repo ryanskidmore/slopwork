@@ -9,6 +9,12 @@
  * POST/PUT/DELETE/PATCH request, to any path, known or not.
  */
 import { type Clock, systemClock } from "../core/index.js";
+// Static assets, embedded into the compiled binary at build time (`bun build --compile`
+// bundles every statically-imported file reachable from the entrypoint — verified directly,
+// see this work item's report). Nothing here is fetched from a CDN or read from disk at
+// runtime, so `slop web` works fully offline from `dist/slop`.
+import appJs from "./assets/app.js" with { type: "text" };
+import styleCss from "./assets/style.css" with { type: "text" };
 import type { WebDataSource } from "./data-source.js";
 import { handleReviewPanel } from "./views/review.js";
 import { handleStalePanel } from "./views/stale.js";
@@ -16,12 +22,6 @@ import { handleTicketDetail } from "./views/ticket-detail.js";
 import { handleTicketList } from "./views/tickets.js";
 import { handleTranscriptView } from "./views/transcript-view.js";
 import { handleTreeView } from "./views/tree.js";
-// Static assets, embedded into the compiled binary at build time (`bun build --compile`
-// bundles every statically-imported file reachable from the entrypoint — verified directly,
-// see this work item's report). Nothing here is fetched from a CDN or read from disk at
-// runtime, so `slop web` works fully offline from `dist/slop`.
-import appJs from "./assets/app.js" with { type: "text" };
-import styleCss from "./assets/style.css" with { type: "text" };
 
 const READ_METHODS = new Set(["GET", "HEAD"]);
 
@@ -85,7 +85,7 @@ export function createWebServer(
         GET: (req) => handleTicketList(req, dataSource, now()),
       },
       "/tree": {
-        GET: (req) => handleTreeView(req, dataSource),
+        GET: (req) => handleTreeView(req, dataSource, now()),
       },
       "/review": {
         GET: (req) => handleReviewPanel(req, dataSource, now()),

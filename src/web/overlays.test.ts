@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { newTicketId, ticketSchema } from "../core/index.js";
-import type { Ticket } from "../core/index.js";
+import type { Event, Ticket } from "../core/index.js";
+import { newEventId, newSessionId, newTicketId, ticketSchema } from "../core/index.js";
 import {
+  buildReverseEdgeIndex,
   computeBlockedTicketIds,
+  computeStaleReason,
+  deriveEffectiveTickets,
   formatDurationShort,
   formatRelative,
   isTicketStale,
+  liveBlockers,
   msSince,
   staleThresholdsFromConfig,
 } from "./overlays.js";
@@ -134,5 +138,164 @@ describe("formatDurationShort / formatRelative", () => {
   it("msSince never goes negative even for a future timestamp", () => {
     const now = Date.parse("2026-07-23T12:00:00.000Z");
     expect(msSince("2026-07-24T00:00:00.000Z", now)).toBe(0);
+  });
+});
+
+// ticket_01KY9S0172V8AYCYV9KWS6RC9P: the ticket-detail "reason" list for a
+// `blocked` badge — WHICH tickets, not just whether any do.
+describe("liveBlockers", () => {
+  it("returns every non-done/dropped ticket that names the target in its own `blocks`", () => {
+    const target = ticket();
+    const openBlocker = ticket({ state: "open", blocks: [target.id] });
+    const inProgressBlocker = ticket({ state: "in_progress", blocks: [target.id] });
+    const doneBlocker = ticket({ state: "done", blocks: [target.id] });
+    const unrelated = ticket();
+    const blockers = liveBlockers(target.id, [
+      target,
+      openBlocker,
+      inProgressBlocker,
+      doneBlocker,
+      unrelated,
+    ]);
+    expect(blockers.map((b) => b.id).sort()).toEqual([openBlocker.id, inProgressBlocker.id].sort());
+  });
+
+  it("returns an empty array when nothing blocks the target", () => {
+    const target = ticket();
+    expect(liveBlockers(target.id, [target])).toEqual([]);
+  });
+});
+
+// ticket_01KY9S0172V8AYCYV9KWS6RC9P: the ticket-detail "reason" for a
+// `stale` badge — which clock, and since when.
+describe("computeStaleReason", () => {
+  const thresholds = staleThresholdsFromConfig({
+    project: "x",
+    remotes: {},
+    defaults: { stale_after: "60m", review_stale_after: "24h" },
+    transcripts: "local",
+  });
+  const now = Date.parse("2026-07-23T12:00:00.000Z");
+
+  it("is null whenever isTicketStale is false", () => {
+    const fresh = ticket({ state: "in_progress", last_activity_at: "2026-07-23T11:30:00.000Z" });
+    expect(isTicketStale(fresh, thresholds, now)).toBe(false);
+    expect(computeStaleReason(fresh, thresholds, now)).toBeNull();
+  });
+
+  it("reports state in_progress, anchored on last_activity_at, when in_progress is stale", () => {
+    const stale = ticket({ state: "in_progress", last_activity_at: "2026-07-23T10:00:00.000Z" });
+    expect(computeStaleReason(stale, thresholds, now)).toEqual({
+      state: "in_progress",
+      since: "2026-07-23T10:00:00.000Z",
+    });
+  });
+
+  it("reports state review, anchored on review.requested_at (not last_activity_at), when review is stale", () => {
+    const stillRotting = ticket({
+      state: "review",
+      last_activity_at: "2026-07-23T11:59:00.000Z", // fresh-looking, but irrelevant to review staleness
+      review: {
+        requested_at: "2026-07-21T12:00:00.000Z", // 2 days ago — actually stale
+        by: { name: "ryan", kind: "human" },
+      },
+    });
+    expect(computeStaleReason(stillRotting, thresholds, now)).toEqual({
+      state: "review",
+      since: "2026-07-21T12:00:00.000Z",
+    });
+  });
+});
+
+// ticket_01KY9S0172V8AYCYV9KWS6RC9P: reverse-edge derivation — "who blocks
+// me" / "who relates to me" / "what got discovered here" — mirrors
+// src/repo/db-index.ts's buildIndex reverse-edge computation.
+describe("buildReverseEdgeIndex", () => {
+  it("derives blockedBy from every OTHER ticket's outgoing `blocks`, regardless of state", () => {
+    const target = ticket();
+    const liveBlocker = ticket({ state: "open", blocks: [target.id] });
+    const doneBlocker = ticket({ state: "done", blocks: [target.id] });
+    const index = buildReverseEdgeIndex([target, liveBlocker, doneBlocker]);
+    // Unlike liveBlockers, this includes the done blocker too — it's a
+    // structural edge, not a live-overlay reason.
+    expect(index.blockedBy.get(target.id)?.sort()).toEqual([liveBlocker.id, doneBlocker.id].sort());
+  });
+
+  it("derives relatedFrom from every OTHER ticket's outgoing `relates_to`", () => {
+    const a = ticket();
+    const b = ticket({ relates_to: [a.id] });
+    const index = buildReverseEdgeIndex([a, b]);
+    expect(index.relatedFrom.get(a.id)).toEqual([b.id]);
+    expect(index.relatedFrom.get(b.id) ?? []).toEqual([]);
+  });
+
+  it('derives "discovered" (discovered-from reverse) from every OTHER ticket\'s outgoing `discovered_from`', () => {
+    const workedTicket = ticket();
+    const foundWhileWorkingIt = ticket({ discovered_from: [workedTicket.id] });
+    const index = buildReverseEdgeIndex([workedTicket, foundWhileWorkingIt]);
+    expect(index.discovered.get(workedTicket.id)).toEqual([foundWhileWorkingIt.id]);
+  });
+
+  it("returns empty arrays (via ?? []) for a ticket nothing points at", () => {
+    const lonely = ticket();
+    const index = buildReverseEdgeIndex([lonely]);
+    expect(index.blockedBy.get(lonely.id) ?? []).toEqual([]);
+    expect(index.relatedFrom.get(lonely.id) ?? []).toEqual([]);
+    expect(index.discovered.get(lonely.id) ?? []).toEqual([]);
+  });
+});
+
+// ticket_01KY9S0172V8AYCYV9KWS6RC9P: applying src/repo/db-index.ts's
+// deriveEffectiveOverlay across a whole ticket list — the same EFFECTIVE
+// latest_note/last_activity_at `slop show` renders, not the possibly-stale
+// verbatim ticket-file value.
+describe("deriveEffectiveTickets", () => {
+  function progressEvent(ticketId: string, at: string, progress: string): Event {
+    return {
+      id: newEventId(),
+      actor: { name: "agent", kind: "agent" },
+      session: null,
+      verb: "ticket.updated",
+      entity: { kind: "ticket", id: ticketId },
+      payload: { progress },
+      at,
+    };
+  }
+
+  it("folds a lock-free progress event newer than the stored baseline into latest_note/last_activity_at", () => {
+    const t = ticket({ last_activity_at: "2026-07-23T10:00:00.000Z", latest_note: null });
+    const events = [progressEvent(t.id, "2026-07-23T11:00:00.000Z", "still going")];
+    const [effective] = deriveEffectiveTickets([t], events);
+    expect(effective?.latest_note).toBe("still going");
+    expect(effective?.last_activity_at).toBe("2026-07-23T11:00:00.000Z");
+    // The original ticket object is untouched (a new object is returned).
+    expect(t.latest_note).toBeNull();
+  });
+
+  it("returns the SAME object reference when no event is newer than the stored baseline (no-op case)", () => {
+    const t = ticket({ last_activity_at: "2026-07-23T10:00:00.000Z", latest_note: "already this" });
+    const olderEvent = progressEvent(t.id, "2026-07-23T09:00:00.000Z", "stale note");
+    const [effective] = deriveEffectiveTickets([t], [olderEvent]);
+    expect(effective).toBe(t);
+  });
+
+  it("ignores events for other tickets and non-ticket-kind events", () => {
+    const t = ticket({ last_activity_at: "2026-07-23T10:00:00.000Z" });
+    const other = ticket();
+    const sessionId = newSessionId();
+    const events: Event[] = [
+      progressEvent(other.id, "2026-07-23T12:00:00.000Z", "not mine"),
+      {
+        id: newEventId(),
+        actor: { name: "agent", kind: "agent" },
+        session: sessionId,
+        verb: "session.started",
+        entity: { kind: "session", id: sessionId },
+        payload: {},
+        at: "2026-07-23T12:00:00.000Z",
+      },
+    ];
+    const [effective] = deriveEffectiveTickets([t], events);
+    expect(effective).toBe(t);
   });
 });

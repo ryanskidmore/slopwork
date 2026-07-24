@@ -72,6 +72,23 @@ export interface WebDataSource {
   listEventsForTicket(ticketId: TicketId): Promise<Event[]>;
 
   /**
+   * ticket_01KY9S0172V8AYCYV9KWS6RC9P: every event in the db, unfiltered.
+   * The one bulk read {@link ../overlays.js!deriveEffectiveTickets} needs to
+   * compute EVERY ticket's effective `latest_note`/`last_activity_at`
+   * (src/repo/db-index.ts's `deriveEffectiveOverlay`) in a single O(tickets
+   * + events) pass — the same grouping strategy `buildIndex` uses — rather
+   * than a separate {@link listEventsForTicket} call (itself already a full
+   * directory scan, per that method's implementation) per ticket, which
+   * would turn an N-ticket list/tree/stale view into an O(tickets × events)
+   * read. Any view that needs `slop show`-consistent effective ticket
+   * fields across more than one ticket at a time should call this once,
+   * not loop {@link listEventsForTicket}. Order is unspecified — callers
+   * that need chronological order sort themselves (this is a bulk read for
+   * grouping-by-ticket, not a timeline).
+   */
+  listEvents(): Promise<Event[]>;
+
+  /**
    * Open a transcript by a session's `transcript_ref`. `null` if the ref
    * doesn't resolve to a readable file (matches D16/S2: a missing
    * transcript is an expected, non-fatal case everywhere else in this

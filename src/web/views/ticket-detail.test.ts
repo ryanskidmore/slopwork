@@ -1,13 +1,22 @@
-import { type ChildProcess, spawn, spawnSync, type SpawnSyncReturns } from "node:child_process";
+import { type ChildProcess, type SpawnSyncReturns, spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { newTicketId, ticketSchema } from "../../core/index.js";
-import type { Ticket } from "../../core/index.js";
-import { renderMrLink, renderResolutionSection } from "./ticket-detail.js";
+import type { Event, Ticket, TicketId } from "../../core/index.js";
+import { newEventId, newTicketId, ticketSchema } from "../../core/index.js";
+import type { ReverseEdgeIndex, StaleReason } from "../overlays.js";
+import {
+  ancestryBreadcrumb,
+  renderMrLink,
+  renderOverlayReasons,
+  renderRelationshipsSection,
+  renderResolutionSection,
+  renderTicketRefList,
+  renderTimelineEntry,
+} from "./ticket-detail.js";
 
 // Stored-XSS regression (ticket_01KY93E2FG20KF5RVW7HRK9M7X): before this
 // fix, ticket-detail.ts interpolated `ticket.review.mr` straight into a
@@ -63,6 +72,229 @@ function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
     ...overrides,
   });
 }
+
+// ticket_01KY9S0172V8AYCYV9KWS6RC9P — relationships, overlay reasons, and
+// the ancestry breadcrumb are all pure `html`-template rendering (no
+// `Bun.markdown`), so — unlike `renderResolutionSection`'s markdown path —
+// they're safe to exercise directly inside vitest.
+
+// An attacker-controlled ticket `name` is exactly the kind of string these
+// helpers render via `ticketLink` (shared.ts) — this is the "confirm the
+// escaping" case for every new field this ticket adds to ticket-detail.ts.
+const XSS_NAME = '<img src=x onerror="alert(1)">evil';
+
+describe("renderTicketRefList", () => {
+  it('renders "none" for an empty id list', () => {
+    const out = renderTicketRefList([], new Map());
+    expect(out.raw).toContain("none");
+  });
+
+  it("renders a resolved ticket as a state badge + escaped link", () => {
+    const t = makeTicket({ name: XSS_NAME, state: "open" });
+    const byId = new Map<TicketId, Ticket>([[t.id, t]]);
+    const out = renderTicketRefList([t.id], byId);
+    expect(out.raw).toContain(`href="/tickets/${t.id}"`);
+    expect(out.raw).toContain("badge state-open");
+    // The XSS payload is HTML-escaped, never a live tag.
+    expect(out.raw).not.toContain("<img src=x onerror");
+    expect(out.raw).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;evil");
+  });
+
+  it("degrades a dangling/unresolved id to inert muted text instead of a broken link", () => {
+    const missingId = newTicketId();
+    const out = renderTicketRefList([missingId], new Map());
+    expect(out.raw).not.toContain("<a ");
+    expect(out.raw).toContain(missingId);
+    expect(out.raw).toContain("muted");
+  });
+
+  it("joins multiple entries with a comma", () => {
+    const a = makeTicket({ name: "A" });
+    const b = makeTicket({ name: "B" });
+    const byId = new Map<TicketId, Ticket>([
+      [a.id, a],
+      [b.id, b],
+    ]);
+    const out = renderTicketRefList([a.id, b.id], byId);
+    expect(out.raw).toContain(", ");
+  });
+});
+
+describe("renderRelationshipsSection", () => {
+  it("renders blocks/blocked-by/relates-to (merged both directions)/discovered-from/discovered-here, all escaped", () => {
+    const blockTarget = makeTicket({ name: "Blocks target" });
+    const blocker = makeTicket({ name: "Blocker" });
+    const relatesOut = makeTicket({ name: "Relates out" });
+    const relatesIn = makeTicket({ name: XSS_NAME });
+    const discoveredFrom = makeTicket({ name: "Discovered from this" });
+    const discoveredHere = makeTicket({ name: "Found while working main" });
+
+    const ticket = makeTicket({
+      name: "Main",
+      blocks: [blockTarget.id],
+      relates_to: [relatesOut.id],
+      discovered_from: [discoveredFrom.id],
+    });
+
+    const byId = new Map<TicketId, Ticket>(
+      [ticket, blockTarget, blocker, relatesOut, relatesIn, discoveredFrom, discoveredHere].map(
+        (t) => [t.id, t],
+      ),
+    );
+
+    const reverseEdges: ReverseEdgeIndex = {
+      blockedBy: new Map([[ticket.id, [blocker.id]]]),
+      relatedFrom: new Map([[ticket.id, [relatesIn.id]]]),
+      discovered: new Map([[ticket.id, [discoveredHere.id]]]),
+    };
+
+    const out = renderRelationshipsSection(ticket, byId, reverseEdges).raw;
+
+    expect(out).toContain("Relationships");
+    expect(out).toContain(`href="/tickets/${blockTarget.id}"`);
+    expect(out).toContain(`href="/tickets/${blocker.id}"`);
+    expect(out).toContain(`href="/tickets/${relatesOut.id}"`);
+    expect(out).toContain(`href="/tickets/${relatesIn.id}"`);
+    expect(out).toContain(`href="/tickets/${discoveredFrom.id}"`);
+    expect(out).toContain(`href="/tickets/${discoveredHere.id}"`);
+    // relatesIn's XSS-laden name is escaped, not live.
+    expect(out).not.toContain("<img src=x onerror");
+    expect(out).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;evil");
+  });
+
+  it('shows "none" for every edge kind on an isolated ticket', () => {
+    const ticket = makeTicket();
+    const byId = new Map<TicketId, Ticket>([[ticket.id, ticket]]);
+    const reverseEdges: ReverseEdgeIndex = {
+      blockedBy: new Map(),
+      relatedFrom: new Map(),
+      discovered: new Map(),
+    };
+    const out = renderRelationshipsSection(ticket, byId, reverseEdges).raw;
+    // 5 relationship rows, each "none".
+    expect(out.match(/none/g)?.length).toBe(5);
+  });
+
+  it("merges outgoing relates_to and incoming relatedFrom without duplicating a ticket present in both", () => {
+    const mainId = newTicketId();
+    const mutual = makeTicket({ name: "Mutual" });
+    const main = makeTicket({ id: mainId, name: "Main", relates_to: [mutual.id] });
+    const byId = new Map<TicketId, Ticket>([
+      [main.id, main],
+      [mutual.id, mutual],
+    ]);
+    // mutual also names `main` in its OWN relates_to — the reverse index
+    // reflects that, exactly like a real db built by scanning every
+    // ticket's outgoing edges would.
+    const reverseEdges: ReverseEdgeIndex = {
+      blockedBy: new Map(),
+      relatedFrom: new Map([[main.id, [mutual.id]]]),
+      discovered: new Map(),
+    };
+    const out = renderRelationshipsSection(main, byId, reverseEdges).raw;
+    // mutual.id's link appears exactly once in the "Relates to" row, not twice.
+    const occurrences = out.split(`href="/tickets/${mutual.id}"`).length - 1;
+    expect(occurrences).toBe(1);
+  });
+});
+
+describe("renderOverlayReasons", () => {
+  const config = { defaults: { stale_after: "60m", review_stale_after: "24h" } };
+  const now = Date.parse("2026-07-23T12:00:00.000Z");
+
+  it("renders nothing when there is no blocker and no stale reason", () => {
+    const out = renderOverlayReasons([], new Map(), null, config, now).raw;
+    expect(out.trim()).toBe("");
+  });
+
+  it("lists the live blocker(s) by name/link when blocked", () => {
+    const blocker = makeTicket({ name: XSS_NAME, state: "open" });
+    const byId = new Map<TicketId, Ticket>([[blocker.id, blocker]]);
+    const out = renderOverlayReasons([blocker], byId, null, config, now).raw;
+    expect(out).toContain("blocked by");
+    expect(out).toContain(`href="/tickets/${blocker.id}"`);
+    expect(out).not.toContain("<img src=x onerror");
+  });
+
+  it("explains an in_progress stale reason with the anchor timestamp", () => {
+    const reason: StaleReason = { state: "in_progress", since: "2026-07-23T10:00:00.000Z" };
+    const out = renderOverlayReasons([], new Map(), reason, config, now).raw;
+    expect(out).toContain("no activity since 2026-07-23T10:00:00.000Z");
+    expect(out).toContain("threshold 60m");
+  });
+
+  it("explains a review stale reason with the anchor timestamp", () => {
+    const reason: StaleReason = { state: "review", since: "2026-07-21T12:00:00.000Z" };
+    const out = renderOverlayReasons([], new Map(), reason, config, now).raw;
+    expect(out).toContain("awaiting review since 2026-07-21T12:00:00.000Z");
+    expect(out).toContain("threshold 24h");
+  });
+});
+
+describe("ancestryBreadcrumb", () => {
+  it("renders (root) for an empty path", () => {
+    const t = makeTicket({ path: [] });
+    expect(ancestryBreadcrumb(t, new Map()).raw).toContain("(root)");
+  });
+
+  it("renders a linked breadcrumb ending in the ticket's own escaped, unlinked name", () => {
+    const root = makeTicket({ name: "Root" });
+    const mid = makeTicket({ name: "Mid" });
+    const leaf = makeTicket({ name: XSS_NAME, path: [root.id, mid.id] });
+    const byId = new Map<TicketId, Ticket>([
+      [root.id, root],
+      [mid.id, mid],
+    ]);
+    const out = ancestryBreadcrumb(leaf, byId).raw;
+    expect(out).toContain(`href="/tickets/${root.id}"`);
+    expect(out).toContain(`href="/tickets/${mid.id}"`);
+    expect(out).not.toContain("<img src=x onerror");
+    expect(out).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;evil");
+  });
+
+  it("degrades an unresolved ancestor id to inert text", () => {
+    const missingId = newTicketId();
+    const leaf = makeTicket({ path: [missingId] });
+    const out = ancestryBreadcrumb(leaf, new Map()).raw;
+    expect(out).not.toContain("<a ");
+    expect(out).toContain(missingId);
+  });
+});
+
+describe("renderTimelineEntry", () => {
+  function makeEvent(overrides: Partial<Event> = {}): Event {
+    return {
+      id: newEventId(),
+      actor: { name: "agent", kind: "agent" },
+      session: null,
+      verb: "ticket.updated",
+      entity: { kind: "ticket", id: newTicketId() },
+      payload: {},
+      at: "2026-07-23T10:00:00.000Z",
+      ...overrides,
+    };
+  }
+
+  it("surfaces a lock-free progress note inline, escaped", () => {
+    const event = makeEvent({ payload: { progress: XSS_NAME } });
+    const out = renderTimelineEntry(event).raw;
+    expect(out).toContain("progress note:");
+    expect(out).not.toContain("<img src=x onerror");
+    expect(out).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;evil");
+  });
+
+  it("shows no inline progress line when payload.progress is absent", () => {
+    const event = makeEvent({ payload: { from: "open", to: "in_progress" } });
+    const out = renderTimelineEntry(event).raw;
+    expect(out).not.toContain("progress note:");
+  });
+
+  it("escapes the actor name", () => {
+    const event = makeEvent({ actor: { name: XSS_NAME, kind: "human" } });
+    const out = renderTimelineEntry(event).raw;
+    expect(out).not.toContain("<img src=x onerror");
+  });
+});
 
 // This one case never calls `renderMarkdownToString` (it short-circuits on
 // an empty/whitespace-only source before ever touching `Bun.markdown`), so

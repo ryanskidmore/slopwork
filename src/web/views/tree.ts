@@ -8,13 +8,20 @@ import type { BunRequest } from "bun";
 import type { Config, Ticket, TicketId } from "../../core/index.js";
 import { isTicketId } from "../../core/index.js";
 import type { WebDataSource } from "../data-source.js";
-import { type RawHtml, html, joinHtml } from "../html.js";
-import { computeBlockedTicketIds } from "../overlays.js";
+import { html, joinHtml, type RawHtml } from "../html.js";
 import {
+  computeBlockedTicketIds,
+  deriveEffectiveTickets,
+  isTicketStale,
+  staleThresholdsFromConfig,
+} from "../overlays.js";
+import {
+  blockedBadge,
   externalParentBadge,
   labelChips,
   pageResponse,
   priorityBadge,
+  staleBadge,
   stateBadge,
   ticketLink,
 } from "./shared.js";
@@ -39,6 +46,7 @@ function renderNode(
   childIndex: Map<TicketId, Ticket[]>,
   config: Config,
   blockedIds: Set<TicketId>,
+  staleIds: Set<TicketId>,
   visited: Set<TicketId>,
 ): RawHtml {
   // Cycle defence: B3 cycle-checks at write time, but a tree renderer
@@ -57,14 +65,17 @@ function renderNode(
     ${priorityBadge(ticket.priority)}
     ${ticketLink(ticket)}
     <span class="mono muted">${ticket.slug}</span>
-    ${blockedIds.has(ticket.id) ? html`<span class="badge blocked">Blocked</span>` : ""}
+    ${blockedIds.has(ticket.id) ? blockedBadge() : ""}
+    ${staleIds.has(ticket.id) ? staleBadge() : ""}
     ${labelChips(ticket.labels)}
     ${hasExternalParent && ticket.parent !== undefined ? externalParentBadge(ticket.parent, config) : ""}
   </div>
   ${
     children.length > 0
       ? html`<ul class="tree">${joinHtml(
-          children.map((child) => renderNode(child, childIndex, config, blockedIds, nextVisited)),
+          children.map((child) =>
+            renderNode(child, childIndex, config, blockedIds, staleIds, nextVisited),
+          ),
         )}</ul>`
       : ""
   }
@@ -74,9 +85,24 @@ function renderNode(
 export async function handleTreeView(
   _req: BunRequest,
   dataSource: WebDataSource,
+  now: number,
 ): Promise<Response> {
-  const [tickets, config] = await Promise.all([dataSource.listTickets(), dataSource.getConfig()]);
+  const [rawTickets, config, events] = await Promise.all([
+    dataSource.listTickets(),
+    dataSource.getConfig(),
+    dataSource.listEvents(),
+  ]);
+  // ticket_01KY9S0172V8AYCYV9KWS6RC9P: effective `last_activity_at` (see
+  // overlays.ts's `deriveEffectiveTickets` doc) — a lock-free `update
+  // --progress` note must reset an in_progress ticket's staleness clock
+  // here exactly like it does on `slop show`/`/tickets/:ref`, not just on
+  // the ticket detail page.
+  const tickets = deriveEffectiveTickets(rawTickets, events);
   const blockedIds = computeBlockedTicketIds(tickets);
+  const thresholds = staleThresholdsFromConfig(config);
+  const staleIds = new Set(
+    tickets.filter((t) => isTicketStale(t, thresholds, now)).map((t) => t.id),
+  );
   const childIndex = buildChildIndex(tickets);
 
   // Local roots (D1): no parent at all, or an external parent — either way
@@ -90,7 +116,7 @@ export async function handleTreeView(
 ${
   roots.length > 0
     ? html`<ul class="tree root">${joinHtml(
-        roots.map((root) => renderNode(root, childIndex, config, blockedIds, new Set())),
+        roots.map((root) => renderNode(root, childIndex, config, blockedIds, staleIds, new Set())),
       )}</ul>`
     : html`<div class="empty-state">No tickets yet.</div>`
 }`;

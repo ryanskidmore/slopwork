@@ -7,7 +7,12 @@
 import type { BunRequest } from "bun";
 import type { WebDataSource } from "../data-source.js";
 import { html } from "../html.js";
-import { formatRelative, isTicketStale, staleThresholdsFromConfig } from "../overlays.js";
+import {
+  deriveEffectiveTickets,
+  formatRelative,
+  isTicketStale,
+  staleThresholdsFromConfig,
+} from "../overlays.js";
 import { pageResponse, priorityBadge, stateBadge, ticketLink } from "./shared.js";
 
 export async function handleStalePanel(
@@ -15,7 +20,16 @@ export async function handleStalePanel(
   dataSource: WebDataSource,
   now: number,
 ): Promise<Response> {
-  const [tickets, config] = await Promise.all([dataSource.listTickets(), dataSource.getConfig()]);
+  const [rawTickets, config, events] = await Promise.all([
+    dataSource.listTickets(),
+    dataSource.getConfig(),
+    dataSource.listEvents(),
+  ]);
+  // ticket_01KY9S0172V8AYCYV9KWS6RC9P: effective `last_activity_at` — see
+  // overlays.ts's `deriveEffectiveTickets` doc. A lock-free `update
+  // --progress` note must un-stale an in_progress ticket here exactly like
+  // it does on `slop show`/`slop status`.
+  const tickets = deriveEffectiveTickets(rawTickets, events);
   const thresholds = staleThresholdsFromConfig(config);
 
   const stale = tickets

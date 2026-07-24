@@ -13,14 +13,14 @@
 import type { BunRequest } from "bun";
 import { isSessionId } from "../../core/index.js";
 import type { WebDataSource } from "../data-source.js";
-import { type RawHtml, html, joinHtml, raw } from "../html.js";
+import { html, joinHtml, type RawHtml, raw } from "../html.js";
 import { renderMarkdownToString } from "../markdown.js";
 import {
   DEFAULT_TRANSCRIPT_PAGE_SIZE,
+  getTranscriptPage,
   MAX_TRANSCRIPT_PAGE_SIZE,
   type TranscriptBlock,
   type TranscriptRecord,
-  getTranscriptPage,
   toolResultText,
 } from "../transcript.js";
 import { notFoundPage, pageResponse } from "./shared.js";
