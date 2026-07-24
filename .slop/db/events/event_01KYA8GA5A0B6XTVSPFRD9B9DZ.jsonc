@@ -1,0 +1,18 @@
+{
+  "id": "event_01KYA8GA5A0B6XTVSPFRD9B9DZ",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "human"
+  },
+  "session": "session_01KYA8GA532R9ZGCMGA1A0RNC6",
+  "verb": "session.started",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KYA8GA532R9ZGCMGA1A0RNC6"
+  },
+  "payload": {
+    "harness": "other",
+    "takeover": false
+  },
+  "at": "2026-07-24T14:29:39.114Z"
+}

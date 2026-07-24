@@ -1,0 +1,17 @@
+{
+  "id": "event_01KYA78VK569FY47V22B6B76H6",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYA6RGF72X6CQ1CN903A78TH"
+  },
+  "payload": {
+    "progress": "v0-implementation-plan.md: 33 cite-lines across 28 files (nearly every tests/acceptance/*.test.ts cites '§3' as the verbatim acceptance-criterion source, plus README/DECISIONS/vitest.config.ts) -> KEPT at root, dozens-of-cites case. spikes/(findings.md,jsonc.md): 36 cite-lines across 20 files, deeply embedded as technical rationale in production src comments (jsonc.ts, harness.ts, transcript.ts, etc.) -> KEPT at root too, same reasoning. .gitignore/.gitattributes reviewed, both sensible for release, no changes made."
+  },
+  "at": "2026-07-24T14:08:06.245Z"
+}

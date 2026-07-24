@@ -1,0 +1,50 @@
+{
+  "id": "ticket_01KYA7XNH8K70JM6S13A19X7ZB",
+  "name": "ci: OIDC trusted publishing + latest action versions + ci efficiency",
+  "slug": "ci-oidc-trusted-publishing-latest",
+  "spec": {
+    "summary": "GitHub Actions pass: switch release.yml to npm trusted publishing via OIDC (no NPM_TOKEN; id-token:write; npm>=11.5.1; automatic provenance), bump all actions to latest majors (checkout v7, cache v6, setup-node v7), and make the PR/default-branch ci.yml efficient (single test:coverage gate instead of running the suite twice; effective bun caching; one lean job). actionlint clean.",
+    "details_md": "",
+    "acceptance": [
+      "release.yml publishes via OIDC trusted publishing, no NPM_TOKEN",
+      "all actions on current latest major",
+      "ci.yml runs the suite once (coverage gate), caches deps, gate complete-and-exactly-once",
+      "both workflows actionlint-clean"
+    ],
+    "context": [
+      ".github/workflows/release.yml",
+      ".github/workflows/ci.yml",
+      "RELEASE.md",
+      "maintainer configured OIDC trusted publisher on npm"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [
+    "backlog:post-audit",
+    "area:ci",
+    "kind:chore"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYA7XNH8K70JM6S13A19X7ZB",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T14:29:40.063Z",
+  "latest_note": null,
+  "resolution": "Fixed and merged to main — 7c58a43",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-24T14:19:28.177Z",
+  "updated_at": "2026-07-24T14:29:40.063Z"
+}
