@@ -25,6 +25,7 @@ function makeRow(overrides: Partial<IndexTicketRow> = {}): IndexTicketRow {
     root_id: id,
     path: [],
     labels: [],
+    latest_note: null,
     last_activity_at: "2026-07-23T10:00:00.000Z",
     active_session: null,
     blocked_by: [],

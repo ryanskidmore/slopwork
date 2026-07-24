@@ -1,7 +1,14 @@
 import type { Command } from "commander";
 import type { Config, Ticket } from "../../core/index.js";
 import { isTicketId, shortTicketCode } from "../../core/index.js";
-import { listTickets, repoPaths, requireRepoRoot, resolveTicketRef } from "../../repo/index.js";
+import {
+  deriveEffectiveOverlay,
+  listTickets,
+  queryEvents,
+  repoPaths,
+  requireRepoRoot,
+  resolveTicketRef,
+} from "../../repo/index.js";
 import type { RepoPaths } from "../../repo/index.js";
 import {
   CONTEXT_PACK_BUDGET_UNIT,
@@ -58,6 +65,27 @@ interface TreeNodeJson {
   children: TreeNodeJson[];
 }
 
+/**
+ * ticket_01KY9RWFM80BKNE2CDX85QMKGS: `latest_note`/`last_activity_at` as
+ * `show` should actually display them — effective, not necessarily what's
+ * stored verbatim on the ticket file. A lock-free `update --progress`
+ * call (`src/cli/commands/update.ts`) never rewrites the ticket file, so
+ * the freshest note can live only in its event; this folds every such
+ * event for `ticket` on top of its stored baseline, one small per-ticket
+ * event read (`queryEvents({ ticket })`, not a full index/event-log scan)
+ * — the same combination `src/repo/db-index.ts`'s `buildIndex` does for
+ * `status`/`ready`, applied here to the single ticket `show` already
+ * resolved. A single-writer ticket (every `--progress` note went through
+ * the locked path, or none at all) gets back the exact same ticket:
+ * `deriveEffectiveOverlay` is a no-op whenever no event is newer than the
+ * ticket's own stored `last_activity_at`.
+ */
+async function effectiveTicket(paths: RepoPaths, ticket: Ticket): Promise<Ticket> {
+  const events = await queryEvents(paths, { ticket: ticket.id });
+  const overlay = deriveEffectiveOverlay(ticket, events);
+  return { ...ticket, ...overlay };
+}
+
 function treeNodeJson(node: TreeNode, targetId: string): TreeNodeJson {
   const { ticket } = node;
   return {
@@ -109,7 +137,9 @@ async function runShowJson(
   // shape (E1's `--budget` floor-behavior contract for this command only
   // covers `context`; a stray extra top-level key never risks it).
   const body: Record<string, unknown> = {
-    ticket,
+    // ticket_01KY9RWFM80BKNE2CDX85QMKGS: effective, not stored-verbatim —
+    // see effectiveTicket's doc.
+    ticket: await effectiveTicket(paths, ticket),
     handle: shortTicketCode(ticket.id),
     jira_url: jiraUrl,
   };
@@ -176,8 +206,12 @@ async function runShow(ref: string, opts: ShowCommandOptions): Promise<void> {
     // output with nothing else around it (E1: `bounded.stdout.length <=
     // budget + 1` — prepending a line here would inflate that past the
     // budget by the line's own length), so this stays out of that path.
+    // ticket_01KY9RWFM80BKNE2CDX85QMKGS: formatTicketDetail itself stays
+    // untouched (detail.test.ts pins its output directly against whatever
+    // Ticket it's handed) — the effective `latest_note`/`last_activity_at`
+    // are folded in here, before the call, instead.
     process.stdout.write(
-      `handle: ${shortTicketCode(ticket.id)}\n${formatTicketDetail(ticket, config)}\n`,
+      `handle: ${shortTicketCode(ticket.id)}\n${formatTicketDetail(await effectiveTicket(paths, ticket), config)}\n`,
     );
   }
 }

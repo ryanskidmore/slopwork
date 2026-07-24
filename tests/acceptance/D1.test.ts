@@ -594,7 +594,11 @@ describe("D1: init + agent onboarding", () => {
     }
 
     interface ShowJson {
-      ticket: { review?: { mr?: string } };
+      ticket: {
+        review?: { mr?: string };
+        latest_note: string | null;
+        last_activity_at: string;
+      };
     }
 
     interface StatusJson {
@@ -727,6 +731,12 @@ describe("D1: init + agent onboarding", () => {
       expect(showContext.stdout).toContain("2. [ ] step two");
 
       // --- `slop update <ref> --progress "..."` ---
+      // ticket_01KY9RWFM80BKNE2CDX85QMKGS: a pure `--progress` call is
+      // lock-free — it appends an event and never rewrites the ticket
+      // file at all, so the raw file's OWN `latest_note`/`last_activity_at`
+      // stay exactly as they were; `show --json` (every read path, in
+      // fact) reports the EFFECTIVE values instead, folding the new event
+      // in at read time (src/repo/db-index.ts's `deriveEffectiveOverlay`).
       const beforeUpdate = await readTicket(paths, ticket.id as TicketId);
       const updateResult = runLoopStep(
         ["update", ticket.slug, "--progress", "made good progress on step one"],
@@ -734,8 +744,12 @@ describe("D1: init + agent onboarding", () => {
       );
       expect(updateResult.status, updateResult.stderr).toBe(0);
       const afterUpdate = await readTicket(paths, ticket.id as TicketId);
-      expect(afterUpdate.latest_note).toBe("made good progress on step one");
-      expect(Date.parse(afterUpdate.last_activity_at)).toBeGreaterThanOrEqual(
+      expect(afterUpdate).toEqual(beforeUpdate); // the ticket FILE itself: untouched
+      const showAfterUpdate = parseJson<ShowJson>(
+        runLoopStep(["show", ticket.slug, "--json"], dir),
+      );
+      expect(showAfterUpdate.ticket.latest_note).toBe("made good progress on step one");
+      expect(Date.parse(showAfterUpdate.ticket.last_activity_at)).toBeGreaterThanOrEqual(
         Date.parse(beforeUpdate.last_activity_at),
       );
 

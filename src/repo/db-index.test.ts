@@ -21,10 +21,11 @@ import {
   loadIndex,
   writeIndex,
 } from "./db-index.js";
+import { appendEvent } from "./events.js";
 import type { EventContext, MutationEventSpec } from "./events.js";
 import { ensureDbDirs } from "./paths.js";
 import type { RepoPaths } from "./paths.js";
-import { createTicket, ticketFilePath } from "./tickets.js";
+import { createTicket, readTicket, ticketFilePath, updateTicket } from "./tickets.js";
 
 // A4: createTicket now requires an EventContext + a MutationEventSpec —
 // these fixtures don't exercise event behavior, so a single fixed pair is
@@ -196,6 +197,159 @@ describe("buildIndex", () => {
       expect(earlyRow?.stale_at).toBe("2026-07-23T11:00:00.000Z");
       // built_at is the only thing that legitimately differs.
       expect(earlyIndex.built_at).not.toBe(lateIndex.built_at);
+    });
+  });
+
+  describe("ticket_01KY9RWFM80BKNE2CDX85QMKGS: latest_note/last_activity_at are EFFECTIVE (derived from events)", () => {
+    it("a lock-free `ticket.updated` progress event (no accompanying ticket write) becomes the row's latest_note/last_activity_at", async () => {
+      const t = makeTicket({
+        latest_note: null,
+        last_activity_at: "2026-07-23T10:00:00.000Z",
+      });
+      await createTicket(paths, t, ctx, createdEvent);
+
+      // Simulate a lock-free `update --progress` call: an event, with NO
+      // accompanying ticket-file write — exactly what
+      // src/cli/commands/update.ts's `appendEvent` call does.
+      await appendEvent(
+        paths,
+        ctx,
+        { kind: "ticket", id: t.id },
+        { verb: "ticket.updated", payload: { progress: "lock-free note" } },
+        fixedClock(new Date("2026-07-23T11:00:00.000Z")),
+      );
+
+      const index = await buildIndex(paths, clock);
+      const row = index.tickets.find((r) => r.id === t.id);
+      expect(row?.latest_note).toBe("lock-free note");
+      expect(row?.last_activity_at).toBe("2026-07-23T11:00:00.000Z");
+
+      // The ticket FILE itself was never touched.
+      const onDisk = await readTicket(paths, t.id);
+      expect(onDisk.latest_note).toBeNull();
+      expect(onDisk.last_activity_at).toBe("2026-07-23T10:00:00.000Z");
+    });
+
+    it("the LATEST of several progress events wins, regardless of listing order", async () => {
+      const t = makeTicket({ latest_note: null, last_activity_at: "2026-07-23T10:00:00.000Z" });
+      await createTicket(paths, t, ctx, createdEvent);
+
+      await appendEvent(
+        paths,
+        ctx,
+        { kind: "ticket", id: t.id },
+        { verb: "ticket.updated", payload: { progress: "first" } },
+        fixedClock(new Date("2026-07-23T10:30:00.000Z")),
+      );
+      await appendEvent(
+        paths,
+        ctx,
+        { kind: "ticket", id: t.id },
+        { verb: "ticket.updated", payload: { progress: "second, and latest" } },
+        fixedClock(new Date("2026-07-23T11:30:00.000Z")),
+      );
+
+      const index = await buildIndex(paths, clock);
+      const row = index.tickets.find((r) => r.id === t.id);
+      expect(row?.latest_note).toBe("second, and latest");
+      expect(row?.last_activity_at).toBe("2026-07-23T11:30:00.000Z");
+    });
+
+    it("a locked update's OWN accompanying progress event never overrides its stored baseline (single-writer output is unaffected)", async () => {
+      const t = makeTicket({
+        latest_note: "old note",
+        last_activity_at: "2026-07-23T10:00:00.000Z",
+      });
+      await createTicket(paths, t, ctx, createdEvent);
+
+      // Mirrors what a LOCKED `update --progress --priority 0` does: the
+      // ticket write and its event share one clock reading.
+      const sharedClock = fixedClock(new Date("2026-07-23T10:30:00.000Z"));
+      const locked: Ticket = { ...t, priority: 0, latest_note: "locked note" };
+      await updateTicket(
+        paths,
+        t.id,
+        [
+          { path: ["priority"], value: 0 },
+          { path: ["latest_note"], value: "locked note" },
+        ],
+        locked,
+        ctx,
+        { verb: "ticket.updated", payload: { progress: "locked note" } },
+        sharedClock,
+      );
+
+      const index = await buildIndex(paths, clock);
+      const row = index.tickets.find((r) => r.id === t.id);
+      expect(row?.latest_note).toBe("locked note");
+      expect(row?.last_activity_at).toBe("2026-07-23T10:30:00.000Z");
+    });
+
+    it("an event for a DIFFERENT ticket never leaks into this ticket's overlay", async () => {
+      const t1 = makeTicket({ latest_note: null, last_activity_at: "2026-07-23T10:00:00.000Z" });
+      const t2 = makeTicket({ latest_note: null, last_activity_at: "2026-07-23T10:00:00.000Z" });
+      await createTicket(paths, t1, ctx, createdEvent);
+      await createTicket(paths, t2, ctx, createdEvent);
+
+      await appendEvent(
+        paths,
+        ctx,
+        { kind: "ticket", id: t2.id },
+        { verb: "ticket.updated", payload: { progress: "for t2 only" } },
+        fixedClock(new Date("2026-07-23T11:00:00.000Z")),
+      );
+
+      const index = await buildIndex(paths, clock);
+      const row1 = index.tickets.find((r) => r.id === t1.id);
+      expect(row1?.latest_note).toBeNull();
+      expect(row1?.last_activity_at).toBe("2026-07-23T10:00:00.000Z");
+    });
+
+    it("a lock-free progress event resets stale_at exactly like a locked activity bump always has", async () => {
+      const t = makeTicket({
+        state: "in_progress",
+        last_activity_at: "2026-07-23T09:00:00.000Z", // already past the 60m default -> would be stale
+      });
+      await createTicket(paths, t, ctx, createdEvent);
+
+      const staleBefore = await buildIndex(paths, clock);
+      const rowBefore = staleBefore.tickets.find((r) => r.id === t.id);
+      expect(rowBefore?.stale_at).toBe("2026-07-23T10:00:00.000Z"); // already in the past relative to `clock`
+
+      // A lock-free progress note IS activity — it must push the deadline
+      // out, exactly like `--progress` always has.
+      await appendEvent(
+        paths,
+        ctx,
+        { kind: "ticket", id: t.id },
+        { verb: "ticket.updated", payload: { progress: "still working on it" } },
+        fixedClock(new Date("2026-07-23T11:55:00.000Z")),
+      );
+
+      const staleAfter = await buildIndex(paths, clock);
+      const rowAfter = staleAfter.tickets.find((r) => r.id === t.id);
+      expect(rowAfter?.stale_at).toBe("2026-07-23T12:55:00.000Z"); // +60m from the NEW activity
+    });
+
+    it("a non-progress event (e.g. plan.set) never affects latest_note/last_activity_at", async () => {
+      const t = makeTicket({
+        latest_note: "unchanged",
+        last_activity_at: "2026-07-23T10:00:00.000Z",
+      });
+      await createTicket(paths, t, ctx, createdEvent);
+
+      await appendEvent(
+        paths,
+        ctx,
+        { kind: "ticket", id: t.id },
+        { verb: "plan.set", payload: {} },
+        fixedClock(new Date("2026-07-23T12:00:00.000Z")),
+      );
+
+      const index = await buildIndex(paths, clock);
+      const row = index.tickets.find((r) => r.id === t.id);
+      expect(row?.latest_note).toBe("unchanged");
+      expect(row?.last_activity_at).toBe("2026-07-23T10:00:00.000Z");
     });
   });
 
@@ -624,6 +778,34 @@ describe("computeContentFingerprint", () => {
     await expect(computeContentFingerprint(paths)).resolves.toEqual({
       tickets: { count: 1, digest: expect.any(String) },
       config: { count: 0, digest: "absent" },
+      // ticket_01KY9RWFM80BKNE2CDX85QMKGS: events/ joins the fingerprint
+      // too — createTicket above already appended one `ticket.created`
+      // event (A4), so this is {count: 1, digest: <that event's own id>},
+      // never a readdir/stat-only listing.
+      events: { count: 1, digest: expect.any(String) },
+    });
+  });
+
+  // ticket_01KY9RWFM80BKNE2CDX85QMKGS: events/ is part of the fingerprint
+  // — this is what lets loadIndex() notice a lock-free `update --progress`
+  // event even though appending one never touches tickets/ or
+  // config.yaml. Cheap by construction (events are immutable/append-only,
+  // events.ts's module doc): {count, digest: <max event id>}, zero `stat`
+  // calls, unlike fingerprintTicketsDir's per-file stat.
+  describe("events/ is part of the fingerprint", () => {
+    it("is {count:0, digest:'empty'} for an empty events dir", async () => {
+      const fp = await computeContentFingerprint(paths);
+      expect(fp.events).toEqual({ count: 0, digest: "empty" });
+    });
+
+    it("changes (count and digest, the max event id) on every event appended, regardless of which ticket file it describes", async () => {
+      const before = await computeContentFingerprint(paths);
+      const t = makeTicket();
+      const created = await createTicket(paths, t, ctx, createdEvent);
+      const after = await computeContentFingerprint(paths);
+      expect(after.events?.count).toBe((before.events?.count ?? 0) + 1);
+      expect(after.events?.digest).toBe(created.id);
+      expect(after.events?.digest).not.toBe(before.events?.digest);
     });
   });
 

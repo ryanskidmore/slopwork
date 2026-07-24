@@ -1,5 +1,8 @@
 import type { Command } from "commander";
+import { fixedClock, systemClock } from "../../core/index.js";
+import type { Ticket } from "../../core/index.js";
 import {
+  appendEvent,
   readTicket,
   repoPaths,
   requireRepoRoot,
@@ -21,6 +24,35 @@ interface UpdateCommandOptions {
   spec?: string;
 }
 
+/**
+ * The note, iff `opts` is a PURE progress call — `--progress` and NOTHING
+ * else — `undefined` otherwise. ticket_01KY9RWFM80BKNE2CDX85QMKGS: this is
+ * the one `update` call shape that goes lock-free below; every other
+ * combination (including `--progress` alongside a real field) keeps
+ * today's locked read-modify-write path unchanged.
+ */
+function pureProgressNote(opts: UpdateCommandOptions): string | undefined {
+  if (
+    opts.progress === undefined ||
+    opts.state !== undefined ||
+    opts.priority !== undefined ||
+    opts.label.length > 0 ||
+    opts.name !== undefined ||
+    opts.spec !== undefined
+  ) {
+    return undefined;
+  }
+  return opts.progress;
+}
+
+function printUpdated(ticket: Pick<Ticket, "id" | "slug" | "name" | "state" | "priority">): void {
+  process.stdout.write(
+    `updated ${ticket.id}  (slug: ${ticket.slug})\n` +
+      `  ${ticket.name}\n` +
+      `  state: ${ticket.state}  priority: ${ticket.priority}\n`,
+  );
+}
+
 async function runUpdate(ref: string, opts: UpdateCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
@@ -35,6 +67,41 @@ async function runUpdate(ref: string, opts: UpdateCommandOptions): Promise<void>
   // between this read and the write below would be silently reverted by
   // `updateTicket`'s `writeCanonical(expectedAfter)` fallback.
   const initialTicket = await resolveTicketRef(paths, ref);
+
+  // ticket_01KY9RWFM80BKNE2CDX85QMKGS: a pure `--progress` call never
+  // reads/writes the ticket file and never takes `paths.lockFile` — it
+  // just appends a `ticket.updated` event carrying the note. N agents can
+  // do this against the SAME ticket at the same instant with zero write
+  // contention: each call mints its own ULID event file, and ULID
+  // filenames never collide (entity-file.ts's `createEntityFileCanonical`
+  // doc) — nothing here needs mutual exclusion at all.
+  // `latest_note`/`last_activity_at` become effective (derived) values,
+  // folding this event on top of the ticket's stored baseline at READ
+  // time (`src/repo/db-index.ts`'s `deriveEffectiveOverlay`) — `show`/
+  // `status`/`ready`/staleness all read the derived value, never the
+  // (possibly now-stale) field on the ticket file itself.
+  const note = pureProgressNote(opts);
+  if (note !== undefined) {
+    // Deferred-item early return, progress flavor: identical to the note
+    // we already saw for this ticket a moment ago (best-effort — this
+    // read predates the call, same as `initialTicket` above always is) —
+    // genuinely nothing to record, so append nothing. Mirrors buildUpdate's
+    // own same-content no-op rule (tickets/update.ts's UPDATE_CONTENT_FIELDS)
+    // for the single-writer case; under real concurrency this is purely an
+    // optimization; it never has to be right for correctness; another
+    // agent's genuinely different note is unaffected.
+    if (note !== initialTicket.latest_note) {
+      await appendEvent(
+        paths,
+        { actor, session: null },
+        { kind: "ticket", id: initialTicket.id },
+        { verb: "ticket.updated", payload: { progress: note } },
+      );
+    }
+
+    printUpdated(initialTicket);
+    return;
+  }
 
   const specRaw =
     opts.spec === undefined ? undefined : opts.spec === "-" ? await readStdin() : opts.spec;
@@ -51,7 +118,24 @@ async function runUpdate(ref: string, opts: UpdateCommandOptions): Promise<void>
       specRaw,
     };
 
-    const { ticket, patch, verb, payload } = buildUpdate(current, input);
+    // One clock reading shared by the ticket write AND its event: keeps
+    // `deriveEffectiveOverlay` (db-index.ts) a byte-for-byte no-op here
+    // when `--progress` rides along with a real field change, since the
+    // accompanying event's `at` can then never disagree with the ticket's
+    // own `last_activity_at`/`updated_at` it's describing.
+    const clock = fixedClock(systemClock.now());
+    const { ticket, patch, verb, payload } = buildUpdate(current, input, clock);
+
+    if (patch.length === 0) {
+      // Deferred item: a genuinely no-op update — nothing in
+      // UPDATE_TOUCHABLE_FIELDS actually changed (e.g. `--state
+      // <same-state>`, `--priority <same>`, a fully redundant `--label`)
+      // — has nothing to persist or describe. Early-return with no write
+      // and no event, rather than (as before) still taking the lock's
+      // write and emitting an empty-payload event for a call that
+      // changed nothing.
+      return ticket;
+    }
 
     await updateTicket(
       paths,
@@ -60,16 +144,13 @@ async function runUpdate(ref: string, opts: UpdateCommandOptions): Promise<void>
       ticket,
       { actor, session: null },
       { verb, payload },
+      clock,
     );
 
     return ticket;
   });
 
-  process.stdout.write(
-    `updated ${ticket.id}  (slug: ${ticket.slug})\n` +
-      `  ${ticket.name}\n` +
-      `  state: ${ticket.state}  priority: ${ticket.priority}\n`,
-  );
+  printUpdated(ticket);
 }
 
 /** `slop update` — design.md §4.2; work item B1.

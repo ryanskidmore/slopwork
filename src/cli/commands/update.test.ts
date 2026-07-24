@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import type { TicketId } from "../../core/index.js";
-import { listSessions, readTicket, repoPaths } from "../../repo/index.js";
+import { listSessions, queryEvents, readTicket, repoPaths } from "../../repo/index.js";
 
 // Regression test for ticket_01KY93E2BKH5JCMAV3JWPNN63G: `update` (and
 // `draft`/`undraft`, see draft.test.ts/undraft.test.ts) used to read the
@@ -224,4 +224,104 @@ describe("update: race against a concurrent lock-holding mutator (regression, ti
     expect(sessions).toHaveLength(1);
     expect(sessions[0]?.ended_at).not.toBeNull();
   }, 30_000);
+});
+
+// ---------------------------------------------------------------------------
+// ticket_01KY9RWFM80BKNE2CDX85QMKGS: `update --progress` (and ONLY
+// --progress — no other flag) is lock-free. This is the payoff: N agents
+// can post progress notes against the SAME ticket at the same instant with
+// ZERO write contention and zero merge conflicts, because each note is an
+// immutable event of its own (a freshly-minted ULID file — never
+// collides), not a mutation of the shared ticket file that would need
+// `withLock` to serialize. Contrast the "update vs start/done" tests
+// above: those races serialize on the db lock (one waits for the other);
+// this one never even tries to acquire it.
+// ---------------------------------------------------------------------------
+
+describe("update --progress: lock-free concurrency (ticket_01KY9RWFM80BKNE2CDX85QMKGS)", () => {
+  it("8 concurrent pure `update --progress` calls against the SAME ticket all succeed, land as 8 distinct events, and the derived latest_note/last_activity_at reflect them — with no lock contention", async () => {
+    const { dir } = await makeCliRepo();
+    const ticket = newTicketCli(dir, "ryan", "Concurrent progress ticket");
+    const paths = repoPaths(dir);
+
+    const N = 8;
+    const procs = Array.from({ length: N }, (_, i) =>
+      spawn("bun", [cliEntry, "update", ticket.id, "--progress", `note-${i}`], {
+        cwd: dir,
+        env: slopEnv({ SLOP_ACTOR: `agent-${i}` }),
+      }),
+    );
+    const results = await Promise.all(procs.map(collect));
+
+    expect(
+      hasGenuineOverlap(results),
+      "the N update --progress calls never overlapped in wall-clock time — this run could pass vacuously off accidental serialisation",
+    ).toBe(true);
+
+    // All N succeed, and none ever saw a CONFLICT/lock error — there was
+    // never a lock to contend on in the first place.
+    for (const [i, r] of results.entries()) {
+      expect(r.code, `update --progress note-${i} stderr: ${r.stderr}`).toBe(0);
+      expect(r.stderr).not.toMatch(/CONFLICT|lock/i);
+    }
+
+    // All N progress events landed, as distinct ULID event files — none
+    // clobbered another (the whole point: append-only, never a shared
+    // mutation).
+    const events = await queryEvents(paths, { ticket: ticket.id });
+    const progressEntries = events.flatMap((e) =>
+      typeof e.payload.progress === "string"
+        ? [{ note: e.payload.progress, at: e.at, id: e.id }]
+        : [],
+    );
+    expect(progressEntries).toHaveLength(N);
+    expect(new Set(progressEntries.map((e) => e.id)).size).toBe(N); // distinct event files
+    expect(new Set(progressEntries.map((e) => e.note)).size).toBe(N); // distinct notes, none lost
+
+    // No ticket-file write contention: the ticket file itself was never
+    // touched by any of these calls (a pure --progress call never takes
+    // the lock or writes it).
+    const finalTicket = await readTicket(paths, ticket.id);
+    expect(finalTicket.latest_note).toBeNull();
+    expect(finalTicket.updated_at).toBe(finalTicket.created_at);
+
+    // The DERIVED effective values (what every real read path reports —
+    // `show --json` here) are correct: latest_note is one of the N notes,
+    // and last_activity_at is the newest of the N events' timestamps.
+    const show = mustRunSlopSource(["show", ticket.id, "--json"], dir, "ryan");
+    const shown = JSON.parse(show.stdout) as {
+      ticket: { latest_note: string | null; last_activity_at: string };
+    };
+    expect(progressEntries.map((e) => e.note)).toContain(shown.ticket.latest_note);
+    const newestAt = progressEntries.reduce((max, e) => (e.at > max ? e.at : max), "");
+    expect(shown.ticket.last_activity_at).toBe(newestAt);
+  }, 30_000);
+});
+
+// ---------------------------------------------------------------------------
+// ticket_01KY9RWFM80BKNE2CDX85QMKGS's deferred item: a genuinely no-op
+// `update` call (nothing in UPDATE_TOUCHABLE_FIELDS actually changes)
+// early-returns with no write and no event — previously it still took the
+// lock's write and emitted an empty-payload `ticket.updated` event.
+// ---------------------------------------------------------------------------
+
+describe("update: a PURE no-op call writes nothing and emits no event (CLI-layer early return)", () => {
+  it("`update --state <same-state>`, nothing else given: ticket file byte-for-byte unchanged, no new event", async () => {
+    const { dir } = await makeCliRepo();
+    const ticket = newTicketCli(dir, "ryan", "No-op update ticket");
+    const paths = repoPaths(dir);
+
+    const before = await readTicket(paths, ticket.id);
+    const eventsBefore = await queryEvents(paths, { ticket: ticket.id });
+
+    // A freshly-`new`'d ticket is already "open" — this restates it.
+    const result = mustRunSlopSource(["update", ticket.id, "--state", "open"], dir, "ryan");
+    expect(result.status, result.stderr).toBe(0);
+
+    const after = await readTicket(paths, ticket.id);
+    expect(after).toEqual(before);
+
+    const eventsAfter = await queryEvents(paths, { ticket: ticket.id });
+    expect(eventsAfter.map((e) => e.id)).toEqual(eventsBefore.map((e) => e.id));
+  });
 });

@@ -504,7 +504,13 @@ describe("B1: new / show / edit / update", () => {
   // -------------------------------------------------------------------------
 
   describe("update", () => {
-    it("--progress sets latest_note and bumps last_activity_at", async () => {
+    // ticket_01KY9RWFM80BKNE2CDX85QMKGS: a pure `--progress` call (no
+    // other flag) is lock-free — it appends a `ticket.updated` event and
+    // never re-reads/rewrites the ticket file at all, so the file's OWN
+    // `latest_note`/`last_activity_at` are untouched; every read path
+    // (`show`, here) reports the EFFECTIVE values instead, folding the
+    // new event in at read time (db-index.ts's `deriveEffectiveOverlay`).
+    it("--progress sets the EFFECTIVE latest_note/last_activity_at (via `show --json`) without writing the ticket file", async () => {
       const fixture = await makeFixture();
       const { id } = await createTicketViaCli(fixture, "Progress ticket");
       const before = await readTicketFile(fixture.paths, id);
@@ -512,9 +518,17 @@ describe("B1: new / show / edit / update", () => {
 
       const result = runSlop(["update", id, "--progress", "made real progress"], fixture.root);
       expect(result.status, result.stderr).toBe(0);
+
       const after = await readTicketFile(fixture.paths, id);
-      expect(after.latest_note).toBe("made real progress");
-      expect(Date.parse(after.last_activity_at)).toBeGreaterThan(
+      expect(after).toEqual(before); // the ticket FILE itself: byte-for-byte untouched
+
+      const show = runSlop(["show", id, "--json"], fixture.root);
+      expect(show.status, show.stderr).toBe(0);
+      const shown = JSON.parse(show.stdout) as {
+        ticket: { latest_note: string | null; last_activity_at: string };
+      };
+      expect(shown.ticket.latest_note).toBe("made real progress");
+      expect(Date.parse(shown.ticket.last_activity_at)).toBeGreaterThan(
         Date.parse(before.last_activity_at),
       );
     });
@@ -612,7 +626,13 @@ describe("B1: new / show / edit / update", () => {
       const { id } = await createTicketViaCli(fixture, "Progress dash ticket");
       const result = runSlop(["update", id, "--progress", "-1 regression"], fixture.root);
       expect(result.status, result.stderr).toBe(0);
-      expect((await readTicketFile(fixture.paths, id)).latest_note).toBe("-1 regression");
+      // Lock-free pure progress (ticket_01KY9RWFM80BKNE2CDX85QMKGS): read
+      // the EFFECTIVE value via `show --json`, not the ticket file — see
+      // the test above.
+      const show = runSlop(["show", id, "--json"], fixture.root);
+      expect(show.status, show.stderr).toBe(0);
+      const shown = JSON.parse(show.stdout) as { ticket: { latest_note: string | null } };
+      expect(shown.ticket.latest_note).toBe("-1 regression");
     });
 
     it("--name accepts a value starting with a dash", async () => {

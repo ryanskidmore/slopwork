@@ -78,6 +78,27 @@ export async function listEvents(paths: RepoPaths): Promise<Event[]> {
   return Promise.all(ids.map((id) => readEvent(paths, id)));
 }
 
+/**
+ * Like {@link listEvents}, but never throws on a corrupt/unreadable event
+ * file: it's silently excluded rather than taking the whole read down —
+ * same fault-tolerance policy `tickets.ts`'s `listTicketsTolerant` applies
+ * to ticket files (db-index.ts's "Fault tolerance"), applied here so one
+ * damaged event file can't stop `buildIndex` from deriving effective
+ * `latest_note`/`last_activity_at` (ticket_01KY9RWFM80BKNE2CDX85QMKGS)
+ * from every OTHER, perfectly good event. Still in cursor (ascending id /
+ * chronological) order — the filtering only ever removes entries, never
+ * reorders survivors.
+ */
+export async function listEventsTolerant(paths: RepoPaths): Promise<Event[]> {
+  const ids = await listEventIds(paths);
+  const settled = await Promise.allSettled(ids.map((id) => readEvent(paths, id)));
+  const events: Event[] = [];
+  for (const outcome of settled) {
+    if (outcome.status === "fulfilled") events.push(outcome.value);
+  }
+  return events;
+}
+
 // --- A4: emit-on-mutation hook --------------------------------------------
 
 /**
@@ -117,6 +138,42 @@ export interface MutationEventSpec {
 }
 
 /**
+ * Mint and write exactly one event — no accompanying entity write, no
+ * lock. The lock-free counterpart to {@link withMutationEvent} below, and
+ * what it now delegates to once its own `write()` has landed.
+ *
+ * ticket_01KY9RWFM80BKNE2CDX85QMKGS: a pure `slop update --progress`
+ * call (no other field) is the one mutation-adjacent action that emits an
+ * event with NOTHING else to make durable first — the note itself only
+ * ever lives in the event, never re-written into the ticket file (see
+ * db-index.ts's read-time derivation). Calling this directly, instead of
+ * `withMutationEvent`, is what lets that call skip `withLock` entirely:
+ * safe for the same reason a brand-new entity file already is
+ * (entity-file.ts's `createEntityFileCanonical` doc) — every event's
+ * filename is its own freshly-minted ULID, so however many callers race
+ * this at once, each writes a distinct file and none can ever collide.
+ */
+export async function appendEvent(
+  paths: RepoPaths,
+  ctx: EventContext,
+  entity: EventEntity,
+  spec: MutationEventSpec,
+  clock: Clock = systemClock,
+): Promise<Event> {
+  const event: Event = {
+    id: newEventId(),
+    actor: ctx.actor,
+    session: ctx.session,
+    verb: spec.verb,
+    entity,
+    payload: spec.payload ?? {},
+    at: clock.now().toISOString(),
+  };
+  await createEvent(paths, event);
+  return event;
+}
+
+/**
  * The emit-on-mutation hook itself (A4). Runs `write` — the actual entity
  * file mutation — and then emits exactly one event describing it. This is
  * the mechanism the acceptance criterion ("every repo mutation in tests
@@ -134,7 +191,8 @@ export interface MutationEventSpec {
  *      throws NOT_FOUND and no event file is ever written).
  *   2. Only once the entity write has genuinely landed on disk (atomic
  *      tmp+rename, per atomic-write.ts) does this mint and write the
- *      event, via {@link createEvent}.
+ *      event, via {@link appendEvent} (itself just {@link createEvent}
+ *      plus minting the event).
  *
  * What this does NOT provide: cross-file atomicity between the entity
  * write and its event. design.md §3 only promises atomicity *within* a
@@ -164,17 +222,7 @@ export async function withMutationEvent(
   clock: Clock = systemClock,
 ): Promise<Event> {
   await write();
-  const event: Event = {
-    id: newEventId(),
-    actor: ctx.actor,
-    session: ctx.session,
-    verb: spec.verb,
-    entity,
-    payload: spec.payload ?? {},
-    at: clock.now().toISOString(),
-  };
-  await createEvent(paths, event);
-  return event;
+  return appendEvent(paths, ctx, entity, spec, clock);
 }
 
 // --- A4: ULID cursor query -------------------------------------------------

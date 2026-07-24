@@ -186,6 +186,36 @@
  * `stale_at`/`review_stale_at` computed against the CURRENT configured
  * thresholds, not whatever was configured the last time some ticket file
  * happened to change.
+ *
+ * ## ticket_01KY9RWFM80BKNE2CDX85QMKGS: `latest_note`/`last_activity_at` are EFFECTIVE, not stored-verbatim
+ *
+ * A pure `slop update --progress "..."` (no other field) is lock-free
+ * (`src/cli/commands/update.ts`): it appends a `ticket.updated` event
+ * whose `payload.progress` carries the note and never re-reads/writes the
+ * ticket file at all — no `withLock`, zero write contention between any
+ * number of concurrent callers. That means the ticket file's own stored
+ * `latest_note`/`last_activity_at` can lag behind reality, exactly the
+ * way `index.jsonc` itself can lag a `git pull` — so this row's
+ * `last_activity_at` (and new `latest_note` column) are the same kind of
+ * DERIVED value `stale_at`/`review_stale_at` already are just above:
+ * `deriveEffectiveOverlay` folds every `payload.progress`-carrying event
+ * for a ticket in on top of its stored baseline, keeping whichever is
+ * more recent. A LOCKED update that changes `--progress` alongside a real
+ * field (state/priority/label/name/spec) still writes the ticket file
+ * directly, exactly as before — its own accompanying event's `at` is
+ * mint from the SAME clock reading `src/cli/commands/update.ts` used to
+ * build the ticket, so the overlay is always a no-op there: single-writer
+ * `status`/`show`/`ready`/`web` output is unaffected, byte for byte (see
+ * DECISIONS.md / this ticket's report for the full writeup).
+ *
+ * Correctness depends on `loadIndex()` noticing a lock-free progress
+ * event even though it never touches `tickets/` or `config.yaml` —
+ * {@link computeContentFingerprint} therefore ALSO fingerprints
+ * `events/` (see {@link fingerprintEventsDir}): since events are
+ * immutable and strictly append-only (events.ts's module doc — no
+ * `updateEvent`, no `deleteEvent`), `{count, digest: <max event id>}` is
+ * a complete, cheap (zero `stat` calls) signature — it changes if, and
+ * only if, at least one event was appended since the index was built.
  */
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
@@ -194,6 +224,7 @@ import { z } from "zod";
 import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import {
+  isEventId,
   isTicketId,
   labelSchema,
   outgoingEdges,
@@ -203,7 +234,7 @@ import {
   ticketIdSchema,
   ticketStateSchema,
 } from "../core/index.js";
-import type { SessionId, Ticket, TicketId, TicketState } from "../core/index.js";
+import type { Event, SessionId, Ticket, TicketId, TicketState } from "../core/index.js";
 import { isoTimestampSchema } from "../core/timestamp.js";
 import { slugSchema } from "../core/slug.js";
 import { parseJsonc, writeCanonical } from "../core/jsonc.js";
@@ -220,20 +251,23 @@ import { parseDurationMs } from "../core/duration.js";
 import { computeReviewStaleAt, computeStaleAt } from "../tickets/staleness.js";
 import { atomicWriteFile } from "./atomic-write.js";
 import { loadConfigDefaultsTolerant } from "./config.js";
+import { listEventsTolerant } from "./events.js";
 import { isEnoent, readDirSafe } from "./fs-utils.js";
 import type { RepoPaths } from "./paths.js";
 import { listTicketsTolerant } from "./tickets.js";
 
 /**
- * C5 bumped this 1 → 2: `stale`/`review_stale` (`boolean | null`) were
- * replaced by `stale_at`/`review_stale_at` (`IsoTimestamp | null`) — a
- * genuine row-shape change, not an already-nullable-field fill-in (see
- * this module's "C5" doc section above). Any `index.jsonc` written by a
- * pre-C5 binary fails `dbIndexSchema` validation against the new field
- * names/types and falls into the existing `stale_schema_version`/
- * `invalid_schema` auto-heal path, exactly like any other schema bump.
+ * C5 bumped this 1 → 2 (`stale`/`review_stale` -> `stale_at`/
+ * `review_stale_at`). ticket_01KY9RWFM80BKNE2CDX85QMKGS bumps it again,
+ * 2 → 3: a new required `latest_note` column joins `last_activity_at` as
+ * an EFFECTIVE (event-derived), not stored-verbatim, value — see this
+ * module's doc section above. A genuine row-shape change, not an
+ * already-nullable-field fill-in, so any `index.jsonc` written by an
+ * older binary fails `dbIndexSchema` validation against the new field and
+ * falls into the existing `stale_schema_version`/`invalid_schema`
+ * auto-heal path, exactly like every prior schema bump.
  */
-export const INDEX_SCHEMA_VERSION = 2;
+export const INDEX_SCHEMA_VERSION = 3;
 
 export const indexTicketRowSchema = z.object({
   id: ticketIdSchema,
@@ -245,6 +279,12 @@ export const indexTicketRowSchema = z.object({
   root_id: ticketIdSchema,
   path: z.array(ticketIdSchema),
   labels: z.array(labelSchema),
+  // --- ticket_01KY9RWFM80BKNE2CDX85QMKGS: EFFECTIVE, not stored-verbatim
+  // — see this module's doc section above. `deriveEffectiveOverlay` folds
+  // the ticket's stored baseline together with every `payload.progress`
+  // -carrying event, so this reflects a lock-free `update --progress`
+  // note the ticket FILE itself was never rewritten to contain. ---
+  latest_note: z.string().nullable(),
   last_activity_at: isoTimestampSchema,
   active_session: sessionIdSchema.nullable(),
 
@@ -390,6 +430,66 @@ export function computeReady(
   return state === "open" && liveBlockedCount === 0 && activeSession === null;
 }
 
+/** {@link deriveEffectiveOverlay}'s result — the two fields
+ * ticket_01KY9RWFM80BKNE2CDX85QMKGS makes derived, not stored-verbatim. */
+export interface EffectiveOverlay {
+  latest_note: string | null;
+  last_activity_at: string;
+}
+
+/** The minimal ticket-shaped input {@link deriveEffectiveOverlay} needs. */
+export interface EffectiveOverlaySource {
+  latest_note: string | null;
+  last_activity_at: string;
+}
+
+/**
+ * ticket_01KY9RWFM80BKNE2CDX85QMKGS: fold a ticket's stored baseline
+ * together with every `payload.progress`-carrying event for that same
+ * ticket, keeping whichever note is most recent — this is the ONE place
+ * that combination happens; `buildIndex` below calls it per ticket, over
+ * every event already grouped by `entity.id`.
+ *
+ * `events` MUST already be scoped to this one ticket (`buildIndex` groups
+ * every event by `entity.id` once, up front, rather than filtering per
+ * row) — a non-`"ticket"`-kind entry is skipped defensively, but this
+ * function never checks `entity.id` itself. Order MUST be cursor
+ * (ascending id / chronological), exactly what {@link listEventsTolerant}/
+ * {@link listEvents} already return: since two events can (rarely, under
+ * real concurrency) share the same millisecond-resolution `at`, iterating
+ * in id order and using `>=` (not `>`) to decide "this event is newer"
+ * means ties resolve toward whichever event has the greater id — full
+ * determinism, without needing the id itself as a second sort key.
+ *
+ * A LOCKED `update --progress` (progress alongside a real field change)
+ * mints its accompanying event from the exact same clock reading used to
+ * build the ticket it writes (`src/cli/commands/update.ts`), so that
+ * event's `at` is never strictly greater than the ticket's own
+ * `last_activity_at` — the `>=` comparison below can re-select it, but
+ * only ever with content identical to the stored baseline it's tied
+ * with, so the effective result is byte-for-byte the same either way.
+ * Only a genuinely lock-free progress event (whose `at` is strictly
+ * later, having never touched the ticket file's own baseline at all) can
+ * actually move the result.
+ */
+export function deriveEffectiveOverlay(
+  ticket: EffectiveOverlaySource,
+  events: readonly Event[],
+): EffectiveOverlay {
+  let latestNote = ticket.latest_note;
+  let lastActivityAt = ticket.last_activity_at;
+  for (const event of events) {
+    if (event.entity.kind !== "ticket") continue;
+    const progress = event.payload.progress;
+    if (typeof progress !== "string") continue;
+    if (event.at >= lastActivityAt) {
+      lastActivityAt = event.at;
+      latestNote = progress;
+    }
+  }
+  return { latest_note: latestNote, last_activity_at: lastActivityAt };
+}
+
 function pushInto<K>(map: Map<K, TicketId[]>, key: K, value: TicketId): void {
   const existing = map.get(key);
   if (existing) {
@@ -467,6 +567,29 @@ async function fingerprintConfigFile(configPath: string): Promise<DirFingerprint
 }
 
 /**
+ * ticket_01KY9RWFM80BKNE2CDX85QMKGS: `events/`'s own fingerprint — cheaper
+ * than {@link fingerprintTicketsDir}'s (zero `stat` calls, `readdir` only)
+ * because it can be: events are immutable and strictly append-only
+ * (events.ts's module doc — no `updateEvent`, no `deleteEvent`), so
+ * `{count, digest: <max event id>}` is already a complete signature of
+ * "every event id currently on disk" — ids are ULIDs, so the lexically
+ * greatest one is also the most recently appended, and any append at all
+ * changes both `count` and `digest`. This is what lets `loadIndex()`
+ * notice a lock-free `update --progress` event even though appending one
+ * never touches `tickets/` or `config.yaml`.
+ */
+async function fingerprintEventsDir(dir: string): Promise<DirFingerprint> {
+  const names = await readDirSafe(dir);
+  const ids = names
+    .filter((name) => name.endsWith(".jsonc"))
+    .map((name) => name.slice(0, -".jsonc".length))
+    .filter(isEventId)
+    .sort();
+  const last = ids[ids.length - 1];
+  return { count: ids.length, digest: last ?? "empty" };
+}
+
+/**
  * Cheap staleness signal for `loadIndex()`'s auto-heal — `readdir`/`stat`
  * only, no file content read or parsed. See the module doc's "Content
  * staleness" section for the full rationale and the known
@@ -474,14 +597,18 @@ async function fingerprintConfigFile(configPath: string): Promise<DirFingerprint
  * itself (key `"config"`) — `stale_at`/`review_stale_at` are computed
  * from its `defaults.*` thresholds, so a hand-edit to config.yaml must
  * invalidate the index exactly like a ticket-file edit does.
+ * ticket_01KY9RWFM80BKNE2CDX85QMKGS: also fingerprints `events/` (key
+ * `"events"`, {@link fingerprintEventsDir}) — see this module's doc
+ * section above.
  */
 export async function computeContentFingerprint(paths: RepoPaths): Promise<ContentFingerprint> {
   const configPath = join(paths.slopDir, "config.yaml");
-  const [tickets, config] = await Promise.all([
+  const [tickets, config, events] = await Promise.all([
     fingerprintTicketsDir(paths.ticketsDir),
     fingerprintConfigFile(configPath),
+    fingerprintEventsDir(paths.eventsDir),
   ]);
-  return { tickets, config };
+  return { tickets, config, events };
 }
 
 function fingerprintsEqual(a: ContentFingerprint, b: ContentFingerprint): boolean {
@@ -541,14 +668,29 @@ function warnAboutIndexProblems(problems: TicketReadProblem[]): void {
  * fresh fingerprint catches the difference and rebuilds again. */
 export async function buildIndex(paths: RepoPaths, clock: Clock = systemClock): Promise<DbIndex> {
   const fingerprint = await computeContentFingerprint(paths);
-  const [{ tickets, problems }, configDefaults] = await Promise.all([
+  const [{ tickets, problems }, configDefaults, events] = await Promise.all([
     listTicketsTolerant(paths),
     // C5: tolerant — never throws, falls back to schema defaults (60m/24h)
     // when config.yaml is missing/unparseable (see repo/config.ts).
     loadConfigDefaultsTolerant(paths),
+    // ticket_01KY9RWFM80BKNE2CDX85QMKGS: fault-tolerant, same rationale as
+    // listTicketsTolerant above — one damaged event file must not take
+    // the whole index build down.
+    listEventsTolerant(paths),
   ]);
   const staleAfterMs = parseDurationMs(configDefaults.stale_after);
   const reviewStaleAfterMs = parseDurationMs(configDefaults.review_stale_after);
+
+  // ticket_01KY9RWFM80BKNE2CDX85QMKGS: group once, up front — O(events),
+  // not O(tickets × events) — then {@link deriveEffectiveOverlay} looks up
+  // each ticket's own (already cursor-ordered) slice in O(1).
+  const eventsByTicket = new Map<TicketId, Event[]>();
+  for (const event of events) {
+    if (event.entity.kind !== "ticket" || !isTicketId(event.entity.id)) continue;
+    const list = eventsByTicket.get(event.entity.id);
+    if (list) list.push(event);
+    else eventsByTicket.set(event.entity.id, [event]);
+  }
 
   const blockedBy = new Map<TicketId, TicketId[]>();
   const relatedFrom = new Map<TicketId, TicketId[]>();
@@ -570,6 +712,13 @@ export async function buildIndex(paths: RepoPaths, clock: Clock = systemClock): 
   const rows: IndexTicketRow[] = tickets
     .map((ticket: Ticket): IndexTicketRow => {
       const liveBlockedCount = blockedCounts.get(ticket.id) ?? 0;
+      // ticket_01KY9RWFM80BKNE2CDX85QMKGS: the effective overlay — see
+      // this module's doc section and deriveEffectiveOverlay's own doc.
+      // `stale_at`/`review_stale_at` below are computed against the
+      // EFFECTIVE last_activity_at too: a lock-free progress note is
+      // activity, and must reset the staleness clock exactly like a
+      // locked one always has.
+      const overlay = deriveEffectiveOverlay(ticket, eventsByTicket.get(ticket.id) ?? []);
       return {
         id: ticket.id,
         slug: ticket.slug,
@@ -580,7 +729,8 @@ export async function buildIndex(paths: RepoPaths, clock: Clock = systemClock): 
         root_id: ticket.root_id,
         path: ticket.path,
         labels: ticket.labels,
-        last_activity_at: ticket.last_activity_at,
+        latest_note: overlay.latest_note,
+        last_activity_at: overlay.last_activity_at,
         active_session: ticket.active_session,
         blocked_by: blockedBy.get(ticket.id) ?? [],
         related_from: relatedFrom.get(ticket.id) ?? [],
@@ -592,8 +742,18 @@ export async function buildIndex(paths: RepoPaths, clock: Clock = systemClock): 
         // last_activity_at/review.requested_at + the configured
         // thresholds; the live boolean is computed at read time by
         // callers (ready --resumable, status), never here.
-        stale_at: computeStaleAt(ticket, staleAfterMs),
-        review_stale_at: computeReviewStaleAt(ticket, reviewStaleAfterMs),
+        stale_at: computeStaleAt(
+          { state: ticket.state, last_activity_at: overlay.last_activity_at },
+          staleAfterMs,
+        ),
+        review_stale_at: computeReviewStaleAt(
+          {
+            state: ticket.state,
+            review: ticket.review,
+            last_activity_at: overlay.last_activity_at,
+          },
+          reviewStaleAfterMs,
+        ),
       };
     })
     .sort((a, b) => a.id.localeCompare(b.id));
