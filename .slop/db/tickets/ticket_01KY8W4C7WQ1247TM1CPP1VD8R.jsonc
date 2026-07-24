@@ -1,0 +1,37 @@
+{
+  "id": "ticket_01KY8W4C7WQ1247TM1CPP1VD8R",
+  "name": "Fix: CLI dumps a Bun EPIPE stack trace when stdout is closed early (e.g. slop ready | head)",
+  "slug": "fix-cli-dumps-a-bun-epipe-stack-trace-when-stdout-is-closed",
+  "spec": {
+    "summary": "Fix: CLI dumps a Bun EPIPE stack trace when stdout is closed early (e.g. slop ready | head)",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 1,
+  "labels": [
+    "kind:bug"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KY8W4C7WQ1247TM1CPP1VD8R",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-24T01:49:10.761Z",
+  "latest_note": "merged to main",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-07-24T01:34:10.690Z",
+  "updated_at": "2026-07-24T01:49:10.761Z"
+}

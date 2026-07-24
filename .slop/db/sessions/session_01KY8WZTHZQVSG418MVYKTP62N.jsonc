@@ -1,0 +1,40 @@
+{
+  "id": "session_01KY8WZTHZQVSG418MVYKTP62N",
+  "ticket": "ticket_01KY8W4C7WQ1247TM1CPP1VD8R",
+  "actor": {
+    "name": "coordinator",
+    "kind": "human"
+  },
+  "harness": {
+    "kind": "other",
+    "session_id": null
+  },
+  "git": {
+    "branch": "main",
+    "commit_at_start": "7a8fc66f212bdab91f9fb1ecfaf5758e82b35a24"
+  },
+  "started_at": "2026-07-24T01:49:10.079Z",
+  "ended_at": "2026-07-24T01:49:10.743Z",
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "add EPIPE stream guard",
+          "checked": true
+        },
+        {
+          "text": "test with closed reader",
+          "checked": true
+        },
+        {
+          "text": "commit",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-07-24T01:49:10.201Z"
+    }
+  ],
+  "end_summary": "merged to main",
+  "transcript_ref": null
+}

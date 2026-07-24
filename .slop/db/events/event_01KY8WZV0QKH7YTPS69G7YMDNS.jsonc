@@ -1,0 +1,17 @@
+{
+  "id": "event_01KY8WZV0QKH7YTPS69G7YMDNS",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KY8W4C7WQ1247TM1CPP1VD8R"
+  },
+  "payload": {
+    "progress": "installEpipeGuards at top of main(); exits 0 on EPIPE"
+  },
+  "at": "2026-07-24T01:49:10.551Z"
+}

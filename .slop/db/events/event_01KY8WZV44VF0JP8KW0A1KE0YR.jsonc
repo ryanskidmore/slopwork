@@ -1,0 +1,17 @@
+{
+  "id": "event_01KY8WZV44VF0JP8KW0A1KE0YR",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "human"
+  },
+  "session": "session_01KY8WZTHZQVSG418MVYKTP62N",
+  "verb": "review.requested",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KY8W4C7WQ1247TM1CPP1VD8R"
+  },
+  "payload": {
+    "mr": "https://github.com/ryanskidmore/slopwork/commit/7a8fc66"
+  },
+  "at": "2026-07-24T01:49:10.660Z"
+}
