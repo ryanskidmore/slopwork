@@ -16,6 +16,21 @@ async function runUndraft(ref: string): Promise<void> {
   // (it would also silently accept `in_progress -> open`, `stop`'s edge).
   assertUndraftable(current);
 
+  // E1: an already-open ticket is a legitimate no-op (assertUndraftable's
+  // own doc calls this "idempotent"), but the write itself is skipped
+  // entirely — no bumped updated_at, no ticket.updated event — and the
+  // message says "already open" rather than the misleading "undrafted"
+  // (which used to print even though the ticket was never drafted in the
+  // first place). A genuine illegal transition (in_progress/review/done/
+  // dropped) still exits 6 above, unaffected by this early return.
+  if (current.state === "open") {
+    process.stdout.write(
+      `${current.id}  (slug: ${current.slug}) is already open — no changes made\n` +
+        `  ${current.name}\n`,
+    );
+    return;
+  }
+
   const { ticket, patch, verb, payload } = buildUpdate(current, {
     state: "open",
     labelOps: [],

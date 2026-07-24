@@ -161,15 +161,24 @@ function escapeRegExp(text: string): string {
  * substring of a longer matched term (e.g. "au" inside "auth") never eats
  * part of the longer one's marker — good enough for the naive-scan bar
  * this work item sets (§4.6: no real highlighting engine).
+ *
+ * **E1 fix:** a match already flanked by `**` on both sides (the snippet
+ * window landed on text that was already markdown-bold — e.g. a ticket's
+ * own `spec.details_md` already reads "see the **term** below") used to
+ * get marked AGAIN, producing `****term****` — asterisk soup that no
+ * longer reads as bold anything. The lookaround below (`(?<!\*)` /
+ * `(?!\*)`) skips a match that already has a `*` immediately touching it
+ * on either side, so already-bold text is left alone rather than
+ * double-wrapped; every other occurrence is marked exactly as before.
  */
-function markTerms(text: string, terms: readonly string[]): string {
+export function markTerms(text: string, terms: readonly string[]): string {
   if (terms.length === 0) return text;
   const pattern = terms
     .slice()
     .sort((a, b) => b.length - a.length)
     .map(escapeRegExp)
     .join("|");
-  const re = new RegExp(`(${pattern})`, "gi");
+  const re = new RegExp(`(?<!\\*)(${pattern})(?!\\*)`, "gi");
   return text.replace(re, "**$1**");
 }
 

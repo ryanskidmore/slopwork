@@ -53,7 +53,8 @@
  *   "events": [ { "id", "at", "verb", "actor", "session", "entity", "payload" }, … ],
  *   "count": number,           // events.length
  *   "next_cursor": "event_… | null",
- *   "has_more": boolean
+ *   "has_more": boolean,
+ *   "elided": ["<note>", ...]  // E1's --budget; only non-empty when a budget forced elision
  * }
  * ```
  *
@@ -65,10 +66,15 @@
  * the same query later, once new events land, picks them up without the
  * caller having to special-case "empty page" vs "no cursor yet". A caller
  * pages by looping `--since <next_cursor>` until `has_more` is `false`.
- * `has_more` is only meaningful relative to `--limit`: without `--limit`,
- * every matching event is already returned, so `has_more` is always
- * `false`. This shape is E1's starting point for standardising `--json`
- * across commands, not a final cross-command contract on its own.
+ * `has_more` is only meaningful relative to `--limit` OR `--budget`:
+ * without either, every matching event is already returned, so `has_more`
+ * is always `false`. When `--budget` (E1) forces eliding trailing events
+ * from what would otherwise be the page, `next_cursor`/`has_more` are
+ * recomputed against what's ACTUALLY returned (not the pre-budget page) —
+ * a caller paging with `--since <next_cursor>` must never silently skip an
+ * event that got elided rather than actually sent. This shape is E1's
+ * starting point for standardising `--json` across commands, not a final
+ * cross-command contract on its own.
  */
 import type { Command } from "commander";
 import {
@@ -77,6 +83,7 @@ import {
   type EventId,
   type TicketId,
   isEventId,
+  renderEntriesWithBudget,
 } from "../../core/index.js";
 import {
   listSessions,
@@ -87,6 +94,7 @@ import {
   requireRepoRoot,
   resolveTicketRef,
 } from "../../repo/index.js";
+import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
 import { SlopError } from "../errors.js";
 import { parseIntegerOption } from "./shared.js";
 
@@ -95,6 +103,7 @@ interface EventsOptions {
   ticket?: string;
   json?: boolean;
   limit?: number;
+  budget?: number;
 }
 
 /** Validate `--since`'s shape (USAGE_ERROR, exit 2) without touching disk. */
@@ -213,33 +222,56 @@ function formatHumanLine(event: Event): string {
   return parts.join("  ");
 }
 
-function printHuman(page: EventsPage, limited: boolean): void {
-  if (page.events.length === 0) {
-    process.stdout.write("no events\n");
-    return;
-  }
-  for (const event of page.events) {
-    process.stdout.write(`${formatHumanLine(event)}\n`);
-  }
-  if (limited && page.hasMore && page.nextCursor) {
-    process.stdout.write(`-- more events: continue with --since ${page.nextCursor}\n`);
-  }
+/**
+ * Recompute `next_cursor`/`has_more` against `kept` — what's ACTUALLY
+ * being returned in this rendering — rather than trusting `page`'s
+ * pre-budget values. Needed because `--budget` (E1) can elide trailing
+ * events from `page.events` on top of whatever `--limit` already did; a
+ * caller that pages with `--since <next_cursor>` must land exactly after
+ * the last event it actually SAW, never after one that got silently
+ * elided (that would drop it from every future page too).
+ */
+function pageFor(page: EventsPage, kept: readonly Event[], since: EventId | undefined): EventsPage {
+  const hasMore = page.hasMore || kept.length < page.events.length;
+  const last = kept[kept.length - 1];
+  const nextCursor = last ? last.id : (since ?? null);
+  return { events: [...kept], nextCursor, hasMore };
 }
 
-function printJson(
+function buildHuman(page: EventsPage, kept: readonly Event[], elisions: readonly string[]): string {
+  const lines: string[] = [];
+  if (kept.length === 0) {
+    lines.push("no events");
+  } else {
+    for (const event of kept) lines.push(formatHumanLine(event));
+    if (page.hasMore && page.nextCursor) {
+      lines.push(`-- more events: continue with --since ${page.nextCursor}`);
+    }
+  }
+  if (elisions.length > 0) {
+    lines.push("");
+    lines.push(`(--budget, ${CONTEXT_PACK_BUDGET_UNIT}):`);
+    for (const note of elisions) lines.push(`  - ${note}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+function buildJson(
   page: EventsPage,
   since: EventId | undefined,
   ticketId: TicketId | undefined,
   limit: number | undefined,
-): void {
+  elisions: readonly string[],
+): string {
   const body = {
     query: { since: since ?? null, ticket: ticketId ?? null, limit: limit ?? null },
     events: page.events,
     count: page.events.length,
     next_cursor: page.nextCursor,
     has_more: page.hasMore,
+    elided: elisions,
   };
-  process.stdout.write(`${JSON.stringify(body, null, 2)}\n`);
+  return `${JSON.stringify(body, null, 2)}\n`;
 }
 
 /** `slop events` — design.md §3, §4.2; work item D3. */
@@ -251,6 +283,12 @@ export function registerEventsCommand(program: Command): void {
     .option("--ticket <ref>", "only events for this ticket (id, slug, or short prefix)")
     .option("--limit <n>", "cap the number of events returned", parseIntegerOption("--limit"))
     .option("--json", "machine-readable output (events + a next cursor for paging)")
+    .option(
+      "--budget <n>",
+      `cap output size to N ${CONTEXT_PACK_BUDGET_UNIT} (elides the newest trailing events first, ` +
+        "adjusting next_cursor/has_more to match what's actually returned)",
+      parseIntegerOption("--budget"),
+    )
     .action(async (opts: EventsOptions) => {
       const root = requireRepoRoot(process.cwd());
       const paths = repoPaths(root);
@@ -273,10 +311,15 @@ export function registerEventsCommand(program: Command): void {
 
       const page = await fetchPage(paths, since, predicate, limit);
 
-      if (opts.json) {
-        printJson(page, since, ticketId, limit);
-      } else {
-        printHuman(page, limit !== undefined);
-      }
+      const rendered = renderEntriesWithBudget(
+        page.events,
+        (kept, elisions) =>
+          opts.json
+            ? buildJson(pageFor(page, kept, since), since, ticketId, limit, elisions)
+            : buildHuman(pageFor(page, kept, since), kept, elisions),
+        opts.budget,
+        { format: opts.json ? "json" : "text", noun: "event" },
+      );
+      process.stdout.write(rendered.text);
     });
 }

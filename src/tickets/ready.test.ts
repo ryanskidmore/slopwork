@@ -302,4 +302,31 @@ describe("renderReadyWithBudget", () => {
     expect(result.text).toBe("[]");
     expect(result.elisions).toEqual([]);
   });
+
+  // E1 defect fix (B4 adversarial review): `ready --json --budget <tiny>`
+  // used to emit invalid, truncated-mid-structure JSON on exit 0, because
+  // the last-resort fallback was a raw string slice — fine for text, fatal
+  // for JSON. `format: "json"` must never do that: the floor is the
+  // already-valid empty-entries envelope, returned as-is.
+  describe('format: "json" never corrupts the JSON, even at a pathologically tiny budget', () => {
+    const jsonRender = (kept: readonly ReadyEntry[], elisions: readonly string[]): string =>
+      `${JSON.stringify({ ready: kept.map((e) => e.row.id), elided: [...elisions] })}\n`;
+
+    for (const budget of [0, 1, 2, 5]) {
+      it(`budget=${budget}: stays parseable`, () => {
+        const entries = entriesFor(5);
+        const result = renderReadyWithBudget(entries, jsonRender, budget, "json");
+        expect(() => JSON.parse(result.text)).not.toThrow();
+        const parsed = JSON.parse(result.text) as { ready: string[]; elided: string[] };
+        expect(parsed.ready).toEqual([]);
+        expect(parsed.elided.length).toBeGreaterThan(0);
+      });
+    }
+
+    it("defaults to text-mode (raw-slice) behavior when format is omitted, for backward compatibility", () => {
+      const entries = entriesFor(2);
+      const result = renderReadyWithBudget(entries, jsonRender, 1);
+      expect(result.text.length).toBeLessThanOrEqual(1);
+    });
+  });
 });

@@ -72,17 +72,35 @@
  *   ],   // sorted longest-waiting-first; review_stale (C5) marks it WITHOUT hiding the mr link
  *   "stale": [ { "id", "slug", "name", "state": "in_progress" | "review" }, ... ],
  *   // always an array now (C5 has landed) — never null.
- *   "problems": [ { "id", "message" }, ... ]   // session/ticket files this run couldn't read; usually []
+ *   "problems": [ { "id", "message" }, ... ],  // session/ticket files this run couldn't read; usually []
+ *   "elided": ["<note>", ...]  // E1's --budget; only non-empty when a budget forced elision
  * }
  * ```
  *
- * `--json` is never truncated (see `tickets/status.ts`'s `STATUS_LIST_CAP`
- * doc) — the human view is what stays to "one screen"; `--json` is the
- * full-fidelity agent path.
+ * `--json` was previously never truncated ("the human view is what stays
+ * to 'one screen'; `--json` is the full-fidelity agent path") — **E1 adds
+ * `--budget N`**, which now bounds BOTH views (this is exactly the
+ * "every read respects budget" acceptance clause). Without `--budget`,
+ * behavior is unchanged — `--json` still returns everything, `capRows`
+ * still keeps the human view to one screen. With it, this command elides
+ * whole rows least-important-first: `stale` rows first (the section
+ * already implied by the `stale`/`review_stale` flags elsewhere), then
+ * `review` rows (from the least-long-waiting end), then `in_progress` rows
+ * (from the least-stale end) — `counts`/`derived`/`problems` are always
+ * kept in full (small, fixed-size, and the whole point of a "pulse" view).
+ * `--json`'s new `elided` array (always present, like `ready`/`search`/
+ * `events`) names what was dropped; never corrupts the JSON at any budget
+ * (`core/budget.ts`'s `renderEntriesWithBudget`, same helper `ready`/
+ * `search`/`events` use).
  */
 import type { Command } from "commander";
-import type { Clock, Session, SessionId, Ticket, TicketId } from "../../core/index.js";
-import { fixedClock, systemClock, TICKET_STATES } from "../../core/index.js";
+import type { Clock, RenderFormat, Session, SessionId, Ticket, TicketId } from "../../core/index.js";
+import {
+  fixedClock,
+  renderEntriesWithBudget,
+  systemClock,
+  TICKET_STATES,
+} from "../../core/index.js";
 import type { IndexTicketRow, RepoPaths } from "../../repo/index.js";
 import {
   loadIndex,
@@ -91,6 +109,7 @@ import {
   repoPaths,
   requireRepoRoot,
 } from "../../repo/index.js";
+import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
 import { isReviewStale, isStale } from "../../tickets/staleness.js";
 import type {
   DerivedOverlayCounts,
@@ -110,9 +129,11 @@ import {
   sortReviewRows,
   staleTicketRows,
 } from "../../tickets/status.js";
+import { parseIntegerOption } from "./shared.js";
 
 interface StatusCommandOptions {
   json?: boolean;
+  budget?: number;
 }
 
 interface StatusProblem {
@@ -343,10 +364,9 @@ function renderStaleSection(rows: readonly StaleTicketRow[]): string[] {
   return lines;
 }
 
-function printHuman(data: StatusData): void {
+function buildHuman(data: StatusData, elisions: readonly string[]): string {
   if (data.counts.total === 0) {
-    process.stdout.write('no tickets yet — `slop new "..."` to create one\n');
-    return;
+    return 'no tickets yet — `slop new "..."` to create one\n';
   }
 
   const lines: string[] = [`Slopworks status — ${data.counts.total} ticket(s)`, ""];
@@ -358,14 +378,20 @@ function printHuman(data: StatusData): void {
   lines.push("");
   lines.push(...renderStaleSection(data.stale));
 
-  process.stdout.write(`${lines.join("\n")}\n`);
+  if (elisions.length > 0) {
+    lines.push("");
+    lines.push(`(--budget, ${CONTEXT_PACK_BUDGET_UNIT}):`);
+    for (const note of elisions) lines.push(`  - ${note}`);
+  }
+
+  return `${lines.join("\n")}\n`;
 }
 
 // ---------------------------------------------------------------------------
 // --json rendering
 // ---------------------------------------------------------------------------
 
-function printJson(data: StatusData, generatedAtIso: string): void {
+function buildJson(data: StatusData, generatedAtIso: string, elisions: readonly string[]): string {
   const body = {
     generated_at: generatedAtIso,
     counts: data.counts,
@@ -399,8 +425,48 @@ function printJson(data: StatusData, generatedAtIso: string): void {
     })),
     stale: data.stale,
     problems: data.problems,
+    elided: elisions,
   };
-  process.stdout.write(`${JSON.stringify(body, null, 2)}\n`);
+  return `${JSON.stringify(body, null, 2)}\n`;
+}
+
+// ---------------------------------------------------------------------------
+// E1: `--budget` — elide whole rows, least-important-last, across the
+// three list sections in ONE combined elision-priority order:
+// in_progress (most important — active work) > review (awaiting a human)
+// > stale (a derived, largely-redundant-with-the-above overlay). Dropping
+// from the tail of the combined array therefore drops stale rows first,
+// then review, then in_progress — see this file's module doc. `counts`/
+// `derived`/`problems` are never elided (small, fixed-size, and the whole
+// point of a pulse view).
+// ---------------------------------------------------------------------------
+
+type StatusEntry =
+  | { kind: "in_progress"; row: InProgressTicketRow }
+  | { kind: "review"; row: ReviewTicketRow }
+  | { kind: "stale"; row: StaleTicketRow };
+
+function buildStatusEntries(data: StatusData): StatusEntry[] {
+  return [
+    ...data.inProgress.map((row): StatusEntry => ({ kind: "in_progress", row })),
+    ...data.review.map((row): StatusEntry => ({ kind: "review", row })),
+    ...data.stale.map((row): StatusEntry => ({ kind: "stale", row })),
+  ];
+}
+
+function filterStatusData(data: StatusData, kept: readonly StatusEntry[]): StatusData {
+  return {
+    ...data,
+    inProgress: kept
+      .filter((e): e is Extract<StatusEntry, { kind: "in_progress" }> => e.kind === "in_progress")
+      .map((e) => e.row),
+    review: kept
+      .filter((e): e is Extract<StatusEntry, { kind: "review" }> => e.kind === "review")
+      .map((e) => e.row),
+    stale: kept
+      .filter((e): e is Extract<StatusEntry, { kind: "stale" }> => e.kind === "stale")
+      .map((e) => e.row),
+  };
 }
 
 async function runStatus(opts: StatusCommandOptions): Promise<void> {
@@ -409,12 +475,22 @@ async function runStatus(opts: StatusCommandOptions): Promise<void> {
   const clock = resolveClock();
 
   const data = await gatherStatus(paths, clock);
+  const generatedAtIso = clock.now().toISOString();
+  const format: RenderFormat = opts.json ? "json" : "text";
 
-  if (opts.json) {
-    printJson(data, clock.now().toISOString());
-    return;
-  }
-  printHuman(data);
+  const entries = buildStatusEntries(data);
+  const rendered = renderEntriesWithBudget(
+    entries,
+    (kept, elisions) => {
+      const filtered = filterStatusData(data, kept);
+      return opts.json
+        ? buildJson(filtered, generatedAtIso, elisions)
+        : buildHuman(filtered, elisions);
+    },
+    opts.budget,
+    { format, noun: "row" },
+  );
+  process.stdout.write(rendered.text);
 }
 
 /** `slop status` — design.md §4.2; work item D4. */
@@ -426,5 +502,11 @@ export function registerStatusCommand(program: Command): void {
         "items, and tickets awaiting review with MR links.",
     )
     .option("--json", "machine-readable output")
+    .option(
+      "--budget <n>",
+      `cap output size to N ${CONTEXT_PACK_BUDGET_UNIT} (elides stale rows, then review rows, then ` +
+        "in_progress rows, least-important-first; counts/derived are always kept in full)",
+      parseIntegerOption("--budget"),
+    )
     .action(runStatus);
 }

@@ -2,7 +2,13 @@ import type { Command } from "commander";
 import type { Clock } from "../../core/clock.js";
 import { systemClock } from "../../core/clock.js";
 import type { EventVerb, HarnessKind, Session } from "../../core/index.js";
-import { HARNESS_KINDS, harnessKindSchema, nowIso, sessionSchema } from "../../core/index.js";
+import {
+  EXIT_CODES,
+  HARNESS_KINDS,
+  harnessKindSchema,
+  nowIso,
+  sessionSchema,
+} from "../../core/index.js";
 import {
   createSession,
   readSession,
@@ -29,22 +35,30 @@ import {
 import { renderContextPack } from "../../tickets/context.js";
 import { TICKET_FIELDS, diffTicketPatch } from "../../tickets/patch.js";
 import { loadConfig, resolveActor } from "../actor.js";
+import { SlopError } from "../errors.js";
 import { printWarning } from "./shared.js";
 
 interface StartCommandOptions {
   as?: string;
   harness?: HarnessKind;
   takeover?: boolean;
+  json?: boolean;
 }
 
 /** Validate `--harness` eagerly against the known enum (D17/S1) — a bad
  * value is a usage mistake, so it's rejected here with the full allowed
  * list rather than silently degrading to sniffing (that graceful fallback
- * is reserved for detection *failing*, not for a typo the user can fix). */
+ * is reserved for detection *failing*, not for a typo the user can fix).
+ * Throws a {@link SlopError} (USAGE_ERROR, exit 2) — E1's exit-code audit
+ * fix (see `shared.ts`'s `parseIntegerOption` doc for why a bare `Error`
+ * here would silently exit 1 instead of the documented 2). */
 function parseHarnessFlag(value: string): HarnessKind {
   const parsed = harnessKindSchema.safeParse(value);
   if (!parsed.success) {
-    throw new Error(`--harness must be one of ${HARNESS_KINDS.join("|")}, got "${value}"`);
+    throw new SlopError(
+      `--harness must be one of ${HARNESS_KINDS.join("|")}, got "${value}"`,
+      EXIT_CODES.USAGE_ERROR,
+    );
   }
   return parsed.data;
 }
@@ -213,6 +227,34 @@ async function runStart(ref: string, opts: StartCommandOptions): Promise<void> {
 
   for (const w of warnings) printWarning(w);
 
+  if (opts.json) {
+    // E1: a small, stable `--json` result — the id/slug an agent's next
+    // command needs — NOT the context pack (that's structured `slop
+    // context --json`'s job; duplicating it here would just be a second,
+    // divergence-prone copy of the same data).
+    const body = {
+      session: {
+        id: result.session.id,
+        actor: actor.name,
+        harness: harness.kind,
+        harness_session_id: harness.session_id,
+        started_at: result.session.started_at,
+      },
+      ticket: {
+        id: result.ticket.id,
+        slug: result.ticket.slug,
+        name: result.ticket.name,
+        state: result.ticket.state,
+      },
+      git: { branch: git.branch, commit_at_start: git.commit_at_start },
+      re_entry: result.previousSession !== null && result.isReviewReentry,
+      takeover: result.previousSession !== null && !result.isReviewReentry,
+      warnings,
+    };
+    process.stdout.write(`${JSON.stringify(body, null, 2)}\n`);
+    return;
+  }
+
   process.stdout.write(
     `started ${result.session.id} on ${result.ticket.id} (${result.ticket.slug})\n` +
       `  ${result.ticket.name}\n` +
@@ -247,5 +289,10 @@ export function registerStartCommand(program: Command): void {
       parseHarnessFlag,
     )
     .option("--takeover", "take over a ticket with another active session (logged)")
+    .option(
+      "--json",
+      "machine-readable result (session/ticket ids, git info) — omits the context pack; " +
+        "follow up with `slop context <ref> --json` for a structured pack",
+    )
     .action(runStart);
 }

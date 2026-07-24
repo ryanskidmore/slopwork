@@ -3,8 +3,33 @@
  * asserted." Pure functions over the entities a {@link WebDataSource}
  * already hands back — no persisted `index.jsonc` involved, deliberately,
  * so D5 doesn't have to wait on B4's reindex logic landing in src/repo/.
+ *
+ * **E1 fix — web/CLI staleness divergence.** Before this fix,
+ * {@link isTicketStale} computed review-staleness anchored on
+ * `last_activity_at` for BOTH `in_progress` and `review` states, while
+ * `src/tickets/staleness.ts` (the CLI's `ready --resumable`/`status`
+ * source of truth, C5) anchors `review` specifically on
+ * `review.requested_at` — see that module's doc, "`requested_at` vs
+ * `last_activity_at` for review staleness", for why that distinction is
+ * load-bearing: a review ticket that sits unreviewed for a week, then gets
+ * one unrelated `update --progress` note (bumping `last_activity_at`
+ * without addressing the review at all), must still read as review-stale;
+ * anchoring on `last_activity_at` incorrectly resets the clock on exactly
+ * the case the overlay exists to catch. `slop web`'s stale panel could
+ * therefore disagree with `slop status`/`slop ready --resumable` about
+ * whether the SAME review ticket was stale. Fixed by delegating
+ * {@link isTicketStale} to `tickets/staleness.ts`'s pure
+ * `computeStaleAt`/`computeReviewStaleAt` (the deadline) +
+ * `isStale`/`isReviewStale` (the live boolean) — the exact same functions
+ * the CLI uses — rather than re-deriving the rule a second time here. This
+ * function's own signature (`ticket, thresholds, nowMs) => boolean`) is
+ * UNCHANGED, so every view file that calls it (`views/stale.ts`,
+ * `views/review.ts`, `views/ticket-detail.ts`) needed no edits — web/'s
+ * routes/rendering stay exactly as D5 built them, per this work item's
+ * ground rules (only `overlays.ts` itself is in scope).
  */
 import { type Config, type Ticket, type TicketId, parseDurationMs } from "../core/index.js";
+import { computeReviewStaleAt, computeStaleAt, isReviewStale, isStale } from "../tickets/staleness.js";
 
 export interface StaleThresholds {
   staleAfterMs: number;
@@ -43,13 +68,16 @@ export function computeBlockedTicketIds(tickets: readonly Ticket[]): Set<TicketI
  * other state is never stale. The threshold is `stale_after` for
  * `in_progress`, `review_stale_after` for `review` — two different clocks
  * for two different kinds of waiting.
+ *
+ * Delegates to `tickets/staleness.ts`'s pure deadline + live-boolean
+ * functions (module doc, "E1 fix") — this is now the SAME rule the CLI
+ * uses, not a second, independently-drifting implementation of it.
  */
 export function isTicketStale(ticket: Ticket, thresholds: StaleThresholds, nowMs: number): boolean {
-  if (ticket.state !== "in_progress" && ticket.state !== "review") return false;
-  const thresholdMs =
-    ticket.state === "review" ? thresholds.reviewStaleAfterMs : thresholds.staleAfterMs;
-  const lastActivityMs = Date.parse(ticket.last_activity_at);
-  return nowMs - lastActivityMs > thresholdMs;
+  const staleAt = computeStaleAt(ticket, thresholds.staleAfterMs);
+  const reviewStaleAt = computeReviewStaleAt(ticket, thresholds.reviewStaleAfterMs);
+  const now = new Date(nowMs);
+  return isStale({ stale_at: staleAt }, now) || isReviewStale({ review_stale_at: reviewStaleAt }, now);
 }
 
 /** Milliseconds since an ISO timestamp, floored at 0 (clock skew / future timestamps never go negative in the UI). */

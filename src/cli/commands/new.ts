@@ -16,6 +16,7 @@ interface NewCommandOptions {
   adhoc?: boolean;
   owner?: string;
   priority?: number;
+  json?: boolean;
 }
 
 async function runNew(name: string, opts: NewCommandOptions): Promise<void> {
@@ -66,6 +67,27 @@ async function runNew(name: string, opts: NewCommandOptions): Promise<void> {
 
   for (const warning of warnings) printWarning(warning);
 
+  if (opts.json) {
+    // E1: small `--json` result for a mutator that creates an entity — the
+    // id/slug the next command in an agent's loop needs, not a full ticket
+    // dump (that's `slop show <ref> --json`'s job).
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          id: ticket.id,
+          slug: ticket.slug,
+          name: ticket.name,
+          state: ticket.state,
+          priority: ticket.priority,
+          parent: ticket.parent ?? null,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    return;
+  }
+
   process.stdout.write(
     `created ${ticket.id}  (slug: ${ticket.slug})\n` +
       `  ${ticket.name}\n` +
@@ -94,5 +116,6 @@ export function registerNewCommand(program: Command): void {
     .option("--adhoc", "mark as created outside normal planning")
     .option("--owner <actor>", "owning actor (roots require a human owner, D1)")
     .option("--priority <0-3>", "priority: 0 urgent .. 3 low, default 2", parsePriority)
+    .option("--json", "machine-readable result (id, slug, name, state, priority, parent)")
     .action(runNew);
 }

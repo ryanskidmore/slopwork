@@ -109,11 +109,16 @@ export const HOUSE_RULES: readonly string[] = [
   "**Don't takeover.** If `start` warns that another session is active, stop and tell the human. Use `--takeover` only when explicitly instructed.",
   "**Stopping requires a handoff note.** The next session (probably another amnesiac you) starts from your `--note`. Write what you'd want to read: current state, next step, traps.",
   "**Prefer structured spec fields.** When creating tickets, put acceptance criteria in `acceptance[]` and file/URL pointers in `context[]`, not buried in prose.",
-  // FIX against the shipped CLI: the draft read "Use `--json --budget N`
-  // on `ready`/`show`" — `show` (src/cli/commands/show.ts) takes only
-  // `--context`/`--tree`; it has neither `--json` nor `--budget`. Only
-  // `ready` supports both.
-  "**Budget your reads.** Use `--json --budget N` on `ready` to cap output; use `slop context <ref>` to re-load your bearings after compaction instead of re-exploring the repo.",
+  // Originally FIXED against the shipped CLI (the draft read "Use `--json
+  // --budget N` on `ready`/`show`", back when `show` had neither flag —
+  // only `ready` did). E1 then genuinely landed `--json`/`--budget`
+  // across every read command (`ready`, `status`, `search`, `events`,
+  // `context`, and `show --context`), so the rule is updated again here to
+  // match the NOW-shipped CLI, not reverted to the original draft's wrong
+  // claim — see src/cli/commands/*.ts's own `--budget`/`--json` help text
+  // for the authoritative per-command shape (`show`'s plain-ticket output
+  // has a documented floor: `--budget` only bounds its `--context` output).
+  "**Budget your reads.** `ready`, `status`, `search`, `events`, and `context` all take `--json --budget N` to cap output (`show --context` too); use `slop context <ref>` to re-load your bearings after compaction instead of re-exploring the repo.",
 ] as const;
 
 /** Reference resolution rule (draft-v0-SKILL.md, unchanged). */

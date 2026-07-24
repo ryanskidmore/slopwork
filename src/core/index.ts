@@ -8,6 +8,7 @@
  * spike decision, spikes/jsonc.md). Pure, in-memory, and testable only —
  * no file I/O, no repo layer, no CLI wiring; that's A3.
  */
+export * from "./budget.js";
 export * from "./clock.js";
 export * from "./duration.js";
 export * from "./entities/index.js";

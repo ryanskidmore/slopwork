@@ -231,6 +231,7 @@ async function runReady(opts: ReadyCommandOptions): Promise<void> {
         ? renderJson(kept, elisions, resumableRequested, hint, mrLinks)
         : renderText(kept, elisions, resumableRequested, hint, mrLinks),
     opts.budget,
+    opts.json ? "json" : "text",
   );
   process.stdout.write(rendered.text);
 }

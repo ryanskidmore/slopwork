@@ -15,6 +15,21 @@ async function runDraft(ref: string): Promise<void> {
   // its own — see `tickets/draft.ts`'s module doc.
   assertDraftable(current);
 
+  // E1: an already-draft ticket is a legitimate no-op (assertDraftable's
+  // own doc calls this "idempotent"), but the write itself is skipped
+  // entirely — no bumped updated_at, no ticket.updated event — and the
+  // message says "already draft" rather than the misleading "drafted"
+  // (which used to print even though nothing changed). A genuine illegal
+  // transition (in_progress/review/done/dropped) still exits 6 above,
+  // unaffected by this early return.
+  if (current.state === "draft") {
+    process.stdout.write(
+      `${current.id}  (slug: ${current.slug}) is already draft — no changes made\n` +
+        `  ${current.name}\n`,
+    );
+    return;
+  }
+
   const { ticket, patch, verb, payload } = buildUpdate(current, {
     state: "draft",
     labelOps: [],

@@ -52,14 +52,20 @@
  * left is building a `ContextPackData` (see `context-pack.ts`, also C1)
  * and passing it here.
  */
-import type { Ticket } from "../core/index.js";
+import type { Session, Ticket } from "../core/index.js";
+import { BUDGET_UNIT as CONTEXT_PACK_BUDGET_UNIT, renderJsonBodyWithBudget } from "../core/budget.js";
 import type { ContextPackData } from "../tickets/context.js";
 import { renderContextPack } from "../tickets/context.js";
+import { jiraBrowseUrl } from "../tickets/jira.js";
 
 /** The unit `--budget N` counts in for `slop context`/`slop start` — see
  * this module's doc for why this deliberately differs from `slop show
- * --context --budget`'s rough token estimate. */
-export const CONTEXT_PACK_BUDGET_UNIT = "characters";
+ * --context --budget`'s rough token estimate. Re-exported under this
+ * historical name (rather than making every existing caller switch to
+ * importing `BUDGET_UNIT` from `core/budget.ts` directly) purely for
+ * call-site continuity — `core/budget.ts` owns the single canonical
+ * constant now that E1 generalises `--budget` beyond the context pack. */
+export { CONTEXT_PACK_BUDGET_UNIT };
 
 export interface BudgetedContextPack {
   text: string;
@@ -174,4 +180,201 @@ export function renderContextPackWithBudget(
   // not an arbitrary cut through the original, un-elided pack.
   const rawSlice = budgetChars <= 0 ? "" : withoutHardTruncation.slice(0, budgetChars);
   return { text: rawSlice, elisions: finalNotes, withinBudget: rawSlice.length <= budgetChars };
+}
+
+// ---------------------------------------------------------------------------
+// `--json` (E1): a structured form of the same pack, budget-aware without
+// ever corrupting JSON — see core/budget.ts's module doc, "the defect this
+// module fixes". Used by both `slop context --json` and `slop show
+// --context --json`.
+// ---------------------------------------------------------------------------
+
+interface ContextPackJsonTicketRef {
+  id: string;
+  slug: string;
+  name: string;
+  state: string;
+}
+
+interface ContextPackJsonSession {
+  id: string;
+  actor: string;
+  harness: string;
+  started_at: string;
+  ended_at: string | null;
+}
+
+export interface ContextPackJsonBody {
+  ticket: {
+    id: string;
+    slug: string;
+    name: string;
+    state: string;
+    priority: number;
+    spec: { summary: string; details_md: string; acceptance: string[]; context: string[] };
+  };
+  ancestry: ContextPackJsonTicketRef[];
+  external_parent_ref: string | null;
+  jira_url: string | null;
+  blockers: ContextPackJsonTicketRef[];
+  sessions: ContextPackJsonSession[];
+  elided: string[];
+}
+
+function ticketRefJson(t: Ticket): ContextPackJsonTicketRef {
+  return { id: t.id, slug: t.slug, name: t.name, state: t.state };
+}
+
+function sessionJson(s: Session): ContextPackJsonSession {
+  return {
+    id: s.id,
+    actor: s.actor.name,
+    harness: s.harness.kind,
+    started_at: s.started_at,
+    ended_at: s.ended_at,
+  };
+}
+
+/** The structured (`--json`) equivalent of {@link renderContextPack} — same
+ * fields, machine-shaped. `elisions` (E1's budget notes) always rides
+ * along as `elided`, mirroring `ready`/`search`/`events`'s `--json`
+ * convention of an always-present (possibly empty) array rather than an
+ * optional field. */
+export function buildContextPackJson(
+  data: ContextPackData,
+  elisions: readonly string[] = [],
+): ContextPackJsonBody {
+  const { ticket } = data;
+  return {
+    ticket: {
+      id: ticket.id,
+      slug: ticket.slug,
+      name: ticket.name,
+      state: ticket.state,
+      priority: ticket.priority,
+      spec: {
+        summary: ticket.spec.summary,
+        details_md: ticket.spec.details_md,
+        acceptance: ticket.spec.acceptance,
+        context: ticket.spec.context,
+      },
+    },
+    ancestry: data.ancestors.map(ticketRefJson),
+    external_parent_ref: data.externalParentRef ?? null,
+    jira_url:
+      data.externalParentRef !== undefined ? jiraBrowseUrl(data.config, data.externalParentRef) : null,
+    blockers: data.blockers.map(ticketRefJson),
+    sessions: data.sessions.map(sessionJson),
+    elided: [...elisions],
+  };
+}
+
+/**
+ * The guaranteed-fits-almost-any-real-budget floor for
+ * {@link renderContextPackJsonWithBudget}'s final fallback: ticket core
+ * fields only (id/slug/name/state/priority), no spec prose, no
+ * ancestry/blockers/sessions. Small and FIXED size regardless of how huge
+ * the real pack is — genuinely returned as-is (never sliced) even for a
+ * pathological budget (0, 1 char) too small for even this to fit (see
+ * `core/budget.ts`'s module doc for why that's the correct behavior, not a
+ * bug: valid-but-over-budget beats corrupt-but-under-budget).
+ */
+function minimalContextPackJson(
+  ticket: Ticket,
+  elisions: readonly string[],
+): ContextPackJsonBody {
+  return {
+    ticket: {
+      id: ticket.id,
+      slug: ticket.slug,
+      name: ticket.name,
+      state: ticket.state,
+      priority: ticket.priority,
+      spec: { summary: "", details_md: "", acceptance: [], context: [] },
+    },
+    ancestry: [],
+    external_parent_ref: null,
+    jira_url: null,
+    blockers: [],
+    sessions: [],
+    elided: [...elisions],
+  };
+}
+
+function toJsonResult(body: ContextPackJsonBody): { body: ContextPackJsonBody; text: string } {
+  return { body, text: `${JSON.stringify(body, null, 2)}\n` };
+}
+
+/**
+ * The `--json` sibling of {@link renderContextPackWithBudget} — same
+ * elision order (sessions, then `details_md`, mirrored step-for-step
+ * below) and same "never exceed a real budget when a fit exists" guarantee,
+ * but the LAST-resort step differs on purpose (core/budget.ts's module
+ * doc): text can always be raw-sliced and stay valid; JSON cannot, so this
+ * function's floor is {@link minimalContextPackJson} returned AS-IS,
+ * never a corrupt slice of it. Also drops `ancestry`/`blockers` at that
+ * final step (the prose version doesn't need an equivalent step — a long
+ * ancestor/blocker chain is comparatively rare and small next to
+ * `details_md`, but unlike prose, JSON field overhead means it's worth
+ * being thorough about the guaranteed-minimal floor here).
+ */
+export function renderContextPackJsonWithBudget(
+  data: ContextPackData,
+  budgetChars?: number,
+): { body: ContextPackJsonBody; text: string; withinBudget: boolean } {
+  const full = toJsonResult(buildContextPackJson(data));
+  if (budgetChars === undefined || full.text.length <= budgetChars) {
+    return { ...full, withinBudget: true };
+  }
+
+  const totalSessions = data.sessions.length;
+
+  // Step 1: drop the oldest prior sessions, one at a time.
+  for (let keep = totalSessions - 1; keep >= 0; keep--) {
+    const dropped = totalSessions - keep;
+    const notes = [sessionElisionNote(dropped, totalSessions)];
+    const candidate = toJsonResult(
+      buildContextPackJson({ ...data, sessions: data.sessions.slice(0, keep) }, notes),
+    );
+    if (candidate.text.length <= budgetChars) return { ...candidate, withinBudget: true };
+  }
+  const carriedNotes = totalSessions > 0 ? [sessionElisionNote(totalSessions, totalSessions)] : [];
+  const noSessions: ContextPackData = { ...data, sessions: [] };
+
+  // Step 2: binary-search the longest spec.details_md prefix (zero
+  // sessions) whose JSON serialization still fits.
+  const fullDetailsLen = data.ticket.spec.details_md.length;
+  if (fullDetailsLen > 0) {
+    let lo = 0;
+    let hi = fullDetailsLen;
+    let best: { body: ContextPackJsonBody; text: string } | null = null;
+    while (lo <= hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      const truncatedTicket = withTruncatedDetails(noSessions.ticket, mid);
+      const notes = mid < fullDetailsLen ? [...carriedNotes, DETAILS_ELIDED_NOTE] : carriedNotes;
+      const candidate = toJsonResult(
+        buildContextPackJson({ ...noSessions, ticket: truncatedTicket }, notes),
+      );
+      if (candidate.text.length <= budgetChars) {
+        best = candidate;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    if (best !== null) return { ...best, withinBudget: true };
+  }
+
+  // Step 3 (final fallback, JSON-safe): drop details_md entirely AND drop
+  // ancestry/blockers — the guaranteed-minimal floor. Delegates to
+  // core/budget.ts's `renderJsonBodyWithBudget` for the actual "return it
+  // as-is, valid JSON, even if it still exceeds budgetChars" decision —
+  // the single shared mechanism every command in this codebase uses for
+  // "JSON can't be safely raw-sliced the way text can" (that module's doc).
+  const finalNotes = [...carriedNotes, DETAILS_ELIDED_NOTE, "ancestry/blockers omitted"];
+  const { body, text, withinBudget } = renderJsonBodyWithBudget(
+    [() => minimalContextPackJson(data.ticket, finalNotes)],
+    budgetChars,
+  );
+  return { body, text, withinBudget };
 }

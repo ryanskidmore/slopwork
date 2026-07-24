@@ -100,12 +100,25 @@ describe("D1 onboarding content: one source, three renderings", () => {
     expect(SKILL_NAME).toBe("slopworks");
   });
 
-  it("neither `update`'s nor `show`'s corrected claims mention a nonexistent flag", () => {
-    // Regression guard for the two corrections against draft-v0-SKILL.md
-    // called out in content.ts: `update` has no `--blocks` flag, and
-    // `show` has neither `--json` nor `--budget`.
+  it("`update`'s corrected claim doesn't regress to a nonexistent flag", () => {
+    // Regression guard for content.ts's `--blocks` correction against
+    // draft-v0-SKILL.md: `update` has no `--blocks` flag (only `new` does).
     const body = renderOnboardingBody(ctx);
     expect(body).not.toMatch(/update <current> --state open.*--blocks/s);
+  });
+
+  it("the budget/--json house rule matches the CLI's ACTUAL shipped surface, not a stale claim in either direction", () => {
+    // content.ts's `--budget`/`--json` house rule has been corrected
+    // twice: first (D1) narrowed from the draft's over-broad "ready/show"
+    // claim (only `ready` had both flags then), then (E1) widened again
+    // once `--json`/`--budget` genuinely landed on `show`/`status`/
+    // `search`/`events`/`context` too — see content.ts's own comment.
+    // Assert the CURRENT, accurate claim, and that the old-wrong phrasing
+    // ("...--budget N`... on `ready`/`show`" with no other commands named)
+    // never regresses back in.
+    const body = renderOnboardingBody(ctx);
     expect(body).not.toMatch(/--json --budget N.*on `ready`\/`show`/s);
+    expect(body).toMatch(/`ready`, `status`, `search`, `events`, and `context`/);
+    expect(body).toMatch(/`show --context`/);
   });
 });

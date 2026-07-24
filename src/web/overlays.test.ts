@@ -89,6 +89,29 @@ describe("isTicketStale", () => {
     });
     expect(isTicketStale(twoDaysAgo, thresholds, now)).toBe(true);
   });
+
+  // E1: web's stale panel used to anchor review-staleness on
+  // `last_activity_at` (unlike the CLI's `tickets/staleness.ts`, which
+  // anchors on `review.requested_at` — DECISIONS.md's C5 entry, "requested_at
+  // vs last_activity_at"). Unified onto the same shared functions; this is
+  // the case that used to disagree between web and the CLI.
+  it('review staleness is anchored on "requested_at", not a fresher unrelated "last_activity_at" — matches tickets/staleness.ts', () => {
+    // The MR has sat for review_stale_after (24h) worth of time — but an
+    // UNRELATED progress note bumped last_activity_at to just now. Anchoring
+    // on last_activity_at (the old web-only bug) would incorrectly read this
+    // as fresh; anchoring on requested_at (the fix) correctly reads it as
+    // stale — this is the exact case the review-staleness overlay exists to
+    // catch (design.md §2: "catches MRs rotting unreviewed").
+    const stillRotting = ticket({
+      state: "review",
+      last_activity_at: "2026-07-23T11:59:00.000Z", // 1 minute ago — looks fresh
+      review: {
+        requested_at: "2026-07-21T12:00:00.000Z", // 2 days ago — actually stale
+        by: { name: "ryan", kind: "human" },
+      },
+    });
+    expect(isTicketStale(stillRotting, thresholds, now)).toBe(true);
+  });
 });
 
 describe("formatDurationShort / formatRelative", () => {

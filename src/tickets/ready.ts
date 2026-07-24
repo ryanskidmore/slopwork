@@ -45,7 +45,8 @@
  * See {@link compareReadyOrder} for the exact rule and its documented
  * tiebreak.
  */
-import type { TicketState } from "../core/index.js";
+import type { RenderFormat, TicketState } from "../core/index.js";
+import { renderEntriesWithBudget } from "../core/index.js";
 import type { IndexTicketRow } from "../repo/db-index.js";
 import { isReviewStale, isStale } from "./staleness.js";
 
@@ -209,55 +210,29 @@ export interface BudgetedReadyRender {
 /**
  * Bound a rendering of `entries` to `budgetChars` characters — C1's unit
  * (`sessions/context-budget.ts`'s `CONTEXT_PACK_BUDGET_UNIT`; this work
- * item's brief: "Reconcile with C1's unit (characters)"). Reuses that
- * module's elision *philosophy* — drop the least important content first,
- * one step at a time, and say what was dropped — rather than its exact
- * function, which is specific to a single ticket's `ContextPackData`: a
- * `ready` response is a LIST of tickets, so what gets elided is whole list
- * entries, not prose within one. `entries` must already be in
- * elision-priority order (see {@link buildReadyEntries}) — least important
- * last.
+ * item's brief: "Reconcile with C1's unit (characters)"). `entries` must
+ * already be in elision-priority order (see {@link buildReadyEntries}) —
+ * least important last. `render(kept, elisionNotes)` re-renders the FULL
+ * output (text or JSON — this function is format-agnostic) for a candidate
+ * prefix of `entries`.
  *
- * `render(kept, elisionNotes)` re-renders the FULL output (text or JSON —
- * this function is format-agnostic) for a candidate prefix of `entries`;
- * called repeatedly, dropping one more trailing entry each time, until the
- * result fits. Always genuinely respects `budgetChars` (never returns text
- * longer than requested, for any `budgetChars >= 0`) — the same guarantee
- * `renderContextPackWithBudget` documents, and for the same reason: the
- * final fallback is a raw slice of our own already-shortest rendering, not
- * a fixed-length note that could itself exceed a tiny budget.
+ * A thin, ready-flavored wrapper over `core/budget.ts`'s
+ * {@link renderEntriesWithBudget} — E1's generalisation of this exact
+ * mechanism across every command that pairs `--json` with `--budget`
+ * (`search`, `events`, `status`, this one). **`format` matters**: for
+ * `"json"`, the fallback when even zero entries doesn't fit is the
+ * already-valid empty-list envelope returned AS-IS, never a raw slice of
+ * it — B4 adversarial review found `ready --json --budget <tiny>` used to
+ * emit invalid, truncated-mid-structure JSON on exit 0 via exactly that
+ * raw-slice fallback; see `core/budget.ts`'s module doc for the full
+ * writeup. `format` defaults to `"text"` (a raw slice is always safe for
+ * plain text) for any caller that hasn't been updated to pass it.
  */
 export function renderReadyWithBudget(
   entries: readonly ReadyEntry[],
   render: (kept: readonly ReadyEntry[], elisions: readonly string[]) => string,
   budgetChars?: number,
+  format: RenderFormat = "text",
 ): BudgetedReadyRender {
-  const full = render(entries, []);
-  if (budgetChars === undefined || full.length <= budgetChars) {
-    return { text: full, elisions: [], withinBudget: true };
-  }
-
-  for (let keep = entries.length - 1; keep >= 0; keep--) {
-    const dropped = entries.length - keep;
-    const notes = [
-      `${dropped} lower-priority/less-relevant ticket(s) omitted to fit --budget (kept ${keep} of ${entries.length})`,
-    ];
-    const candidate = render(entries.slice(0, keep), notes);
-    if (candidate.length <= budgetChars) {
-      return { text: candidate, elisions: notes, withinBudget: true };
-    }
-  }
-
-  // Even zero entries doesn't fit (a pathologically tiny budget, or fixed
-  // wrapper text alone exceeds it) — raw-slice our own shortest rendering,
-  // the same last-resort `renderContextPackWithBudget` takes and for the
-  // same reason: a plain string slice can never itself exceed the budget.
-  const finalNotes =
-    entries.length > 0 ? [`all ${entries.length} ticket(s) omitted to fit --budget`] : [];
-  const zero = render([], finalNotes);
-  if (zero.length <= budgetChars) {
-    return { text: zero, elisions: finalNotes, withinBudget: true };
-  }
-  const rawSlice = budgetChars <= 0 ? "" : zero.slice(0, budgetChars);
-  return { text: rawSlice, elisions: finalNotes, withinBudget: rawSlice.length <= budgetChars };
+  return renderEntriesWithBudget(entries, render, budgetChars, { format, noun: "ticket" });
 }

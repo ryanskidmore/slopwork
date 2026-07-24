@@ -58,15 +58,17 @@
  *     }, ...
  *   ],
  *   "count": number,       // results.length
- *   "problems": [ { "id", "path", "message" }, ... ]   // ticket files skipped; usually []
+ *   "problems": [ { "id", "path", "message" }, ... ],  // ticket files skipped; usually []
+ *   "elided": ["<note>", ...]   // E1's --budget; only non-empty when a budget forced elision
  * }
  * ```
  */
 import type { Command } from "commander";
 import type { Event, Ticket, TicketId } from "../../core/index.js";
-import { EXIT_CODES, isTicketId } from "../../core/index.js";
+import { EXIT_CODES, isTicketId, renderEntriesWithBudget } from "../../core/index.js";
 import { listEvents, listTicketsTolerant, repoPaths, requireRepoRoot } from "../../repo/index.js";
 import type { TicketReadProblem } from "../../repo/index.js";
+import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
 import type { RankedResult, SearchField, SearchFieldKind } from "../../tickets/search.js";
 import {
   buildSnippet,
@@ -80,6 +82,7 @@ import { parseIntegerOption } from "./shared.js";
 interface SearchCommandOptions {
   json?: boolean;
   limit?: number;
+  budget?: number;
 }
 
 interface ProgressNote {
@@ -158,14 +161,23 @@ function formatHumanLine(entry: RankedResult<Ticket>): string {
   return `${header}  —  [${result.best.field.kind}] ${buildSnippet(result.best)}`;
 }
 
-function printHuman(text: string, results: readonly RankedResult<Ticket>[]): void {
+function buildHuman(
+  text: string,
+  results: readonly RankedResult<Ticket>[],
+  elisions: readonly string[],
+): string {
+  const lines: string[] = [];
   if (results.length === 0) {
-    process.stdout.write(`no matches for "${text}"\n`);
-    return;
+    lines.push(`no matches for "${text}"`);
+  } else {
+    for (const entry of results) lines.push(formatHumanLine(entry));
   }
-  for (const entry of results) {
-    process.stdout.write(`${formatHumanLine(entry)}\n`);
+  if (elisions.length > 0) {
+    lines.push("");
+    lines.push(`(--budget, ${CONTEXT_PACK_BUDGET_UNIT}):`);
+    for (const note of elisions) lines.push(`  - ${note}`);
   }
+  return `${lines.join("\n")}\n`;
 }
 
 interface SearchJsonResult {
@@ -195,20 +207,22 @@ function toJsonResult(entry: RankedResult<Ticket>): SearchJsonResult {
   };
 }
 
-function printJson(
+function buildJson(
   text: string,
   terms: readonly string[],
   limit: number | undefined,
   results: readonly RankedResult<Ticket>[],
   problems: readonly TicketReadProblem[],
-): void {
+  elisions: readonly string[],
+): string {
   const body = {
     query: { text, terms, limit: limit ?? null },
     results: results.map(toJsonResult),
     count: results.length,
     problems,
+    elided: elisions,
   };
-  process.stdout.write(`${JSON.stringify(body, null, 2)}\n`);
+  return `${JSON.stringify(body, null, 2)}\n`;
 }
 
 async function runSearch(text: string, opts: SearchCommandOptions): Promise<void> {
@@ -247,11 +261,20 @@ async function runSearch(text: string, opts: SearchCommandOptions): Promise<void
   const ranked = rankSearchResults(matched);
   const limited = limit !== undefined ? ranked.slice(0, limit) : ranked;
 
-  if (opts.json) {
-    printJson(text, terms, limit, limited, problems);
-  } else {
-    printHuman(text, limited);
-  }
+  // E1: "--budget N" for search too — elides lowest-ranked results first
+  // (`limited` is already ranked best-first, so it's already in
+  // elision-priority order: least-relevant/last-ranked last), never
+  // corrupting `--json` under a tiny budget (core/budget.ts's module doc).
+  const rendered = renderEntriesWithBudget(
+    limited,
+    (kept, elisions) =>
+      opts.json
+        ? buildJson(text, terms, limit, kept, problems, elisions)
+        : buildHuman(text, kept, elisions),
+    opts.budget,
+    { format: opts.json ? "json" : "text", noun: "result" },
+  );
+  process.stdout.write(rendered.text);
 }
 
 /** `slop search` — design.md §4.2; work item D2 (SlopQL proper is F6). */
@@ -268,5 +291,10 @@ export function registerSearchCommand(program: Command): void {
     )
     .option("--json", "machine-readable output")
     .option("--limit <n>", "cap the number of results returned", parseIntegerOption("--limit"))
+    .option(
+      "--budget <n>",
+      `cap output size to N ${CONTEXT_PACK_BUDGET_UNIT} (elides lowest-ranked results first)`,
+      parseIntegerOption("--budget"),
+    )
     .action(runSearch);
 }

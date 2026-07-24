@@ -3,6 +3,7 @@ import type { SearchField } from "./search.js";
 import {
   buildSnippet,
   compareHits,
+  markTerms,
   matchTicketFields,
   rankSearchResults,
   searchTerms,
@@ -118,6 +119,33 @@ describe("buildSnippet", () => {
     const snippet = buildSnippet(result?.best as NonNullable<typeof result>["best"]);
     expect(snippet).toContain("**quick**");
     expect(snippet).toContain("**fox**");
+  });
+
+  // E1: a term that's already markdown-bold in the source text (common in
+  // spec.details_md) used to get marked a SECOND time, producing
+  // `****term****` — asterisk soup, not readable bold. It must be left
+  // alone (already reads cleanly) rather than double-wrapped.
+  it("does not double-mark a term that's already markdown-bold in the source text", () => {
+    const field: SearchField = {
+      kind: "details_md",
+      text: "please see the **widget** subsystem for details on this",
+    };
+    const result = matchTicketFields([field], searchTerms("widget"));
+    const snippet = buildSnippet(result?.best as NonNullable<typeof result>["best"]);
+    expect(snippet).toContain("**widget**");
+    expect(snippet).not.toContain("****widget****");
+    expect(snippet).not.toContain("***widget***");
+  });
+
+  it("still marks a plain (not-yet-bold) occurrence of a term that ALSO appears bold elsewhere in the same text", () => {
+    const full = markTerms(
+      "already **widget** noted once, and mentioned again as widget later on",
+      ["widget"],
+    );
+    expect(full).not.toContain("****widget****");
+    // Both occurrences read as exactly one bold marker each: the
+    // already-bold one is left alone, the plain one is newly marked.
+    expect(full.match(/\*\*widget\*\*/g)?.length).toBe(2);
   });
 });
 

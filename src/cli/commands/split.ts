@@ -88,7 +88,11 @@ function validateNames(names: readonly string[]): void {
   }
 }
 
-async function runSplit(ref: string, names: string[]): Promise<void> {
+interface SplitCommandOptions {
+  json?: boolean;
+}
+
+async function runSplit(ref: string, names: string[], opts: SplitCommandOptions): Promise<void> {
   validateNames(names);
 
   const root = requireRepoRoot(process.cwd());
@@ -153,6 +157,28 @@ async function runSplit(ref: string, names: string[]): Promise<void> {
     return created;
   });
 
+  if (opts.json) {
+    // E1: small `--json` result — the target plus each new child's id/slug.
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          target: { id: initialTarget.id, slug: initialTarget.slug },
+          children: children.map((c) => ({
+            id: c.id,
+            slug: c.slug,
+            name: c.name,
+            state: c.state,
+            priority: c.priority,
+            parent: c.parent ?? null,
+          })),
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    return;
+  }
+
   process.stdout.write(
     `split ${initialTarget.id}  (slug: ${initialTarget.slug}) into ${children.length} sub-ticket(s):\n`,
   );
@@ -173,5 +199,6 @@ export function registerSplitCommand(program: Command): void {
     .description("Split <ref> into new sub-tickets, one per name given.")
     .argument("<ref>", "ticket to split")
     .argument("<names...>", 'names of the sub-tickets, e.g. "sub1" "sub2"')
+    .option("--json", "machine-readable result (target + each new child's id/slug)")
     .action(runSplit);
 }

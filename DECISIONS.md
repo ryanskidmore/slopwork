@@ -597,3 +597,106 @@ there's exactly one `isStale`/`isReviewStale` implementation in the
 codebase, not two that could drift — note web's already differs on the
 `requested_at`-vs-`last_activity_at` question above) is real, valuable
 follow-up work, but it's an E1 polish item, not C5's.
+
+## E1 — `--json`/`--budget` never corrupt JSON: one shared helper, two shapes
+
+B4's adversarial review found `ready --json --budget <tiny>` could emit
+invalid, truncated-mid-structure JSON on exit 0 — the character-budget
+eliding helper (`sessions/context-budget.ts`, built for prose) falls back
+to a raw string slice as its last resort, which corrupts JSON. Deferred to
+this work item, whose brief asked for a shared fix across every command
+pairing `--json` with `--budget`.
+
+**`src/core/budget.ts`** (new, pure, zero I/O — the lowest layer, so every
+other layer can depend on it without a cycle) holds two helpers, matching
+the two shapes of unbounded output this codebase has:
+
+- `renderEntriesWithBudget` — **list-shaped** output (`ready`'s combined
+  rows, `search`'s ranked results, `events`' event page, `status`'s three
+  row-sections combined into one elision-priority list). Elides whole
+  entries from the tail; for `format: "json"`, the final fallback is the
+  already-valid EMPTY-entries envelope returned as-is (never sliced),
+  reported via `withinBudget: false` when even that doesn't fit — a
+  budget of 0 or 1 characters can never truly be met by valid JSON, and
+  that's an honest, non-corrupting answer to an unmeetable request, not a
+  bug. `tickets/ready.ts`'s `renderReadyWithBudget` is now a thin wrapper
+  over this (kept for its existing call sites/doc, `format` defaults to
+  `"text"` for backward compatibility).
+- `renderJsonBodyWithBudget` — **single-object-shaped** output (`context`'s
+  pack; by extension `show --context --json`, which reuses the same
+  function). Takes an explicit degradation ladder of candidate builders,
+  most-complete first; the first whose JSON fits wins, and if none do, the
+  LAST (caller-guaranteed-minimal) candidate is returned as-is.
+  `context-budget.ts`'s `renderContextPackJsonWithBudget` mostly hand-rolls
+  its OWN elision loop (session-dropping, then a `details_md` binary
+  search) rather than expressing every step as a ladder candidate — that
+  needs iterative search granularity a short fixed candidate list can't
+  give cheaply — but its OWN final fallback step (drop everything down to
+  ticket-core-fields-only) calls `renderJsonBodyWithBudget` directly for
+  exactly the "return the guaranteed-minimal candidate as-is, valid JSON,
+  possibly over budget" decision, rather than re-deriving that one-line
+  policy a third time.
+
+**`show`'s `--budget` floor** (E1's brief explicitly sanctions this: "a
+single show of one ticket may exceed a tiny budget... define and document
+the floor behaviour"): `--budget` only ever bounds the `--context`
+sub-object (reusing `context`'s own budget machinery directly, not
+re-deriving it) — the surrounding `ticket`/`tree` JSON fields, and the
+plain (no-`--context`) ticket detail in text mode, are never elided. A
+bare `show <ref>` returns exactly one ticket's data, which isn't a list to
+drop entries from; `--budget` genuinely has no effect there, documented in
+the command's own `--help` text rather than silently ignored.
+
+**`show --context --budget`'s unit reconciled to characters.** Before this
+work item, `show --context --budget N` meant "~4×N characters" (a rough
+token estimate, `tickets/context.ts`'s `budgetCharsFromTokens`) while
+`slop context --budget N` meant "exactly N characters" — a real,
+documented inconsistency (`sessions/context-budget.ts`'s module doc
+flagged it for E1 by name). `show.ts` now calls the same
+`renderContextPackWithBudget`/`renderContextPackJsonWithBudget` `context`
+itself uses; `budgetCharsFromTokens` stays exported (still unit-tested,
+still documented) but nothing in the CLI wires it anymore.
+
+**`status --budget`'s elision order**: the three list sections
+(`in_progress`, `review`, `stale`) are combined into ONE elision-priority
+list — `in_progress` first (kept longest), `review` second, `stale` last
+(dropped first, since it's a derived overlay largely redundant with the
+`stale`/`review_stale` flags the other two sections already carry).
+`counts`/`derived`/`problems` are never elided — small, fixed-size, and
+the entire point of a pulse view. This is a genuine behavior change from
+D4's original "`--json` is never truncated" — superseded here since "every
+read respects budget" is this work item's own acceptance clause.
+
+## E1 — `draft`/`undraft` on an already-target-state ticket: no-op, not a fake mutation
+
+`assertDraftable`/`assertUndraftable` (`tickets/draft.ts`, B2) treat
+`draft -> draft` / `open -> open` as legal (idempotent) rather than
+CONFLICT — correct, and unchanged here. But the CLI commands used to fall
+through into a REAL `buildUpdate` + `updateTicket` call regardless, which
+silently bumped `updated_at` and emitted an empty-payload `ticket.updated`
+event for a call that changed NOTHING, while printing `drafted `/
+`undrafted ` — actively misleading when the ticket was already at the
+target state. Fixed by short-circuiting before any write when
+`current.state` already equals the target: no write, no event, and the
+message says "already draft"/"already open — no changes made" instead.
+A genuine illegal transition (e.g. `draft` on an `in_progress` ticket)
+still throws CONFLICT (exit 6) from the existing guard, unaffected — this
+only touches the one case that guard already treats as legal.
+
+## E1 — exit-code audit finding: every `parseIntegerOption`-style flag parser exited 1, not the documented 2
+
+`src/cli/commands/shared.ts`'s `parseIntegerOption` (backing `--priority`,
+`--limit`, `--check`/`--uncheck`, `--port`, and several `--budget` flags),
+plus `context.ts`'s `parseBudgetFlag` and `start.ts`'s `parseHarnessFlag`,
+all threw a bare `new Error(...)` on a malformed value, on a documented
+assumption ("caught and reported by the top-level Commander error
+handling") that turned out to be false: Commander's `_callParseArg` only
+intercepts errors carrying its own `commander.invalidArgument` code, so a
+plain `Error` propagates past Commander's handling entirely and lands in
+`src/cli/index.ts`'s generic catch, which treats a non-`SlopError` `Error`
+as `GENERIC_ERROR` (1) — verified directly against the compiled binary
+(`slop new x --priority notanumber` exited 1). Every one of these now
+throws a `SlopError(..., EXIT_CODES.USAGE_ERROR)` instead, landing on the
+documented 2 regardless of which layer's `catch` actually handles it.
+Found via this work item's own exit-code audit, not a pre-existing bug
+report — `tests/acceptance/E1.test.ts`'s usage-error matrix now guards it.
