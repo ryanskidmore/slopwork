@@ -22,14 +22,22 @@ import { recomputeAncestry } from "../../tickets/parent.js";
 import { loadConfig, resolveActor } from "../actor.js";
 import { SlopError } from "../errors.js";
 
-/** `$VISUAL` first, then `$EDITOR`, then a sensible POSIX fallback (`vi`
- * is present on essentially every real Unix system this binary targets —
- * see README's Bun/CI requirements). A launch failure even for that
- * fallback (e.g. a minimal container with no editor at all) is where the
- * "clear error if none" half of B1's brief actually fires — see
+/** `$VISUAL` first, then `$EDITOR`, then a platform-appropriate fallback:
+ * `vi` is present on essentially every real Unix system this binary
+ * targets (see README's Bun/CI requirements — Linux/macOS is the tested
+ * platform), but stock Windows has no `vi` at all, so falling back to it
+ * there would always fail to launch. `notepad` is on every stock Windows
+ * install and is the analogous "always there" fallback for `win32`
+ * (best-effort, unverified — no Windows environment to test the actual
+ * launch against; see the `--transcript`-style "graceful degrade, never
+ * crash" posture used elsewhere in this codebase). A launch failure even
+ * for that fallback (e.g. a minimal container with no editor at all) is
+ * where the "clear error if none" half of B1's brief actually fires — see
  * `runEdit`'s `result.error` handling below. */
-function pickEditorCommand(): string {
-  return process.env.VISUAL || process.env.EDITOR || "vi";
+export function pickEditorCommand(): string {
+  if (process.env.VISUAL) return process.env.VISUAL;
+  if (process.env.EDITOR) return process.env.EDITOR;
+  return process.platform === "win32" ? "notepad" : "vi";
 }
 
 /**

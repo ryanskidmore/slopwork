@@ -51,7 +51,18 @@ export function upsertGitignoreSection(
   lines: string[],
 ): { text: string; changed: boolean } {
   const before = existingText;
-  const sourceLines = existingText.length > 0 ? existingText.split("\n") : [];
+  // Tolerant split (mirrors config-yaml.ts's own `/\r?\n/`): a CRLF
+  // `.gitignore` (Windows, or `core.autocrlf=true` on any platform) split
+  // on a bare `"\n"` would leave a trailing `"\r"` on every line, so
+  // neither marker line would ever match `SECTION_START`/`SECTION_END`
+  // below — re-running `init` against such a file would never find its
+  // own prior managed section and would duplicate it instead. Splitting
+  // on `/\r?\n/` strips the `\r` either way, so LF and CRLF input both
+  // produce identical, marker-matchable line arrays. Output is always
+  // rejoined with plain `"\n"` (unchanged) — a CRLF file's line endings
+  // are normalized to LF on rewrite, exactly like config-yaml.ts already
+  // does for config.yaml.
+  const sourceLines = existingText.length > 0 ? existingText.split(/\r?\n/) : [];
 
   const startIdx = sourceLines.indexOf(SECTION_START);
   const endIdx = sourceLines.indexOf(SECTION_END);

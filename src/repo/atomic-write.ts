@@ -100,11 +100,23 @@ function tempFilePathFor(targetPath: string): string {
 
 /**
  * fsync a directory so a rename's directory-entry update is durable, not
- * just visible. POSIX-only (opening a directory for reading works on
- * Linux/macOS; there is no Windows equivalent, which is fine — v0 only
- * targets POSIX per the compiled-binary/CI setup).
+ * just visible. Opening a directory for reading and syncing its fd is a
+ * POSIX trick (works on Linux/macOS); Windows has no equivalent, and
+ * attempting it can throw outright — this function sits under 100% of
+ * atomic writes, so that would crash every single one.
+ *
+ * On `win32`, this is a safe no-op instead: the temp file's own content is
+ * still fsynced before the rename (see {@link atomicWriteFile}), and the
+ * rename itself still happens, so the write is still durable — what's
+ * given up on Windows is only the extra guarantee that the RENAME's
+ * directory-entry update specifically survives a raw power-loss (as
+ * opposed to a process crash, which the rename being atomic already
+ * covers). That's the deliberate tradeoff: a narrower durability guarantee
+ * on win32 in exchange for never crashing there. POSIX (darwin/linux)
+ * behavior below is completely unchanged.
  */
 async function fsyncDir(dir: string): Promise<void> {
+  if (process.platform === "win32") return;
   const handle = await open(dir, "r");
   try {
     await handle.sync();

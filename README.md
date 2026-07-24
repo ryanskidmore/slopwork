@@ -44,7 +44,9 @@ any command's options.
 
 ## Development
 
-Requires [Bun](https://bun.sh) ≥ 1.3.
+Requires [Bun](https://bun.sh) ≥ 1.3. Developed and tested on Linux and macOS; Windows is
+best-effort (untested), with platform guards in place so it degrades gracefully rather than
+crashing.
 
 ```sh
 bun install            # install dependencies

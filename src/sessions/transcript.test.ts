@@ -211,6 +211,84 @@ describe("locateTranscript — claude-code", () => {
 });
 
 // ---------------------------------------------------------------------------
+// locateTranscript — claude-code cwd encoding on win32 (Windows portability,
+// best-effort/unverified — see encodeClaudeCwd's own doc in transcript.ts).
+// `encodeClaudeCwd` isn't exported (same as every other internal helper in
+// this module); this exercises it the same indirect way the POSIX encoding
+// tests above already do, through `locateTranscript`'s public surface, with
+// `process.platform` mocked since this suite runs on a Linux host.
+// ---------------------------------------------------------------------------
+
+describe("locateTranscript — claude-code cwd encoding on win32", () => {
+  const originalPlatform = process.platform;
+
+  afterEach(() => {
+    Object.defineProperty(process, "platform", {
+      value: originalPlatform,
+      configurable: true,
+    });
+  });
+
+  it("also folds \\ and : to - (in addition to / and .), producing a stable encoding for a Windows-shaped cwd", async () => {
+    Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+
+    const claudeHome = join(scratch, "fake-claude-home-win32");
+    await mkdir(claudeHome, { recursive: true });
+    const cwd = "C:\\Users\\x\\proj";
+    const encoded = "C--Users-x-proj";
+    const projectDir = join(claudeHome, "projects", encoded);
+    await mkdir(projectDir, { recursive: true });
+    const target = join(projectDir, "win-session.jsonl");
+    await writeFile(target, "{}\n", "utf8");
+
+    // No session id: this deliberately skips locateClaudeCode's step-1
+    // exact-match AND step-2 defensive cross-project-dir glob fallback
+    // (both gated on `sessionId !== null`), which would otherwise find the
+    // file by scanning every project dir regardless of how the cwd was
+    // encoded and mask a broken encoding — leaving ONLY step 3
+    // (newest-mtime inside the win32-encoded `projectDir`) as the path
+    // that can locate it, so this genuinely exercises `encodeClaudeCwd`'s
+    // win32 branch, not the glob safety net.
+    const roots: LocateTranscriptRoots = { claudeHome };
+    const found = locateTranscript(harness("claude-code", null), cwd, undefined, roots);
+    expect(found).toBe(target);
+  });
+
+  it("the win32 encoding is stable/deterministic across repeated calls for the same cwd", () => {
+    Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+    const cwd = "C:\\Users\\x\\proj";
+    const roots: LocateTranscriptRoots = { claudeHome: join(scratch, "unused") };
+    // Two calls with no matching transcript both return null via the exact
+    // same code path either way — this only proves no throw/crash and no
+    // nondeterminism (e.g. from a Map/Set iteration order) creeps in.
+    expect(locateTranscript(harness("claude-code", null), cwd, undefined, roots)).toBeNull();
+    expect(locateTranscript(harness("claude-code", null), cwd, undefined, roots)).toBeNull();
+  });
+
+  it("does NOT affect the POSIX encoding when explicitly on linux (unchanged)", async () => {
+    Object.defineProperty(process, "platform", { value: "linux", configurable: true });
+
+    const claudeHome = join(scratch, "fake-claude-home-posix-explicit");
+    await mkdir(claudeHome, { recursive: true });
+    const cwd = "/home/ryan/proj";
+    const encoded = "-home-ryan-proj";
+    const projectDir = join(claudeHome, "projects", encoded);
+    await mkdir(projectDir, { recursive: true });
+    const target = join(projectDir, "posix-session-id.jsonl");
+    await writeFile(target, "{}\n", "utf8");
+
+    const roots: LocateTranscriptRoots = { claudeHome };
+    const found = locateTranscript(
+      harness("claude-code", "posix-session-id"),
+      cwd,
+      undefined,
+      roots,
+    );
+    expect(found).toBe(target);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // locateTranscript — codex
 // ---------------------------------------------------------------------------
 

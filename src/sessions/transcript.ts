@@ -360,8 +360,33 @@ function readFirstLineSync(path: string, maxBytes = 65_536): string | null {
 // ---------------------------------------------------------------------------
 
 /** Encoding rule, as observed live (findings.md §3.1): every `/` and every
- * `.` in the cwd becomes `-`. A leading `/` becomes a leading `-`. */
+ * `.` in the cwd becomes `-`. A leading `/` becomes a leading `-`.
+ *
+ * The `win32` branch below is a BEST-EFFORT, UNVERIFIED guess, not an
+ * observed rule like the POSIX one above — there is no Windows environment
+ * available to check it against a real Claude Code install. A Windows cwd
+ * (e.g. `C:\Users\x\proj`) has neither `/` nor `.` as its path separator,
+ * so applying the POSIX regex as-is would leave `\` and `:` completely
+ * unencoded, virtually guaranteeing a miss against whatever the real
+ * on-disk project directory name turns out to be. Folding `\` and `:` to
+ * `-` too (in addition to `/` and `.`, in case either appears) is a
+ * reasonable guess at the analogous encoding, in the same shape as the
+ * POSIX rule, and nothing more.
+ *
+ * A miss here carries no correctness risk either way: `encodeClaudeCwd`
+ * only ever produces a candidate directory name inside
+ * {@link locateClaudeCode}'s step 3 (newest-mtime last resort) and feeds
+ * the exact-path check in its step 1 — both already sit behind the
+ * session-id glob fallback, and the module's never-block guarantee (see
+ * top-of-file doc) means a wrong guess here degrades to
+ * `transcript_ref: null` plus a warning, never a crash or a silently wrong
+ * transcript. It only affects how OFTEN Windows auto-detection succeeds,
+ * not whether `slop stop`/`review`/`done`/`drop` can complete.
+ */
 function encodeClaudeCwd(cwd: string): string {
+  if (process.platform === "win32") {
+    return cwd.replace(/[/.\\:]/g, "-");
+  }
   return cwd.replace(/[/.]/g, "-");
 }
 

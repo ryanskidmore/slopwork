@@ -281,3 +281,78 @@ describe("sweepStaleTempFiles", () => {
     expect(removed.sort()).toEqual([tempA, tempB].sort());
   });
 });
+
+// ---------------------------------------------------------------------------
+// fsyncDir platform guard (Windows portability — no Windows equivalent of
+// opening a directory for reading and fsyncing its fd; this sits under
+// 100% of atomic writes, so it must degrade to a safe no-op on win32
+// rather than throw). `process.platform` is mocked per test since this is
+// a Linux host — every real POSIX behavior is exercised unmocked, both
+// here and by every other test in this file.
+// ---------------------------------------------------------------------------
+describe("fsyncDir platform guard (Windows portability)", () => {
+  const originalPlatform = process.platform;
+
+  afterEach(() => {
+    Object.defineProperty(process, "platform", {
+      value: originalPlatform,
+      configurable: true,
+    });
+  });
+
+  it("on win32, skips the directory fsync entirely — write still succeeds, temp file still cleaned up", async () => {
+    Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+
+    const target = join(scratch, "ticket_x.jsonc");
+    openLog.enable();
+    try {
+      await atomicWriteFile(target, '{"a":1}\n');
+    } finally {
+      openLog.disable();
+    }
+
+    expect(await readFile(target, "utf8")).toBe('{"a":1}\n');
+    const names = await readdir(scratch);
+    expect(names).toEqual(["ticket_x.jsonc"]);
+
+    // No `open(dir, "r")` call at all — that's fsyncDir's signature call,
+    // and it must never fire on win32.
+    const dirOpens = openLog.calls.filter((call) => call.flags === "r");
+    expect(dirOpens).toEqual([]);
+  });
+
+  it("on win32, still fsyncs newly-created directories were mkdir self-healed (only the FINAL directory fsync is skipped)", async () => {
+    // fsyncNewlyCreatedDirChain calls fsyncDir too — on win32 every one of
+    // those calls must also no-op, not just the post-rename one.
+    Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+
+    const missingDir = join(scratch, "sessions");
+    const target = join(missingDir, "session_x.jsonc");
+    openLog.enable();
+    try {
+      await atomicWriteFile(target, "{}\n");
+    } finally {
+      openLog.disable();
+    }
+
+    expect(await readFile(target, "utf8")).toBe("{}\n");
+    const dirOpens = openLog.calls.filter((call) => call.flags === "r");
+    expect(dirOpens).toEqual([]);
+  });
+
+  it("explicitly on posix (linux), still fsyncs the containing directory — unchanged from before this guard existed", async () => {
+    Object.defineProperty(process, "platform", { value: "linux", configurable: true });
+
+    const target = join(scratch, "ticket_y.jsonc");
+    openLog.enable();
+    try {
+      await atomicWriteFile(target, "{}\n");
+    } finally {
+      openLog.disable();
+    }
+
+    expect(await readFile(target, "utf8")).toBe("{}\n");
+    const dirOpens = openLog.calls.filter((call) => call.flags === "r").map((call) => call.path);
+    expect(dirOpens).toContain(scratch);
+  });
+});

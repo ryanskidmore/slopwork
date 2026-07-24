@@ -97,4 +97,48 @@ describe("upsertGitignoreSection", () => {
     expect(second.text).toBe(text);
     expect(second.changed).toBe(false);
   });
+
+  // Windows portability: a CRLF `.gitignore` (native on Windows, or any
+  // platform with `core.autocrlf=true`) split on a bare "\n" leaves a
+  // trailing "\r" on every line, so SECTION_START/SECTION_END never match
+  // and a re-run duplicates the managed section instead of replacing it.
+  describe("tolerates a CRLF-line-ended .gitignore (Windows / core.autocrlf)", () => {
+    it("recognizes an existing CRLF managed section and replaces it in place — no duplication", () => {
+      const existingCrlf =
+        "before/\r\n\r\n# --- slopworks (managed by `slop init`) ---\r\n" +
+        ".slop/db/index.jsonc\r\n# --- end slopworks ---\r\nafter/\r\n";
+
+      const { text, changed } = upsertGitignoreSection(existingCrlf, [".slop/db/index.jsonc"]);
+
+      expect(changed).toBe(true);
+      expect(text).toContain("before/");
+      expect(text).toContain("after/");
+      // Exactly one managed section — the CRLF one was found and replaced,
+      // not left behind alongside a freshly-appended second copy.
+      expect(text.match(/index\.jsonc/g)).toHaveLength(1);
+      expect(text.match(/# --- slopworks/g)).toHaveLength(1);
+    });
+
+    it("re-running init against its own CRLF output is idempotent (no duplicate section)", () => {
+      // First run against a CRLF file with NO prior managed section.
+      const first = upsertGitignoreSection("node_modules/\r\n*.log\r\n", [".slop/db/index.jsonc"]);
+      expect(first.text.match(/index\.jsonc/g)).toHaveLength(1);
+
+      // Second run against the first run's own output (LF, per the
+      // documented output normalization) must not duplicate anything.
+      const second = upsertGitignoreSection(first.text, [".slop/db/index.jsonc"]);
+      expect(second.changed).toBe(false);
+      expect(second.text).toBe(first.text);
+      expect(second.text.match(/index\.jsonc/g)).toHaveLength(1);
+    });
+
+    it("LF-only input behavior is completely unchanged (byte-for-byte) by the CRLF-tolerant split", () => {
+      const existing = "node_modules/\n*.log\n";
+      const { text, changed } = upsertGitignoreSection(existing, [".slop/db/index.jsonc"]);
+      expect(changed).toBe(true);
+      expect(text).toBe(
+        "node_modules/\n*.log\n\n# --- slopworks (managed by `slop init`) ---\n.slop/db/index.jsonc\n# --- end slopworks ---\n",
+      );
+    });
+  });
 });
