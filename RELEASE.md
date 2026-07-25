@@ -57,8 +57,9 @@ from that ref.
 
 ## What v0 ships
 
-`package.json`'s `files` list ships `bin/`, `src/`, `README.md`, and `LICENSE` — **source, not
-the compiled `dist/` binary**. `npm i -g slopwork` installs a small launcher (`bin/slop.mjs`) that
+`package.json`'s `files` list ships `bin/`, `src/` (minus `src/**/*.test.ts` — the co-located
+tests were roughly half the tarball and are useless to an installer), `README.md`,
+`CHANGELOG.md`, and `LICENSE` — **source, not the compiled `dist/` binary**. `npm i -g slopwork` installs a small launcher (`bin/slop.mjs`) that
 runs the TypeScript sources directly via Bun; there is no build step for npm consumers. `bun run
 build` (used in CI/release for the smoke test) is a quality gate, not a publish artifact.
 

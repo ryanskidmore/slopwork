@@ -9,6 +9,10 @@ where breaking changes land.
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.2.0 — 2026-07-24
+
 The first sweep after v0 feature-completeness: a full review of the
 implementation, then every finding fixed. Behavior changes below are grouped by
 whether they can surprise an existing user.
@@ -111,11 +115,29 @@ whether they can surprise an existing user.
   replaced its linter). See `docs/DECISIONS.md` — notably, `src/web/views/**` is
   excluded because formatting `` html`` `` tagged templates changes the emitted
   HTML.
+- **`slop web` is now a React + Tailwind + shadcn-style single-page app** over a
+  new read-only JSON API, replacing the server-rendered HTML views. Everything
+  (JS, CSS, an inlined monospace font) is bundled into the single binary — no
+  CDN, no external requests, still fully offline. Adds a command palette,
+  copy-on-click identifiers, light/dark, and an audit-spine timeline on ticket
+  detail that shows a ticket's whole provenance from creation through session,
+  plan checkpoints, review and done. All the web hardening fixes above carry
+  forward. See [`docs/web-ui.md`](docs/web-ui.md).
 - **Docs**: the internal spec, decision log, and implementation plan moved under
   `docs/` with a History & internals index; `docs/benchmarks.md` records
-  measured scaling limits.
+  measured scaling limits (1k → 1,000,000 tickets).
+- **Resolving many refs in one command is no longer quadratic.** `slop new
+  --blocks a --blocks b …` re-scanned and re-parsed the whole index once per
+  ref; it now shares a single load across the batch. At 100k tickets that was
+  ~1.3s of re-scanning *per ref*.
 - The npm package no longer ships test files — roughly half the previous
   tarball.
+- **CI passes for the first time.** Three causes: the quadratic ref resolution
+  above (which timed out the degree-cap tests on slower runners), a property
+  test whose clock was tighter than its real work, and coverage collection
+  crashing on the new browser bundle. The full gate — lint, format, typecheck,
+  test with coverage thresholds, build, and a compiled-binary smoke test — is
+  green on a clean machine.
 
 ## 0.1.1
 
