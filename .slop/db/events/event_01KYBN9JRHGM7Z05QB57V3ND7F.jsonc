@@ -1,0 +1,17 @@
+{
+  "id": "event_01KYBN9JRHGM7Z05QB57V3ND7F",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYBKQVJW4Q5KZ72SFSSJWEK6"
+  },
+  "payload": {
+    "progress": "Facets verified (open beta, lives under Dynamic Workers): facet SQLite DBs are 'stored together as part of the same overall Durable Object' — they SHARE the parent's 10GB, no per-facet cap documented, 'each facet gets its own 10GB' is unsupported. Facets = organization (independent DBs, independent delete) not capacity. Single-DO capacity from measured coefficients: ~1.2M fully-hot tickets; ~2.5M w/ event offload; ~15-35M lifetime w/ closed-ticket stubs. Real single-DO binding constraint is ~1k req/s + single location, not storage. Ryan's group:repo:hash IDs embed the shard key => granularity becomes a routing decision; single-DO-first with prefix split later is viable."
+  },
+  "at": "2026-07-25T03:32:24.465Z"
+}

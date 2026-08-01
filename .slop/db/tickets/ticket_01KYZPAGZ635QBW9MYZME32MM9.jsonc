@@ -1,0 +1,38 @@
+{
+  "id": "ticket_01KYZPAGZ635QBW9MYZME32MM9",
+  "name": "t-code handle space: collisions likely by 10k tickets",
+  "slug": "t-code-handle-space-collisions",
+  "spec": {
+    "summary": "sha256 mod 36^5 gives a 60.5M space; birthday math makes a collision more likely than not at 10k tickets and ~83 pairs at 100k. Failure is a clean AMBIGUOUS_REF but docs claim vanishingly-unlikely; widen the code or fix the claim.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 3,
+  "labels": [
+    "backlog",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZPAGZ635QBW9MYZME32MM9",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:15:12.682Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:15:12.682Z",
+  "updated_at": "2026-08-01T22:15:12.682Z"
+}

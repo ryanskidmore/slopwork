@@ -1,0 +1,17 @@
+{
+  "id": "event_01KYBMD17PKEWAAV2QWC6YRHFH",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYBKQVJW4Q5KZ72SFSSJWEK6"
+  },
+  "payload": {
+    "progress": "Ryan probed two design points, answered in session: (1) 10GB cap => keep DO size O(live work): event retention window (full history in Iceberg), closed tickets become ~200B stubs w/ R2 pointer, self-monitoring via databaseSize + alarms, facets/split-shard as last resorts. (2) Cross-DO queries => never scatter-gather (6 concurrent outbound conns/Worker); all cross-project reads served by derived stores fed from the event stream: D1 directory of LIVE tickets (my-work, global ready, ref routing), AI Search/Vectorize for global search, Iceberg+R2 SQL for history. Cross-project edges via idempotent event delivery (event ULIDs as dedupe keys); cross-project cascade eventually consistent (~seconds). VERIFY LATER: DO Facets per-facet storage caps."
+  },
+  "at": "2026-07-25T03:16:49.014Z"
+}

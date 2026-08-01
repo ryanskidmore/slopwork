@@ -1,0 +1,43 @@
+{
+  "id": "ticket_01KYZP9WVSN23810TB0P414AAS",
+  "name": "Docs corrections from the audit",
+  "slug": "docs-corrections-from-the-audit",
+  "spec": {
+    "summary": "Add a namespace-disambiguation note to DECISIONS.md (design D1-D17 vs plan-lane D1-D5 collide). Document cross-clone limitations honestly in concurrency-and-merging.md (slug collisions, active_session double-claims, unconditional updated_at conflicts) with pointers to their fix tickets. Trim the review-to-review over-specification in cli-reference.",
+    "details_md": "",
+    "acceptance": [
+      "A cold reader can no longer misread the decision log or over-trust cross-clone merge semantics"
+    ],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "group:g5",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "parent": "ticket_01KYZP8A340W5A8X70TYQ6XVT8",
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZP8A340W5A8X70TYQ6XVT8",
+  "path": [
+    "ticket_01KYZP8A340W5A8X70TYQ6XVT8"
+  ],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:14:52.028Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:14:52.028Z",
+  "updated_at": "2026-08-01T22:14:52.028Z"
+}

@@ -1,0 +1,43 @@
+{
+  "id": "ticket_01KYZP98WQXV0W3E7M9EWVN1ZT",
+  "name": "update: clear owner and parent, edit discovered-from, agent owners",
+  "slug": "update-clear-owner-and-parent",
+  "spec": {
+    "summary": "Agents cannot clear owner/parent or touch discovered-from without EDITOR (which refuses non-TTYs), and --owner hardcodes kind human contradicting D1 agent-owned-below-root. Add explicit clearing syntax on --owner/--parent, add +/-ref editing for --discovered-from, and support agent-kind owners (e.g. --owner agent:name).",
+    "details_md": "",
+    "acceptance": [
+      "All graph fields agents are told to maintain are editable via update on a non-TTY"
+    ],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "group:g3",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "parent": "ticket_01KYZP89SKDFS5RE7NDE2J8W82",
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZP89SKDFS5RE7NDE2J8W82",
+  "path": [
+    "ticket_01KYZP89SKDFS5RE7NDE2J8W82"
+  ],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:14:31.595Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:14:31.595Z",
+  "updated_at": "2026-08-01T22:14:31.595Z"
+}

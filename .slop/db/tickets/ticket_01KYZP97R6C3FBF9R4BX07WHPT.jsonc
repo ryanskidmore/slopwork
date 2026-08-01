@@ -1,0 +1,43 @@
+{
+  "id": "ticket_01KYZP97R6C3FBF9R4BX07WHPT",
+  "name": "Remote backend wire contract + stub driver",
+  "slug": "remote-backend-wire-contract-stub-driver",
+  "spec": {
+    "summary": "Document the JSON-over-HTTP wire contract a remote backend (future Cloudflare worker) must implement, mapped 1:1 to the storage interface. Ship a stub remote driver selected via config that fails every call with a clear not-implemented message pointing at the contract doc.",
+    "details_md": "",
+    "acceptance": [
+      "docs/storage-backends.md (or similar) specifies every interface call's wire shape"
+    ],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "group:g2",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "parent": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F",
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F",
+  "path": [
+    "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F"
+  ],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:14:30.409Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:14:30.409Z",
+  "updated_at": "2026-08-01T22:14:30.409Z"
+}

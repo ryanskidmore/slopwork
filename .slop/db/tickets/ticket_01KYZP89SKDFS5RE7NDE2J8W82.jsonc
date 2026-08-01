@@ -1,0 +1,40 @@
+{
+  "id": "ticket_01KYZP89SKDFS5RE7NDE2J8W82",
+  "name": "CLI workbench: list, ready filters, bulk ops, graph editing, slug shadowing",
+  "slug": "cli-workbench-list-ready-filters",
+  "spec": {
+    "summary": "Close the CLI capability gaps from the product audit: slop list, ready filters, bulk multi-ref commands, update flags that can clear owner/parent and edit discovered-from, agent-kind owners, and honest handling of cross-clone slug collisions.",
+    "details_md": "",
+    "acceptance": [
+      "Every child ticket done; full gate green"
+    ],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "group:g3",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZP89SKDFS5RE7NDE2J8W82",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:13:59.781Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:13:59.781Z",
+  "updated_at": "2026-08-01T22:13:59.781Z"
+}

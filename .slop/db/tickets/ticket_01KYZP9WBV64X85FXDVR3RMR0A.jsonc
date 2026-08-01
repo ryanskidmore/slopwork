@@ -1,0 +1,43 @@
+{
+  "id": "ticket_01KYZP9WBV64X85FXDVR3RMR0A",
+  "name": "Unify --budget elision into one generic strategy",
+  "slug": "unify-budget-elision-into-one",
+  "spec": {
+    "summary": "Six commands each carry a bespoke, individually documented elision ladder. Replace with one shared cap-and-report strategy (keep the never-emit-truncated-JSON guarantee and a simple elided marker), simplifying code and cli-reference docs.",
+    "details_md": "",
+    "acceptance": [
+      "One shared elision implementation; per-command bespoke ladders gone; JSON validity guarantee retained"
+    ],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "group:g5",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "parent": "ticket_01KYZP8A340W5A8X70TYQ6XVT8",
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZP8A340W5A8X70TYQ6XVT8",
+  "path": [
+    "ticket_01KYZP8A340W5A8X70TYQ6XVT8"
+  ],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:14:51.518Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:14:51.518Z",
+  "updated_at": "2026-08-01T22:14:51.518Z"
+}

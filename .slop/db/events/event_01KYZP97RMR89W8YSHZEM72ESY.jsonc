@@ -1,0 +1,20 @@
+{
+  "id": "event_01KYZP97RMR89W8YSHZEM72ESY",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.created",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYZP97R6C3FBF9R4BX07WHPT"
+  },
+  "payload": {
+    "method": "new",
+    "state": "open",
+    "adhoc": false,
+    "parent": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F"
+  },
+  "at": "2026-08-01T22:14:30.420Z"
+}

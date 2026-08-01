@@ -1,0 +1,38 @@
+{
+  "id": "ticket_01KYZPAGETSCXA55ZZ3GPSWEPA",
+  "name": "Derive updated_at from the event log",
+  "slug": "derive-updated-at-from-the-event-log",
+  "spec": {
+    "summary": "Every same-ticket edit across clones conflicts on updated_at by construction (DECISIONS Fix 5, accepted for v0). Derive it from events so unrelated-field edits merge cleanly.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "backlog",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZPAGETSCXA55ZZ3GPSWEPA",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:15:12.145Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:15:12.145Z",
+  "updated_at": "2026-08-01T22:15:12.145Z"
+}

@@ -1,0 +1,44 @@
+{
+  "id": "ticket_01KYBKAHJKCAYDPBCHSE33M8C7",
+  "name": "Research: Cloudflare primitives to replace the flat-file JSON DB at scale",
+  "slug": "research-cloudflare-primitives-to",
+  "spec": {
+    "summary": "Evaluate Cloudflare storage/compute primitives (D1, Durable Objects, KV, R2, Queues, Hyperdrive, etc.) as a backend for slopwork at the scale of thousands of engineers and tens of millions of tickets. Deliverable: tier-ranked list of viable architectures with trade-offs, respecting product limits (cost out of scope).",
+    "details_md": "",
+    "acceptance": [
+      "Current v0 storage guarantees enumerated (atomic writes, locking/fencing, append-only events, derived index)",
+      "Cloudflare primitive limits verified against current docs, not memory",
+      "Tier-ranked list of architectures presented to Ryan with a recommendation"
+    ],
+    "context": [
+      "src/repo/atomic-write.ts",
+      "src/repo/lock.ts",
+      "src/repo/db-index.ts",
+      "src/repo/events.ts"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "done",
+  "priority": 2,
+  "labels": [],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYBKAHJKCAYDPBCHSE33M8C7",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-07-25T03:05:23.586Z",
+  "latest_note": "Tier-ranked list presented to Ryan with recommendation: S = DO-SQLite-per-project + thin global directory; A = D1 fleet; B = Hyperdrive+PlanetScale; C = R2 CAS lift-and-shift; KV cache-only. All limits verified against live docs 2026-07-24 (4 research agents; findings in progress notes + session transcript). Follow-up design work drafted as t-mp6hu, awaiting Ryan's direction choice.",
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-07-25T02:57:58.878Z",
+  "updated_at": "2026-07-25T03:05:23.586Z"
+}

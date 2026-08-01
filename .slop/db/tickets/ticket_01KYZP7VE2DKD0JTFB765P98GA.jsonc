@@ -1,0 +1,42 @@
+{
+  "id": "ticket_01KYZP7VE2DKD0JTFB765P98GA",
+  "name": "Remove transcripts from the product entirely",
+  "slug": "remove-transcripts-from-the-product",
+  "spec": {
+    "summary": "Delete the transcript feature end to end: capture machinery, session transcript_ref, --transcript flags on review/stop/done/drop, transcripts: config key, init gitignore scaffolding for .slop/transcripts, web transcript viewer + API route + DTOs, and all current-doc references. No backwards compat needed (unreleased), but existing session files carrying transcript_ref must still parse.",
+    "details_md": "",
+    "acceptance": [
+      "No reference to transcripts remains in src/, tests/, or current docs (design.md/DECISIONS.md stay as history)",
+      "Legacy session JSONC files with transcript_ref still load",
+      "Full gate green: test, lint, format:check, typecheck, build"
+    ],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "in_progress",
+  "priority": 1,
+  "labels": [
+    "group:g1",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZP7VE2DKD0JTFB765P98GA",
+  "path": [],
+  "active_session": "session_01KYZPATTZHQHRY3FY4VCCMYD6",
+  "last_activity_at": "2026-08-01T22:15:22.741Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:13:45.039Z",
+  "updated_at": "2026-08-01T22:15:22.741Z"
+}

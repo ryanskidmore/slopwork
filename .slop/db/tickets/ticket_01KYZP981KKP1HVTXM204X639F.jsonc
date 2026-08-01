@@ -1,0 +1,43 @@
+{
+  "id": "ticket_01KYZP981KKP1HVTXM204X639F",
+  "name": "Simplify the db lock; make timeout configurable",
+  "slug": "simplify-the-db-lock-make",
+  "spec": {
+    "summary": "Drop the fencing-token/assertHeld dispossession protocol (built speculatively, no real call site per DECISIONS) down to a plain O_EXCL acquire/release with pid-liveness stale-breaking. Expose lock timeout in config.yaml (benchmarks remediation item 3). Correct concurrency-and-merging.md's false claim that the lock exists only for the done-cascade.",
+    "details_md": "",
+    "acceptance": [
+      "lock.ts materially smaller; timeout configurable; docs match reality"
+    ],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "group:g2",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "parent": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F",
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F",
+  "path": [
+    "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F"
+  ],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:14:30.711Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:14:30.711Z",
+  "updated_at": "2026-08-01T22:14:30.711Z"
+}
