@@ -9,7 +9,31 @@ where breaking changes land.
 
 ## Unreleased
 
-Nothing yet.
+### Breaking
+
+- **Transcripts are removed from the product entirely** (product audit).
+  Everything about the feature is gone, locally and remote:
+  - the harness-transcript capture machinery (Claude Code / opencode / Codex
+    locators, the most-recently-modified-file fallback, and
+    capture-on-session-end from `stop`/`done`/`drop`/`review`/takeover);
+  - the `transcript_ref` field on the session schema — new sessions no longer
+    carry it. Session files written by an older version that still have it
+    load fine: the unknown key is ignored;
+  - the `--transcript <path>` flag on `review`, `stop`, `done`, and `drop`
+    (now an unknown option, exit 2), the transcript-warning stderr output on
+    session end, and the `transcript` field in those commands' `--json`
+    output;
+  - the `transcripts:` config key (`local`/`commit`/`off`), `slop init`'s
+    `.slop/transcripts/` scaffolding, and the `.slop/transcripts/` gitignore
+    rule. A legacy `transcripts:` key in an existing `config.yaml` is
+    ignored with a stderr warning — delete the line to silence it;
+  - the web transcript viewer page, its
+    `/api/tickets/:ref/sessions/:sessionId/transcript` endpoint (now 404),
+    its DTOs, and the "View transcript" links on session cards.
+
+  Everything else about sessions is unchanged: harness kind detection,
+  `harness.session_id` capture, git branch/commit capture, plans, and end
+  summaries all still work exactly as before.
 
 ## 0.2.0 — 2026-07-24
 

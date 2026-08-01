@@ -111,9 +111,6 @@ candidate; pick explicitly. Full rules:
 
 - **No `.slop/` in the repo:** slopwork isn't set up. Ask the human before
   running `slop init` — never initialize on your own.
-- **Transcript warnings** on `stop`/`done`/`review`: report the warning to
-  the human; never block or retry-loop on it — a missing transcript never
-  blocks the underlying state change.
 - **Draft tickets** (`state: draft`) are not workable — they're still
   being defined. Don't start them; ask if one looks like it should be
   yours.
@@ -125,6 +122,6 @@ candidate; pick explicitly. Full rules:
 Every step above writes an immutable [event](concepts.md#event) — this is
 what lets a human run `slop status`/`slop show`/`slop web` and reconstruct
 exactly what happened, when, and by whom, instead of trusting a chat
-transcript or a commit message written after the fact. See
+log or a commit message written after the fact. See
 [Concepts](concepts.md) for the full data model this loop is built on, and
 [Web UI](web-ui.md) for how a human audits it.

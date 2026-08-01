@@ -36,7 +36,7 @@ repo's top level (or the current directory, if there's no git repo at all).
 It writes:
 
 - `.slop/config.yaml` — project name, actor fallback, git remote, Jira base
-  URL, staleness thresholds, transcript mode (autodetected where possible;
+  URL, staleness thresholds (autodetected where possible;
   see [Configuration](configuration.md))
 - `.slop/db/{tickets,sessions,events}/` — the flatfile database, with a
   tracked `.gitkeep` in each so the empty skeleton is committable
@@ -45,8 +45,7 @@ It writes:
 - `.claude/skills/slopwork/SKILL.md` — only if a Claude Code setup is
   detected in this repo
 - a managed section in `.gitignore` (the derived index, the lock file,
-  atomic-write temp files, and — unless `transcripts: commit` — the
-  transcripts directory)
+  and atomic-write temp files)
 
 `--yes` accepts every autodetected default and never prompts (safe for
 agents/CI). Interactively, it will also ask whether to add a pointer to an
@@ -148,9 +147,9 @@ slop done add-password-reset-flow \
   --outcome "Added token-based password reset with 15-minute expiry."
 ```
 
-`done` finalizes the session (captures a transcript, writes an end
-summary), and cascades: any other ticket that was blocked *only* by this
-one flips to unblocked and is reported.
+`done` finalizes the session (writes an end summary), and cascades: any
+other ticket that was blocked *only* by this one flips to unblocked and
+is reported.
 
 ### 8. Check the pulse
 
@@ -193,7 +192,7 @@ slop web serving /path/to/repo/.slop
 ```
 
 Open `http://localhost:4553` for a read-only ticket list, tree view, and
-per-ticket detail with sessions, plans, the transcript viewer, and the
+per-ticket detail with sessions, plans, and the
 review/stale panels — see [Web UI](web-ui.md).
 
 ## Where to next

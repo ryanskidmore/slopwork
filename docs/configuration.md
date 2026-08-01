@@ -14,7 +14,6 @@ remotes:
 defaults:
   stale_after: 60m
   review_stale_after: 24h
-transcripts: local            # local | commit | off
 ```
 
 | Field | Meaning | Default |
@@ -25,7 +24,10 @@ transcripts: local            # local | commit | off
 | `remotes.jira` | Jira base URL, used to build ticket-detail links for `jira:` parents in `slop web`/`slop show` | absent (never prompted) or `""` (prompted, explicitly declined) |
 | `defaults.stale_after` | how long an `in_progress` ticket can sit with no activity before it's `stale` | `60m` |
 | `defaults.review_stale_after` | how long a `review` ticket can sit unactioned (from `review.requested_at`, not general activity) before it's `stale` | `24h` |
-| `transcripts` | `local` (captured, gitignored), `commit` (captured, tracked in git), or `off` (never captured) | `local` |
+
+Unknown keys (e.g. one left behind by an older slopwork version) are
+ignored; commands warn on stderr about a known-legacy key and keep
+working — delete the stale line to silence the warning.
 
 ### Staleness thresholds
 
@@ -94,7 +96,6 @@ harness exposes a session id to the environment today.
 | `SLOP_ACTOR` | every mutating command | actor-name fallback, rung 2 of the D17 order above |
 | `CLAUDECODE`, `OPENCODE`, `CODEX_SANDBOX_NETWORK_DISABLED`, `CODEX_SANDBOX` | `slop start` (and the actor-kind heuristic on every mutating command) | harness auto-detection, see above |
 | `CLAUDE_CODE_SESSION_ID` | `slop start` | Claude Code's own session id, captured into `session.harness.session_id` |
-| `CODEX_HOME` | transcript capture | overrides where Codex's own transcript files are looked for (defaults to `~/.codex`) |
 | `EDITOR`, `VISUAL` | `slop edit` | which editor to open the ticket's JSONC file in (`VISUAL` wins if both are set) |
 | `SLOP_WEB_DEBUG` | `slop web` | `1` (or any truthy value) switches to Bun's verbose dev error pages — see [Web UI → Debugging](web-ui.md#debugging) |
 
@@ -102,43 +103,6 @@ None of these need to be set for normal use — `git config user.name` and
 plain harness auto-detection (falling back to `other`) already cover the
 common cases; `SLOP_ACTOR` and `--harness`/`--as` exist for CI, scripted
 agents, and overriding a misdetection.
-
-## Transcripts
-
-Controlled by `transcripts:` in `config.yaml`:
-
-- **`local`** (default) — captured to `.slop/transcripts/session_<ulid>.jsonl`
-  on `stop`/`done`/`drop`, and also, as a snapshot, on `review` (which does
-  *not* end the session — see
-  [Concepts → Session](concepts.md#session)); gitignored by `slop init`.
-  `slop start --takeover` and D15's "changes requested" re-entry (a plain
-  `slop start` on a `review`-state ticket) also end the *previous* session as
-  a side effect, and they capture a snapshot for it too — those are often the
-  transcripts most worth reading, since that work was ended out from under
-  someone rather than wrapped up normally.
-
-  **One deliberate exception:** if the superseded session recorded no harness
-  session id, no capture is attempted and `slop start` says so on stderr.
-  Locating a transcript without that id means picking the most recently
-  modified one for this project — which, during a takeover, is most likely
-  the *taking* session's own transcript. Filing that under the seized session
-  would be silently wrong audit data, which is worse than an honest `null`.
-  Use `--transcript <path>` on that session's own `stop`/`done` if you still
-  have the file.
-- **`commit`** — same capture, but `slop init` does **not** add
-  `.slop/transcripts/` to `.gitignore`, so transcripts land in git history.
-  Only turn this on if you've thought about what might be in a transcript
-  (see the caution below).
-- **`off`** — never captured; `session.transcript_ref` stays `null`.
-
-A transcript that can't be located (unsupported harness, harness didn't
-write one, etc.) never blocks the underlying command — it warns on stderr
-and records `transcript_ref: null`.
-
-**Caution:** transcripts can be large and can contain anything the
-session's conversation contained, including secrets pasted into a prompt
-or tool output. `local` (gitignored) is the default specifically because
-of this; think before switching a project to `commit`.
 
 ## See also
 
