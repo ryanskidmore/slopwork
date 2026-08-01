@@ -110,7 +110,7 @@ export async function runSplit(
   // under the lock, immediately below.
   const initialTarget = await resolveTicketRef(paths, ref);
 
-  const children: Ticket[] = await withLock(paths.lockFile, async (lock) => {
+  const children: Ticket[] = await withLock(paths.lockFile, async () => {
     const target = await readTicket(paths, initialTarget.id);
     const created: Ticket[] = [];
 
@@ -121,7 +121,6 @@ export async function runSplit(
         // Fencing contract (lock.ts): re-check between each entity write
         // once more than one write happens under this acquisition. The
         // very first write is covered by the acquisition itself.
-        await lock.assertHeld();
       }
       const { ticket } = await buildSplitChild(paths, { name, parent: target, actor });
       await createTicket(
@@ -141,7 +140,6 @@ export async function runSplit(
       created.push(ticket);
     }
 
-    await lock.assertHeld();
     const now = nowIso(systemClock);
     const updatedTarget: Ticket = { ...target, last_activity_at: now, updated_at: now };
     await updateTicket(

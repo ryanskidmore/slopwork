@@ -114,7 +114,7 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
     assertMaxLength("--outcome", outcomeRaw.trim(), RESOLUTION_MAX_LENGTH);
   }
 
-  const result = await withLock(paths.lockFile, async (lock) => {
+  const result = await withLock(paths.lockFile, async () => {
     const current = await readTicket(paths, initialTicket.id);
 
     // D15/§2, revised (ticket_01KY9RWFDR9QEWQ5B1ZACQJ338): review is now
@@ -175,7 +175,6 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
         },
       },
     );
-    await lock.assertHeld();
 
     const doneTicket = buildDoneTicket(current, opts.note, outcomeRaw);
     await updateTicket(
@@ -186,13 +185,12 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
       { actor, session: session.id },
       { verb: "ticket.done", payload: { from: current.state } },
     );
-    await lock.assertHeld();
 
     // B4's done-cascade — called exactly once, right after the terminal
     // state write it depends on, inside this SAME lock acquisition (see
     // cascade.ts's module doc, "Locking contract"). This is what emits
     // `ticket.ready` for any dependent this ticket was blocking.
-    const cascade = await cascadeOnClose(paths, current.id, { actor, session: session.id }, lock);
+    const cascade = await cascadeOnClose(paths, current.id, { actor, session: session.id });
 
     return {
       session: finalSession,

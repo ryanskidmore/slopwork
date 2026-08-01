@@ -52,7 +52,7 @@ export async function runStop(ref: string, opts: StopCommandOptions): Promise<vo
   // line and the lock is still caught there.
   assertStoppable(initialTicket);
 
-  const result = await withLock(paths.lockFile, async (lock) => {
+  const result = await withLock(paths.lockFile, async () => {
     const current = await readTicket(paths, initialTicket.id);
     assertStoppable(current);
     const activeSessionId = current.active_session;
@@ -79,7 +79,6 @@ export async function runStop(ref: string, opts: StopCommandOptions): Promise<vo
         payload: opts.note !== undefined ? { note: opts.note } : {},
       },
     );
-    await lock.assertHeld();
 
     const stoppedTicket = buildStoppedTicket(current, opts.note);
     await updateTicket(

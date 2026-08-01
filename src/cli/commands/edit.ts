@@ -230,7 +230,7 @@ export async function runEdit(ref: string): Promise<void> {
   let wroteAnything = false;
   let descendantCount = 0;
   try {
-    await withLock(paths.lockFile, async (lock) => {
+    await withLock(paths.lockFile, async () => {
       const all = await listTickets(paths);
       const others = all.filter((t) => t.id !== candidate.id);
 
@@ -259,7 +259,6 @@ export async function runEdit(ref: string): Promise<void> {
       for (const descendant of descendants) {
         // Fencing contract (lock.ts): re-check between each entity write
         // once more than one write is happening under this acquisition.
-        await lock.assertHeld();
         const descendantPatch: JsoncPatchEntry[] = [
           { path: ["root_id"], value: descendant.root_id },
           { path: ["path"], value: descendant.path },

@@ -111,14 +111,13 @@ export async function runReindex(options: ReindexOptions): Promise<void> {
   if (options.heal && sessionScan.orphans.length > 0) {
     const config = await loadConfig(paths);
     const actor = resolveActor({ config, cwd: root });
-    await withLock(paths.lockFile, async (lock) => {
+    await withLock(paths.lockFile, async () => {
       // A3's fencing contract (lock.ts's own doc): "every call site that
       // performs more than one write inside a single withLock block MUST
       // call the handle's assertHeld() between writes" — this loop can
       // write one session per orphan, so every iteration checks back in
       // FIRST, mirroring cascade.ts's identical pattern.
       for (const session of sessionScan.orphans) {
-        await lock.assertHeld();
         const healed = buildHealedSession(session);
         await updateSession(
           paths,

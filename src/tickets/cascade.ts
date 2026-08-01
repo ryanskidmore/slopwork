@@ -91,26 +91,22 @@
  * tickets) — cheap at v0's target scale, and correct regardless of graph
  * shape.
  *
- * ## Locking contract (A3's fencing contract — `src/repo/lock.ts`)
+ * ## Locking contract (`src/repo/lock.ts` via `StorageBackend.transact`)
  *
- * {@link cascadeOnClose} takes an ALREADY-ACQUIRED {@link LockHandle} — it
- * does NOT call `withLock` itself. A second `acquireLock` on the SAME lock
- * file from the SAME process, while the first is still held, would
- * deadlock (`O_EXCL` creation fails immediately with `EEXIST`, and the
- * only process that could break the "stale" lock is the very one blocked
- * waiting on it). The caller (C3) must invoke this from INSIDE its own
- * `withLock(paths.lockFile, ...)` block, after already writing the closed
- * ticket's terminal state under that same acquisition — this makes "write
- * the closed ticket" + "cascade its unblocks" one transaction, so a
- * concurrent second closure racing the same graph (e.g. closing both
- * blockers of a diamond at once, from two different processes) can never
- * observe — or produce — a torn intermediate state. Every event this
- * function writes is preceded by `lock.assertHeld()` (A3's fencing
- * contract: "every call site that performs more than one write inside a
- * single withLock block MUST call the handle's assertHeld() between
- * writes") — a transaction that ran long enough to be declared stale and
- * reclaimed by someone else fails loudly here (`SlopError`, CONFLICT) the
- * moment it tries its next write, instead of silently continuing.
+ * {@link cascadeOnClose} runs inside an ALREADY-OPEN write transaction —
+ * it does NOT open one itself (a second acquisition of the same lock from
+ * the same process would deadlock: `O_EXCL` creation fails immediately
+ * with `EEXIST`, and the only process that could break the "stale" lock
+ * is the very one blocked waiting on it). The caller (C3's `done`/`drop`)
+ * must invoke this from INSIDE its own `storage.transact(...)` block,
+ * after already writing the closed ticket's terminal state under that
+ * same acquisition — this makes "write the closed ticket" + "cascade its
+ * unblocks" one transaction, so a concurrent second closure racing the
+ * same graph (e.g. closing both blockers of a diamond at once, from two
+ * different processes) can never observe — or produce — a torn
+ * intermediate state. The `tx` parameter is the transaction-scope marker
+ * `transact` hands its callback — requiring it here makes "must be called
+ * inside a transaction" a compile-time property, not a comment.
  *
  * ## Failure semantics on a partial cascade
  *
@@ -163,7 +159,7 @@ import {
   listEvents,
   listTicketsTolerant,
 } from "../repo/index.js";
-import type { EventContext, LockHandle, RepoPaths, TicketReadProblem } from "../repo/index.js";
+import type { EventContext, RepoPaths, TicketReadProblem } from "../repo/index.js";
 
 export interface CascadeOnCloseResult {
   /** Every ticket that is, per THIS call's fresh read of disk,
@@ -278,7 +274,6 @@ export async function cascadeOnClose(
   paths: RepoPaths,
   closedTicketId: TicketId,
   ctx: EventContext,
-  lock: LockHandle,
   clock: Clock = systemClock,
 ): Promise<CascadeOnCloseResult> {
   const { tickets, problems } = await listTicketsTolerant(paths);
@@ -321,7 +316,6 @@ export async function cascadeOnClose(
     // for THIS closure, so a re-invocation (the documented recovery path
     // after a partial cascade) is exactly-once, not at-least-once.
     if (alreadyEmittedReadyFor(priorReadyEvents, ticket.id, closedTicketId)) continue;
-    await lock.assertHeld();
     const event = buildTicketReadyEvent(ticket.id, closedTicketId, ctx, clock);
     await createEvent(paths, event);
     events.push(event);

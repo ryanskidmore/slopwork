@@ -226,8 +226,8 @@ describe("B4: Derivations", () => {
       for (const t of [a, b, c, closer]) await createTicket(paths, t, ctx, createdEvent);
 
       await closeTicket(paths, closer.id, "done");
-      const result = await withLock(paths.lockFile, (lock) =>
-        cascadeOnClose(paths, closer.id, ctx, lock, clock),
+      const result = await withLock(paths.lockFile, () =>
+        cascadeOnClose(paths, closer.id, ctx, clock),
       );
 
       expect(result.unblocked.slice().sort()).toEqual([a.id, b.id, c.id].sort());
@@ -268,8 +268,8 @@ describe("B4: Derivations", () => {
       }
 
       await closeTicket(paths, closer.id, "done");
-      const result = await withLock(paths.lockFile, (lock) =>
-        cascadeOnClose(paths, closer.id, ctx, lock, clock),
+      const result = await withLock(paths.lockFile, () =>
+        cascadeOnClose(paths, closer.id, ctx, clock),
       );
 
       // --- exactly the right subset flips ---
@@ -317,15 +317,15 @@ describe("B4: Derivations", () => {
       for (const t of [target, first, second]) await createTicket(paths, t, ctx, createdEvent);
 
       await closeTicket(paths, first.id, "done");
-      const afterFirst = await withLock(paths.lockFile, (lock) =>
-        cascadeOnClose(paths, first.id, ctx, lock, clock),
+      const afterFirst = await withLock(paths.lockFile, () =>
+        cascadeOnClose(paths, first.id, ctx, clock),
       );
       expect(afterFirst.unblocked).toEqual([]);
       expect(afterFirst.events).toEqual([]);
 
       await closeTicket(paths, second.id, "done");
-      const afterSecond = await withLock(paths.lockFile, (lock) =>
-        cascadeOnClose(paths, second.id, ctx, lock, clock),
+      const afterSecond = await withLock(paths.lockFile, () =>
+        cascadeOnClose(paths, second.id, ctx, clock),
       );
       expect(afterSecond.unblocked).toEqual([target.id]);
       expect(afterSecond.events).toHaveLength(1);
@@ -346,8 +346,8 @@ describe("B4: Derivations", () => {
       await createTicket(paths, closer, ctx, createdEvent);
 
       await closeTicket(paths, closer.id, "dropped");
-      const result = await withLock(paths.lockFile, (lock) =>
-        cascadeOnClose(paths, closer.id, ctx, lock, clock),
+      const result = await withLock(paths.lockFile, () =>
+        cascadeOnClose(paths, closer.id, ctx, clock),
       );
       expect(result.unblocked).toEqual([target.id]);
       expect(result.events).toHaveLength(1);

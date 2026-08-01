@@ -83,7 +83,7 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
 
   const initialTicket = await resolveTicketRef(paths, ref);
 
-  const result = await withLock(paths.lockFile, async (lock) => {
+  const result = await withLock(paths.lockFile, async () => {
     const current = await readTicket(paths, initialTicket.id);
 
     const check = checkDropEntry(current.state);
@@ -120,7 +120,6 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
           },
         },
       );
-      await lock.assertHeld();
     }
 
     const droppedTicket = buildDroppedTicket(current, opts.reason);
@@ -132,18 +131,15 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
       { actor, session: finalSession?.id ?? null },
       { verb: "ticket.dropped", payload: { from: current.state, reason: opts.reason } },
     );
-    await lock.assertHeld();
 
     // B4's done-cascade, once — a dropped ticket also stops blocking
     // (cascade.ts treats done/dropped identically as "no longer a live
     // blocker", see its own module doc / db-index.ts's
     // `isLiveBlockerState`).
-    const cascade = await cascadeOnClose(
-      paths,
-      current.id,
-      { actor, session: finalSession?.id ?? null },
-      lock,
-    );
+    const cascade = await cascadeOnClose(paths, current.id, {
+      actor,
+      session: finalSession?.id ?? null,
+    });
 
     return {
       session: finalSession,

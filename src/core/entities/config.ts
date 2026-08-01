@@ -8,6 +8,10 @@ import { durationStringSchema } from "../duration.js";
 
 export const DEFAULT_STALE_AFTER = "60m";
 export const DEFAULT_REVIEW_STALE_AFTER = "24h";
+/** G2 (simplify-db-lock): how long a mutating command waits for the db
+ * write lock before giving up with CONFLICT (exit 6). Matches the lock's
+ * long-standing hardcoded 5s. */
+export const DEFAULT_LOCK_TIMEOUT = "5s";
 
 /**
  * `null` -> `undefined` for a single field. A real YAML parser (e.g.
@@ -46,6 +50,9 @@ export type ConfigRemotes = z.infer<typeof configRemotesSchema>;
 export const configDefaultsSchema = z.object({
   stale_after: durationStringSchema.default(DEFAULT_STALE_AFTER),
   review_stale_after: durationStringSchema.default(DEFAULT_REVIEW_STALE_AFTER),
+  /** G2: db write-lock acquisition timeout (flatfile backend). Absent =
+   * {@link DEFAULT_LOCK_TIMEOUT}. See docs/configuration.md. */
+  lock_timeout: durationStringSchema.default(DEFAULT_LOCK_TIMEOUT),
 });
 export type ConfigDefaults = z.infer<typeof configDefaultsSchema>;
 

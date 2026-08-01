@@ -180,7 +180,7 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
   // same `--blocks` flags).
   const warnings: string[] = [];
 
-  const { ticket, reparentedDescendants } = await withLock(paths.lockFile, async (lock) => {
+  const { ticket, reparentedDescendants } = await withLock(paths.lockFile, async () => {
     const current = await readTicket(paths, initialTicket.id);
 
     // `--relates-to <±ref>` refs are resolved here, fresh, under the same
@@ -315,7 +315,6 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
             // write once more than one write is happening under this
             // acquisition — same discipline edit.ts's own descendant loop
             // follows.
-            await lock.assertHeld();
             const descendantPatch: JsoncPatchEntry[] = [
               { path: ["root_id"], value: descendant.root_id },
               { path: ["path"], value: descendant.path },

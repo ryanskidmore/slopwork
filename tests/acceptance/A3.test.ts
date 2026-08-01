@@ -237,82 +237,14 @@ describe("A3: Flatfile repo layer", () => {
     }, 120_000);
   });
 
-  // A companion to "Kill -9 mid-write leaves no corrupt files": a dead
-  // holder isn't the only way a lock's exclusivity can be violated — a
-  // genuinely-alive-but-slow holder (contended, I/O-stalled, GC-paused,
-  // cgroup-throttled) that runs past staleTimeoutMs looks identical from
-  // the outside, and the original stale-timeout reclaim let a second
-  // process steal the lock and write concurrently with no error at all
-  // (adversarial-review Finding 1). Real processes, real OS-level
-  // concurrency, same reasoning as the kill -9 test above for why a
-  // spawned `bun` child is used instead of simulating this in-process.
-  describe("lock fencing: a dispossessed holder fails loudly instead of writing (adversarial-review Finding 1)", () => {
-    const lockWorkerPath = join(dirname(fileURLToPath(import.meta.url)), "a3-lock-worker.ts");
-
-    function spawnLockWorker(args: string[]): ChildProcess {
-      return spawn("bun", [lockWorkerPath, ...args], { stdio: "ignore" });
-    }
-
-    function waitForExit(child: ChildProcess): Promise<void> {
-      return new Promise((resolve, reject) => {
-        child.once("exit", () => resolve());
-        child.once("error", reject);
-      });
-    }
-
-    it("two real processes contend for the lock with a short stale timeout: the reclaimed holder's assertHeld() throws CONFLICT (exit 6) and never performs its write, while the reclaiming process's write lands cleanly", async () => {
-      const scratch = await mkdtemp(join(tmpdir(), "slop-a3-lock-fencing-"));
-      try {
-        const lockPath = join(scratch, ".lock");
-        const resultPath = join(scratch, "result.log");
-        const counterPath = join(scratch, "counter.txt");
-        await writeFile(resultPath, "");
-        await writeFile(counterPath, "0");
-
-        const staleTimeoutMs = 200;
-        const hangMs = 1_500; // holder "hangs" well past staleTimeoutMs before ever checking back in
-        const stealDelayMs = 500; // contender waits well past staleTimeoutMs before trying, and finishes long before the holder checks back in
-
-        const holder = spawnLockWorker([
-          "holder",
-          lockPath,
-          resultPath,
-          counterPath,
-          String(staleTimeoutMs),
-          String(hangMs),
-        ]);
-        const contender = spawnLockWorker([
-          "contender",
-          lockPath,
-          resultPath,
-          counterPath,
-          String(staleTimeoutMs),
-          String(stealDelayMs),
-        ]);
-
-        await Promise.all([waitForExit(holder), waitForExit(contender)]);
-
-        const resultLines = (await readFile(resultPath, "utf8")).trim().split("\n").filter(Boolean);
-
-        expect(resultLines).toContain("holder:acquired");
-        expect(resultLines).toContain("contender:acquired");
-        expect(resultLines).toContain("contender:wrote");
-        // The headline property: the dispossessed holder's assertHeld()
-        // threw CONFLICT (exit 6) and it therefore never wrote.
-        expect(resultLines).toContain("holder:assertHeld:threw:6");
-        expect(resultLines).not.toContain("holder:wrote");
-        expect(resultLines).not.toContain("holder:assertHeld:ok");
-
-        // Exactly one write landed on the shared counter — the whole
-        // point of fencing is that the dispossessed holder never got to
-        // race the reclaiming process for it.
-        const counter = (await readFile(counterPath, "utf8")).trim();
-        expect(counter).toBe("1");
-      } finally {
-        await rm(scratch, { recursive: true, force: true });
-      }
-    }, 20_000);
-  });
+  // G2 (simplify-db-lock): the fencing/assertHeld protocol — and the
+  // spawned-worker test that proved a dispossessed holder fails loudly —
+  // were removed along with the feature. The lock is now a plain O_EXCL
+  // acquire/release with stale-breaking (dead pid instantly; any holder
+  // past staleTimeoutMs; unparseable lock files by mtime) — see
+  // src/repo/lock.ts's module doc for the retained TOCTOU-safe break and
+  // the accepted long-transaction trade-off, and src/repo/lock.test.ts
+  // for the unit coverage of what remains.
 
   describe('"ambiguous prefix errors git-style"', () => {
     it("lists every candidate with id/name/slug and exits 5; not-found exits 4; exact slug beats an ambiguous prefix", async () => {

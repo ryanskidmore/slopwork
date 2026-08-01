@@ -111,7 +111,7 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
     throw new SlopError(initialCheck.reason ?? "illegal state transition", EXIT_CODES.CONFLICT);
   }
 
-  const result = await withLock(paths.lockFile, async (lock) => {
+  const result = await withLock(paths.lockFile, async () => {
     const current = await readTicket(paths, initialTicket.id);
 
     const check = checkReviewEntry(current.state, mr !== undefined);
@@ -141,7 +141,6 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
       { actor, session: activeSessionId },
       { verb: "review.requested", payload: { mr: mr ?? null } },
     );
-    await lock.assertHeld();
 
     return { sessionId: activeSessionId, ticket: reviewedTicket };
   });

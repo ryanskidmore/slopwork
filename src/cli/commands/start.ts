@@ -127,7 +127,7 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
   // two concurrent `start`s on the same ticket race-free (see C1's report).
   const initialTicket = await resolveTicketRef(paths, ref);
 
-  const result = await withLock(paths.lockFile, async (lock) => {
+  const result = await withLock(paths.lockFile, async () => {
     const current = await readTicket(paths, initialTicket.id);
     assertStartable(current);
 
@@ -223,7 +223,6 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
         },
       },
     );
-    await lock.assertHeld();
 
     // ticket_01KYAPKRJ9RJRJRAV42WCTJET4: end the SUPERSEDED previous
     // session (if any) BEFORE the ticket write below, not after. This used
@@ -282,7 +281,6 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
           },
         );
       }
-      await lock.assertHeld();
     }
 
     const {
