@@ -1,0 +1,43 @@
+{
+  "id": "ticket_01KYZP97WTGW8P2CN0M7FMS1S9",
+  "name": "Shard event storage by month",
+  "slug": "shard-event-storage-by-month",
+  "spec": {
+    "summary": "Real dogfood ratio is ~9 events/ticket, so the parked 5k-file threshold arrives at ~550 tickets (about two weeks of active use). Shard events/ into YYYY-MM subdirectories, fingerprint per shard so unchanged months are not re-scanned, and migrate any flat layout on reindex.",
+    "details_md": "",
+    "acceptance": [
+      "Fingerprint cost no longer scales with total historical event count for unchanged shards"
+    ],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "group:g2",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "parent": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F",
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F",
+  "path": [
+    "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F"
+  ],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:14:30.557Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:14:30.557Z",
+  "updated_at": "2026-08-01T22:14:30.557Z"
+}

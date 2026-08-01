@@ -1,0 +1,38 @@
+{
+  "id": "ticket_01KYZPAH8PT3J8V10SVY8R14WE",
+  "name": "Notifications / standing queries (F13)",
+  "slug": "notifications-standing-queries-f13",
+  "spec": {
+    "summary": "No watches, digests, webhooks, or feeds; events --since polling is the only primitive. Standing queries emitting events on change, then delivery (Slack/webhook) on top.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 3,
+  "labels": [
+    "backlog",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZPAH8PT3J8V10SVY8R14WE",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:15:12.969Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:15:12.969Z",
+  "updated_at": "2026-08-01T22:15:12.969Z"
+}

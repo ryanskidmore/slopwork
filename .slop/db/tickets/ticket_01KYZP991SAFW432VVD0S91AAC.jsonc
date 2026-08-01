@@ -1,0 +1,43 @@
+{
+  "id": "ticket_01KYZP991SAFW432VVD0S91AAC",
+  "name": "Slug shadowing: detect duplicates, resolve as ambiguous, heal by re-suffix",
+  "slug": "slug-shadowing-detect-duplicates-resolve",
+  "spec": {
+    "summary": "Two clones creating the same slug merge cleanly and the index silently does last-writer-wins (db-index.ts), leaving one ticket unreachable by slug. Detect duplicate slugs at index build (problems entry + stderr warning), make slug resolution of a duplicated slug return AMBIGUOUS_REF listing candidates, and give reindex --heal a deterministic re-suffix repair (older ticket keeps the slug).",
+    "details_md": "",
+    "acceptance": [
+      "Cross-clone slug collision is loud, resolvable, and never silently shadows"
+    ],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "group:g3",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "parent": "ticket_01KYZP89SKDFS5RE7NDE2J8W82",
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZP89SKDFS5RE7NDE2J8W82",
+  "path": [
+    "ticket_01KYZP89SKDFS5RE7NDE2J8W82"
+  ],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:14:31.740Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:14:31.740Z",
+  "updated_at": "2026-08-01T22:14:31.740Z"
+}

@@ -1,0 +1,38 @@
+{
+  "id": "ticket_01KYZPAG4JNCTR40GEXQF7F1XS",
+  "name": "slop sync: built-in commit/push/pull of tracker state",
+  "slug": "slop-sync-built-in-commit",
+  "spec": {
+    "summary": "The tool never touches git; work is invisible to other clones until someone manually commits and pushes .slop. Add an explicit sync command (and/or auto-commit-on-write option) so tracker visibility stops depending on human memory.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "backlog",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZPAG4JNCTR40GEXQF7F1XS",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:15:11.815Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:15:11.815Z",
+  "updated_at": "2026-08-01T22:15:11.815Z"
+}

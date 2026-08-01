@@ -318,7 +318,7 @@
   }
 }
 
-/* Rendered markdown (spec details, resolution, transcript prose) — server
+/* Rendered markdown (spec details, resolution) — server
    pre-sanitizes via src/web/markdown.ts, client only supplies typography. */
 @layer components {
   .prose-slop {

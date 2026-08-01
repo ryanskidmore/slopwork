@@ -50,7 +50,7 @@ describe("runInstructions", () => {
     const paths = await bootstrapRepo(root, { project: "p", user: "u" });
     await writeFile(
       join(paths.slopDir, "config.yaml"),
-      "project: p\ntranscripts: not-a-valid-mode\n",
+      "project: p\ndefaults:\n  stale_after: not-a-duration\n",
     );
 
     await expect(withCwd(root, () => runInstructions())).rejects.toThrow(

@@ -1,0 +1,45 @@
+{
+  "id": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F",
+  "name": "Pluggable storage backend behind a repo interface",
+  "slug": "pluggable-storage-backend-behind-a",
+  "spec": {
+    "summary": "Extract a storage-backend interface at the repo boundary sized to what commands actually need. Flatfile driver = current code refactored behind it. config.yaml selects the backend (default flatfile). Ship a documented remote wire contract plus a stub remote driver so a future Cloudflare worker can implement the server side. Includes event sharding, lock simplification, and unifying the effective-overlay fold.",
+    "details_md": "",
+    "acceptance": [
+      "All 22 commands work unchanged against the flatfile driver via the interface",
+      "backend: config key selects driver; remote stub fails with a clear message and the wire contract is documented",
+      "Full gate green"
+    ],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "group:g2",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [
+    "ticket_01KYAVM4GJVG34MC95VDNT7JVQ",
+    "ticket_01KYBKQVJW4Q5KZ72SFSSJWEK6"
+  ],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:13:59.638Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:13:59.638Z",
+  "updated_at": "2026-08-01T22:13:59.638Z"
+}

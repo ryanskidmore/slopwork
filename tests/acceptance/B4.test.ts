@@ -167,7 +167,6 @@ async function makeRepoFixture(): Promise<RepoFixture> {
     "defaults:",
     "  stale_after: 60m",
     "  review_stale_after: 24h",
-    "transcripts: local",
   ];
   await writeFile(join(paths.slopDir, "config.yaml"), `${lines.join("\n")}\n`, "utf8");
   return { root, paths };

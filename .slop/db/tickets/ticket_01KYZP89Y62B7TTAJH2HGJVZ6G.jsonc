@@ -1,0 +1,42 @@
+{
+  "id": "ticket_01KYZP89Y62B7TTAJH2HGJVZ6G",
+  "name": "Elicitations: structured questions, awaiting_input overlay, questions inbox",
+  "slug": "elicitations-structured-questions",
+  "spec": {
+    "summary": "Implement design.md F2: a structured need-a-human channel replacing the QUESTION: string convention. Agents raise questions tied to a ticket; tickets with unanswered questions get an awaiting_input overlay surfaced in status and the web UI; slop questions lists the inbox; answers land back on the ticket. Update slop instructions, generated AGENTS.md, and the skill so the convention is retired everywhere.",
+    "details_md": "",
+    "acceptance": [
+      "Question raise/answer round-trip works via CLI with events on the audit spine",
+      "awaiting_input visible in status + web; QUESTION: convention gone from all generated guidance",
+      "Full gate green"
+    ],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "group:g4",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZP89Y62B7TTAJH2HGJVZ6G",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:13:59.943Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:13:59.943Z",
+  "updated_at": "2026-08-01T22:13:59.943Z"
+}

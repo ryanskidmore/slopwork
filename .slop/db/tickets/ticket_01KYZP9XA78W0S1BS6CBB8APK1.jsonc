@@ -1,0 +1,38 @@
+{
+  "id": "ticket_01KYZP9XA78W0S1BS6CBB8APK1",
+  "name": "Aggregation and reporting for external visibility",
+  "slug": "aggregation-and-reporting-for-external",
+  "spec": {
+    "summary": "A manager cannot answer how-is-this-going: no counts-over-time, throughput, review latency, or dashboard. Add a status-parity dashboard to the web UI plus basic aggregate queries (depends on the F6/SlopQL direction).",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "backlog",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZP9XA78W0S1BS6CBB8APK1",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:14:52.544Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:14:52.544Z",
+  "updated_at": "2026-08-01T22:14:52.544Z"
+}

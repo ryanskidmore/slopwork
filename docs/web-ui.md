@@ -92,8 +92,8 @@ Everything about one ticket, across four tabs:
   (also markdown), when set.
 - **Sessions** — one card per session, oldest-first (a session history
   reads as a narrative): actor, harness kind, git branch/commit,
-  start/end times, every plan version with its checked steps, end
-  summary, and a link into the transcript viewer.
+  start/end times, every plan version with its checked steps, and the end
+  summary.
 - **Relationships** — outgoing `blocks`/`relates_to`/`discovered_from`,
   and the reverse (who blocks this ticket, what relates back to it, what
   was discovered from it) — the reverse direction is derived, never
@@ -104,17 +104,6 @@ reason — which live tickets are blocking it, or which clock is overdue
 and since when), the meta grid (owner, labels, parent, latest note, last
 activity, provenance, …), and — when the ticket is in review — its MR
 link and review-staleness.
-
-### Transcript viewer (`/tickets/:ref/sessions/:sessionId/transcript`)
-
-Renders a session's captured `.jsonl` transcript readably, never raw
-JSON: user/assistant turns as distinct blocks, prose rendered as
-markdown, `thinking` blocks de-emphasized and collapsible, `tool_use`
-collapsed behind the tool's name, `tool_result` collapsed with an expand
-affordance (very long tool output is truncated with a note), and
-non-conversational record types hidden until toggled on. Paginated so a
-multi-megabyte transcript stays responsive; records render oldest-first
-("Newer →" moves toward more recent activity).
 
 ### Review panel (`/review`)
 
@@ -141,13 +130,12 @@ also call directly (still strictly read-only — GET/HEAD only, same
 | `GET /api/tickets` | ticket list; accepts `state`/`label`/`priority`/`owner`/`q` query params, same semantics as the `/tickets` page's filters |
 | `GET /api/tree` | the parent/child hierarchy, nested, with external-parent badges resolved |
 | `GET /api/tickets/:ref` | one ticket: spec (markdown pre-rendered to sanitized HTML), relationships, overlays, events, sessions |
-| `GET /api/tickets/:ref/sessions/:sessionId/transcript` | a paginated, pre-classified transcript page (`offset`/`limit`/`all` query params) |
 | `GET /api/review` | tickets in review, longest-awaiting-first |
 | `GET /api/stale` | stale tickets, longest-idle-first |
 
 `:ref` accepts the same forms as everywhere else in the CLI: a full
 ticket id, an exact slug, or an unambiguous short id-prefix. Markdown
-fields (`spec.details_html`, `resolution_html`, transcript block `html`)
+fields (`spec.details_html`, `resolution_html`)
 are rendered and XSS-sanitized server-side (`src/web/markdown.ts` +
 `src/web/url-safety.ts` — the same guard used for `remotes.jira`/MR
 links, which come back as `{ url, safe_url }` so a client never has to

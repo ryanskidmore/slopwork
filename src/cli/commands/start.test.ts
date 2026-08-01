@@ -1,5 +1,5 @@
 import { type SpawnSyncReturns, spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,7 +8,6 @@ import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cl
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
 import { EXIT_CODES } from "../../core/exit-codes.js";
 import type { SessionId, TicketId } from "../../core/index.js";
-import { sessionSchema } from "../../core/index.js";
 import {
   listEvents,
   readSession,
@@ -500,111 +499,5 @@ describe("runStart (in-process)", () => {
     }
     const paths = repoPaths(root);
     expect((await readTicket(paths, id)).state).toBe("in_progress");
-  });
-});
-
-// ticket sessions-capture-transcript-on-takeover: `--takeover` and D15 review
-// re-entry both END the previous session, but neither used to snapshot its
-// transcript the way stop/done/drop/review do — leaving exactly the sessions
-// most worth reading (seized or changes-requested work) with no transcript at
-// all. These cover both paths plus the deliberate refusal that keeps a
-// takeover from misattributing the TAKER's transcript to the seized session.
-describe("start — transcript capture for the session it supersedes", () => {
-  /** Put a fake harness transcript where a claude-code exact-id lookup finds
-   * it: `<claudeHome>/projects/<encoded-cwd>/<harnessSessionId>.jsonl`. */
-  async function plantClaudeTranscript(
-    claudeHome: string,
-    repoRoot: string,
-    harnessSessionId: string,
-    body: string,
-  ): Promise<void> {
-    const encoded = repoRoot.replace(/[^a-zA-Z0-9]/g, "-");
-    const dir = join(claudeHome, "projects", encoded);
-    await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, `${harnessSessionId}.jsonl`), body, "utf8");
-  }
-
-  /** Force the session on disk to look like it came from a claude-code harness
-   * carrying `sessionId` — `runStart` records whatever the env sniffs, which
-   * in a test process is not what we need to exercise the locator. */
-  async function setSessionHarness(
-    root: string,
-    sessionId: string,
-    harnessSessionId: string | null,
-  ): Promise<void> {
-    const paths = repoPaths(root);
-    const session = await readSession(paths, sessionId as never);
-    const updated = sessionSchema.parse({
-      ...session,
-      harness: { kind: "claude-code", session_id: harnessSessionId },
-    });
-    await writeFile(
-      sessionFilePath(paths, sessionId as never),
-      `${JSON.stringify(updated, null, 2)}\n`,
-      "utf8",
-    );
-  }
-
-  it("--takeover snapshots the seized session's transcript into it", async () => {
-    const root = await makeTempRepo("slop-start-takeover-transcript-");
-    await bootstrapRepo(root, { project: "p", user: "ryan" });
-    const claudeHome = await makeTempRepo("slop-start-takeover-claudehome-");
-    const id = await jsonNewTicket(root, "Takeover transcript ticket");
-
-    const first = captureOutput();
-    try {
-      await withCwd(root, () => runStart(id, {}));
-    } finally {
-      first.restore();
-    }
-    const paths = repoPaths(root);
-    const seizedId = (await readTicket(paths, id)).active_session as string;
-    await setSessionHarness(root, seizedId, "harness-abc");
-    await plantClaudeTranscript(claudeHome, root, "harness-abc", '{"type":"user"}\n');
-
-    const prevEnv = process.env.SLOP_TEST_CLAUDE_HOME;
-    process.env.SLOP_TEST_CLAUDE_HOME = claudeHome;
-    const second = captureOutput();
-    try {
-      await withCwd(root, () => runStart(id, { takeover: true }));
-    } finally {
-      second.restore();
-      if (prevEnv === undefined) delete process.env.SLOP_TEST_CLAUDE_HOME;
-      else process.env.SLOP_TEST_CLAUDE_HOME = prevEnv;
-    }
-
-    const seized = await readSession(paths, seizedId as never);
-    expect(seized.ended_at).not.toBeNull();
-    expect(seized.transcript_ref).toBe(`transcripts/${seizedId}.jsonl`);
-  });
-
-  it("refuses to guess when the superseded session recorded no harness session id, and says why", async () => {
-    const root = await makeTempRepo("slop-start-takeover-noguess-");
-    await bootstrapRepo(root, { project: "p", user: "ryan" });
-    const id = await jsonNewTicket(root, "Takeover no-guess ticket");
-
-    const first = captureOutput();
-    try {
-      await withCwd(root, () => runStart(id, {}));
-    } finally {
-      first.restore();
-    }
-    const paths = repoPaths(root);
-    const seizedId = (await readTicket(paths, id)).active_session as string;
-    await setSessionHarness(root, seizedId, null);
-
-    const second = captureOutput();
-    try {
-      await withCwd(root, () => runStart(id, { takeover: true }));
-      // The warning must name the risk, not just "not found" — misattributing
-      // the taker's own transcript is the failure this refusal prevents.
-      expect(second.stderr()).toContain("no harness session id");
-    } finally {
-      second.restore();
-    }
-
-    const seized = await readSession(paths, seizedId as never);
-    expect(seized.ended_at).not.toBeNull();
-    expect(seized.transcript_ref).toBeNull();
   });
 });

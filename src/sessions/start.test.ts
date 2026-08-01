@@ -88,7 +88,6 @@ describe("buildNewSession", () => {
     expect(session.ended_at).toBeNull();
     expect(session.plan).toEqual([]);
     expect(session.end_summary).toBeNull();
-    expect(session.transcript_ref).toBeNull();
     expect(session.harness).toEqual({ kind: "claude-code", session_id: "sess-123" });
     expect(session.git).toEqual({ branch: "main", commit_at_start: "deadbeef" });
   });

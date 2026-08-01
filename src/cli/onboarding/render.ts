@@ -68,7 +68,7 @@ export function renderOnboardingBody(ctx: OnboardingContext): string {
 
 ${projectLine(ctx)}
 
-Slopwork (\`slop\`) tracks work as a dependency graph of tickets. You read it to know what to do, you write to it as you work, and humans audit your trail (sessions, plans, progress, MRs, transcripts). Run \`slop instructions\` anytime for this project's local copy of these rules.
+Slopwork (\`slop\`) tracks work as a dependency graph of tickets. You read it to know what to do, you write to it as you work, and humans audit your trail (sessions, plans, progress, MRs). Run \`slop instructions\` anytime for this project's local copy of these rules.
 
 ## When to act, at a glance
 

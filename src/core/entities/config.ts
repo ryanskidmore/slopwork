@@ -6,13 +6,8 @@
 import { z } from "zod";
 import { durationStringSchema } from "../duration.js";
 
-export const TRANSCRIPTS_MODES = ["local", "commit", "off"] as const;
-export type TranscriptsMode = (typeof TRANSCRIPTS_MODES)[number];
-export const transcriptsModeSchema = z.enum(TRANSCRIPTS_MODES);
-
 export const DEFAULT_STALE_AFTER = "60m";
 export const DEFAULT_REVIEW_STALE_AFTER = "24h";
-export const DEFAULT_TRANSCRIPTS_MODE: TranscriptsMode = "local";
 
 /**
  * `null` -> `undefined` for a single field. A real YAML parser (e.g.
@@ -69,6 +64,5 @@ export const configSchema = z.object({
   // present-but-empty.
   remotes: configRemotesSchema.default(() => configRemotesSchema.parse({})),
   defaults: configDefaultsSchema.default(() => configDefaultsSchema.parse({})),
-  transcripts: transcriptsModeSchema.default(DEFAULT_TRANSCRIPTS_MODE),
 });
 export type Config = z.infer<typeof configSchema>;

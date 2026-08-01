@@ -113,7 +113,6 @@ describe("buildHealedSession", () => {
     expect(healed.actor).toEqual(session.actor);
     expect(healed.harness).toEqual(session.harness);
     expect(healed.started_at).toBe(session.started_at);
-    expect(healed.transcript_ref).toBe(session.transcript_ref);
   });
 
   it("overwrites a pre-existing (human-authored or otherwise) end_summary — an orphan by definition never had a real one for THIS ending", () => {

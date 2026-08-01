@@ -2,8 +2,7 @@
 /**
  * Generates the committed fixture db at tests/fixtures/web-db/.slop/ that
  * D5's views and acceptance test run against (design.md §3's layout:
- * `config.yaml`, `db/{tickets,sessions,events}/*.jsonc`,
- * `transcripts/*.jsonl`).
+ * `config.yaml`, `db/{tickets,sessions,events}/*.jsonc`).
  *
  * Every entity is built through the real A2 zod schemas (`ticketSchema`,
  * `sessionSchema`, `eventSchema`, `configSchema`) and written with the
@@ -252,8 +251,7 @@ addEvent({ kind: "ticket", id: addSsoDocs.id }, "ticket.created", RYAN, null, -2
 
 // ---------------------------------------------------------------------------
 // Session S1: implement-oauth-provider — claude-code, multi-version plan,
-// fresh activity, the "big" transcript (every record/block kind, long
-// enough to paginate).
+// fresh activity.
 // ---------------------------------------------------------------------------
 
 const s1Id = newSessionId();
@@ -288,7 +286,6 @@ const s1: Session = sessionSchema.parse({
     },
   ],
   end_summary: null,
-  transcript_ref: `transcripts/${s1Id}.jsonl`,
 });
 sessions.push(s1);
 addEvent({ kind: "session", id: s1.id }, "session.started", AGENT_1, s1.id, -3 * HOUR, {
@@ -362,9 +359,7 @@ const billingRunbook = makeTicket(
 addEvent({ kind: "ticket", id: billingRunbook.id }, "ticket.created", RYAN, null, -4 * DAY);
 
 // Session S2: migrate-billing — opencode, single-version plan, STALE
-// (last activity 5h ago > stale_after 60m), no transcript captured
-// (S2/D16: an expected, non-fatal case — opencode's session id and
-// transcript locator are both null-by-default per docs/spikes/findings.md §1.2/§3.2).
+// (last activity 5h ago > stale_after 60m).
 const s2Id = newSessionId();
 const s2: Session = sessionSchema.parse({
   id: s2Id,
@@ -387,7 +382,6 @@ const s2: Session = sessionSchema.parse({
     },
   ],
   end_summary: null,
-  transcript_ref: null,
 });
 sessions.push(s2);
 addEvent({ kind: "session", id: s2.id }, "session.started", OPENCODE_AGENT, s2.id, -6 * HOUR, {
@@ -459,7 +453,6 @@ const s3: Session = sessionSchema.parse({
   ],
   end_summary:
     "Root-caused a race in the windows runner cleanup step (a lock file wasn't always released before the next job started); added a retry with backoff. CI green x10 locally.",
-  transcript_ref: `transcripts/${s3Id}.jsonl`,
 });
 sessions.push(s3);
 addEvent({ kind: "session", id: s3.id }, "session.started", CODEX_AGENT, s3.id, -2 * DAY, {
@@ -511,7 +504,6 @@ const s5a: Session = sessionSchema.parse({
   ],
   end_summary:
     "Explored two interface shapes; handing off with a recommendation in the ticket notes.",
-  transcript_ref: null,
 });
 sessions.push(s5a);
 addEvent({ kind: "session", id: s5a.id }, "session.started", AGENT_1, s5a.id, -9 * DAY, {
@@ -571,7 +563,6 @@ const s5b: Session = sessionSchema.parse({
     },
   ],
   end_summary: "Finalized the interface directly (no harness) after the agent handoff; merged.",
-  transcript_ref: null,
 });
 sessions.push(s5b);
 addEvent({ kind: "session", id: s5b.id }, "session.started", RYAN, s5b.id, -8 * DAY, {
@@ -665,7 +656,6 @@ const s6: Session = sessionSchema.parse({
     },
   ],
   end_summary: "All commands now throw SlopError; exit codes match the table in the README. MR up.",
-  transcript_ref: `transcripts/${s6Id}.jsonl`,
 });
 sessions.push(s6);
 addEvent({ kind: "session", id: s6.id }, "session.started", AGENT_1, s6.id, -2 * HOUR, {
@@ -801,7 +791,6 @@ const s4: Session = sessionSchema.parse({
     },
   ],
   end_summary: null,
-  transcript_ref: null,
 });
 sessions.push(s4);
 addEvent({ kind: "session", id: s4.id }, "session.started", AGENT_2, s4.id, -2 * DAY, {
@@ -838,395 +827,7 @@ const config: Config = configSchema.parse({
     stale_after: "60m",
     review_stale_after: "24h",
   },
-  transcripts: "local",
 });
-
-// ---------------------------------------------------------------------------
-// Transcripts (docs/spikes/findings.md §4 record/block shapes)
-// ---------------------------------------------------------------------------
-
-interface RawRecord {
-  [key: string]: unknown;
-}
-
-function baseFields(sessionId: string, gitBranch: string, offsetMs: number): RawRecord {
-  return {
-    uuid: `${sessionId}-${Math.abs(offsetMs)}`,
-    parentUuid: null,
-    sessionId,
-    isSidechain: false,
-    userType: "external",
-    cwd: "/home/ryan/projects/slopwork-fixture",
-    version: "1.2.3",
-    timestamp: at(offsetMs),
-    gitBranch,
-  };
-}
-
-function buildBigTranscript(): RawRecord[] {
-  const branch = "feature/oauth-provider";
-  const records: RawRecord[] = [];
-  let t = -3 * HOUR;
-  const step = 2 * MIN;
-
-  records.push({
-    type: "file-history-snapshot",
-    ...baseFields(s1Id, branch, t),
-    snapshot: { files: [] },
-  });
-  t += step;
-
-  records.push({
-    type: "user",
-    ...baseFields(s1Id, branch, t),
-    message: {
-      role: "user",
-      content:
-        "Let's implement the OAuth provider described in the ticket. Start by reading the provider interface.",
-    },
-  });
-  t += step;
-
-  records.push({
-    type: "assistant",
-    ...baseFields(s1Id, branch, t),
-    message: {
-      id: "msg_01",
-      type: "message",
-      role: "assistant",
-      model: "claude-sonnet-5",
-      content: [
-        {
-          type: "thinking",
-          thinking:
-            "I should read src/auth/provider.ts first to see the interface shape before writing anything.",
-        },
-        {
-          type: "tool_use",
-          id: "tu_01",
-          name: "Read",
-          input: { file_path: "src/auth/provider.ts" },
-        },
-      ],
-      stop_reason: "tool_use",
-      usage: { input_tokens: 1200, output_tokens: 80 },
-    },
-  });
-  t += step;
-
-  records.push({
-    type: "user",
-    ...baseFields(s1Id, branch, t),
-    message: {
-      role: "user",
-      content: [
-        {
-          type: "tool_result",
-          tool_use_id: "tu_01",
-          content: [
-            {
-              type: "text",
-              text: "export interface AuthProvider {\n  id: string;\n  authorize(req: Request): Promise<AuthResult>;\n  refresh(token: string): Promise<AuthResult>;\n}\n",
-            },
-          ],
-        },
-      ],
-    },
-  });
-  t += step;
-
-  records.push({
-    type: "mode",
-    ...baseFields(s1Id, branch, t),
-    mode: "default",
-  });
-  t += step;
-
-  records.push({
-    type: "assistant",
-    ...baseFields(s1Id, branch, t),
-    message: {
-      id: "msg_02",
-      type: "message",
-      role: "assistant",
-      model: "claude-sonnet-5",
-      content: [
-        {
-          type: "text",
-          text:
-            "Got it — the interface needs `authorize` and `refresh`. I'll wire up `openid-client` " +
-            "for the OAuth flow and implement both methods against it. Let me check what's already " +
-            "in the repo for OAuth-adjacent code.",
-        },
-        {
-          type: "tool_use",
-          id: "tu_02",
-          name: "Grep",
-          input: { pattern: "openid-client", path: "src" },
-        },
-      ],
-      stop_reason: "tool_use",
-      usage: { input_tokens: 1400, output_tokens: 140 },
-    },
-  });
-  t += step;
-
-  // A deliberately long tool_result — this is the fixture's "long tool_result" case.
-  const longOutput = Array.from(
-    { length: 400 },
-    (_, i) => `src/auth/oauth/candidate-${i}.ts:${i + 1}: // TODO scaffold ${i}`,
-  ).join("\n");
-  records.push({
-    type: "user",
-    ...baseFields(s1Id, branch, t),
-    message: {
-      role: "user",
-      content: [{ type: "tool_result", tool_use_id: "tu_02", content: longOutput }],
-    },
-  });
-  t += step;
-
-  records.push({
-    type: "system",
-    ...baseFields(s1Id, branch, t),
-    isMeta: true,
-    subtype: "compact_boundary",
-    durationMs: 4210,
-    messageCount: 6,
-  });
-  t += step;
-
-  // A conversational back-and-forth long enough to force pagination
-  // (default page size is 40 records; this generates well over that).
-  const topics = [
-    "wiring the authorize() flow",
-    "handling the refresh token rotation",
-    "adding config validation for a missing client secret",
-    "writing the provider registration docs",
-    "double-checking error handling for a revoked token",
-  ];
-  for (let i = 0; i < 24; i++) {
-    const topic = topics[i % topics.length];
-    records.push({
-      type: "user",
-      ...baseFields(s1Id, branch, t),
-      message: { role: "user", content: `Continue with ${topic}, step ${i + 1}.` },
-    });
-    t += step;
-    records.push({
-      type: "assistant",
-      ...baseFields(s1Id, branch, t),
-      message: {
-        id: `msg_loop_${i}`,
-        type: "message",
-        role: "assistant",
-        model: "claude-sonnet-5",
-        content: [
-          {
-            type: "text",
-            text: `Working on ${topic} (iteration ${i + 1}). Applying the change now.`,
-          },
-          {
-            type: "tool_use",
-            id: `tu_loop_${i}`,
-            name: "Edit",
-            input: {
-              file_path: "src/auth/oauth/provider.ts",
-              old_string: "// TODO",
-              new_string: "// done",
-            },
-          },
-        ],
-        stop_reason: "tool_use",
-        usage: { input_tokens: 900 + i, output_tokens: 60 + i },
-      },
-    });
-    t += step;
-    records.push({
-      type: "user",
-      ...baseFields(s1Id, branch, t),
-      message: {
-        role: "user",
-        content: [
-          {
-            type: "tool_result",
-            tool_use_id: `tu_loop_${i}`,
-            content: "File updated successfully.",
-          },
-        ],
-      },
-    });
-    t += step;
-  }
-
-  records.push({
-    type: "last-prompt",
-    ...baseFields(s1Id, branch, t),
-    prompt: "internal bookkeeping, not conversational",
-  });
-  t += step;
-
-  records.push({
-    type: "assistant",
-    ...baseFields(s1Id, branch, t),
-    message: {
-      id: "msg_final",
-      type: "message",
-      role: "assistant",
-      model: "claude-sonnet-5",
-      content: [
-        {
-          type: "text",
-          text:
-            "Token refresh now works against a live test IdP. Next up: config validation for a " +
-            "missing client secret, then updating AGENTS.md with the new provider.",
-        },
-      ],
-      stop_reason: "end_turn",
-      usage: { input_tokens: 500, output_tokens: 90 },
-    },
-  });
-
-  return records;
-}
-
-function buildSmallTranscript(sessionId: string, branch: string): RawRecord[] {
-  let t = -2 * DAY;
-  const step = 5 * MIN;
-  const records: RawRecord[] = [];
-  records.push({
-    type: "user",
-    ...baseFields(sessionId, branch, t),
-    message: {
-      role: "user",
-      content: "The windows CI job is flaky in the cleanup step. Can you dig in?",
-    },
-  });
-  t += step;
-  records.push({
-    type: "assistant",
-    ...baseFields(sessionId, branch, t),
-    message: {
-      id: "msg_01",
-      type: "message",
-      role: "assistant",
-      model: "gpt-5-codex",
-      content: [
-        { type: "thinking", thinking: "Likely a race on a lock file during parallel job cleanup." },
-        {
-          type: "tool_use",
-          id: "tu_01",
-          name: "Bash",
-          input: { command: "grep -R cleanup .github/workflows" },
-        },
-      ],
-      stop_reason: "tool_use",
-      usage: { input_tokens: 600, output_tokens: 70 },
-    },
-  });
-  t += step;
-  records.push({
-    type: "user",
-    ...baseFields(sessionId, branch, t),
-    message: {
-      role: "user",
-      content: [
-        {
-          type: "tool_result",
-          tool_use_id: "tu_01",
-          content: ".github/workflows/ci.yml:88:      - name: cleanup\n",
-        },
-      ],
-    },
-  });
-  t += step;
-  records.push({
-    type: "assistant",
-    ...baseFields(sessionId, branch, t),
-    message: {
-      id: "msg_02",
-      type: "message",
-      role: "assistant",
-      model: "gpt-5-codex",
-      content: [
-        {
-          type: "text",
-          text: "Found it: the cleanup step doesn't wait for the lock file to release before the next job starts. Adding a retry with backoff.",
-        },
-      ],
-      stop_reason: "end_turn",
-      usage: { input_tokens: 300, output_tokens: 50 },
-    },
-  });
-  return records;
-}
-
-function buildReviewTranscript(sessionId: string, branch: string): RawRecord[] {
-  let t = -2 * HOUR;
-  const step = 10 * MIN;
-  const records: RawRecord[] = [];
-  records.push({
-    type: "user",
-    ...baseFields(sessionId, branch, t),
-    message: {
-      role: "user",
-      content: "Consolidate every command's error reporting into SlopError.",
-    },
-  });
-  t += step;
-  records.push({
-    type: "assistant",
-    ...baseFields(sessionId, branch, t),
-    message: {
-      id: "msg_01",
-      type: "message",
-      role: "assistant",
-      model: "claude-sonnet-5",
-      content: [
-        { type: "text", text: "Auditing every command's current error path first." },
-        {
-          type: "tool_use",
-          id: "tu_01",
-          name: "Grep",
-          input: { pattern: "throw new Error", path: "src/cli" },
-        },
-      ],
-      stop_reason: "tool_use",
-      usage: { input_tokens: 700, output_tokens: 60 },
-    },
-  });
-  t += step;
-  records.push({
-    type: "user",
-    ...baseFields(sessionId, branch, t),
-    message: {
-      role: "user",
-      content: [
-        { type: "tool_result", tool_use_id: "tu_01", content: "3 matches across 3 files." },
-      ],
-    },
-  });
-  t += step;
-  records.push({
-    type: "assistant",
-    ...baseFields(sessionId, branch, t),
-    message: {
-      id: "msg_02",
-      type: "message",
-      role: "assistant",
-      model: "claude-sonnet-5",
-      content: [
-        {
-          type: "text",
-          text: "All three now throw SlopError with the right exit code. Opening the MR.",
-        },
-      ],
-      stop_reason: "end_turn",
-      usage: { input_tokens: 250, output_tokens: 40 },
-    },
-  });
-  return records;
-}
 
 // ---------------------------------------------------------------------------
 // Write everything out.
@@ -1236,21 +837,14 @@ async function writeJsonc(dir: string, id: string, value: unknown): Promise<void
   await Bun.write(join(dir, `${id}.jsonc`), writeCanonical(value));
 }
 
-async function writeJsonl(path: string, records: RawRecord[]): Promise<void> {
-  const text = `${records.map((r) => JSON.stringify(r)).join("\n")}\n`;
-  await Bun.write(path, text);
-}
-
 async function main(): Promise<void> {
   await rm(fixtureRoot, { recursive: true, force: true });
   const ticketsDir = join(fixtureRoot, "db", "tickets");
   const sessionsDir = join(fixtureRoot, "db", "sessions");
   const eventsDir = join(fixtureRoot, "db", "events");
-  const transcriptsDir = join(fixtureRoot, "transcripts");
   await mkdir(ticketsDir, { recursive: true });
   await mkdir(sessionsDir, { recursive: true });
   await mkdir(eventsDir, { recursive: true });
-  await mkdir(transcriptsDir, { recursive: true });
 
   // Re-validate every ticket now that cross-references (e.g. `blocks`) were mutated after creation.
   for (const ticket of tickets) {
@@ -1267,16 +861,6 @@ async function main(): Promise<void> {
   await Bun.write(
     join(fixtureRoot, "config.yaml"),
     configYaml.endsWith("\n") ? configYaml : `${configYaml}\n`,
-  );
-
-  await writeJsonl(join(transcriptsDir, `${s1Id}.jsonl`), buildBigTranscript());
-  await writeJsonl(
-    join(transcriptsDir, `${s3Id}.jsonl`),
-    buildSmallTranscript(s3Id, "fix/ci-flaky-windows"),
-  );
-  await writeJsonl(
-    join(transcriptsDir, `${s6Id}.jsonl`),
-    buildReviewTranscript(s6Id, "refactor/cli-error-reporting"),
   );
 
   console.log(

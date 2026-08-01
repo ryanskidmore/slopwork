@@ -2,13 +2,7 @@ import type { Command } from "commander";
 import type { Clock } from "../../core/clock.js";
 import { systemClock } from "../../core/clock.js";
 import type { Session, Ticket } from "../../core/index.js";
-import {
-  END_SUMMARY_MAX_LENGTH,
-  EXIT_CODES,
-  nowIso,
-  sessionSchema,
-  ticketSchema,
-} from "../../core/index.js";
+import { END_SUMMARY_MAX_LENGTH, EXIT_CODES, nowIso, ticketSchema } from "../../core/index.js";
 import {
   formatIndexProblems,
   readSession,
@@ -22,10 +16,6 @@ import {
 } from "../../repo/index.js";
 import { buildFinalizedSession } from "../../sessions/finalize.js";
 import { diffSessionPatch, SESSION_END_FIELDS } from "../../sessions/patch.js";
-import {
-  resolveTranscriptCapture,
-  speculativeTranscriptCapture,
-} from "../../sessions/transcript.js";
 import { cascadeOnClose } from "../../tickets/cascade.js";
 import { diffTicketPatch, TICKET_FIELDS } from "../../tickets/patch.js";
 import { checkDropEntry } from "../../tickets/state.js";
@@ -36,15 +26,8 @@ import { assertMaxLength, printWarning, sessionOwnershipWarning, ticketJson } fr
 
 interface DropCommandOptions {
   reason: string;
-  transcript?: string;
   json?: boolean;
 }
-
-/** Same shape as `done.ts`'s `DONE_SESSION_FIELDS` — see that module's doc. */
-const DROP_SESSION_FIELDS = [
-  ...SESSION_END_FIELDS,
-  "transcript_ref",
-] as const satisfies readonly (keyof Session)[];
 
 /**
  * Build (never persist) the ticket as `drop` should leave it: `-> dropped`
@@ -100,25 +83,6 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
 
   const initialTicket = await resolveTicketRef(paths, ref);
 
-  // Fix 1 (ticket_01KY93E2ZK6Z3TFEBP86ATMW37): locate + copy the harness
-  // transcript BEFORE acquiring the db lock — see transcript.ts's
-  // top-of-file doc, "Fix 1", and stop.ts's identical comment for the
-  // full rationale. `null` when `initialTicket` has no active session
-  // (an open/draft ticket being dropped) — `speculativeTranscriptCapture`
-  // degrades to `null` itself in that case, same as the in-lock path
-  // below skipping capture entirely. Reconciled against the
-  // AUTHORITATIVE session below via `resolveTranscriptCapture`.
-  const speculativeCapture = await speculativeTranscriptCapture(
-    paths,
-    initialTicket.active_session,
-    {
-      paths,
-      cwd: root,
-      transcriptsMode: config.transcripts,
-      explicitTranscriptPath: opts.transcript,
-    },
-  );
-
   const result = await withLock(paths.lockFile, async (lock) => {
     const current = await readTicket(paths, initialTicket.id);
 
@@ -128,7 +92,6 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
     }
 
     let finalSession: Session | null = null;
-    let transcriptWarning: string | null = null;
     let ownershipWarning: string | null = null;
 
     // §2: "dropped (wontdo) from anywhere" — an open/draft ticket has no
@@ -139,30 +102,14 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
       // ticket_01KYAPN9NXY6RPSV6WGR42CJHJ: session ownership is a
       // warning, not an enforced gate — see sessionOwnershipWarning's own
       // doc. `null` (never warned) when there's no session to compare
-      // against at all, same as `transcriptWarning` above.
+      // against at all.
       ownershipWarning = sessionOwnershipWarning(session, actor);
-      const finalizedSession = buildFinalizedSession(session, opts.reason);
-
-      // C4's seam — see done.ts's identical comment for the full
-      // rationale. Reuses `speculativeCapture` (captured OUTSIDE this
-      // lock, above) when it's still keyed to this exact session.
-      const capture = await resolveTranscriptCapture(speculativeCapture, {
-        session,
-        paths,
-        cwd: root,
-        transcriptsMode: config.transcripts,
-        explicitTranscriptPath: opts.transcript,
-      });
-      finalSession = sessionSchema.parse({
-        ...finalizedSession,
-        transcript_ref: capture.transcriptRef,
-      });
-      transcriptWarning = capture.warning;
+      finalSession = buildFinalizedSession(session, opts.reason);
 
       await updateSession(
         paths,
         session.id,
-        diffSessionPatch(session, finalSession, DROP_SESSION_FIELDS),
+        diffSessionPatch(session, finalSession, SESSION_END_FIELDS),
         finalSession,
         { actor, session: session.id },
         {
@@ -170,7 +117,6 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
           payload: {
             reason: "dropped",
             note: opts.reason,
-            ...(capture.transcriptRef !== null ? { transcript_ref: capture.transcriptRef } : {}),
           },
         },
       );
@@ -202,13 +148,11 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
     return {
       session: finalSession,
       ticket: droppedTicket,
-      transcriptWarning,
       ownershipWarning,
       cascade,
     };
   });
 
-  if (result.transcriptWarning !== null) printWarning(result.transcriptWarning);
   if (result.ownershipWarning !== null) printWarning(result.ownershipWarning);
   if (result.cascade.problems.length > 0) {
     process.stderr.write(`${formatIndexProblems(result.cascade.problems)}\n`);
@@ -224,10 +168,7 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
           ticket: ticketJson(result.ticket),
           // `null` when the dropped ticket had no active session at all (an
           // open/draft ticket) — there was no session to report on.
-          session:
-            result.session === null
-              ? null
-              : { id: result.session.id, transcript: result.session.transcript_ref },
+          session: result.session === null ? null : { id: result.session.id },
           reason: opts.reason,
           unblocked: result.cascade.unblocked,
           problems: result.cascade.problems.map((p) => ({ id: p.id, message: p.message })),
@@ -244,21 +185,18 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
       `  ${result.ticket.name}\n` +
       `  state: ${result.ticket.state}\n` +
       `  reason: ${opts.reason}\n` +
-      (result.session !== null
-        ? `  transcript: ${result.session.transcript_ref ?? "(none)"}\n`
-        : "") +
       (result.cascade.unblocked.length > 0
         ? `  unblocked: ${result.cascade.unblocked.join(", ")}\n`
         : ""),
   );
 }
 
-/** `slop drop` — design.md §2, §4.3, D16; work item C3.
+/** `slop drop` — design.md §2, §4.3; work item C3.
  *
  * `-> dropped` from any non-terminal state. If there's an active session,
- * finalizes it (end summary from `--reason`, transcript captured per C4);
- * either way, runs B4's done-cascade exactly once — a dropped ticket also
- * stops blocking its dependents.
+ * finalizes it (end summary from `--reason`); either way, runs B4's
+ * done-cascade exactly once — a dropped ticket also stops blocking its
+ * dependents.
  */
 export function registerDropCommand(program: Command): void {
   program
@@ -267,12 +205,8 @@ export function registerDropCommand(program: Command): void {
     .argument("<ref>", "ticket to drop")
     .requiredOption("--reason <text>", "why this ticket is being dropped")
     .option(
-      "--transcript <path>",
-      "manual transcript path (only relevant if there's an active session to finalize)",
-    )
-    .option(
       "--json",
-      "machine-readable result (id, slug, handle, name, state, reason, transcript, unblocked, problems)",
+      "machine-readable result (id, slug, handle, name, state, reason, unblocked, problems)",
     )
     .action(runDrop);
 }

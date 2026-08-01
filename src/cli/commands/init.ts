@@ -29,7 +29,6 @@ import {
   type Config,
   DEFAULT_REVIEW_STALE_AFTER,
   DEFAULT_STALE_AFTER,
-  DEFAULT_TRANSCRIPTS_MODE,
   configSchema,
   resolveActorName,
 } from "../../core/index.js";
@@ -149,7 +148,6 @@ async function loadOrCreateConfig(
     ...(jira !== undefined ? { jira } : {}),
     staleAfter: DEFAULT_STALE_AFTER,
     reviewStaleAfter: DEFAULT_REVIEW_STALE_AFTER,
-    transcripts: DEFAULT_TRANSCRIPTS_MODE,
   });
 
   const config = configSchema.parse(parseConfigYamlText(yamlText));
@@ -219,13 +217,10 @@ async function maybeInstallSkill(root: string, config: Config): Promise<boolean>
 // .gitignore (D14/D16)
 // ---------------------------------------------------------------------------
 
-async function updateGitignore(root: string, config: Config): Promise<void> {
+async function updateGitignore(root: string): Promise<void> {
   const gitignorePath = join(root, ".gitignore");
   const existing = existsSync(gitignorePath) ? await readFile(gitignorePath, "utf8") : "";
-  const { text, changed } = upsertGitignoreSection(
-    existing,
-    computeGitignoreLines(config.transcripts),
-  );
+  const { text, changed } = upsertGitignoreSection(existing, computeGitignoreLines());
   if (changed) {
     await atomicWriteFile(gitignorePath, text);
   }
@@ -335,14 +330,13 @@ export async function runInit(opts: InitOptions): Promise<void> {
   const { root, alreadyInitialized } = determineRoot(process.cwd());
 
   const paths = await ensureDbDirs(root);
-  await mkdir(join(paths.slopDir, "transcripts"), { recursive: true });
   await writeDbDirPlaceholders(paths);
 
   const { config, wasExisting } = await loadOrCreateConfig(paths, root, opts);
 
   await writeAgentsMd(paths, config);
   const skillInstalled = await maybeInstallSkill(root, config);
-  await updateGitignore(root, config);
+  await updateGitignore(root);
   const claudeMdResult = await maybeLinkClaudeMd(root, opts);
 
   report({ root, alreadyInitialized, wasExisting, skillInstalled, claudeMdResult });

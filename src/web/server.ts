@@ -29,7 +29,6 @@ import { handleReviewPanel } from "./api/review.js";
 import { handleStalePanel } from "./api/stale.js";
 import { handleTicketDetail } from "./api/ticket-detail.js";
 import { handleTicketList } from "./api/tickets.js";
-import { handleTranscriptView } from "./api/transcript.js";
 import { handleTreeView } from "./api/tree.js";
 import type { WebDataSource } from "./data-source.js";
 
@@ -43,8 +42,8 @@ const READ_METHODS = new Set(["GET", "HEAD"]);
  * requests straight at this server — nothing here previously checked the
  * `Host` header a request actually arrived with, so a DNS-rebound request
  * was served identically to a real `http://127.0.0.1:<port>/` one. `.slop/db`
- * and its transcripts routinely contain secrets (an API key pasted into a
- * ticket, a token in a transcript), so this is a real scrape-the-local-repo
+ * routinely contains secrets (an API key pasted into a
+ * ticket), so this is a real scrape-the-local-repo
  * vector, not just a theoretical one.
  *
  * Bun's declarative `routes` table dispatches a matched GET request
@@ -248,9 +247,6 @@ export function createWebServer(
       },
       "/api/tickets/:ref": {
         ...readMethods((req) => handleTicketDetail(req, dataSource, now())),
-      },
-      "/api/tickets/:ref/sessions/:sessionId/transcript": {
-        ...readMethods((req) => handleTranscriptView(req, dataSource)),
       },
     },
     fetch(req) {

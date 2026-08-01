@@ -1,0 +1,38 @@
+{
+  "id": "ticket_01KYZPAG8X01Y71X4T0F4C1E38",
+  "name": "Cross-clone active_session honesty",
+  "slug": "cross-clone-active-session-honesty",
+  "spec": {
+    "summary": "Two clones can both start the same ticket; merge silently discards one claim, and ready/status confidently misreport. Detect double-claim on merge (index problem + warning) and define resolution semantics.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "backlog",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZPAG8X01Y71X4T0F4C1E38",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:15:11.999Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:15:11.999Z",
+  "updated_at": "2026-08-01T22:15:11.999Z"
+}

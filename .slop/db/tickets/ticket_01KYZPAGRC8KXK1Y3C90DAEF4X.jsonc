@@ -1,0 +1,38 @@
+{
+  "id": "ticket_01KYZPAGRC8KXK1Y3C90DAEF4X",
+  "name": "Model blocked-on-person and blocked-on-external",
+  "slug": "model-blocked-on-person-and",
+  "spec": {
+    "summary": "blocked derives only from local ticket edges; blocked on a person, a decision, or jira:X shipping is inexpressible without creating a synthetic ticket. Extend the blocking model (or blocked_reason) to cover non-ticket blockers.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 3,
+  "labels": [
+    "backlog",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZPAGRC8KXK1Y3C90DAEF4X",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:15:12.461Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:15:12.461Z",
+  "updated_at": "2026-08-01T22:15:12.461Z"
+}

@@ -171,7 +171,6 @@ export interface SessionDTO {
   ended_at: string | null;
   plan: PlanVersionDTO[];
   end_summary: string | null;
-  has_transcript: boolean;
   is_active: boolean;
 }
 
@@ -247,50 +246,6 @@ export interface StaleRowDTO {
 export interface StaleResponseDTO {
   config: ConfigDTO;
   rows: StaleRowDTO[];
-}
-
-// --- Transcript viewer -------------------------------------------------
-
-export type TranscriptBlockDTO =
-  | { type: "text"; html: string }
-  | { type: "thinking"; html: string }
-  | { type: "tool_use"; name: string; input_json: string; truncated: boolean; total_chars: number }
-  | {
-      type: "tool_result";
-      is_error: boolean;
-      text: string;
-      truncated: boolean;
-      total_chars: number;
-    }
-  | { type: "unknown"; raw_type: string; json: string; truncated: boolean; total_chars: number };
-
-export interface TranscriptTurnDTO {
-  kind: "turn";
-  role: "user" | "assistant";
-  model: string | null;
-  timestamp: string | null;
-  blocks: TranscriptBlockDTO[];
-}
-
-export interface TranscriptSystemDTO {
-  kind: "system";
-  summary: string;
-}
-
-export type TranscriptRecordDTO = TranscriptTurnDTO | TranscriptSystemDTO;
-
-export interface TranscriptResponseDTO {
-  config: ConfigDTO;
-  ticket: TicketRefDTO;
-  session: { id: string; actor: ActorDTO; harness: HarnessKind };
-  transcript_ref: string | null;
-  available: boolean;
-  records: TranscriptRecordDTO[];
-  offset: number;
-  limit: number;
-  has_more: boolean;
-  total: number;
-  include_system: boolean;
 }
 
 export interface ApiErrorDTO {

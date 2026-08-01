@@ -2,7 +2,7 @@
  * Read-only local web explorer (`slop web`, design.md §4.4; rewritten as a
  * React + Tailwind + shadcn/ui SPA by rewrite-slop-web-as-a): ticket
  * list/filters, tree view (external parents as badges), ticket detail
- * (spec/timeline/sessions/plans — the "audit spine"), transcript viewer,
+ * (spec/timeline/sessions/plans — the "audit spine"),
  * review panel, stale/resumable panel. Read-only for v0 — mutations arrive
  * with F9 (design.md §4.6).
  *
@@ -15,7 +15,7 @@
  * {@link startWebServer}. See src/web/fixture-data-source.ts's doc comment
  * for the data-source seam this is built on.
  */
-export type { TranscriptHandle, WebDataSource } from "./data-source.js";
+export type { WebDataSource } from "./data-source.js";
 export { FixtureDataSource } from "./fixture-data-source.js";
 export {
   createWebServer,

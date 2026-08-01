@@ -71,7 +71,6 @@ const CONFIG_YAML = [
   "defaults:",
   "  stale_after: 60m",
   "  review_stale_after: 24h",
-  "transcripts: local",
   "",
 ].join("\n");
 

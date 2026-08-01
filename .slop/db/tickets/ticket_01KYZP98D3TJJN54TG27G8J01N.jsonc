@@ -1,0 +1,43 @@
+{
+  "id": "ticket_01KYZP98D3TJJN54TG27G8J01N",
+  "name": "slop list: filtered ticket enumeration",
+  "slug": "slop-list-filtered-ticket-enumeration",
+  "spec": {
+    "summary": "The CLI has no way to enumerate tickets; the read-only web UI filters better than the agent-facing surface. Add slop list with --state, repeatable --label, --owner, --priority, --parent (subtree), free-text match, --limit/--offset, --json/--budget, sorted deterministically.",
+    "details_md": "",
+    "acceptance": [
+      "Web UI ticket-list filters are all expressible via slop list"
+    ],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "group:g3",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "parent": "ticket_01KYZP89SKDFS5RE7NDE2J8W82",
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZP89SKDFS5RE7NDE2J8W82",
+  "path": [
+    "ticket_01KYZP89SKDFS5RE7NDE2J8W82"
+  ],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:14:31.078Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:14:31.078Z",
+  "updated_at": "2026-08-01T22:14:31.078Z"
+}

@@ -43,8 +43,8 @@
  * when the directory already exists (the overwhelmingly common case, one
  * extra `stat`-class syscall per write) — this is EVERY entity write's
  * shared choke point (`entity-file.ts`'s `createEntityFileCanonical`/
- * `updateEntityFile`, `lock.ts`'s lock-file write, `transcript.ts`'s
- * capture write, `init.ts`'s config/docs writes), so fixing it exactly
+ * `updateEntityFile`, `lock.ts`'s lock-file write, `init.ts`'s config/docs
+ * writes), so fixing it exactly
  * here makes every one of those call sites self-heal for free, without
  * threading "does this directory exist yet" through each of them
  * individually. `slop init` (Fix 4 part 2, `cli/commands/init.ts`) also

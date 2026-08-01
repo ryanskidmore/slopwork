@@ -153,7 +153,6 @@ export interface ConfigYamlInput {
   jira?: string;
   staleAfter: string;
   reviewStaleAfter: string;
-  transcripts: string;
 }
 
 /**
@@ -180,6 +179,5 @@ export function stringifyConfigYaml(input: ConfigYamlInput): string {
   lines.push("defaults:");
   lines.push(`  stale_after: ${input.staleAfter}`);
   lines.push(`  review_stale_after: ${input.reviewStaleAfter}`);
-  lines.push(`transcripts: ${input.transcripts}            # local | commit | off`);
   return `${lines.join("\n")}\n`;
 }

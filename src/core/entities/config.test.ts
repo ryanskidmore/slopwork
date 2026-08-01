@@ -14,7 +14,6 @@ describe("configSchema", () => {
         stale_after: "60m",
         review_stale_after: "24h",
       },
-      transcripts: "local",
     });
     expect(parsed).toEqual({
       project: "slopwork",
@@ -27,7 +26,6 @@ describe("configSchema", () => {
         stale_after: "60m",
         review_stale_after: "24h",
       },
-      transcripts: "local",
     });
   });
 
@@ -40,7 +38,6 @@ describe("configSchema", () => {
         stale_after: "60m",
         review_stale_after: "24h",
       },
-      transcripts: "local",
     });
   });
 
@@ -68,14 +65,13 @@ describe("configSchema", () => {
     );
   });
 
-  it("rejects an unknown transcripts mode", () => {
-    expect(configSchema.safeParse({ project: "x", transcripts: "s3" }).success).toBe(false);
-  });
-
-  it("accepts every transcripts mode", () => {
-    for (const mode of ["local", "commit", "off"]) {
-      expect(configSchema.safeParse({ project: "x", transcripts: mode }).success).toBe(true);
-    }
+  // G1 (transcripts removed): a config.yaml written before the removal may
+  // still carry a `transcripts:` key — parsing must not fail; the unknown
+  // key is simply stripped by the (non-strict) object schema.
+  it("still parses a legacy config carrying a transcripts key (ignored, not fatal)", () => {
+    const result = configSchema.safeParse({ project: "x", transcripts: "local" });
+    expect(result.success).toBe(true);
+    expect(result.success && "transcripts" in result.data).toBe(false);
   });
 
   it("rejects a missing project name", () => {

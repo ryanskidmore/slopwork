@@ -129,7 +129,7 @@ function newTicket(
  * `checkDropEntry`/`assertStartable`/`assertStoppable`/`assertDraftable`/
  * `assertUndraftable` from `src/tickets/state.ts` or `src/sessions/*.ts` —
  * so this validates the CLI's actual behavior against a second, separate
- * transcription of the spec, not the implementation checked against
+ * rendering of the spec, not the implementation checked against
  * itself.
  *
  * `Op -> (fromState -> toState)`; an absent entry for a given
@@ -432,9 +432,6 @@ describe("C3: Lifecycle", () => {
 
       const result = runSlop(["review", slug, "--mr", MR_URL], root);
       expect(result.status, result.stderr).toBe(0);
-      // No --mr nag specifically — a separate, unrelated "could not locate
-      // a transcript" warning is legitimate here (no real harness in this
-      // test env) and must not be conflated with the D15 nag under test.
       expect(result.stderr).not.toMatch(/no --mr given/i);
 
       const ticket = await readTicket(paths, id);
@@ -462,13 +459,9 @@ describe("C3: Lifecycle", () => {
     });
 
     // Fix 3 (adversarial review): `review --mr <invalid-url>` must fail
-    // atomically — no session write, no event, no wasted transcript
-    // capture — BEFORE this fix, the invalid `--mr` was only caught deep
-    // inside `buildReviewedTicket`'s schema validation, AFTER the
-    // transaction had already folded `transcript_ref` into the active
-    // session (an `updateSession` write + a `review.requested` session
-    // event), leaving that write behind for an operation that then failed
-    // anyway.
+    // atomically — no session write, no event — rather than only being
+    // caught deep inside `buildReviewedTicket`'s schema validation after
+    // writes had already happened.
     it("review <ref> --mr <invalid-url>: fails fast as a usage error (exit 2), with NO session write, NO event, and the ticket left exactly as it was", async () => {
       const { root, paths } = await makeFixtureRepo();
       const { id, slug } = newTicket(root, "Bad MR ticket");
@@ -496,8 +489,7 @@ describe("C3: Lifecycle", () => {
       expect(after.active_session).toBe(sessionIdBefore);
       expect(after.updated_at).toBe(before.updated_at);
 
-      // Session completely untouched: same transcript_ref (still null —
-      // captureTranscript/updateSession never ran), no ended_at.
+      // Session completely untouched: no write ever ran, no ended_at.
       const sessionAfter = await readSession(
         paths,
         sessionIdBefore as NonNullable<typeof sessionIdBefore>,
@@ -514,13 +506,13 @@ describe("C3: Lifecycle", () => {
 
   // ---------------------------------------------------------------------------
   // End-to-end loop: new -> start -> plan -> update --progress -> review
-  // --mr -> done, asserting finalize + transcript + cascade.
+  // --mr -> done, asserting finalize + cascade.
   // ---------------------------------------------------------------------------
 
   describe("end-to-end loop", () => {
     it(
-      "new -> start -> plan -> update --progress -> review --mr -> done finalizes the session, captures " +
-        "(or null-refs) the transcript, and cascades ticket.ready to a dependent",
+      "new -> start -> plan -> update --progress -> review --mr -> done finalizes the session " +
+        "and cascades ticket.ready to a dependent",
       async () => {
         const { root, paths } = await makeFixtureRepo();
 
@@ -553,13 +545,6 @@ describe("C3: Lifecycle", () => {
         const session = await readSession(paths, sessionId as NonNullable<typeof sessionId>);
         expect(session.ended_at).not.toBeNull();
         expect(session.end_summary).toBe("shipped and merged");
-        // Never blocks — a null ref + warning is a legitimate outcome here
-        // (no real harness in this test env), never a failure.
-        if (session.transcript_ref === null) {
-          expect(doneResult.stderr).toMatch(/could not locate a transcript/i);
-        } else {
-          expect(session.transcript_ref).toMatch(/^transcripts\//);
-        }
 
         // Cascade: the dependent this ticket was blocking is now ready,
         // with a ticket.ready event crediting the worker's closure.

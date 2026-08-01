@@ -1,0 +1,38 @@
+{
+  "id": "ticket_01KYZPAGKF4BAZ5DB936RPY95A",
+  "name": "Identity normalization: asserted actor kind, canonical names",
+  "slug": "identity-normalization-asserted-actor",
+  "spec": {
+    "summary": "Actor kind is env-var sniffing (all 785 dogfood events say agent, including human actions) and names are free text (Ryan Skidmore vs coordinator already). Let --as assert kind, normalize known actors per repo, and stop rendering a guess as the audit spine's human/agent glyphs.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "backlog",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZPAGKF4BAZ5DB936RPY95A",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:15:12.294Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:15:12.294Z",
+  "updated_at": "2026-08-01T22:15:12.294Z"
+}

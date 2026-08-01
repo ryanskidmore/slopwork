@@ -50,7 +50,7 @@ them without special-casing:
   ```json
   {
     "ticket":  { "id": "ticket_01…", "slug": "add-auth", "handle": "t-ab12x", "name": "Add auth", "state": "done" },
-    "session": { "id": "session_01…", "note": "shipped", "transcript": "transcripts/session_01….jsonl" },
+    "session": { "id": "session_01…", "note": "shipped" },
     "unblocked": ["ticket_01…"]
   }
   ```
@@ -58,7 +58,7 @@ them without special-casing:
 The `ticket` object always carries the same five fields (`id`, `slug`,
 `handle`, `name`, `state`), so `ticket.id` means the same thing everywhere.
 `drop` reports `"session": null` when the dropped ticket had no active session
-at all — distinct from a session that simply captured no transcript.
+at all.
 
 Errors never go to stdout, so a `--json` stdout stream is always either valid
 JSON or empty; branch on the [exit code](#exit-codes) first.
@@ -435,8 +435,7 @@ slop review <ref> --mr <url>            # also legal AGAIN once <ref> is already
 
 Moves `in_progress → review`. `--mr` is recommended, not required (D15):
 omitting it still moves the ticket, but nags on stderr and leaves
-`review.mr` absent. `--transcript <path>` overrides transcript
-auto-detection for this call.
+`review.mr` absent.
 
 Re-running `review <ref> --mr <url>` on a ticket **already** in review is
 also legal — an idempotent attach/replace of the MR link, not a new
@@ -445,7 +444,7 @@ recovery path the no-`--mr` nag advises; a bare `review <ref>` (no `--mr`)
 on an already-review ticket is still rejected (`CONFLICT`, exit `6`) —
 there's nothing to update without a link to attach.
 
-`--json` returns `{id, slug, handle, name, state, review, transcript,
+`--json` returns `{id, slug, handle, name, state, review,
 already_in_review}` — `review` is `null`, or `{mr, requested_at, by}`
 (same shape as `show --json`'s ticket field, `mr: null` when absent).
 
@@ -456,12 +455,9 @@ slop stop <ref> --note "state: X done, next: Y, gotcha: Z"
 ```
 
 Ends the current session without completing the ticket: hands it back to
-`open`, records the handoff note, captures the harness transcript. Never
-blocks if the transcript can't be found — warns instead. `--transcript
-<path>` is a manual override.
+`open` and records the handoff note.
 
-`--json` returns `{id, slug, handle, name, state, session_id, note,
-transcript}`.
+`--json` returns `{id, slug, handle, name, state, session_id, note}`.
 
 ### `done`
 
@@ -472,15 +468,14 @@ slop done <ref> --outcome - < outcome.md
 ```
 
 Completes `<ref>` — legal from `review` **or** directly from
-`in_progress` (review is optional). Finalizes the session (end summary +
-transcript), then runs the done-cascade exactly once, reporting any
+`in_progress` (review is optional). Finalizes the session (end summary),
+then runs the done-cascade exactly once, reporting any
 ticket this one was blocking that just became unblocked.
 
 | Flag | Meaning |
 |---|---|
 | `--note <text>` | completion note (also becomes the session's end summary and the ticket's `latest_note`) |
 | `--outcome <text>` | long-form resolution writeup stored on the ticket; `-` reads stdin |
-| `--transcript <path>` | manual transcript path override |
 | `--json` | machine-readable result — see below |
 
 Completing a non-`adhoc` ticket directly from `in_progress` (never went
@@ -488,7 +483,7 @@ through `review`) still succeeds but nags on stderr; `adhoc` tickets and
 the `review → done` path never nag.
 
 `--json` returns `{id, slug, handle, name, state, note, resolution_set,
-transcript, unblocked, problems, skipped_review}` — `unblocked` is the
+unblocked, problems, skipped_review}` — `unblocked` is the
 `TicketId[]` cascade list the prose output only ever joined into a
 comma-separated string; `problems` is `{id, message}[]` (any ticket/
 session file the cascade's own scan couldn't read, almost always `[]`);
@@ -504,12 +499,11 @@ slop drop <ref> --reason "superseded by ticket_01…"
 Marks `<ref>` `dropped` (wontdo) from any non-terminal state. `--reason`
 is **required**. Finalizes an active session if one exists, and runs the
 same done-cascade `done` does — a dropped ticket also stops blocking its
-dependents. `--transcript <path>` only matters if there's an active
-session to finalize.
+dependents.
 
-`--json` returns `{id, slug, handle, name, state, reason, transcript,
+`--json` returns `{id, slug, handle, name, state, reason, session,
 unblocked, problems}` — same `unblocked`/`problems` shape as `done
---json` (both run the identical cascade); `transcript` is `null` when
+--json` (both run the identical cascade); `session` is `null` when
 there was no active session to finalize.
 
 ---

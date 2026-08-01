@@ -1,0 +1,43 @@
+{
+  "id": "ticket_01KYZP97J5S0M4C4S7JAK7ET0R",
+  "name": "Storage interface + flatfile driver + backend config selection",
+  "slug": "storage-interface-flatfile-driver",
+  "spec": {
+    "summary": "Define the backend interface from what commands need (ticket/session CRUD, event append/list, ref resolution inputs, derived index data, transactional write scope). Refactor the current flatfile code into a driver implementing it. Add backend: to config.yaml, defaulting to flatfile.",
+    "details_md": "",
+    "acceptance": [
+      "No command imports flatfile internals directly; all go through the interface"
+    ],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "group:g2",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "parent": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F",
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F",
+  "path": [
+    "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F"
+  ],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:14:30.224Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:14:30.224Z",
+  "updated_at": "2026-08-01T22:14:30.224Z"
+}

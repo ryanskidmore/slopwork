@@ -19,11 +19,7 @@
 import { join } from "node:path";
 import { vi } from "vitest";
 import type { Config } from "../../src/core/index.js";
-import {
-  DEFAULT_REVIEW_STALE_AFTER,
-  DEFAULT_STALE_AFTER,
-  DEFAULT_TRANSCRIPTS_MODE,
-} from "../../src/core/index.js";
+import { DEFAULT_REVIEW_STALE_AFTER, DEFAULT_STALE_AFTER } from "../../src/core/index.js";
 import { type ConfigYamlInput, stringifyConfigYaml } from "../../src/cli/config-yaml.js";
 import { atomicWriteFile, ensureDbDirs, type RepoPaths } from "../../src/repo/index.js";
 
@@ -31,8 +27,7 @@ import { atomicWriteFile, ensureDbDirs, type RepoPaths } from "../../src/repo/in
  * Every harness/actor-identity env var real command code reads at runtime
  * — `src/sessions/harness.ts`'s `sniffHarnessKind`/`sessionIdForKind`
  * (`CLAUDECODE`, `OPENCODE`, `CODEX_SANDBOX`,
- * `CODEX_SANDBOX_NETWORK_DISABLED`, `CLAUDE_CODE_SESSION_ID`),
- * `src/sessions/transcript.ts`'s `$CODEX_HOME` fallback (`CODEX_HOME`),
+ * `CODEX_SANDBOX_NETWORK_DISABLED`, `CLAUDE_CODE_SESSION_ID`)
  * and `src/cli/actor.ts`'s D17 `SLOP_ACTOR` env read — scrubbed by
  * {@link withCwd} below for the duration of every in-process command run.
  *
@@ -40,8 +35,8 @@ import { atomicWriteFile, ensureDbDirs, type RepoPaths } from "../../src/repo/in
  * process's own ambient environment. Locally that's often a live coding-
  * agent session (e.g. Claude Code itself sets `CLAUDECODE=1`/
  * `CLAUDE_CODE_SESSION_ID` on every process it spawns, including `bun run
- * test`), which makes harness detection — and therefore transcript-capture
- * warnings, `--harness`-less auto-detection, actor `kind` — resolve
+ * test`), which makes harness detection — and therefore
+ * `--harness`-less auto-detection and actor `kind` — resolve
  * DIFFERENTLY than it does in CI, where none of these vars are ever set.
  * A test that passed locally under such a session and asserted on that
  * env-dependent behavior (e.g. "stderr is empty") would then fail in CI,
@@ -146,19 +141,17 @@ export async function bootstrapRepo(dir: string, opts: BootstrapOptions = {}): P
     ...(opts.jira !== undefined ? { jira: opts.jira } : {}),
     staleAfter: opts.staleAfter ?? DEFAULT_STALE_AFTER,
     reviewStaleAfter: opts.reviewStaleAfter ?? DEFAULT_REVIEW_STALE_AFTER,
-    transcripts: opts.transcripts ?? DEFAULT_TRANSCRIPTS_MODE,
   } satisfies ConfigYamlInput);
   await atomicWriteFile(join(paths.slopDir, "config.yaml"), yamlText);
   return paths;
 }
 
 /** Config-shaped defaults {@link bootstrapRepo} writes, for tests that want to assert against them without re-deriving. */
-export const BOOTSTRAP_DEFAULTS: Pick<Config, "defaults" | "transcripts"> = {
+export const BOOTSTRAP_DEFAULTS: Pick<Config, "defaults"> = {
   defaults: {
     stale_after: DEFAULT_STALE_AFTER,
     review_stale_after: DEFAULT_REVIEW_STALE_AFTER,
   },
-  transcripts: DEFAULT_TRANSCRIPTS_MODE,
 };
 
 export interface CapturedOutput {

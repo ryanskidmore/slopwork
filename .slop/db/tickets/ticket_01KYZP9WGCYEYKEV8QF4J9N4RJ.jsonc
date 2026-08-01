@@ -1,0 +1,43 @@
+{
+  "id": "ticket_01KYZP9WGCYEYKEV8QF4J9N4RJ",
+  "name": "Benchmarks: realistic event ratio, drop the 1M rung",
+  "slug": "benchmarks-realistic-event-ratio-drop",
+  "spec": {
+    "summary": "bench seeds 2 events/ticket; real dogfood ratio is ~9. Reseed at ~9:1, drop the 1M-ticket rung (own docs say nobody should run there), and refresh benchmarks.md numbers for 1k/10k/100k.",
+    "details_md": "",
+    "acceptance": [
+      "benchmarks.md reflects realistic event volume; misleading 1M column removed"
+    ],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "group:g5",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "parent": "ticket_01KYZP8A340W5A8X70TYQ6XVT8",
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZP8A340W5A8X70TYQ6XVT8",
+  "path": [
+    "ticket_01KYZP8A340W5A8X70TYQ6XVT8"
+  ],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:14:51.663Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:14:51.663Z",
+  "updated_at": "2026-08-01T22:14:51.663Z"
+}

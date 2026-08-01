@@ -2,8 +2,8 @@
 
 Slopwork (`slop`) is a free, open-source work tracker built for agents. Engineers break work
 into a dependency graph of tickets; coding agents pick tickets up, plan their approach, work
-through a session, and leave an auditable trail — progress notes, plan checkpoints, an MR, and a
-transcript — ending in `done`. v0 is a local CLI backed by a flatfile JSONC database
+through a session, and leave an auditable trail — progress notes, plan checkpoints, and an
+MR — ending in `done`. v0 is a local CLI backed by a flatfile JSONC database
 (`.slop/db/`) designed to be git-mergeable across parallel agent streams, plus a read-only local
 web explorer (`slop web`). See [`docs/design.md`](docs/design.md) for the full spec and
 [`docs/v0-implementation-plan.md`](docs/v0-implementation-plan.md) for how it was built.
@@ -131,13 +131,13 @@ Stored ticket states: `draft ⇄ open → in_progress → review → done`, plus
 - **`slop review <ref> --mr <url>`** — `in_progress → review` only. `--mr` is
   required-*with-warning* (D15/§8.1 item 3): omit it and the command still succeeds, but nags on
   stderr; `ticket.review.mr` is left absent, not `null`. The session stays **active** across a
-  review round-trip — `review` only captures a fresh transcript snapshot into it, never sets
+  review round-trip — `review` never sets
   `ended_at`. See `DECISIONS.md`'s C3 entries for the full session-model writeup.
 - **`slop done <ref> [--note]`** — `review → done` **or** directly `in_progress → done`; review is
   optional, not required. Completing a non-`adhoc` ticket directly from `in_progress` (i.e. it
   never went through `review`) still succeeds, but nags on stderr suggesting `slop review --mr
   <url>` next time; `adhoc` tickets (D13) and the `review → done` path never nag. Either way,
-  `done` finalizes the session (end summary from `--note`, transcript captured per D16,
+  `done` finalizes the session (end summary from `--note`,
   `active_session` cleared) and runs B4's done-cascade exactly once, emitting `ticket.ready` for
   any dependent this ticket was blocking.
 - **`slop drop <ref> --reason "…"`** — `→ dropped` from any non-terminal state; `--reason` is
@@ -220,7 +220,7 @@ src/
   tickets/              ticket-domain logic on top of repo/: state machine, done-cascade,
                         staleness, search, ancestry/tree, jira ref parsing
   sessions/             session lifecycle: harness/git capture, plan versioning + diff,
-                        context pack, start/stop/finalize, transcript capture
+                        context pack, start/stop/finalize
   web/                  read-only local web explorer (`slop web`) — React SPA + JSON API
     index.ts               re-exports the HTTP server + data source; serves any real `.slop`
                             directory (not just fixtures) at http://localhost:4553 by default

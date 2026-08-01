@@ -30,11 +30,6 @@ describe("buildFinalizedSession", () => {
     expect(finalized.end_summary).toBeNull();
   });
 
-  it("does not touch transcript_ref — that's the caller's job, folding in C4's captureTranscript result", () => {
-    const finalized = buildFinalizedSession(makeSession({ transcript_ref: null }), "note", clock);
-    expect(finalized.transcript_ref).toBeNull();
-  });
-
   it("leaves every other field on the session untouched", () => {
     const session = makeSession({ end_summary: null });
     const finalized = buildFinalizedSession(session, "wrap-up", clock);

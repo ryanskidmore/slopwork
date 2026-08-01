@@ -1,13 +1,12 @@
 import type { Command } from "commander";
 import type { Clock } from "../../core/clock.js";
 import { systemClock } from "../../core/clock.js";
-import type { Session, Ticket } from "../../core/index.js";
+import type { Ticket } from "../../core/index.js";
 import {
   END_SUMMARY_MAX_LENGTH,
   EXIT_CODES,
   nowIso,
   RESOLUTION_MAX_LENGTH,
-  sessionSchema,
   ticketSchema,
 } from "../../core/index.js";
 import {
@@ -23,10 +22,6 @@ import {
 } from "../../repo/index.js";
 import { buildFinalizedSession } from "../../sessions/finalize.js";
 import { diffSessionPatch, SESSION_END_FIELDS } from "../../sessions/patch.js";
-import {
-  resolveTranscriptCapture,
-  speculativeTranscriptCapture,
-} from "../../sessions/transcript.js";
 import { cascadeOnClose } from "../../tickets/cascade.js";
 import { diffTicketPatch, TICKET_FIELDS } from "../../tickets/patch.js";
 import { checkDoneEntry } from "../../tickets/state.js";
@@ -43,21 +38,9 @@ import {
 
 interface DoneCommandOptions {
   note?: string;
-  transcript?: string;
   outcome?: string;
   json?: boolean;
 }
-
-/**
- * Every field this command patches into the active session: `done`'s own
- * end-of-session fields (`ended_at`/`end_summary`) PLUS `transcript_ref`
- * (C4) — one `updateSession` write, matching `stop.ts`'s `STOP_SESSION_FIELDS`
- * (see transcript.ts's module doc, "Exactly how C3 must call this").
- */
-const DONE_SESSION_FIELDS = [
-  ...SESSION_END_FIELDS,
-  "transcript_ref",
-] as const satisfies readonly (keyof Session)[];
 
 /**
  * Build (never persist) the ticket as `done` should leave it: `review ->
@@ -112,9 +95,8 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
   const initialTicket = await resolveTicketRef(paths, ref);
 
   // `--outcome -` reads stdin, mirroring `--spec -` (new/update — see
-  // shared.ts's `readStdin` doc). Read OUTSIDE the lock, same rationale as
-  // the transcript capture just below: I/O that isn't part of the
-  // transactional write shouldn't hold the db lock open.
+  // shared.ts's `readStdin` doc). Read OUTSIDE the lock: I/O that isn't
+  // part of the transactional write shouldn't hold the db lock open.
   const outcomeRaw =
     opts.outcome === undefined
       ? undefined
@@ -131,22 +113,6 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
   if (outcomeRaw !== undefined) {
     assertMaxLength("--outcome", outcomeRaw.trim(), RESOLUTION_MAX_LENGTH);
   }
-
-  // Fix 1 (ticket_01KY93E2ZK6Z3TFEBP86ATMW37): locate + copy the harness
-  // transcript BEFORE acquiring the db lock — see transcript.ts's
-  // top-of-file doc, "Fix 1", and stop.ts's identical comment for the
-  // full rationale. Reconciled against the AUTHORITATIVE session below
-  // via `resolveTranscriptCapture`.
-  const speculativeCapture = await speculativeTranscriptCapture(
-    paths,
-    initialTicket.active_session,
-    {
-      paths,
-      cwd: root,
-      transcriptsMode: config.transcripts,
-      explicitTranscriptPath: opts.transcript,
-    },
-  );
 
   const result = await withLock(paths.lockFile, async (lock) => {
     const current = await readTicket(paths, initialTicket.id);
@@ -166,8 +132,7 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
     // directly from `in_progress` — i.e. this ticket never went through
     // `review` — is legal per `checkDoneEntry` above, but a non-`adhoc`
     // ticket still gets a soft warning, printed on stderr AFTER the
-    // transaction commits (below), same convention as the transcript-miss
-    // warning. `adhoc` tickets (D13: exempt from the usual planning
+    // transaction commits (below). `adhoc` tickets (D13: exempt from the usual planning
     // ceremony) never nag, and neither does the unchanged `review -> done`
     // path.
     const skippedReview = current.state === "in_progress" && current.adhoc !== true;
@@ -194,31 +159,12 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
     // not an enforced gate — see sessionOwnershipWarning's own doc.
     const ownershipWarning = sessionOwnershipWarning(session, actor);
 
-    const finalizedSession = buildFinalizedSession(session, opts.note ?? null);
-
-    // C4's seam (transcript.ts's module doc, "Exactly how C3 must call
-    // this"): capture against the PRE-mutation session, fold the result
-    // into the SAME session write as ended_at/end_summary. Never blocks —
-    // captureTranscript itself never throws; a miss degrades to
-    // transcript_ref: null plus a warning printed after the transaction
-    // commits, below. Reuses `speculativeCapture` (captured OUTSIDE this
-    // lock, above) when it's still keyed to this exact session.
-    const capture = await resolveTranscriptCapture(speculativeCapture, {
-      session,
-      paths,
-      cwd: root,
-      transcriptsMode: config.transcripts,
-      explicitTranscriptPath: opts.transcript,
-    });
-    const finalSession = sessionSchema.parse({
-      ...finalizedSession,
-      transcript_ref: capture.transcriptRef,
-    });
+    const finalSession = buildFinalizedSession(session, opts.note ?? null);
 
     await updateSession(
       paths,
       session.id,
-      diffSessionPatch(session, finalSession, DONE_SESSION_FIELDS),
+      diffSessionPatch(session, finalSession, SESSION_END_FIELDS),
       finalSession,
       { actor, session: session.id },
       {
@@ -226,7 +172,6 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
         payload: {
           reason: "done",
           ...(opts.note !== undefined ? { note: opts.note } : {}),
-          ...(capture.transcriptRef !== null ? { transcript_ref: capture.transcriptRef } : {}),
         },
       },
     );
@@ -252,15 +197,14 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
     return {
       session: finalSession,
       ticket: doneTicket,
-      transcriptWarning: capture.warning,
       cascade,
       skippedReview,
       ownershipWarning,
     };
   });
 
-  // Printed AFTER the transaction commits — a transcript miss, a skipped
-  // review, a session-ownership mismatch, or a corrupt-elsewhere-in-the-db
+  // Printed AFTER the transaction commits — a skipped review, a
+  // session-ownership mismatch, or a corrupt-elsewhere-in-the-db
   // problem is a warning, never a reason `done` itself could fail (same
   // convention as `stop.ts`; see sessionOwnershipWarning's own doc).
   if (result.skippedReview) {
@@ -270,7 +214,6 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
         "optional, not required)",
     );
   }
-  if (result.transcriptWarning !== null) printWarning(result.transcriptWarning);
   if (result.ownershipWarning !== null) printWarning(result.ownershipWarning);
   if (result.cascade.problems.length > 0) {
     process.stderr.write(`${formatIndexProblems(result.cascade.problems)}\n`);
@@ -295,7 +238,6 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
           session: {
             id: result.session.id,
             note: result.session.end_summary,
-            transcript: result.session.transcript_ref,
           },
           resolution_set: result.ticket.resolution !== undefined,
           unblocked: result.cascade.unblocked,
@@ -315,30 +257,28 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
       `  state: ${result.ticket.state}\n` +
       `  note: ${result.session.end_summary ?? "(none)"}\n` +
       `  resolution: ${result.ticket.resolution !== undefined ? "(set)" : "(none)"}\n` +
-      `  transcript: ${result.session.transcript_ref ?? "(none)"}\n` +
       (result.cascade.unblocked.length > 0
         ? `  unblocked: ${result.cascade.unblocked.join(", ")}\n`
         : ""),
   );
 }
 
-/** `slop done` — design.md §2, §4.3, D15, D16; work item C3.
+/** `slop done` — design.md §2, §4.3, D15; work item C3.
  *
  * `review -> done` OR `in_progress -> done` (see `buildDoneTicket`'s doc —
  * D15 revised, review is optional; ticket_01KY9RWFDR9QEWQ5B1ZACQJ338):
- * finalizes the active session (end summary from `--note`, transcript
- * captured per C4), then runs B4's done-cascade exactly once. Completing a
- * non-`adhoc` ticket directly from `in_progress` (skipping review) nags on
- * stderr but still succeeds; `adhoc` tickets and the `review -> done` path
- * never nag.
+ * finalizes the active session (end summary from `--note`), then runs B4's
+ * done-cascade exactly once. Completing a non-`adhoc` ticket directly from
+ * `in_progress` (skipping review) nags on stderr but still succeeds;
+ * `adhoc` tickets and the `review -> done` path never nag.
  */
 export function registerDoneCommand(program: Command): void {
   program
     .command("done")
     .description(
       "Complete <ref> (from review, or directly from in_progress — review is optional, but non-" +
-        "adhoc tickets nag on stderr if they skip it): finalize the session (end summary + transcript per " +
-        "D16), cascade unblocks (B4), and mark done.",
+        "adhoc tickets nag on stderr if they skip it): finalize the session (end summary), " +
+        "cascade unblocks (B4), and mark done.",
     )
     .argument("<ref>", "ticket to complete")
     .option("--note <text>", "completion note")
@@ -347,13 +287,9 @@ export function registerDoneCommand(program: Command): void {
       'long-form resolution/outcome writeup, stored on the ticket; pass "-" to read from stdin',
     )
     .option(
-      "--transcript <path>",
-      "manual transcript path (works for any harness; overrides auto-detection when the file exists)",
-    )
-    .option(
       "--json",
       "machine-readable result (id, slug, handle, name, state, note, resolution_set, " +
-        "transcript, unblocked, problems, skipped_review)",
+        "unblocked, problems, skipped_review)",
     )
     .action(runDone);
 }

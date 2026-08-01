@@ -354,8 +354,6 @@ describe("E2: Concurrency + merge hardening", () => {
     it("index.jsonc (D14) was never part of the merge: gitignored on both clones, genuinely diverged locally, never tracked before or after", () => {
       expect(report.trackedFilesA.some((f) => f.endsWith("index.jsonc"))).toBe(false);
       expect(report.trackedFilesB.some((f) => f.endsWith("index.jsonc"))).toBe(false);
-      expect(report.trackedFilesA.some((f) => f.includes(".slop/transcripts/"))).toBe(false);
-      expect(report.trackedFilesB.some((f) => f.includes(".slop/transcripts/"))).toBe(false);
       expect(report.graph.indexFileTrackedByGitPostMerge).toBe(false);
       expect(report.localIndexDivergedBeforeMerge).toBe(true);
     });

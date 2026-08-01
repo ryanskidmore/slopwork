@@ -1,0 +1,38 @@
+{
+  "id": "ticket_01KYZP9WYW274QT8JEFSDHXA3R",
+  "name": "MCP server (F5)",
+  "slug": "mcp-server-f5",
+  "spec": {
+    "summary": "Built-for-agents tool whose only integration is subprocess+stdout. Ship the F5 MCP server: tiered tools, core ~7 tools / ~5k tokens per design.md.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "backlog",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZP9WYW274QT8JEFSDHXA3R",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-08-01T22:14:52.177Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-01T22:14:52.177Z",
+  "updated_at": "2026-08-01T22:14:52.177Z"
+}

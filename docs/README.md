@@ -3,7 +3,7 @@
 **Slopwork** (`slop`) is a free, open-source work tracker built for coding
 agents. Engineers break work into a dependency graph of tickets; agents pick
 tickets up, plan their approach, work through a session, and leave an
-auditable trail — progress notes, plan checkpoints, an MR, and a transcript —
+auditable trail — progress notes, plan checkpoints, and an MR —
 ending in `done`.
 
 It's a local-first CLI (binary `slop`, npm package `slopwork`) backed by a
@@ -21,7 +21,7 @@ distills those into what you need to actually use the tool.
 
 - **Engineers / humans** who want a dependency graph of work instead of a
   flat backlog, and who want to *audit* what an agent actually did — not
-  just trust a chat transcript.
+  just trust a chat log.
 - **Coding agents** (Claude Code, opencode, Codex, or a plain human at the
   CLI) that need a single source of truth for "what should I work on" and
   "how do I record what I did."
@@ -34,7 +34,7 @@ distills those into what you need to actually use the tool.
 | [Concepts](concepts.md) | The five entities (Ticket, Edge, Session, Event, Actor), the state machine, derived overlays (`blocked`/`stale`/`ready`), the flatfile db layout |
 | [CLI reference](cli-reference.md) | Every command, every flag, ref resolution, exit codes |
 | [Agent workflow](agent-workflow.md) | The loop agents follow and the house rules (mirrors `slop instructions`) |
-| [Web UI](web-ui.md) | What `slop web` shows — list, tree, ticket detail, transcripts, review/stale panels |
+| [Web UI](web-ui.md) | What `slop web` shows — list, tree, ticket detail, review/stale panels |
 | [Configuration](configuration.md) | `.slop/config.yaml`, actor/harness identity resolution, environment variables |
 | [Concurrency & merging](concurrency-and-merging.md) | Why `.slop/db/` merges cleanly, the multi-file lock, and lock-free progress updates |
 | [Benchmarks](benchmarks.md) | Measured scaling limits: where the flatfile store stops being fast, and how it behaves under heavy concurrency |
@@ -49,7 +49,7 @@ design choice, the docs above for how to use the tool:
 | [Design spec](design.md) | The internal spec v0 was built from (v0.6): decisions D1–D17, the state model, the flatfile db, the feature menu |
 | [Engineering decisions](DECISIONS.md) | Append-only decision log written during the build; cited from code comments by work-item id |
 | [v0 implementation plan](v0-implementation-plan.md) | The plan v0 was built from; its work-item ids (A1…E4) name the acceptance tests |
-| [Spike findings](spikes/findings.md) | Day-0 research: harness env vars and transcript locations per harness |
+| [Spike findings](spikes/findings.md) | Day-0 research: harness env vars and per-harness session-log locations |
 | [JSONC spike](spikes/jsonc.md) | The serialization spike behind the comment-preserving JSONC write path |
 
 ## The one-paragraph version

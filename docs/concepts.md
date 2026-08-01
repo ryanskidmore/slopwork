@@ -91,9 +91,6 @@ A real harness session — not a lock/claim (`src/core/entities/session.ts`):
   across a review round-trip; only `done`, `drop`, and `stop` end a
   session.
 - `end_summary` — from `--note` on `stop`/`done`.
-- `transcript_ref` — path (relative to `.slop/`) to the captured harness
-  transcript, or `null` if none could be found (never blocks the state
-  change either way).
 
 A ticket points at its current session via `active_session`; `ready`
 excludes any ticket with one set.
@@ -206,7 +203,6 @@ the current clock.
     events/event_<ulid>.jsonc          # immutable, one per event
     index.jsonc                        # derived — GITIGNORED, auto-healed
     .lock                              # multi-file transaction lock
-  transcripts/session_<ulid>.jsonl     # GITIGNORED by default
 ```
 
 `index.jsonc` is a pure function of the entity files on disk: slug → id

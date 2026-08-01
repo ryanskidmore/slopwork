@@ -22,14 +22,9 @@ import { shortTicketCode } from "../../src/core/index.js";
 // tests/fixtures/web-db/.slop/, a fixture HAND-BUILT via
 // tests/fixtures/generate-web-db.ts (ticketSchema.parse + writeCanonical
 // directly) — never against a `.slop/` directory the real CLI actually
-// produced. DECISIONS.md's D5 entry itself flags `transcript_ref`
-// ("transcripts/<session.id>.jsonl", relative to the `.slop` root) as an
-// assumption made on the WRITING side (src/sessions/transcript.ts) that
-// the READING side (src/web/fixture-data-source.ts's `openTranscript`)
-// independently has to agree with. A drift between those two — or any
-// other write-path/read-path mismatch (a field the write path never
+// produced. A write-path/read-path mismatch (a field the write path never
 // populates the way the view expects, an edge case only a real multi-step
-// lifecycle produces) — would pass every schema check in A2.test.ts yet
+// lifecycle produces) would pass every schema check in A2.test.ts yet
 // still render wrong or 500 in the browser, uncaught by every existing
 // `slop web` test.
 //
@@ -248,19 +243,13 @@ function updateProgress(root: string, ref: string, note: string): void {
   expect(result.status, result.stderr).toBe(0);
 }
 
-function review(root: string, ref: string, mr: string, transcriptPath: string): void {
-  const result = runSlop(["review", ref, "--mr", mr, "--transcript", transcriptPath], root);
+function review(root: string, ref: string, mr: string): void {
+  const result = runSlop(["review", ref, "--mr", mr], root);
   expect(result.status, result.stderr).toBe(0);
 }
 
-function done(
-  root: string,
-  ref: string,
-  note: string,
-  transcriptPath: string,
-  outcome?: string,
-): void {
-  const args = ["done", ref, "--note", note, "--transcript", transcriptPath];
+function done(root: string, ref: string, note: string, outcome?: string): void {
+  const args = ["done", ref, "--note", note];
   if (outcome !== undefined) args.push("--outcome", outcome);
   const result = runSlop(args, root);
   expect(result.status, result.stderr).toBe(0);
@@ -367,13 +356,9 @@ const MR_URL = "https://github.com/real-repo-fixture/real-repo-fixture/pull/7";
 const REVIEW_TICKET_MR_URL = "https://github.com/real-repo-fixture/real-repo-fixture/pull/9";
 const PROGRESS_NOTE = "confirmed the web read path renders real CLI output end to end";
 const DONE_NOTE = "web-real-repo smoke coverage landed; verified against a genuine CLI lifecycle";
-const TRANSCRIPT_USER_MARKER =
-  "please prove slop web can render a transcript that review and done actually captured";
-const TRANSCRIPT_ASSISTANT_MARKER =
-  "Captured. Running the verification command now before handing this back.";
 
 // XSS-shaped strings, one per attacker-influenced field category this
-// ticket's brief names ("names, spec, notes, resolution, transcript text,
+// ticket's brief names ("names, spec, notes, resolution,
 // actor names, MR/urls") that has a real CLI write path — MR itself is
 // EXCLUDED (`mrUrlSchema`, core/entities/ticket.ts, rejects a non-http(s)
 // scheme at write time, so `slop review --mr javascript:...` can never
@@ -398,8 +383,6 @@ const RESOLUTION_MD = [
 ].join("\n");
 const XSS_PROGRESS_NOTE = `${XSS_MARK}progress-note-xss-marker`;
 const XSS_ACTOR_NAME = `${XSS_MARK}xss-actor`;
-const TRANSCRIPT_XSS_MARKER = "transcript-xss-marker";
-const TRANSCRIPT_XSS_SAFE_URL = "https://example.com/transcript/safe";
 
 async function get(path: string, init?: RequestInit): Promise<Response> {
   if (!server) throw new Error("server not started");
@@ -443,11 +426,10 @@ beforeAll(async () => {
       "Prove slop web renders exactly what a real CLI lifecycle produced, not a hand-built fixture.",
     details_md:
       "## Why\n\nEvery existing slop web test runs against a hand-built fixture db, never a repo the " +
-      "real CLI produced.\n\n- Exercise the write path all the way into the web read path\n- Catch any transcript_ref convention drift\n",
+      "real CLI produced.\n\n- Exercise the write path all the way into the web read path\n- Catch any write/read convention drift\n",
     acceptance: [
       "slop web lists this ticket by name",
       "the ticket detail page renders this real spec",
-      "the transcript view renders the transcript review/done actually captured",
     ],
   });
 
@@ -477,64 +459,13 @@ beforeAll(async () => {
   // ends up as whichever was written last).
   updateProgress(root, mainTicket.slug, XSS_PROGRESS_NOTE);
 
-  // A real transcript file (C4.test.ts's `--transcript <path>` fallback —
-  // "works for any harness ... including 'other', the default
-  // no-detection case"), captured at BOTH review and done: `done`'s own
-  // captureTranscript call re-locates independently of review's (C3/C4's
-  // documented contract — see src/sessions/transcript.ts's module doc),
-  // so re-passing --transcript at done is what keeps transcript_ref set
-  // through to the final, served state rather than being recaptured to
-  // null.
-  const transcriptPath = join(root, "fake-transcript.jsonl");
-  await writeFile(
-    transcriptPath,
-    `${[
-      JSON.stringify({
-        type: "user",
-        message: { role: "user", content: TRANSCRIPT_USER_MARKER },
-      }),
-      JSON.stringify({
-        type: "assistant",
-        message: {
-          role: "assistant",
-          model: "claude-sonnet-5",
-          content: [
-            { type: "text", text: TRANSCRIPT_ASSISTANT_MARKER },
-            { type: "tool_use", id: "tu_1", name: "Bash", input: { command: "bun test" } },
-          ],
-        },
-      }),
-      // ticket_01KY9S0172V8AYCYV9KWS6RC9P: a `text` block whose markdown
-      // carries a `javascript:` link alongside a safe one — transcript
-      // text renders through the exact same `renderMarkdownToString` ->
-      // `sanitizeMarkdownHtml` path as spec.details_md/resolution
-      // (transcript-view.ts's `renderBlock`), so this is "transcript text"
-      // from this ticket's XSS-safety brief, proven against a transcript a
-      // real `review`/`done --transcript` call actually captured.
-      JSON.stringify({
-        type: "assistant",
-        message: {
-          role: "assistant",
-          model: "claude-sonnet-5",
-          content: [
-            {
-              type: "text",
-              text: `${TRANSCRIPT_XSS_MARKER}: [bad](javascript:alert('t')) vs [safe](${TRANSCRIPT_XSS_SAFE_URL})`,
-            },
-          ],
-        },
-      }),
-    ].join("\n")}\n`,
-    "utf8",
-  );
-
-  review(root, mainTicket.slug, MR_URL, transcriptPath);
+  review(root, mainTicket.slug, MR_URL);
   // `--outcome`: the resolution writeup (RESOLUTION_MD) carries the same
   // javascript:/raw-HTML XSS shapes ticket-detail.test.ts's dedicated
   // resolution test already covers in isolation — proven here against a
   // ticket that also has a full real session/plan/review history around
   // it, not just a bare `done` call.
-  done(root, mainTicket.slug, DONE_NOTE, transcriptPath, RESOLUTION_MD);
+  done(root, mainTicket.slug, DONE_NOTE, RESOLUTION_MD);
 
   // --- ticket_01KY9S0172V8AYCYV9KWS6RC9P: relationships beyond blocks/blocked-by ---
 
@@ -571,7 +502,7 @@ beforeAll(async () => {
 
   reviewTicket = newTicket(root, "Left in review to go review-stale");
   startTicket(root, reviewTicket.slug);
-  review(root, reviewTicket.slug, REVIEW_TICKET_MR_URL, transcriptPath);
+  review(root, reviewTicket.slug, REVIEW_TICKET_MR_URL);
   // Never done — stays in review for the lifetime of this fixture.
 
   // SLOP_WEB_FAKE_NOW (src/cli/commands/web.ts's testing-only clock
@@ -618,8 +549,8 @@ afterAll(async () => {
 //    still real: the API must hand back the attacker-shaped string
 //    VERBATIM, never interpreted/stripped/mangled — proven below by exact
 //    equality checks.
-//  - markdown-derived fields (`spec.details_html`, `resolution_html`,
-//    transcript block `html`) keep the FULL old XSS-neutralisation
+//  - markdown-derived fields (`spec.details_html`, `resolution_html`)
+//    keep the FULL old XSS-neutralisation
 //    assertions unchanged in spirit — these are still real, sanitized HTML
 //    strings (src/web/markdown.ts), so `javascript:`/`data:` neutralisation
 //    is exactly as testable, and exactly as load-bearing, as before.
@@ -662,7 +593,6 @@ interface TicketDetailLike {
     actor: { name: string };
     harness: string;
     end_summary: string | null;
-    has_transcript: boolean;
     is_active: boolean;
     plan: Array<{ version: number; steps: Array<{ text: string; checked: boolean }> }>;
   }>;
@@ -672,23 +602,6 @@ interface TicketDetailLike {
 async function getTicketDetail(id: string): Promise<{ status: number; body: TicketDetailLike }> {
   const res = await get(`/api/tickets/${id}`);
   return { status: res.status, body: (await res.json()) as TicketDetailLike };
-}
-
-interface TranscriptLike {
-  available: boolean;
-  records: Array<
-    | { kind: "system"; summary: string }
-    | {
-        kind: "turn";
-        role: "user" | "assistant";
-        blocks: Array<
-          | { type: "text" | "thinking"; html: string }
-          | { type: "tool_use"; name: string; input_json: string }
-          | { type: "tool_result"; text: string; is_error: boolean }
-          | { type: "unknown"; json: string }
-        >;
-      }
-  >;
 }
 
 describe("web against a real init/new/start/plan/review/done lifecycle", () => {
@@ -782,9 +695,7 @@ describe("web against a real init/new/start/plan/review/done lifecycle", () => {
       expect(body.spec.details_html).toContain("<h2>Why</h2>");
       expect(body.spec.details_html).not.toContain("## Why");
       expect(body.spec.acceptance).toContain("slop web lists this ticket by name");
-      expect(body.spec.acceptance).toContain(
-        "the transcript view renders the transcript review/done actually captured",
-      );
+      expect(body.spec.acceptance).toContain("the ticket detail page renders this real spec");
     });
 
     it("shows the real final state and the real --note as the session's end summary", async () => {
@@ -805,22 +716,16 @@ describe("web against a real init/new/start/plan/review/done lifecycle", () => {
       ).toBe(true);
     });
 
-    it("shows the real session's actor/harness and a transcript is available", async () => {
+    it("shows the real session's actor/harness", async () => {
       const { body } = await getTicketDetail(mainTicket.id);
       const session = body.sessions[0];
       expect(session?.actor.name).toBe("ryan");
       expect(session?.harness).toBe("other");
       expect(session?.id).toBe(mainSessionId);
-      expect(session?.has_transcript).toBe(true);
     });
 
     it("shows the real updates timeline, including the real review MR (from the review.requested event's payload) and the progress note", async () => {
       const { body } = await getTicketDetail(mainTicket.id);
-      // `review` (src/cli/commands/review.ts) emits TWO review.requested
-      // events — one on the session entity (transcript_ref bookkeeping,
-      // written first) and one on the ticket entity (carries `mr` — see
-      // that file's `buildReviewedTicket` write). Only the ticket-scoped
-      // one carries payload.mr.
       const reviewEvent = body.events.find(
         (e) => e.verb === "review.requested" && e.entity_kind === "ticket",
       );
@@ -829,51 +734,6 @@ describe("web against a real init/new/start/plan/review/done lifecycle", () => {
       expect(doneEvent?.label).toBe("marked done");
       expect(reviewEvent?.payload.mr).toBe(MR_URL);
       expect(body.events.some((e) => e.progress_note === PROGRESS_NOTE)).toBe(true);
-    });
-  });
-
-  describe("transcript view: the real transcript review/done captured", () => {
-    async function getTranscript(): Promise<TranscriptLike> {
-      const res = await get(`/api/tickets/${mainTicket.id}/sessions/${mainSessionId}/transcript`);
-      expect(res.status).toBe(200);
-      return (await res.json()) as TranscriptLike;
-    }
-
-    it("200s and classifies the real captured conversation, not raw JSONL", async () => {
-      const body = await getTranscript();
-      expect(body.available).toBe(true);
-
-      const raw = JSON.stringify(body.records);
-      expect(raw).toContain(TRANSCRIPT_USER_MARKER);
-      expect(raw).toContain(TRANSCRIPT_ASSISTANT_MARKER);
-      const toolUse = body.records
-        .flatMap((r) => (r.kind === "turn" ? r.blocks : []))
-        .find((b) => b.type === "tool_use");
-      expect(toolUse && toolUse.type === "tool_use" ? toolUse.name : null).toBe("Bash");
-      expect(body.records.some((r) => r.kind === "turn" && r.role === "user")).toBe(true);
-      expect(body.records.some((r) => r.kind === "turn" && r.role === "assistant")).toBe(true);
-      // Never dumps the raw record straight from disk (this project's own
-      // guard, re-checked here against a REAL captured file, not a
-      // hand-built one).
-      expect(raw).not.toContain('"parentUuid"');
-      expect(raw).not.toContain('"isSidechain"');
-    });
-
-    // ticket_01KY9S0172V8AYCYV9KWS6RC9P: "transcript text" is one of this
-    // ticket's own named XSS-safety categories — a `javascript:` markdown
-    // link inside a real captured transcript, neutralised the same way
-    // resolution/details_md are (src/web/markdown.ts, reused verbatim by
-    // src/web/api/transcript.ts's `blockDto`).
-    it("neutralises a javascript: link inside real transcript text, keeping the safe one live", async () => {
-      const body = await getTranscript();
-      const textBlocks = body.records
-        .flatMap((r) => (r.kind === "turn" ? r.blocks : []))
-        .filter((b): b is { type: "text" | "thinking"; html: string } => b.type === "text");
-      const html = textBlocks.map((b) => b.html).join("\n");
-      expect(html).toContain(TRANSCRIPT_XSS_MARKER);
-      expect(html).toContain(`href="${TRANSCRIPT_XSS_SAFE_URL}"`);
-      expect(html).not.toMatch(/href="javascript:/i);
-      expect(html).toContain("bad"); // the link's inert anchor text still shows
     });
   });
 

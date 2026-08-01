@@ -12,8 +12,8 @@ import { FIXTURE_NOW_ISO } from "../fixtures/web-db-meta.js";
 // 127.0.0.1 and have the victim's own browser send same-origin-looking
 // requests straight at this server. Nothing previously checked the `Host`
 // header a request actually arrived with, so a DNS-rebound request was
-// served identically to a real request. `.slop/db` and its transcripts
-// routinely contain secrets, so this is a real scrape vector.
+// served identically to a real request. `.slop/db` routinely contains
+// secrets, so this is a real scrape vector.
 //
 // The Fetch API (including Node/undici's global `fetch`, verified
 // directly) refuses to let a caller override the `Host` header — it's a

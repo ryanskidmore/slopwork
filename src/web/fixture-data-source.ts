@@ -2,7 +2,7 @@
  * {@link FixtureDataSource}: a {@link WebDataSource} that reads a
  * `.slop`-shaped directory straight off disk (design.md §3's layout —
  * `config.yaml`, `db/tickets/*.jsonc`, `db/sessions/*.jsonc`,
- * `db/events/*.jsonc`, `transcripts/*.jsonl`) with plain filesystem calls,
+ * `db/events/*.jsonc`) with plain filesystem calls,
  * validating every file against the A2 zod schemas so a malformed fixture
  * fails loudly instead of silently drifting from the real shapes.
  *
@@ -29,21 +29,19 @@
  * called out explicitly in this work item's report.
  */
 import { readdir } from "node:fs/promises";
-import { basename, isAbsolute, join, relative, resolve } from "node:path";
+import { join } from "node:path";
 import {
   configSchema,
   type Event,
   eventSchema,
-  isSessionId,
   parseJsonc,
   type Session,
-  type SessionId,
   sessionSchema,
   type Ticket,
   type TicketId,
   ticketSchema,
 } from "../core/index.js";
-import type { ConfigResult, TranscriptHandle, WebDataSource } from "./data-source.js";
+import type { ConfigResult, WebDataSource } from "./data-source.js";
 import { matchTicketByRef } from "./overlays.js";
 
 /**
@@ -136,55 +134,6 @@ function parseEntity<T>(schema: { parse: (input: unknown) => T }, text: string, 
 }
 
 /**
- * True iff resolved absolute path `candidate` is `root` itself or lives
- * strictly inside it — i.e. `path.relative(root, candidate)` doesn't
- * escape upward (`..`) and isn't itself an absolute path (which
- * `path.relative` returns when `candidate` is on an unrelated path, e.g.
- * a different drive on Windows).
- *
- * The one and only guard against a `transcript_ref` path-traversal
- * (`../../etc/passwd` and friends) reading arbitrary files off the host —
- * see this module's final doc comment and `openTranscript` below, which
- * is the sole caller. `.slop/db` is a git-mergeable, collaborator-editable
- * store, so a tampered or buggy `transcript_ref` is a realistic input,
- * not just a theoretical one. Exported for direct unit testing of the
- * predicate itself, independent of the filesystem.
- */
-export function isContainedPath(root: string, candidate: string): boolean {
-  if (candidate === root) return true;
-  const rel = relative(root, candidate);
-  // path.relative() returns a string starting with ".." when `candidate`
-  // is outside `root`, and an absolute path when the two share no common
-  // root at all (e.g. different drives on Windows) — both mean "escaped".
-  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
-}
-
-/** Streaming line reader over a file on disk — see src/web/transcript.ts's module doc for why this matters for large transcripts. */
-async function* readLines(path: string): AsyncGenerator<string> {
-  const stream = Bun.file(path).stream();
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      let newlineIndex = buffer.indexOf("\n");
-      while (newlineIndex >= 0) {
-        yield buffer.slice(0, newlineIndex);
-        buffer = buffer.slice(newlineIndex + 1);
-        newlineIndex = buffer.indexOf("\n");
-      }
-    }
-    if (buffer.length > 0) yield buffer;
-  } finally {
-    reader.releaseLock();
-    await stream.cancel().catch(() => {});
-  }
-}
-
-/**
  * `project` has no schema default (design.md §3: it's required, prompted at
  * `init`) — so a synthesized fallback {@link Config} needs an explicit
  * stand-in. Deliberately visible/unusual rather than something that could
@@ -195,7 +144,7 @@ async function* readLines(path: string): AsyncGenerator<string> {
 const FALLBACK_PROJECT_LABEL = "(unknown — config.yaml unavailable)";
 
 export class FixtureDataSource implements WebDataSource {
-  /** Root of a `.slop` directory (design.md §3) — the directory that directly contains `config.yaml`, `db/`, and `transcripts/`. */
+  /** Root of a `.slop` directory (design.md §3) — the directory that directly contains `config.yaml` and `db/`. */
   constructor(private readonly slopRoot: string) {}
 
   /**
@@ -245,14 +194,6 @@ export class FixtureDataSource implements WebDataSource {
       .sort((a, b) => a.started_at.localeCompare(b.started_at));
   }
 
-  async getSessionById(id: SessionId): Promise<Session | null> {
-    if (!isSessionId(id)) return null;
-    const path = join(this.slopRoot, "db", "sessions", `${id}.jsonc`);
-    const file = Bun.file(path);
-    if (!(await file.exists())) return null;
-    return parseEntity(sessionSchema, await file.text(), path);
-  }
-
   /** The full `db/events/` directory, fault-tolerantly read — shared by
    * {@link listEventsForTicket} and {@link listEvents} so the two never
    * drift on what counts as a readable event file. */
@@ -286,29 +227,5 @@ export class FixtureDataSource implements WebDataSource {
 
   async listEvents(): Promise<Event[]> {
     return this.readAllEvents();
-  }
-
-  async openTranscript(transcriptRef: string): Promise<TranscriptHandle | null> {
-    // Convention this work item defines (see D5 report): transcript_ref is
-    // a path relative to the `.slop` root, e.g. "transcripts/session_….jsonl".
-    //
-    // transcript_ref comes from a session file in `.slop/db` — a
-    // git-mergeable, collaborator-editable store — so it cannot be
-    // trusted to actually be that shape. sessionSchema (src/core/entities
-    // /session.ts) rejects the obvious bad forms up front, but this is the
-    // load-bearing check: resolve the joined path and confirm it's still
-    // inside the resolved `.slop` root before ever touching the
-    // filesystem. A ref that escapes (`../`, an absolute path that slips
-    // past the schema, a symlink-free `..` segment buried mid-path, etc.)
-    // is treated exactly like "file not found" — never opened.
-    const root = resolve(this.slopRoot);
-    const path = resolve(join(this.slopRoot, transcriptRef));
-    if (!isContainedPath(root, path)) return null;
-    const file = Bun.file(path);
-    if (!(await file.exists())) return null;
-    return {
-      ref: basename(path),
-      lines: () => readLines(path),
-    };
   }
 }

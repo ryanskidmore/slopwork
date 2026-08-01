@@ -16,7 +16,7 @@
  *
  * This `globalSetup` hook is the guarantee: `setup()` runs once, before
  * any test file, and hashes (sha256, byte-for-byte, not mtime-based —
- * mtime granularity is exactly what made the codex transcript tests flaky
+ * mtime granularity is exactly what made mtime-based tests flaky
  * elsewhere in this suite) every file under THIS repo's own `.slop/`.
  * The returned teardown runs once, after every test file has finished,
  * takes the same snapshot again, and — if anything differs — throws,

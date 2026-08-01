@@ -1,0 +1,19 @@
+{
+  "id": "event_01KYBKR3VRCDXSECMQ6DM07BS0",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": "session_01KYBKARV0YD00NDHPNDBZXY4J",
+  "verb": "session.ended",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KYBKARV0YD00NDHPNDBZXY4J"
+  },
+  "payload": {
+    "reason": "done",
+    "note": "Tier-ranked list presented to Ryan with recommendation: S = DO-SQLite-per-project + thin global directory; A = D1 fleet; B = Hyperdrive+PlanetScale; C = R2 CAS lift-and-shift; KV cache-only. All limits verified against live docs 2026-07-24 (4 research agents; findings in progress notes + session transcript). Follow-up design work drafted as t-mp6hu, awaiting Ryan's direction choice.",
+    "transcript_ref": "transcripts/session_01KYBKARV0YD00NDHPNDBZXY4J.jsonl"
+  },
+  "at": "2026-07-25T03:05:23.576Z"
+}

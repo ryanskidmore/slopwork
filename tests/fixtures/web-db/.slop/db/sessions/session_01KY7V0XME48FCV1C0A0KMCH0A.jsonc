@@ -39,6 +39,5 @@
       "created_at": "2026-07-23T10:00:00.000Z"
     }
   ],
-  "end_summary": "All commands now throw SlopError; exit codes match the table in the README. MR up.",
-  "transcript_ref": "transcripts/session_01KY7V0XME48FCV1C0A0KMCH0A.jsonl"
+  "end_summary": "All commands now throw SlopError; exit codes match the table in the README. MR up."
 }

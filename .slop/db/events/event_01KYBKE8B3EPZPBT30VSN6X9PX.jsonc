@@ -1,0 +1,17 @@
+{
+  "id": "event_01KYBKE8B3EPZPBT30VSN6X9PX",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYBKAHJKCAYDPBCHSE33M8C7"
+  },
+  "payload": {
+    "progress": "Capacity math from dogfood db: ticket ~1.9KB, event ~416B (~9/ticket), session ~1.1KB, transcript ~2.85MB. 10M tickets => ~70GB OLTP + TBs of transcripts. Sharding mandatory for any 10GB-class primitive; transcripts are R2 regardless. 4 research agents in flight."
+  },
+  "at": "2026-07-25T03:00:00.483Z"
+}

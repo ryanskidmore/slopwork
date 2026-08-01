@@ -157,7 +157,7 @@ export function printWarning(message: string): void {
  * existing test exercised before this ticket. Every caller should print
  * the non-null result via {@link printWarning} AFTER its transaction
  * commits, same convention as every other soft warning in this codebase
- * (e.g. `stop.ts`'s transcript-capture warning) — this is informational,
+ * — this is informational,
  * never a reason a mutation could fail.
  */
 export function sessionOwnershipWarning(session: Session, actor: Actor): string | null {
