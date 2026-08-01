@@ -1,0 +1,17 @@
+{
+  "id": "event_01KYZRXXRFXBNZ2BY2M4YTW99X",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F"
+  },
+  "payload": {
+    "progress": "G2 subagent spawned; branch feat/g2-pluggable-storage stacked on origin/feat/g1-remove-transcripts; PR will base on the G1 branch. Covers children t-y2j03, t-an2d7, t-6tqw9, t-cloj2, t-k3krj; may also resolve 01KYAVM4 (web cache) as a side effect."
+  },
+  "at": "2026-08-01T23:00:45.455Z"
+}

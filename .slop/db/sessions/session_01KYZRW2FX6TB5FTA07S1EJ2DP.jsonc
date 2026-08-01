@@ -21,7 +21,7 @@
       "steps": [
         {
           "text": "Spawn G2 worktree subagent: storage interface, drivers, sharding, lock, overlay fold",
-          "checked": false
+          "checked": true
         },
         {
           "text": "Review agent report + PR",
