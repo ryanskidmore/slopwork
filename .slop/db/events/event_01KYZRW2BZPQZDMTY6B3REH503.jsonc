@@ -1,0 +1,17 @@
+{
+  "id": "event_01KYZRW2BZPQZDMTY6B3REH503",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYZP7VE2DKD0JTFB765P98GA"
+  },
+  "payload": {
+    "progress": "PR #1 open (base main, +3036/-6258), full gate green: 1812 tests, lint/format/typecheck/build clean. Post-merge coordinator chores: hand-remove transcripts: from .slop/config.yaml (init won't touch existing config), re-run slop init for AGENTS.md + gitignore section, delete .slop/transcripts/. Note: review no longer writes the session (transcript_ref was its only session write); review.requested is now ticket-scoped only."
+  },
+  "at": "2026-08-01T22:59:44.639Z"
+}
