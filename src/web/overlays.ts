@@ -45,40 +45,39 @@
  *    badge — which clock (in_progress's `last_activity_at` vs review's
  *    `review.requested_at`) is overdue, and since when — matching exactly
  *    what {@link isTicketStale} above already tests for the boolean.
- *  - {@link deriveEffectiveTickets}: applies `src/repo/db-index.ts`'s
- *    `deriveEffectiveOverlay` (imported, not reimplemented — this is the
- *    exact function this ticket's brief names) across a whole ticket list
- *    in one O(tickets + events) pass, so `latest_note`/`last_activity_at`
- *    — and everything derived from the latter, like `stale` — read the
- *    same EFFECTIVE values `slop show` does, not a possibly-stale
- *    verbatim ticket-file value (see that module's own doc,
- *    "latest_note/last_activity_at are EFFECTIVE, not stored-verbatim").
- *    This is the one function in this file that reaches into `src/repo/`
- *    — a deliberate, narrow exception to this module's usual
- *    "don't depend on the repo layer" stance: `deriveEffectiveOverlay` is
- *    pure/synchronous (no locking, no I/O, no persisted-index read), so
- *    reusing it carries none of the locking/index machinery
- *    `FixtureDataSource`'s doc comment says this package must not depend
- *    on — only re-deriving the *rule* a second time (and risking it
- *    drifting from `slop show`'s) would be the real hazard.
+ *  - {@link deriveEffectiveTickets} / {@link buildReverseEdgeIndex}: as of
+ *    G2 (unify-effective-overlay) these live in `src/tickets/overlay.ts`
+ *    — the ONE shared, pure derived-overlay module BOTH this web package
+ *    and the flatfile driver's index build (`src/repo/db-index.ts`)
+ *    consume, ending the era of two independently-drifting copies (E1's
+ *    web/CLI review-staleness divergence was exactly that drift). They're
+ *    re-exported here so every `src/web/api/*` caller keeps its existing
+ *    import path. This module no longer imports from `src/repo/` at all —
+ *    the web package depends only on `src/core/` and the pure
+ *    `src/tickets/` domain modules.
  */
 import {
   type Config,
-  type Event,
   idMatchesRef,
-  isTicketId,
-  outgoingEdges,
   parseDurationMs,
   type Ticket,
   type TicketId,
 } from "../core/index.js";
-import { deriveEffectiveOverlay } from "../repo/db-index.js";
+import { computeBlockedCounts } from "../tickets/overlay.js";
 import {
   computeReviewStaleAt,
   computeStaleAt,
   isReviewStale,
   isStale,
 } from "../tickets/staleness.js";
+
+// G2 (unify-effective-overlay): shared pure derivations, re-exported for
+// every existing `src/web/api/*` import site — see this module's doc.
+export {
+  buildReverseEdgeIndex,
+  deriveEffectiveTickets,
+  type ReverseEdgeIndex,
+} from "../tickets/overlay.js";
 
 export interface StaleThresholds {
   staleAfterMs: number;
@@ -121,12 +120,13 @@ export function matchTicketByRef(tickets: readonly Ticket[], ref: string): Ticke
  * over every ticket's outgoing `blocks` edges.
  */
 export function computeBlockedTicketIds(tickets: readonly Ticket[]): Set<TicketId> {
+  // G2 (unify-effective-overlay): derived from the SAME
+  // `computeBlockedCounts` the flatfile driver's index build uses
+  // (src/tickets/overlay.ts) rather than a second local walk of every
+  // ticket's `blocks` array — one live-blocker rule, everywhere.
   const blocked = new Set<TicketId>();
-  for (const ticket of tickets) {
-    if (ticket.state === "done" || ticket.state === "dropped") continue;
-    for (const target of ticket.blocks) {
-      blocked.add(target);
-    }
+  for (const [id, count] of computeBlockedCounts(tickets)) {
+    if (count > 0) blocked.add(id);
   }
   return blocked;
 }
@@ -230,86 +230,4 @@ export function formatRelative(iso: string, nowMs: number): string {
   const ms = msSince(iso, nowMs);
   if (ms < MINUTE) return "just now";
   return `${formatDurationShort(ms)} ago`;
-}
-
-function pushInto<K>(map: Map<K, TicketId[]>, key: K, value: TicketId): void {
-  const existing = map.get(key);
-  if (existing) existing.push(value);
-  else map.set(key, [value]);
-}
-
-/**
- * Every relationship's REVERSE direction — none of these are stored
- * (DECISIONS.md: edges live only on their source ticket), so "who blocks
- * me"/"who relates to me"/"what got discovered here" all have to be
- * derived by scanning every ticket's outgoing edges and inverting, exactly
- * like `src/repo/db-index.ts`'s `buildIndex` does for the real index (see
- * this module's doc for why that logic is mirrored here rather than
- * imported). `parent`/`children` has no entry here — D6's materialised
- * `root_id`/`path` already give ancestry without needing a "children of"
- * index, and `views/ticket-detail.ts` derives "children of this ticket"
- * directly with a one-line filter over the full ticket list it already has.
- */
-export interface ReverseEdgeIndex {
-  /** Tickets whose `blocks` array names the key ticket — i.e. who blocks it (any state, not just live — see {@link liveBlockers} for the live-only reason list). */
-  blockedBy: ReadonlyMap<TicketId, TicketId[]>;
-  /** Tickets whose `relates_to` array names the key ticket. */
-  relatedFrom: ReadonlyMap<TicketId, TicketId[]>;
-  /** Tickets whose `discovered_from` array names the key ticket — i.e. what was discovered while working the key ticket. */
-  discovered: ReadonlyMap<TicketId, TicketId[]>;
-}
-
-export function buildReverseEdgeIndex(tickets: readonly Ticket[]): ReverseEdgeIndex {
-  const blockedBy = new Map<TicketId, TicketId[]>();
-  const relatedFrom = new Map<TicketId, TicketId[]>();
-  const discovered = new Map<TicketId, TicketId[]>();
-  for (const ticket of tickets) {
-    for (const edge of outgoingEdges(ticket)) {
-      if (!isTicketId(edge.to)) continue; // only `parent` edges may be external (edge.ts) — irrelevant here
-      if (edge.kind === "blocks") pushInto(blockedBy, edge.to, edge.from);
-      else if (edge.kind === "relates-to") pushInto(relatedFrom, edge.to, edge.from);
-      else if (edge.kind === "discovered-from") pushInto(discovered, edge.to, edge.from);
-    }
-  }
-  return { blockedBy, relatedFrom, discovered };
-}
-
-/**
- * ticket_01KY9S0172V8AYCYV9KWS6RC9P: apply `src/repo/db-index.ts`'s
- * `deriveEffectiveOverlay` across a whole ticket list in one pass — see
- * this module's doc for why this is the one function here that imports
- * from `src/repo/`. Groups `events` by ticket id once (O(events)), then
- * folds each ticket's own slice on top of its stored baseline (O(1) map
- * lookup per ticket) — the same two-phase shape `buildIndex` itself uses,
- * so this scales the same way: O(tickets + events) total, never
- * O(tickets × events) from re-scanning `events` once per ticket.
- *
- * A ticket whose effective values are byte-identical to its stored ones
- * (the overwhelming common case — see `deriveEffectiveOverlay`'s own doc:
- * this is a no-op whenever no event is newer than the ticket's own stored
- * `last_activity_at`) is returned as the SAME object reference, not a
- * needless copy — callers that compare by reference (there are none today,
- * but it costs nothing to preserve) stay correct either way.
- */
-export function deriveEffectiveTickets(
-  tickets: readonly Ticket[],
-  events: readonly Event[],
-): Ticket[] {
-  const eventsByTicket = new Map<TicketId, Event[]>();
-  for (const event of events) {
-    if (event.entity.kind !== "ticket" || !isTicketId(event.entity.id)) continue;
-    const list = eventsByTicket.get(event.entity.id);
-    if (list) list.push(event);
-    else eventsByTicket.set(event.entity.id, [event]);
-  }
-  return tickets.map((ticket) => {
-    const overlay = deriveEffectiveOverlay(ticket, eventsByTicket.get(ticket.id) ?? []);
-    if (
-      overlay.latest_note === ticket.latest_note &&
-      overlay.last_activity_at === ticket.last_activity_at
-    ) {
-      return ticket;
-    }
-    return { ...ticket, ...overlay };
-  });
 }

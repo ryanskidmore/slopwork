@@ -227,14 +227,13 @@ import {
   isEventId,
   isTicketId,
   labelSchema,
-  outgoingEdges,
   parentRefSchema,
   prioritySchema,
   sessionIdSchema,
   ticketIdSchema,
   ticketStateSchema,
 } from "../core/index.js";
-import type { Event, SessionId, Ticket, TicketId, TicketState } from "../core/index.js";
+import type { Ticket, TicketId } from "../core/index.js";
 import { isoTimestampSchema } from "../core/timestamp.js";
 import { slugSchema } from "../core/slug.js";
 import { parseJsonc, writeCanonical } from "../core/jsonc.js";
@@ -249,6 +248,20 @@ import { isRepresentableDurationMs, parseDurationMs } from "../core/duration.js"
 // (tickets/ready.ts, tickets/status.ts, tickets/cascade.ts) rather than
 // being duplicated or relocated into core/. See DECISIONS.md's C5 entry.
 import { computeReviewStaleAt, computeStaleAt } from "../tickets/staleness.js";
+// G2 (unify-effective-overlay): every pure derivation this index build
+// used to define locally — the effective latest_note/last_activity_at
+// fold, live blocked-counts, the ready verdict, reverse edges — now lives
+// in the ONE shared overlay module `src/tickets/overlay.ts`, consumed by
+// this driver AND the web explorer (src/web/overlays.ts) so the two can
+// never drift again. Same deliberate repo->tickets pure-module crossing
+// staleness.ts already established (see the C5 comment above).
+import {
+  buildReverseEdgeIndex,
+  computeBlockedCounts,
+  computeReady,
+  deriveEffectiveOverlay,
+  groupEventsByTicket,
+} from "../tickets/overlay.js";
 import { atomicWriteFile } from "./atomic-write.js";
 import { loadConfigDefaultsTolerant } from "./config.js";
 import { listEventsTolerant } from "./events.js";
@@ -362,142 +375,17 @@ export const dbIndexSchema = z.object({
 });
 export type DbIndex = z.infer<typeof dbIndexSchema>;
 
-/**
- * B4: ticket states that no longer block anything (D5's "blocked" derived
- * overlay). A blocker that has reached one of these states is CLOSED and
- * stops counting as a "live" blocker for whatever it names in its own
- * `blocks` array — this is the exact "live" in "live blocker" throughout
- * design.md §2 and this work item's brief. Matches `src/tickets/state.ts`'s
- * own treatment of `done`/`dropped` as terminal (`RAW_STATE_TRANSITIONS`)
- * and `sessions/context-pack.ts`'s pre-existing ad hoc live-blocker filter
- * (`t.state !== "done" && t.state !== "dropped"`) — this is now the one
- * place that rule lives, reused by both `buildIndex` below and B4's
- * done-cascade (`src/tickets/cascade.ts`), which recomputes
- * {@link computeBlockedCounts} fresh against a freshly re-read ticket list
- * rather than trusting any persisted counter (see that module's doc for
- * why recompute-from-truth, not a mutated counter, is this work item's
- * chosen design).
- */
-const CLOSED_TICKET_STATES: ReadonlySet<TicketState> = new Set(["done", "dropped"]);
-
-/** Is a ticket in `state` still capable of blocking something? See {@link CLOSED_TICKET_STATES}. */
-export function isLiveBlockerState(state: TicketState): boolean {
-  return !CLOSED_TICKET_STATES.has(state);
-}
-
-/**
- * B4: live blocked-by count for every ticket in `tickets` — for each
- * ticket, how many OTHER tickets currently in a non-`done`/`dropped` state
- * name it in their own `blocks` array. Pure, synchronous, no I/O. Always
- * has an entry (possibly `0`) for every id in `tickets`, so a caller may
- * `.get(id) ?? 0` purely defensively — every real id IS present.
- *
- * This is the ONE place `blocked_count` is computed: `buildIndex` calls it
- * over the full ticket set below, and B4's done-cascade
- * (`src/tickets/cascade.ts`) calls it again over a freshly re-read ticket
- * set after a closure, instead of decrementing a number stored anywhere
- * (D5: `blocked` is a derived overlay, never asserted — there is nowhere
- * on a `Ticket` to hold a running counter even if this wanted to).
- */
-export function computeBlockedCounts(tickets: readonly Ticket[]): Map<TicketId, number> {
-  const counts = new Map<TicketId, number>();
-  for (const ticket of tickets) counts.set(ticket.id, 0);
-  for (const blocker of tickets) {
-    if (!isLiveBlockerState(blocker.state)) continue;
-    for (const edge of outgoingEdges(blocker)) {
-      if (edge.kind !== "blocks") continue;
-      if (!isTicketId(edge.to)) continue; // "blocks" edges are always local (edge.ts) — defensive only
-      if (!counts.has(edge.to)) continue; // target absent from this ticket set — shouldn't happen for a consistent db
-      counts.set(edge.to, (counts.get(edge.to) ?? 0) + 1);
-    }
-  }
-  return counts;
-}
-
-/**
- * B4: design.md §2's `ready` verdict for a single ticket, verbatim —
- * `open ∧ no live blockers ∧ no active session`. Pure; the one place this
- * predicate is implemented, so `buildIndex`'s `ready` column and any other
- * caller that needs to ask "would this ticket be ready" (e.g. B4's
- * done-cascade, deciding whether a newly-unblocked ticket deserves a
- * `ticket.ready` event) always agree.
- */
-export function computeReady(
-  state: TicketState,
-  liveBlockedCount: number,
-  activeSession: SessionId | null,
-): boolean {
-  return state === "open" && liveBlockedCount === 0 && activeSession === null;
-}
-
-/** {@link deriveEffectiveOverlay}'s result — the two fields
- * ticket_01KY9RWFM80BKNE2CDX85QMKGS makes derived, not stored-verbatim. */
-export interface EffectiveOverlay {
-  latest_note: string | null;
-  last_activity_at: string;
-}
-
-/** The minimal ticket-shaped input {@link deriveEffectiveOverlay} needs. */
-export interface EffectiveOverlaySource {
-  latest_note: string | null;
-  last_activity_at: string;
-}
-
-/**
- * ticket_01KY9RWFM80BKNE2CDX85QMKGS: fold a ticket's stored baseline
- * together with every `payload.progress`-carrying event for that same
- * ticket, keeping whichever note is most recent — this is the ONE place
- * that combination happens; `buildIndex` below calls it per ticket, over
- * every event already grouped by `entity.id`.
- *
- * `events` MUST already be scoped to this one ticket (`buildIndex` groups
- * every event by `entity.id` once, up front, rather than filtering per
- * row) — a non-`"ticket"`-kind entry is skipped defensively, but this
- * function never checks `entity.id` itself. Order MUST be cursor
- * (ascending id / chronological), exactly what {@link listEventsTolerant}/
- * {@link listEvents} already return: since two events can (rarely, under
- * real concurrency) share the same millisecond-resolution `at`, iterating
- * in id order and using `>=` (not `>`) to decide "this event is newer"
- * means ties resolve toward whichever event has the greater id — full
- * determinism, without needing the id itself as a second sort key.
- *
- * A LOCKED `update --progress` (progress alongside a real field change)
- * mints its accompanying event from the exact same clock reading used to
- * build the ticket it writes (`src/cli/commands/update.ts`), so that
- * event's `at` is never strictly greater than the ticket's own
- * `last_activity_at` — the `>=` comparison below can re-select it, but
- * only ever with content identical to the stored baseline it's tied
- * with, so the effective result is byte-for-byte the same either way.
- * Only a genuinely lock-free progress event (whose `at` is strictly
- * later, having never touched the ticket file's own baseline at all) can
- * actually move the result.
- */
-export function deriveEffectiveOverlay(
-  ticket: EffectiveOverlaySource,
-  events: readonly Event[],
-): EffectiveOverlay {
-  let latestNote = ticket.latest_note;
-  let lastActivityAt = ticket.last_activity_at;
-  for (const event of events) {
-    if (event.entity.kind !== "ticket") continue;
-    const progress = event.payload.progress;
-    if (typeof progress !== "string") continue;
-    if (event.at >= lastActivityAt) {
-      lastActivityAt = event.at;
-      latestNote = progress;
-    }
-  }
-  return { latest_note: latestNote, last_activity_at: lastActivityAt };
-}
-
-function pushInto<K>(map: Map<K, TicketId[]>, key: K, value: TicketId): void {
-  const existing = map.get(key);
-  if (existing) {
-    existing.push(value);
-  } else {
-    map.set(key, [value]);
-  }
-}
+// G2 (unify-effective-overlay): re-exported from the shared overlay
+// module so existing repo-layer consumers/tests keep one stable import
+// path; the DEFINITIONS live in src/tickets/overlay.ts now — see this
+// module's import comment above.
+export {
+  computeBlockedCounts,
+  computeReady,
+  deriveEffectiveOverlay,
+  isLiveBlockerState,
+} from "../tickets/overlay.js";
+export type { EffectiveOverlay, EffectiveOverlaySource } from "../tickets/overlay.js";
 
 interface StatTuple {
   name: string;
@@ -707,26 +595,11 @@ export async function buildIndex(paths: RepoPaths, clock: Clock = systemClock): 
 
   // ticket_01KY9RWFM80BKNE2CDX85QMKGS: group once, up front — O(events),
   // not O(tickets × events) — then {@link deriveEffectiveOverlay} looks up
-  // each ticket's own (already cursor-ordered) slice in O(1).
-  const eventsByTicket = new Map<TicketId, Event[]>();
-  for (const event of events) {
-    if (event.entity.kind !== "ticket" || !isTicketId(event.entity.id)) continue;
-    const list = eventsByTicket.get(event.entity.id);
-    if (list) list.push(event);
-    else eventsByTicket.set(event.entity.id, [event]);
-  }
+  // each ticket's own (already cursor-ordered) slice in O(1). Shared with
+  // the web explorer via src/tickets/overlay.ts (G2).
+  const eventsByTicket = groupEventsByTicket(events);
 
-  const blockedBy = new Map<TicketId, TicketId[]>();
-  const relatedFrom = new Map<TicketId, TicketId[]>();
-  const discovered = new Map<TicketId, TicketId[]>();
-  for (const ticket of tickets) {
-    for (const edge of outgoingEdges(ticket)) {
-      if (!isTicketId(edge.to)) continue; // only `parent` edges may be external (edge.ts); irrelevant here
-      if (edge.kind === "blocks") pushInto(blockedBy, edge.to, edge.from);
-      else if (edge.kind === "relates-to") pushInto(relatedFrom, edge.to, edge.from);
-      else if (edge.kind === "discovered-from") pushInto(discovered, edge.to, edge.from);
-    }
-  }
+  const { blockedBy, relatedFrom, discovered } = buildReverseEdgeIndex(tickets);
 
   // B4: computed once over the full ticket set, then read per-row below —
   // see computeBlockedCounts's doc for why this (not a stored/decremented
