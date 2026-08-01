@@ -6,7 +6,6 @@ import { ReviewPage } from "./pages/review-page.js";
 import { StalePage } from "./pages/stale-page.js";
 import { TicketDetailPage } from "./pages/ticket-detail-page.js";
 import { TicketsPage } from "./pages/tickets-page.js";
-import { TranscriptPage } from "./pages/transcript-page.js";
 import { TreePage } from "./pages/tree-page.js";
 
 const router = createBrowserRouter([
@@ -16,7 +15,6 @@ const router = createBrowserRouter([
       { index: true, element: <Navigate to="/tickets" replace /> },
       { path: "tickets", element: <TicketsPage /> },
       { path: "tickets/:ref", element: <TicketDetailPage /> },
-      { path: "tickets/:ref/sessions/:sessionId/transcript", element: <TranscriptPage /> },
       { path: "tree", element: <TreePage /> },
       { path: "review", element: <ReviewPage /> },
       { path: "stale", element: <StalePage /> },

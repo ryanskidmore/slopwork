@@ -3,35 +3,22 @@ import { computeGitignoreLines, upsertGitignoreSection } from "./gitignore.js";
 
 describe("computeGitignoreLines", () => {
   it("always ignores index.jsonc (D14)", () => {
-    expect(computeGitignoreLines("local")).toContain(".slop/db/index.jsonc");
-    expect(computeGitignoreLines("commit")).toContain(".slop/db/index.jsonc");
-    expect(computeGitignoreLines("off")).toContain(".slop/db/index.jsonc");
+    expect(computeGitignoreLines()).toContain(".slop/db/index.jsonc");
   });
 
-  it("ignores transcripts/ unless transcripts: commit (D16)", () => {
-    expect(computeGitignoreLines("local")).toContain(".slop/transcripts/");
-    expect(computeGitignoreLines("off")).toContain(".slop/transcripts/");
-    expect(computeGitignoreLines("commit")).not.toContain(".slop/transcripts/");
+  it("always ignores the lock file and atomic-write temp-file globs", () => {
+    const lines = computeGitignoreLines();
+    expect(lines).toContain(".slop/db/.lock");
+    expect(lines).toContain(".slop/db/.tmp-*");
+    expect(lines).toContain(".slop/db/*/.tmp-*");
   });
 
-  it("always ignores the lock file and atomic-write temp-file globs, regardless of transcripts mode", () => {
-    for (const mode of ["local", "off", "commit"] as const) {
-      const lines = computeGitignoreLines(mode);
-      expect(lines).toContain(".slop/db/.lock");
-      expect(lines).toContain(".slop/db/.tmp-*");
-      expect(lines).toContain(".slop/db/*/.tmp-*");
-    }
-  });
-
-  it("always ignores the .lock.stale-<token> sentinel glob, regardless of transcripts mode (regression: ticket housekeeping-gitignore-lock-stale)", () => {
-    for (const mode of ["local", "off", "commit"] as const) {
-      const lines = computeGitignoreLines(mode);
-      expect(lines).toContain(".slop/db/.lock.stale-*");
-    }
+  it("always ignores the .lock.stale-<token> sentinel glob (regression: ticket housekeeping-gitignore-lock-stale)", () => {
+    expect(computeGitignoreLines()).toContain(".slop/db/.lock.stale-*");
   });
 
   it("the .lock.stale-* glob actually matches lock.ts's own sentinel naming (tryBreakStaleLock: `${lockPath}.stale-${token}`)", () => {
-    const glob = computeGitignoreLines("local").find((l) => l === ".slop/db/.lock.stale-*");
+    const glob = computeGitignoreLines().find((l) => l === ".slop/db/.lock.stale-*");
     if (glob === undefined) {
       throw new Error(
         "expected '.slop/db/.lock.stale-*' to be present in the generated gitignore lines",
@@ -45,7 +32,7 @@ describe("computeGitignoreLines", () => {
   });
 
   it("the generated glob entries actually match a stray .lock and a stray tickets/.tmp-* left by a killed process", () => {
-    const lines = computeGitignoreLines("local");
+    const lines = computeGitignoreLines();
 
     // `.slop/db/.lock` — exact match, no globbing needed.
     expect(lines).toContain(".slop/db/.lock");
@@ -98,18 +85,16 @@ describe("upsertGitignoreSection", () => {
     expect(second.text.match(/index\.jsonc/g)).toHaveLength(1);
   });
 
-  it("regenerates the managed section when the lines change (e.g. transcripts: commit)", () => {
-    const withTranscripts = upsertGitignoreSection("node_modules/\n", [
+  it("regenerates the managed section when the lines change", () => {
+    const withExtra = upsertGitignoreSection("node_modules/\n", [
       ".slop/db/index.jsonc",
-      ".slop/transcripts/",
+      ".slop/db/.lock",
     ]);
-    const withoutTranscripts = upsertGitignoreSection(withTranscripts.text, [
-      ".slop/db/index.jsonc",
-    ]);
-    expect(withoutTranscripts.text).not.toContain(".slop/transcripts/");
-    expect(withoutTranscripts.text).toContain(".slop/db/index.jsonc");
-    expect(withoutTranscripts.text.match(/index\.jsonc/g)).toHaveLength(1);
-    expect(withoutTranscripts.changed).toBe(true);
+    const withoutExtra = upsertGitignoreSection(withExtra.text, [".slop/db/index.jsonc"]);
+    expect(withoutExtra.text).not.toContain(".slop/db/.lock");
+    expect(withoutExtra.text).toContain(".slop/db/index.jsonc");
+    expect(withoutExtra.text.match(/index\.jsonc/g)).toHaveLength(1);
+    expect(withoutExtra.changed).toBe(true);
   });
 
   it("preserves content on both sides of an existing managed section (it re-appends at the end, content is never dropped)", () => {

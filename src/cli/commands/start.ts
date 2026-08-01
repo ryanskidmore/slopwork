@@ -1,13 +1,7 @@
 import type { Command } from "commander";
 import type { Clock } from "../../core/clock.js";
 import { systemClock } from "../../core/clock.js";
-import type {
-  EventVerb,
-  HarnessKind,
-  Session,
-  SessionId,
-  TranscriptsMode,
-} from "../../core/index.js";
+import type { EventVerb, HarnessKind, Session, SessionId } from "../../core/index.js";
 import {
   EXIT_CODES,
   HARNESS_KINDS,
@@ -15,7 +9,6 @@ import {
   nowIso,
   sessionSchema,
 } from "../../core/index.js";
-import type { RepoPaths } from "../../repo/index.js";
 import {
   createSession,
   readSession,
@@ -30,7 +23,6 @@ import {
 } from "../../repo/index.js";
 import { buildContextPackData } from "../../sessions/context-pack.js";
 import { captureGit } from "../../sessions/git.js";
-import { captureTranscript } from "../../sessions/transcript.js";
 import { detectHarness } from "../../sessions/harness.js";
 import { diffSessionPatch } from "../../sessions/patch.js";
 import {
@@ -98,63 +90,6 @@ function buildReenteredSession(previous: Session, clock: Clock = systemClock): S
   });
 }
 
-/**
- * Best-effort transcript capture for the session `start` is about to END — a
- * `--takeover` seizure or a D15 review re-entry (ticket
- * sessions-capture-transcript-on-takeover). Every other session-ending command
- * (`stop`/`done`/`drop`/`review`) already snapshots the transcript; these two
- * paths did not, so the sessions most worth reading — interrupted work someone
- * had to seize, or a review round that got changes requested — were the only
- * ones that ended with no snapshot at all.
- *
- * **Why this is deliberately narrower than `stop`/`done`'s capture.** Those
- * capture the caller's OWN session, so any locator strategy is at worst
- * unhelpful. Here the session being ended belongs to SOMEONE ELSE (that is what
- * a takeover is), while the transcript locator runs on THIS machine as THIS
- * actor. `locateClaudeCode`'s last-resort "newest .jsonl in the project dir"
- * fallback would then happily return the CURRENT agent's own transcript and
- * file it under the seized session — silently wrong audit data, which
- * `transcript.ts`'s own Fix 3 doc rightly calls worse than a clean `null`. The
- * generic ambiguity guard does not save us: it refuses when MORE than one
- * candidate postdates the session, but a takeover's most likely shape is
- * exactly one newer candidate — the taker's.
- *
- * So capture is attempted ONLY when the previous session recorded its harness
- * `session_id`, which makes the lookup an exact filename match that either
- * finds that session's real transcript or finds nothing. Without one, this
- * skips and says why, rather than guessing. An already-present
- * `transcript_ref` (e.g. snapshotted by an earlier `review`) is never
- * overwritten with `null`.
- */
-async function capturePreviousSessionTranscript(
-  previous: Session,
-  paths: RepoPaths,
-  cwd: string,
-  transcriptsMode: TranscriptsMode,
-): Promise<{ transcriptRef: string | null; warning: string | null }> {
-  if (previous.transcript_ref !== null) {
-    return { transcriptRef: previous.transcript_ref, warning: null };
-  }
-  if (transcriptsMode === "off") return { transcriptRef: null, warning: null };
-  if (previous.harness.session_id === null) {
-    return {
-      transcriptRef: null,
-      warning:
-        `no transcript captured for the superseded session ${previous.id}: it recorded no harness ` +
-        `session id (harness=${previous.harness.kind}), and guessing by file mtime here could ` +
-        "attach THIS session's transcript to it instead. Pass --transcript to that session's own " +
-        "`slop stop`/`done` if you still have the file.",
-    };
-  }
-  const capture = await captureTranscript({
-    session: previous,
-    paths,
-    cwd,
-    transcriptsMode,
-  });
-  return { transcriptRef: capture.transcriptRef, warning: capture.warning };
-}
-
 export async function runStart(ref: string, opts: StartCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
@@ -209,9 +144,6 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
     // never managed to read. Non-null here is what still gates/logs a
     // takeover in that case.
     let unreadableActiveSessionId: SessionId | null = null;
-    // Set iff the outgoing session's transcript could not be snapshotted —
-    // surfaced after the transaction commits, never a reason to fail `start`.
-    let previousTranscriptWarning: string | null = null;
     if (current.active_session !== null) {
       let existing: Session | null = null;
       let readFailed = false;
@@ -320,24 +252,8 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
     // instead handled by detection + repair, not write-ordering: see
     // `src/sessions/repair.ts` and `slop reindex --heal`.
     if (previousSession !== null) {
-      // Snapshot the outgoing session's transcript BEFORE the write that ends
-      // it, so `transcript_ref` lands in the same `updateSession` call as
-      // `ended_at`/`end_summary` — the same one-write pattern
-      // stop/done/drop/review use. Never blocks: a miss is a warning printed
-      // after the transaction commits.
-      const previousCapture = await capturePreviousSessionTranscript(
-        previousSession,
-        paths,
-        root,
-        config.transcripts,
-      );
-      previousTranscriptWarning = previousCapture.warning;
-
       if (isReviewReentry) {
-        const endedPrevious = sessionSchema.parse({
-          ...buildReenteredSession(previousSession),
-          transcript_ref: previousCapture.transcriptRef,
-        });
+        const endedPrevious = buildReenteredSession(previousSession);
         await updateSession(
           paths,
           previousSession.id,
@@ -353,10 +269,7 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
           },
         );
       } else {
-        const endedPrevious = sessionSchema.parse({
-          ...buildSupersededSession(previousSession, actor),
-          transcript_ref: previousCapture.transcriptRef,
-        });
+        const endedPrevious = buildSupersededSession(previousSession, actor);
         await updateSession(
           paths,
           previousSession.id,
@@ -399,7 +312,6 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
       previousSession,
       isReviewReentry,
       unreadableActiveSessionId,
-      previousTranscriptWarning,
     };
   });
 
@@ -419,11 +331,6 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
         "Inspect/repair or remove the file above manually.",
     );
   }
-
-  // ticket sessions-capture-transcript-on-takeover: the outgoing session's
-  // transcript could not be snapshotted (see capturePreviousSessionTranscript).
-  // Printed after the transaction, same posture as every other capture miss.
-  if (result.previousTranscriptWarning !== null) printWarning(result.previousTranscriptWarning);
 
   for (const w of warnings) printWarning(w);
 

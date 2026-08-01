@@ -29,7 +29,6 @@ import {
   type Ticket,
   TICKET_STATES,
   ticketSchema,
-  TRANSCRIPTS_MODES,
   configSchema,
 } from "../../src/core/index.js";
 
@@ -242,7 +241,6 @@ export const sessionArbitrary: fc.Arbitrary<Session> = fc
     ended_at: fc.oneof(fc.constant(null), isoTimestampArb),
     plan: fc.array(planVersionArb, { maxLength: 3 }),
     end_summary: fc.oneof(fc.constant(null), detailsMdArb),
-    transcript_ref: fc.oneof(fc.constant(null), fc.string({ minLength: 1, maxLength: 80 })),
   })
   .map((raw) => sessionSchema.parse(raw));
 
@@ -279,7 +277,6 @@ export const configArbitrary: fc.Arbitrary<Config> = fc
     user: fc.oneof(fc.constant(undefined), actorNameArb),
     remotes: remotesArb,
     defaults: defaultsArb,
-    transcripts: fc.constantFrom(...TRANSCRIPTS_MODES),
   })
   .map((raw) => configSchema.parse(raw));
 

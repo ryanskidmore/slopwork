@@ -78,12 +78,6 @@ describe("buildStoppedSession", () => {
     const stopped = buildStoppedSession(session, undefined, clock);
     expect(stopped.end_summary).toBeNull();
   });
-
-  it("does not touch transcript_ref — that seam is C4's, not stop's", () => {
-    const session = makeSession({ transcript_ref: null });
-    const stopped = buildStoppedSession(session, "note", clock);
-    expect(stopped.transcript_ref).toBeNull();
-  });
 });
 
 describe("buildStoppedTicket", () => {

@@ -1,9 +1,8 @@
 /**
  * Markdown rendering for `slop web`.
  *
- * D10: ticket specs carry `details_md` — "markdown inside" — and the
- * transcript viewer renders `text`/`thinking` blocks as prose
- * (docs/spikes/findings.md §4). Both need markdown rendering, and the build
+ * D10: ticket specs carry `details_md` — "markdown inside" — which needs
+ * markdown rendering, and the build
  * must stay fully offline with no CDN assets (D5 architecture
  * requirements).
  *
@@ -12,8 +11,8 @@
  * tables/strikethrough/task lists included), so there is nothing to
  * bundle at all: it's part of the Bun runtime itself and works identically
  * from source and from the compiled binary. `noHtmlBlocks`/`noHtmlSpans`
- * are set so raw HTML embedded in markdown source (ticket prose, agent
- * transcript text — both local-but-arbitrary content) is escaped rather
+ * are set so raw HTML embedded in markdown source (ticket prose —
+ * local-but-arbitrary content) is escaped rather
  * than passed through, matching this project's "never trust input as
  * HTML" rule elsewhere (src/web/html.ts).
  *

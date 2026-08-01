@@ -26,6 +26,7 @@ import type { Actor, ActorKind, Config } from "../core/index.js";
 import { configSchema, EXIT_CODES, resolveActorName } from "../core/index.js";
 import type { RepoPaths } from "../repo/paths.js";
 import { detectHarness, sniffHarnessKind } from "../sessions/harness.js";
+import { printWarning } from "./commands/shared.js";
 import { parseConfigYamlText } from "./config-yaml.js";
 import { SlopError } from "./errors.js";
 
@@ -92,6 +93,17 @@ export async function loadConfig(paths: RepoPaths): Promise<Config> {
     throw new SlopError(
       ".slop/config.yaml does not match the expected shape: " +
         result.error.issues.map((i) => i.message).join("; "),
+    );
+  }
+  // G1 (transcripts removed): a config.yaml written before the removal may
+  // still carry a `transcripts:` key. Unknown keys are stripped by the
+  // (non-strict) schema above, so the config still parses and works — but
+  // surface the stale line through the ordinary stderr warning path so it
+  // gets cleaned up rather than silently ignored forever.
+  if (typeof raw === "object" && raw !== null && "transcripts" in raw) {
+    printWarning(
+      ".slop/config.yaml has a legacy `transcripts:` key — transcripts were removed from " +
+        "slopwork, so the key is ignored. Delete that line to silence this warning.",
     );
   }
   return result.data;

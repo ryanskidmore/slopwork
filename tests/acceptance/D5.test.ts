@@ -18,7 +18,6 @@ import type {
   StaleResponseDTO,
   TicketDetailDTO,
   TicketListResponseDTO,
-  TranscriptResponseDTO,
   TreeNodeDTO,
   TreeResponseDTO,
 } from "../../src/web/api/types.js";
@@ -26,9 +25,10 @@ import { FIXTURE_NOW_ISO } from "../fixtures/web-db-meta.js";
 
 // D5: `slop web`
 //
-// Acceptance criterion, verbatim from v0-implementation-plan.md §3:
-//   "All §4.4 views against a seeded fixture db; transcript JSONL renders
-//   readably"
+// Acceptance criterion, from v0-implementation-plan.md §3:
+//   "All §4.4 views against a seeded fixture db" (the plan's original
+//   criterion also covered a session-log viewer, since removed from the
+//   product — see tests/acceptance/G1.test.ts).
 //
 // rewrite-slop-web-as-a replaced the server-rendered HTML this file used to
 // assert on with a read-only JSON API (src/web/api/*) consumed by a React
@@ -410,7 +410,7 @@ describe("D5: slop web", () => {
       expect(events.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("renders sessions with actor/harness/git/plan-versions/checked-steps and a transcript link", async () => {
+    it("renders sessions with actor/harness/git/plan-versions/checked-steps", async () => {
       const implementOauth = ticketBySlug("implement-oauth-provider");
       const { status, body } = await getJson<TicketDetailDTO>(`/api/tickets/${implementOauth.id}`);
       expect(status).toBe(200);
@@ -429,11 +429,9 @@ describe("D5: slop web", () => {
       expect(v2?.steps.filter((s) => s.checked).length).toBe(3);
       expect(v2?.steps.length).toBe(5);
       expect(v2?.steps.some((s) => s.text.includes("Wire up openid-client"))).toBe(true);
-      // has_transcript flags a viewable transcript for this session (asserted end-to-end in section 4 below).
       const [fixtureSession] = sessionsForTicket(implementOauth.id);
       expect(fixtureSession).toBeDefined();
       expect(session?.id).toBe(fixtureSession?.id);
-      expect(session?.has_transcript).toBe(true);
     });
 
     it("shows review info (MR link + review-staleness) for a ticket in review", async () => {
@@ -458,136 +456,6 @@ describe("D5: slop web", () => {
       expect(res.status).toBe(404);
       const body = (await res.json()) as { error: string };
       expect(body.error).toContain('No ticket matches "ticket_01DOESNOTEXIST0000000000"');
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // §4.4 item 4: transcript viewer — GET /api/tickets/:ref/sessions/:sessionId/transcript.
-  // -------------------------------------------------------------------------
-  describe("4. Transcript viewer", () => {
-    const implementOauth = () => ticketBySlug("implement-oauth-provider");
-    const bigSession = () => sessionsForTicket(implementOauth().id)[0] as Session;
-
-    it("classifies conversation turns readably: user text, assistant text, and the tool_use tool name", async () => {
-      const ticket = implementOauth();
-      const session = bigSession();
-      const { status, body } = await getJson<TranscriptResponseDTO>(
-        `/api/tickets/${ticket.id}/sessions/${session.id}/transcript`,
-      );
-      expect(status).toBe(200);
-      expect(body.available).toBe(true);
-
-      // Apostrophe-free slice (matches the fixture's actual text; see markdown.ts —
-      // apostrophes aren't an HTML-escaped character, so this only avoids depending
-      // on exactly which literal/entity form the renderer happens to emit for it).
-      const rawText = JSON.stringify(body.records);
-      expect(rawText).toContain("implement the OAuth provider described in the ticket");
-      expect(rawText).toContain("Working on wiring the authorize() flow");
-      const toolUse = body.records
-        .flatMap((r) => (r.kind === "turn" ? r.blocks : []))
-        .find((b) => b.type === "tool_use");
-      expect(toolUse && toolUse.type === "tool_use" ? toolUse.name : null).toBe("Read");
-      expect(body.records.some((r) => r.kind === "turn" && r.role === "user")).toBe(true);
-      expect(body.records.some((r) => r.kind === "turn" && r.role === "assistant")).toBe(true);
-    });
-
-    it("classifies thinking/tool_use/tool_result as distinct block types (collapsing them is the SPA's job, not the API's)", async () => {
-      const ticket = implementOauth();
-      const session = bigSession();
-      const { body } = await getJson<TranscriptResponseDTO>(
-        `/api/tickets/${ticket.id}/sessions/${session.id}/transcript`,
-      );
-      const blockTypes = new Set(
-        body.records.flatMap((r) => (r.kind === "turn" ? r.blocks.map((b) => b.type) : [])),
-      );
-      expect(blockTypes.has("thinking")).toBe(true);
-      expect(blockTypes.has("tool_use")).toBe(true);
-      expect(blockTypes.has("tool_result")).toBe(true);
-    });
-
-    it("truncates a very long tool_result and says so, rather than shipping it whole", async () => {
-      const ticket = implementOauth();
-      const session = bigSession();
-      const { body } = await getJson<TranscriptResponseDTO>(
-        `/api/tickets/${ticket.id}/sessions/${session.id}/transcript`,
-      );
-      const truncated = body.records
-        .flatMap((r) => (r.kind === "turn" ? r.blocks : []))
-        .find((b) => (b.type === "tool_result" || b.type === "tool_use") && b.truncated);
-      expect(truncated, "expected at least one truncated tool block on this fixture").toBeDefined();
-      if (truncated && (truncated.type === "tool_result" || truncated.type === "tool_use")) {
-        expect(truncated.total_chars).toBeGreaterThan(20_000);
-      }
-    });
-
-    it("does NOT leak raw JSONL record fields — every record is transformed before it reaches the response", async () => {
-      const ticket = implementOauth();
-      const session = bigSession();
-      const res = await get(`/api/tickets/${ticket.id}/sessions/${session.id}/transcript`);
-      const rawBody = await res.text();
-      for (const rawMarker of ['"parentUuid"', '"isSidechain"', '"userType"', '"uuid"']) {
-        expect(rawBody, `transcript API leaked raw JSONL marker ${rawMarker}`).not.toContain(
-          rawMarker,
-        );
-      }
-    });
-
-    it("paginates rather than returning everything at once, and hides non-conversational records by default", async () => {
-      const ticket = implementOauth();
-      const session = bigSession();
-      const { body: page1 } = await getJson<TranscriptResponseDTO>(
-        `/api/tickets/${ticket.id}/sessions/${session.id}/transcript`,
-      );
-      expect(page1.records.every((r) => r.kind !== "system")).toBe(true);
-      expect(page1.offset).toBe(0);
-      expect(page1.limit).toBe(40);
-      expect(page1.records.length).toBe(40);
-      expect(page1.has_more).toBe(true);
-
-      // "(iteration 1)." is a unique marker for the very first loop message, which lands on page 1 — it must not reappear on page 2.
-      expect(JSON.stringify(page1.records)).toContain("(iteration 1).");
-
-      const { body: page2 } = await getJson<TranscriptResponseDTO>(
-        `/api/tickets/${ticket.id}/sessions/${session.id}/transcript?offset=40&limit=40`,
-      );
-      expect(JSON.stringify(page2.records)).not.toContain("(iteration 1).");
-    });
-
-    it("an out-of-range offset clamps onto the last real page instead of returning a nonsense range", async () => {
-      const ticket = implementOauth();
-      const session = bigSession();
-      const { status, body } = await getJson<TranscriptResponseDTO>(
-        `/api/tickets/${ticket.id}/sessions/${session.id}/transcript?offset=999999&limit=40`,
-      );
-      expect(status).toBe(200);
-      expect(body.offset).toBeLessThan(999999);
-      expect(body.records.length).toBeGreaterThan(0);
-    });
-
-    it("shows system records only when explicitly toggled on", async () => {
-      const ticket = implementOauth();
-      const session = bigSession();
-      const { body } = await getJson<TranscriptResponseDTO>(
-        `/api/tickets/${ticket.id}/sessions/${session.id}/transcript?all=1`,
-      );
-      expect(body.include_system).toBe(true);
-      const systemRecord = body.records.find((r) => r.kind === "system");
-      expect(systemRecord, "expected at least one system record with all=1").toBeDefined();
-      expect(systemRecord?.kind === "system" ? systemRecord.summary : "").toContain(
-        "compact_boundary",
-      );
-    });
-
-    it("degrades readably when no transcript was captured for a session (D16/S2: expected, not an error)", async () => {
-      const migrateBilling = ticketBySlug("migrate-billing-to-new-provider");
-      const [session] = sessionsForTicket(migrateBilling.id);
-      expect(session?.transcript_ref).toBeNull();
-      const { status, body } = await getJson<TranscriptResponseDTO>(
-        `/api/tickets/${migrateBilling.id}/sessions/${session?.id}/transcript`,
-      );
-      expect(status).toBe(200);
-      expect(body.available).toBe(false);
-      expect(body.records).toEqual([]);
     });
   });
 

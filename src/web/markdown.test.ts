@@ -9,9 +9,9 @@ import { sanitizeMarkdownHtml } from "./markdown.js";
 // `[x](javascript:alert(1))` renders `<a href="javascript:alert(1)">x</a>`,
 // and `![x](data:text/html;base64,QQ==)` renders
 // `<img src="data:text/html;base64,QQ==" alt="x" />` — both live sinks a
-// human opening the ticket/transcript page would trigger just by viewing
+// human opening the ticket page would trigger just by viewing
 // it. `renderMarkdownToString` (this module's public entry point, and what
-// ticket-detail.ts/transcript-view.ts actually call) is
+// ticket-detail.ts actually calls) is
 // `sanitizeMarkdownHtml(Bun.markdown.html(source, SAFE_OPTIONS))` — the
 // exact strings this suite feeds `sanitizeMarkdownHtml` below are real
 // `Bun.markdown.html()` output for those same malicious markdown inputs

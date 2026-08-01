@@ -9,7 +9,6 @@ import { RefList } from "../components/ref-list.js";
 import { LabelChips, OverlayBadges, PriorityBadge, StateBadge } from "../components/state-badge.js";
 import { DanglingRefText, TicketLink } from "../components/ticket-link.js";
 import { Card, CardContent } from "../components/ui/card.js";
-import { Separator } from "../components/ui/separator.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs.js";
 import { useNow } from "../hooks/use-now.js";
@@ -178,9 +177,7 @@ export function TicketDetailPage() {
           {data.sessions.length === 0 ? (
             <p className="text-sm text-muted-foreground">No sessions yet.</p>
           ) : (
-            data.sessions.map((session) => (
-              <SessionCard key={session.id} session={session} ticketId={ticket.id} />
-            ))
+            data.sessions.map((session) => <SessionCard key={session.id} session={session} />)
           )}
         </TabsContent>
 
@@ -355,7 +352,7 @@ function MetaField({
   );
 }
 
-function SessionCard({ session, ticketId }: { session: SessionDTO; ticketId: string }) {
+function SessionCard({ session }: { session: SessionDTO }) {
   return (
     <Card id={`session-${session.id}`}>
       <CardContent className="flex flex-col gap-2 py-4">
@@ -397,20 +394,6 @@ function SessionCard({ session, ticketId }: { session: SessionDTO; ticketId: str
             <span className="font-medium">End summary: </span>
             {session.end_summary}
           </p>
-        )}
-
-        <Separator className="my-1" />
-        {session.has_transcript ? (
-          <Link
-            to={`/tickets/${ticketId}/sessions/${session.id}/transcript`}
-            className="text-sm underline-offset-2 hover:underline"
-          >
-            View transcript →
-          </Link>
-        ) : (
-          <span className="text-sm text-muted-foreground">
-            No transcript captured for this session.
-          </span>
         )}
       </CardContent>
     </Card>

@@ -1,23 +1,16 @@
 import type { Command } from "commander";
 import type { Clock } from "../../core/clock.js";
 import { systemClock } from "../../core/clock.js";
-import type { Actor, Session, Ticket } from "../../core/index.js";
-import { EXIT_CODES, mrUrlSchema, nowIso, sessionSchema, ticketSchema } from "../../core/index.js";
+import type { Actor, Ticket } from "../../core/index.js";
+import { EXIT_CODES, mrUrlSchema, nowIso, ticketSchema } from "../../core/index.js";
 import {
-  readSession,
   readTicket,
   repoPaths,
   requireRepoRoot,
   resolveTicketRef,
-  updateSession,
   updateTicket,
   withLock,
 } from "../../repo/index.js";
-import { diffSessionPatch } from "../../sessions/patch.js";
-import {
-  resolveTranscriptCapture,
-  speculativeTranscriptCapture,
-} from "../../sessions/transcript.js";
 import { diffTicketPatch, TICKET_FIELDS } from "../../tickets/patch.js";
 import { checkReviewEntry } from "../../tickets/state.js";
 import { formatZodIssuesForUsage } from "../../tickets/validate.js";
@@ -27,20 +20,8 @@ import { printWarning, ticketJson } from "./shared.js";
 
 interface ReviewCommandOptions {
   mr?: string;
-  transcript?: string;
   json?: boolean;
 }
-
-/**
- * `review` only ever patches `transcript_ref` on the active session — it
- * deliberately never ends the session (DECISIONS.md's C3 entry: the
- * session model chosen here keeps a session active across a review
- * round-trip; `done`/`drop`/`stop` are the only three edges that ever set
- * `ended_at`/`end_summary`). See transcript.ts's module doc, "Exactly how
- * C3 must call this", for why this is a narrower field list than
- * `done.ts`/`drop.ts`'s.
- */
-const REVIEW_SESSION_FIELDS = ["transcript_ref"] as const satisfies readonly (keyof Session)[];
 
 /**
  * Build (never persist) the ticket as `review --mr` should leave it:
@@ -97,15 +78,11 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
   // Fix 3 (adversarial review): validate --mr's URL shape UP FRONT — before
   // the lock, before resolving <ref>, before any read or write — so a
   // malformed (but non-empty) --mr fails as a plain USAGE_ERROR (exit 2)
-  // with zero side effects. Previously this validation only happened
-  // inside `buildReviewedTicket`'s `ticketSchema.safeParse` call, which
-  // runs AFTER the transaction below already folds `transcript_ref` into
-  // the active session (an `updateSession` write + a `review.requested`
-  // session event) — an invalid --mr left that write behind (an orphaned
-  // session-side event, a wasted transcript capture) for an operation that
-  // then failed anyway. `mrUrlSchema` (core/entities/ticket.ts) is the
-  // exact same schema `reviewSchema.mr` uses, so this can never be
-  // stricter or looser than what would eventually be persisted.
+  // with zero side effects, rather than only failing much later inside
+  // `buildReviewedTicket`'s `ticketSchema.safeParse` call. `mrUrlSchema`
+  // (core/entities/ticket.ts) is the exact same schema `reviewSchema.mr`
+  // uses, so this can never be stricter or looser than what would
+  // eventually be persisted.
   if (mr !== undefined) {
     const parsedMr = mrUrlSchema.safeParse(mr);
     if (!parsedMr.success) {
@@ -121,39 +98,18 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
 
   // ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC: a fast, UNLOCKED pre-check against
   // this same `initialTicket` read — same `checkReviewEntry` the lock
-  // below authoritatively enforces, run a second time, early, purely so a
+  // below authoritatively enforces, run a second time, early, so a
   // `review` that's clearly going to fail (e.g. the ticket is ALREADY in
   // review AND no --mr was given — `checkReviewEntry` rejects a bare
   // `review -> review`, though `--mr` given DOES succeed there per
-  // review-no-mr-nag-advises, see that function's doc) never reaches the
-  // speculative capture below at all. See stop.ts's identical pre-check
-  // for the full rationale (the speculative capture physically mutates
-  // `.slop/transcripts/<session.id>.jsonl` on disk, so running it
-  // unconditionally before any validation left a doomed `review` mutating
-  // that file with no event ever describing the change). The
-  // AUTHORITATIVE check inside `withLock` below is unchanged and is what
-  // actually guards correctness against the narrow race this pre-check
-  // can't close on its own.
+  // review-no-mr-nag-advises, see that function's doc) exits before doing
+  // any further work. The AUTHORITATIVE check inside `withLock` below is
+  // unchanged and is what actually guards correctness against the narrow
+  // race this pre-check can't close on its own.
   const initialCheck = checkReviewEntry(initialTicket.state, mr !== undefined);
   if (!initialCheck.ok) {
     throw new SlopError(initialCheck.reason ?? "illegal state transition", EXIT_CODES.CONFLICT);
   }
-
-  // Fix 1 (ticket_01KY93E2ZK6Z3TFEBP86ATMW37): locate + copy the harness
-  // transcript BEFORE acquiring the db lock — see transcript.ts's
-  // top-of-file doc, "Fix 1", and stop.ts's identical comment for the
-  // full rationale. Reconciled against the AUTHORITATIVE session below
-  // via `resolveTranscriptCapture`.
-  const speculativeCapture = await speculativeTranscriptCapture(
-    paths,
-    initialTicket.active_session,
-    {
-      paths,
-      cwd: root,
-      transcriptsMode: config.transcripts,
-      explicitTranscriptPath: opts.transcript,
-    },
-  );
 
   const result = await withLock(paths.lockFile, async (lock) => {
     const current = await readTicket(paths, initialTicket.id);
@@ -176,53 +132,18 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
         EXIT_CODES.GENERIC_ERROR,
       );
     }
-    const session = await readSession(paths, activeSessionId);
-
-    // C4's seam (transcript.ts's module doc, "Exactly how C3 must call
-    // this"): §4.3 lists `review` as a capture point too, even though it
-    // doesn't end the session — capture against the PRE-mutation session,
-    // fold transcript_ref into the SAME session write, WITHOUT touching
-    // ended_at/end_summary. Reuses `speculativeCapture` (captured OUTSIDE
-    // this lock, above) when it's still keyed to this exact session.
-    const capture = await resolveTranscriptCapture(speculativeCapture, {
-      session,
-      paths,
-      cwd: root,
-      transcriptsMode: config.transcripts,
-      explicitTranscriptPath: opts.transcript,
-    });
-    const finalSession = sessionSchema.parse({
-      ...session,
-      transcript_ref: capture.transcriptRef,
-    });
-
-    await updateSession(
-      paths,
-      session.id,
-      diffSessionPatch(session, finalSession, REVIEW_SESSION_FIELDS),
-      finalSession,
-      { actor, session: session.id },
-      {
-        // No dedicated "session updated" verb exists (event.ts's closed
-        // EVENT_VERBS) — reuse review.requested for this write too, per
-        // transcript.ts's module doc.
-        verb: "review.requested",
-        payload: capture.transcriptRef !== null ? { transcript_ref: capture.transcriptRef } : {},
-      },
-    );
-    await lock.assertHeld();
-
     const reviewedTicket = buildReviewedTicket(current, mr, actor);
     await updateTicket(
       paths,
       current.id,
       diffTicketPatch(current, reviewedTicket, TICKET_FIELDS),
       reviewedTicket,
-      { actor, session: session.id },
+      { actor, session: activeSessionId },
       { verb: "review.requested", payload: { mr: mr ?? null } },
     );
+    await lock.assertHeld();
 
-    return { session: finalSession, ticket: reviewedTicket, transcriptWarning: capture.warning };
+    return { sessionId: activeSessionId, ticket: reviewedTicket };
   });
 
   // nags-print-before-validation-review: the no-`--mr` nag now prints HERE
@@ -247,10 +168,6 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
     );
   }
 
-  // Printed after the transaction commits — never a reason review itself
-  // could fail (same convention as stop.ts/done.ts).
-  if (result.transcriptWarning !== null) printWarning(result.transcriptWarning);
-
   // review-no-mr-nag-advises: "moved to review" is only accurate for the
   // in_progress -> review edge — the MR attach/replace call (`review
   // -> review`, `checkReviewEntry`'s `hasMr` branch) leaves state
@@ -270,8 +187,7 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
         {
           ticket: ticketJson(result.ticket),
           session: {
-            id: result.session.id,
-            transcript: result.session.transcript_ref,
+            id: result.sessionId,
           },
           review: result.ticket.review
             ? {
@@ -297,8 +213,7 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
     `${headline}\n` +
       `  ${result.ticket.name}\n` +
       `  mr: ${result.ticket.review?.mr ?? "(none)"}\n` +
-      `  requested_at: ${result.ticket.review?.requested_at ?? "(unknown)"}\n` +
-      `  transcript: ${result.session.transcript_ref ?? "(none)"}\n`,
+      `  requested_at: ${result.ticket.review?.requested_at ?? "(unknown)"}\n`,
   );
 }
 
@@ -321,10 +236,6 @@ export function registerReviewCommand(program: Command): void {
     )
     .argument("<ref>", "ticket to move into review")
     .option("--mr <url>", "merge/pull request URL (strongly recommended, see D15)")
-    .option(
-      "--transcript <path>",
-      "manual transcript path (works for any harness; overrides auto-detection when the file exists)",
-    )
-    .option("--json", "machine-readable result (id, slug, handle, name, state, review, transcript)")
+    .option("--json", "machine-readable result (id, slug, handle, name, state, review)")
     .action(runReview);
 }

@@ -1,25 +1,20 @@
 /**
  * Idempotent `.gitignore` section management for `slop init` (D14:
- * "index.jsonc gitignored"; D16: "Transcripts: stored locally, gitignored
- * by default ... committed only if `transcripts: commit`").
+ * "index.jsonc gitignored").
  *
  * `slop init` never owns the whole `.gitignore` file — only one clearly
- * marked, managed section within it. Re-running `init` (e.g. after
- * `transcripts` was hand-edited from `local` to `commit`) replaces just
- * that section in place, so the gitignore entries always reflect the
- * current config without ever duplicating lines or touching anything the
- * repo owner put in the file themselves.
+ * marked, managed section within it. Re-running `init` replaces just
+ * that section in place, so the gitignore entries always stay current
+ * without ever duplicating lines or touching anything the repo owner put
+ * in the file themselves.
  */
-import type { TranscriptsMode } from "../../core/index.js";
-
 const SECTION_START = "# --- slopwork (managed by `slop init`) ---";
 const SECTION_END = "# --- end slopwork ---";
 
 /**
- * D14 (always) + D16 ("gitignored by default ... unless `transcripts:
- * commit`") — the exact lines `slop init` is responsible for.
+ * D14 — the exact lines `slop init` is responsible for.
  *
- * Also always (independent of `transcripts`) ignores the lock file and
+ * Also always ignores the lock file and
  * atomic-write temp files: a `kill -9` mid-transaction can leave the lock
  * file and/or a temp file (see atomic-write.ts's TEMP_FILE_PREFIX) on
  * disk. Left untracked, a `git add -A` would commit these ephemeral
@@ -39,18 +34,14 @@ const SECTION_END = "# --- end slopwork ---";
  * `.lock`/`.tmp-*` entries above, just one glob widened to catch the
  * `.stale-*` suffix too.
  */
-export function computeGitignoreLines(transcriptsMode: TranscriptsMode): string[] {
-  const lines = [
+export function computeGitignoreLines(): string[] {
+  return [
     ".slop/db/index.jsonc",
     ".slop/db/.lock",
     ".slop/db/.lock.stale-*",
     ".slop/db/.tmp-*",
     ".slop/db/*/.tmp-*",
   ];
-  if (transcriptsMode !== "commit") {
-    lines.push(".slop/transcripts/");
-  }
-  return lines;
 }
 
 /**

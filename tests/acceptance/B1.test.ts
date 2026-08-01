@@ -70,7 +70,7 @@ async function makeFixture(options: FixtureOptions = {}): Promise<Fixture> {
   if (options.jira !== undefined) {
     lines.push(`  jira: ${options.jira}`);
   }
-  lines.push("defaults:", "  stale_after: 60m", "  review_stale_after: 24h", "transcripts: local");
+  lines.push("defaults:", "  stale_after: 60m", "  review_stale_after: 24h");
   await writeFile(join(paths.slopDir, "config.yaml"), `${lines.join("\n")}\n`, "utf8");
 
   return { root, paths };

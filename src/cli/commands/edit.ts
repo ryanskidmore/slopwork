@@ -30,7 +30,7 @@ import { isInteractive } from "../init/prompt.js";
  * there would always fail to launch. `notepad` is on every stock Windows
  * install and is the analogous "always there" fallback for `win32`
  * (best-effort, unverified — no Windows environment to test the actual
- * launch against; see the `--transcript`-style "graceful degrade, never
+ * launch against; see the "graceful degrade, never
  * crash" posture used elsewhere in this codebase). A launch failure even
  * for that fallback (e.g. a minimal container with no editor at all) is
  * where the "clear error if none" half of B1's brief actually fires — see

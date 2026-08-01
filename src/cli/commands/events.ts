@@ -25,9 +25,9 @@
  *
  * Rationale: design.md's own framing of what an events feed is FOR is
  * explicit about this — §4.7 item 3 ("every completed ticket has: a
- * session, a plan with checked steps, ... and a transcript"), §5 item 5
+ * session, a plan with checked steps, ..."), §5 item 5
  * ("the human audits via status/web: every state change, plan revision,
- * progress note, MR, and transcript — attributed to actor + session +
+ * progress note, and MR — attributed to actor + session +
  * harness"). A per-ticket audit trail that silently drops every plan
  * revision and every session start/stop because those events happen to be
  * filed under the session as their `entity` rather than the ticket would

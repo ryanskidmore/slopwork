@@ -51,7 +51,6 @@ function sessionDto(session: Session, activeSessionId: string | null): SessionDT
       is_latest: version.version === latestVersion,
     })),
     end_summary: session.end_summary,
-    has_transcript: session.transcript_ref !== null,
     is_active: session.id === activeSessionId,
   };
 }

@@ -2,7 +2,7 @@
  * Identifiers deserve real monospace and click-to-copy (design direction:
  * "ULIDs, `t-<code>` handles, slugs, git SHAs, and JSONC are everywhere...
  * make ids copyable-on-click. This is functional, not decorative.") — used
- * for ticket ids/handles, session ids, git commit SHAs, transcript refs.
+ * for ticket ids/handles, session ids, git commit SHAs.
  */
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";

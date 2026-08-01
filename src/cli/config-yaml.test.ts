@@ -12,7 +12,6 @@ remotes:
 defaults:
   stale_after: 60m
   review_stale_after: 24h
-transcripts: local            # local | commit | off
 `;
     const parsed = configSchema.parse(parseConfigYamlText(text));
     expect(parsed).toEqual({
@@ -23,13 +22,12 @@ transcripts: local            # local | commit | off
         jira: "https://yourorg.atlassian.net",
       },
       defaults: { stale_after: "60m", review_stale_after: "24h" },
-      transcripts: "local",
     });
   });
 
   it("parses a minimal fresh-init config with no user/repo/jira", () => {
     const text =
-      "project: widgets\nremotes:\ndefaults:\n  stale_after: 60m\n  review_stale_after: 24h\ntranscripts: local\n";
+      "project: widgets\nremotes:\ndefaults:\n  stale_after: 60m\n  review_stale_after: 24h\n";
     const parsed = configSchema.parse(parseConfigYamlText(text));
     expect(parsed.project).toBe("widgets");
     expect(parsed.user).toBeUndefined();
@@ -39,14 +37,14 @@ transcripts: local            # local | commit | off
 
   it("parses an explicit blank jira as an empty string, distinct from absent", () => {
     const text =
-      'project: widgets\nremotes:\n  jira: ""\ndefaults:\n  stale_after: 60m\n  review_stale_after: 24h\ntranscripts: local\n';
+      'project: widgets\nremotes:\n  jira: ""\ndefaults:\n  stale_after: 60m\n  review_stale_after: 24h\n';
     const parsed = configSchema.parse(parseConfigYamlText(text));
     expect(parsed.remotes.jira).toBe("");
   });
 
   it("ignores blank lines and full-line comments", () => {
     const text =
-      "# a header comment\n\nproject: widgets\n\n# another comment\nremotes:\ndefaults:\n  stale_after: 60m\n  review_stale_after: 24h\ntranscripts: local\n";
+      "# a header comment\n\nproject: widgets\n\n# another comment\nremotes:\ndefaults:\n  stale_after: 60m\n  review_stale_after: 24h\n";
     const parsed = configSchema.parse(parseConfigYamlText(text));
     expect(parsed.project).toBe("widgets");
   });
@@ -64,7 +62,6 @@ describe("stringifyConfigYaml", () => {
     jira: "https://yourorg.atlassian.net",
     staleAfter: "60m",
     reviewStaleAfter: "24h",
-    transcripts: "local",
   };
 
   it("round-trips through parseConfigYamlText + configSchema for a fully-populated config", () => {
@@ -78,7 +75,6 @@ describe("stringifyConfigYaml", () => {
         jira: "https://yourorg.atlassian.net",
       },
       defaults: { stale_after: "60m", review_stale_after: "24h" },
-      transcripts: "local",
     });
   });
 
@@ -87,7 +83,6 @@ describe("stringifyConfigYaml", () => {
       project: "widgets",
       staleAfter: "60m",
       reviewStaleAfter: "24h",
-      transcripts: "local",
     };
     const text = stringifyConfigYaml(minimal);
     expect(text).not.toMatch(/^user:/m);
@@ -118,6 +113,6 @@ describe("stringifyConfigYaml", () => {
       .split("\n")
       .filter((l) => /^[a-z]/.test(l))
       .map((l) => l.split(":")[0]);
-    expect(keys).toEqual(["project", "user", "remotes", "defaults", "transcripts"]);
+    expect(keys).toEqual(["project", "user", "remotes", "defaults"]);
   });
 });

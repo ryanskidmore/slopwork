@@ -1,7 +1,7 @@
 /**
  * Renders markdown the SERVER already converted to sanitized HTML
  * (src/web/markdown.ts's `renderMarkdownToString` -> `sanitizeMarkdownHtml`
- * — every `spec.details_html`/`resolution_html`/transcript-block `html`
+ * — every `spec.details_html`/`resolution_html`
  * field in the API contract). `dangerouslySetInnerHTML` is safe here
  * specifically BECAUSE the server already stripped raw HTML and neutralised
  * any `javascript:`/`data:` href/src before this ever reaches the client —

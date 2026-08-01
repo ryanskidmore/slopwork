@@ -27,7 +27,7 @@ function buildProgram(): Command {
     .description(
       "Slopwork: a free OSS work tracker built for agents. Engineers break work " +
         "into a dependency graph; agents pick up tickets, plan, work, and leave an " +
-        "auditable trail ending in an MR and a transcript.",
+        "auditable trail ending in an MR.",
     )
     .version(pkg.version, "-V, --version", "print the slopwork version and exit")
     .addHelpCommand(false)

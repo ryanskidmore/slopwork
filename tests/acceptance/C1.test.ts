@@ -535,8 +535,6 @@ describe("C1: Sessions", () => {
       expect(sessions).toHaveLength(1);
       expect(sessions[0]?.ended_at).not.toBeNull();
       expect(sessions[0]?.end_summary).toBe("handed off cleanly");
-      // C4's seam — stop never fabricates a transcript reference.
-      expect(sessions[0]?.transcript_ref).toBeNull();
     });
 
     it("nudges (stderr warning) but does not block when --note is omitted", async () => {

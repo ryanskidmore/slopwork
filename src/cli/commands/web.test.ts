@@ -231,9 +231,8 @@ async function stopServer(server: RunningServer | undefined): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Fixture repo — built once in beforeAll, entirely through the real CLI
-// (spawned from source), with two files corrupted directly on disk
-// afterward:
+// Fixture repos — built once in beforeAll, entirely through the real CLI
+// (spawned from source), with files corrupted directly on disk afterward:
 //
 //  - goodTicket: never touched. Proves an UNRELATED ticket's own detail
 //    page still 200s even though badTicket's file is corrupt.
@@ -241,16 +240,19 @@ async function stopServer(server: RunningServer | undefined): Promise<void> {
 //    after `new` creates it. Proves the listing views degrade to "N-1
 //    tickets", never a 500.
 //  - sessionTicket + its one session: the session's .jsonc gets overwritten
-//    with invalid JSONC after `start` creates it. `getSessionById` (a
-//    direct-by-id read, deliberately left strict — see fixture-data
-//    -source.ts's `readJsoncDir` doc) still throws on it, so hitting its
-//    transcript route is this suite's forced, genuinely-unexpected 500 —
-//    proving THAT 500's body carries no filesystem path or stack trace,
-//    per this ticket's `development: false` half of the fix.
+//    with invalid JSONC after `start` creates it. Proves the tolerant
+//    sessions listing skips it without 500ing the ticket's own detail page.
+//  - brokenRoot: a SECOND, separate repo whose `db/events` directory is
+//    replaced by a plain file, so every view's `listEvents()` readdir throws
+//    ENOTDIR — this suite's forced, genuinely-unexpected 500, proving THAT
+//    500's body carries no filesystem path or stack trace, per this
+//    ticket's `development: false` half of the fix.
 // ---------------------------------------------------------------------------
 
 let root: string;
+let brokenRoot: string;
 let server: RunningServer | undefined;
+let brokenServer: RunningServer | undefined;
 let goodTicket: NewTicketJson;
 let badTicket: NewTicketJson;
 let sessionTicket: NewTicketJson;
@@ -259,6 +261,11 @@ let corruptedSessionId: string;
 async function get(path: string, init?: RequestInit): Promise<Response> {
   if (!server) throw new Error("server not started");
   return fetch(new URL(path, server.baseUrl), init);
+}
+
+async function getBroken(path: string, init?: RequestInit): Promise<Response> {
+  if (!brokenServer) throw new Error("broken server not started");
+  return fetch(new URL(path, brokenServer.baseUrl), init);
 }
 
 beforeAll(async () => {
@@ -309,11 +316,34 @@ beforeAll(async () => {
     // this test must pass with neither var set.
     process.env,
   );
+
+  // The second, deliberately-broken repo: `db/events` becomes a plain file,
+  // so `readdir` on it throws ENOTDIR — an unexpected error class the
+  // tolerant readers deliberately do NOT swallow (only ENOENT is).
+  brokenRoot = await mkdtemp(join(tmpdir(), "slop-web-forced-500-"));
+  const brokenInit = runSlop(
+    ["init", "--yes", "--project", "web-forced-500-fixture", "--user", "tester"],
+    brokenRoot,
+  );
+  expect(brokenInit.status, brokenInit.stderr).toBe(0);
+  newTicket(brokenRoot, "Ticket in the broken repo");
+  const eventsDir = join(brokenRoot, ".slop", "db", "events");
+  await rm(eventsDir, { recursive: true, force: true });
+  await writeFile(eventsDir, "not a directory\n", "utf8");
+
+  brokenServer = await spawnAndWaitForUrl(
+    "bun",
+    [cliEntry, "web", "--port", "0"],
+    brokenRoot,
+    process.env,
+  );
 }, 30_000);
 
 afterAll(async () => {
   await stopServer(server);
+  await stopServer(brokenServer);
   if (root) await rm(root, { recursive: true, force: true });
+  if (brokenRoot) await rm(brokenRoot, { recursive: true, force: true });
 });
 
 describe("web-one-malformed-db-file-500s-every-page-and-leaks-filesyst", () => {
@@ -376,28 +406,31 @@ describe("web-one-malformed-db-file-500s-every-page-and-leaks-filesyst", () => {
     });
   });
 
-  describe("a genuinely unexpected 500 (corrupt session file, strict by-id read) leaks nothing", () => {
+  describe("a corrupt session file no longer breaks the ticket's own detail page", () => {
+    it("200s — the tolerant sessions listing skips the corrupt session", async () => {
+      const res = await get(`/api/tickets/${sessionTicket.id}`);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { sessions: Array<{ id: string }> };
+      expect(body.sessions.map((s) => s.id)).not.toContain(corruptedSessionId);
+    });
+  });
+
+  describe("a genuinely unexpected 500 (db/events replaced by a plain file) leaks nothing", () => {
     it("still 500s — this fix does not paper over real errors", async () => {
-      const res = await get(
-        `/api/tickets/${sessionTicket.id}/sessions/${corruptedSessionId}/transcript`,
-      );
+      const res = await getBroken("/api/tickets");
       expect(res.status).toBe(500);
     });
 
     it("the 500 body contains no server filesystem path", async () => {
-      const res = await get(
-        `/api/tickets/${sessionTicket.id}/sessions/${corruptedSessionId}/transcript`,
-      );
+      const res = await getBroken("/api/tickets");
       const body = await res.text();
-      expect(body).not.toContain(root);
+      expect(body).not.toContain(brokenRoot);
       expect(body).not.toContain(".slop");
       expect(body).not.toContain("fixture-data-source");
     });
 
     it("the 500 body is NOT Bun's verbose dev error page (no stack trace/source excerpt)", async () => {
-      const res = await get(
-        `/api/tickets/${sessionTicket.id}/sessions/${corruptedSessionId}/transcript`,
-      );
+      const res = await getBroken("/api/tickets");
       const body = await res.text();
       // "__bunfallback" is Bun's own dev-mode error-overlay marker (see the
       // SLOP_WEB_DEBUG describe block below, which proves this SAME
@@ -427,7 +460,7 @@ describe("web-one-malformed-db-file-500s-every-page-and-leaks-filesyst", () => {
 // ---------------------------------------------------------------------------
 // SLOP_WEB_DEBUG: the explicit, opt-in escape hatch back to Bun's verbose
 // dev error page — a SEPARATE server instance, spawned with the flag set,
-// against the exact same corrupted-session fixture above. Proves the gate
+// against the exact same broken-events fixture above. Proves the gate
 // really is a live switch (not a no-op) rather than just proving the
 // off-by-default case.
 // ---------------------------------------------------------------------------
@@ -436,7 +469,7 @@ describe("SLOP_WEB_DEBUG opts back into the verbose dev error page", () => {
   let debugServer: RunningServer | undefined;
 
   beforeAll(async () => {
-    debugServer = await spawnAndWaitForUrl("bun", [cliEntry, "web", "--port", "0"], root, {
+    debugServer = await spawnAndWaitForUrl("bun", [cliEntry, "web", "--port", "0"], brokenRoot, {
       ...process.env,
       SLOP_WEB_DEBUG: "1",
     });
@@ -448,12 +481,7 @@ describe("SLOP_WEB_DEBUG opts back into the verbose dev error page", () => {
 
   it("the same forced 500 now DOES render Bun's verbose dev error page", async () => {
     if (!debugServer) throw new Error("debug server not started");
-    const res = await fetch(
-      new URL(
-        `/api/tickets/${sessionTicket.id}/sessions/${corruptedSessionId}/transcript`,
-        debugServer.baseUrl,
-      ),
-    );
+    const res = await fetch(new URL("/api/tickets", debugServer.baseUrl));
     expect(res.status).toBe(500);
     const body = await res.text();
     // Bun's dev-mode error overlay embeds the path/source/stack as base64

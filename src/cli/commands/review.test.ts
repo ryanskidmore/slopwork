@@ -1,5 +1,3 @@
-import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
@@ -122,23 +120,11 @@ describe("runReview (in-process)", () => {
     const id = await jsonNewTicket(root, "In-progress ticket to review");
     await startTicket(root, id);
 
-    // cli-harness.ts's withCwd deterministically scrubs every
-    // harness-identity env var (harness `other`, matching CI), so a
-    // captureTranscript call with no --transcript given would otherwise
-    // ALWAYS produce a "could not locate a transcript" warning on stderr
-    // here — pass a real --transcript file so this test's stderr-is-empty
-    // assertion below stays a meaningful "the whole review call, including
-    // transcript capture, succeeded cleanly" check rather than a vacuous
-    // one that merely tolerates that warning.
-    const transcriptFile = join(root, "transcript.jsonl");
-    await writeFile(transcriptFile, '{"turn":"review"}\n', "utf8");
-
     const out = captureOutput();
     try {
       await withCwd(root, () =>
         runReview(id, {
           mr: "https://example.com/org/repo/pull/1",
-          transcript: transcriptFile,
         }),
       );
       expect(out.stdout()).toContain("moved to review");
@@ -167,7 +153,7 @@ describe("runReview (in-process)", () => {
       );
       const body = JSON.parse(out.stdout()) as {
         ticket: { id: string; slug: string; handle: string; name: string; state: string };
-        session: { id: string; transcript: string | null };
+        session: { id: string };
         review: { mr: string | null; requested_at: string; by: unknown } | null;
         already_in_review: boolean;
       };
@@ -213,55 +199,35 @@ describe("runReview (in-process)", () => {
     expect((await readTicket(paths, id)).state).toBe("in_progress");
   });
 
-  it("ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC: a SECOND bare review (no --mr) on an already-review-state ticket is rejected (CONFLICT) WITHOUT overwriting the transcript the FIRST review already captured", async () => {
+  it("ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC: a SECOND bare review (no --mr) on an already-review-state ticket is rejected (CONFLICT) with zero side effects", async () => {
     const root = await makeTempRepo("slop-review-inproc-double-no-mutate-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });
-    const id = await jsonNewTicket(root, "Double-review ticket, must not mutate transcript");
+    const id = await jsonNewTicket(root, "Double-review ticket, second bare review must refuse");
     await startTicket(root, id);
 
-    const firstTranscript = join(root, "first-review-transcript.jsonl");
-    await writeFile(firstTranscript, '{"round":"first"}\n', "utf8");
     const firstOut = captureOutput();
     try {
-      await withCwd(root, () =>
-        runReview(id, { mr: "https://example.com/org/repo/pull/1", transcript: firstTranscript }),
-      );
+      await withCwd(root, () => runReview(id, { mr: "https://example.com/org/repo/pull/1" }));
     } finally {
       firstOut.restore();
     }
 
-    const paths = repoPaths(root);
-    const ticketAfterFirst = await readTicket(paths, id);
-    const sessionId = ticketAfterFirst.active_session;
-    if (sessionId === null)
-      throw new Error("unreachable: review-state ticket has no active_session");
-    const transcriptPath = join(paths.slopDir, "transcripts", `${sessionId}.jsonl`);
-    const contentAfterFirst = await readFile(transcriptPath, "utf8");
-    expect(contentAfterFirst).toBe('{"round":"first"}\n');
-
     // A SECOND, BARE review (no --mr) on the SAME (now review-state) ticket
     // — checkReviewEntry rejects a bare `review -> review` (D15: nothing to
     // update without a link to attach; review-no-mr-nag-advises made `--mr`
-    // given legal here instead, covered by the next test). A real, findable
-    // "transcript" that the OLD (pre-fix) code would have unconditionally
-    // copied over the FIRST review's file before ever validating that this
-    // second review call is illegal.
-    const secondTranscript = join(root, "second-review-transcript.jsonl");
-    await writeFile(secondTranscript, '{"round":"second-should-never-land"}\n', "utf8");
+    // given legal here instead, covered by the next test).
     const secondOut = captureOutput();
     try {
-      await expect(
-        withCwd(root, () => runReview(id, { transcript: secondTranscript })),
-      ).rejects.toMatchObject({ exitCode: EXIT_CODES.CONFLICT });
+      await expect(withCwd(root, () => runReview(id, {}))).rejects.toMatchObject({
+        exitCode: EXIT_CODES.CONFLICT,
+      });
     } finally {
       secondOut.restore();
     }
 
-    // The fix: the FIRST review's transcript bytes are untouched, and the
-    // ticket's MR link is still the first round's — the doomed second
+    // The ticket's MR link is still the first round's — the doomed second
     // review changed nothing.
-    const contentAfterSecond = await readFile(transcriptPath, "utf8");
-    expect(contentAfterSecond).toBe('{"round":"first"}\n');
+    const paths = repoPaths(root);
     const ticketAfterSecond = await readTicket(paths, id);
     expect(ticketAfterSecond.review?.mr).toBe("https://example.com/org/repo/pull/1");
   });

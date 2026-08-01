@@ -207,7 +207,6 @@ describe("E1: Polish", () => {
         "defaults:",
         "  stale_after: 60m",
         "  review_stale_after: 24h",
-        "transcripts: local",
         "",
       ].join("\n");
       await writeFile(join(paths.slopDir, "config.yaml"), lines, "utf8");

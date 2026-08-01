@@ -137,10 +137,9 @@ export const HOUSE_RULES: readonly string[] = [
 export const REF_RESOLUTION =
   "Anywhere a `<ref>` is accepted: full id (`ticket_01KY9RVF2DCG6TDQ8EBSGXQXT1`), unique short prefix (`01KY9R`), short `t-<code>` handle (`t-wi5fe`), slug (`adding-new-auth-provider`), and for parents also external refs (`jira:PROJ-123`). Ambiguous prefix or handle → the CLI errors and lists candidates; pick explicitly.";
 
-/** Edge cases (the pre-v0 draft, unchanged). */
+/** Edge cases (the pre-v0 draft, minus since-removed rows). */
 export const EDGE_CASES: readonly string[] = [
   "**No `.slop/` in the repo:** slopwork isn't set up. Ask the human before running `slop init` — never initialize on your own.",
-  "**Transcript warnings** on `stop`/`done`: report the warning to the human; never block or retry-loop on it.",
   "**Draft tickets** (`state: draft`) are not workable — they're being defined. Don't start them; ask if one looks like it should be yours.",
   "**`ready` returns nothing:** check `slop status` for blocked/stale items and report what's gating progress rather than inventing work.",
 ] as const;

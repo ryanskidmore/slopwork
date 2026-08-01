@@ -3,15 +3,6 @@
  * `src/sessions/start.ts`: this module decides *what* the resulting
  * {@link Session}/{@link Ticket} objects should be; `src/cli/commands/
  * stop.ts` owns resolving `<ref>`, locking, writing, and printing.
- *
- * design.md §2: "`stop` hands off (transcript also captured — a dead
- * session's transcript is often the most valuable one)." Transcript
- * capture is explicitly C4's job (see this module's `end_summary`/
- * `transcript_ref` handling below) — this module never touches
- * `transcript_ref`, leaving it at whatever `createSession` (start.ts)
- * already wrote (`null`), which is the correct, honest seam: `stop` ends
- * the session; C4 decides what (if anything) fills in the transcript
- * afterward.
  */
 import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
@@ -56,8 +47,7 @@ export function assertStoppable(ticket: Ticket): void {
 }
 
 /** Build (never persist) the session as `stop` should leave it: ended, with
- * `note` (if given) as the handoff `end_summary`. `transcript_ref` is left
- * untouched (C4's seam — see module doc). */
+ * `note` (if given) as the handoff `end_summary`. */
 export function buildStoppedSession(
   session: Session,
   note: string | undefined,

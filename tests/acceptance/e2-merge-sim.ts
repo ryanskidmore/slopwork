@@ -490,8 +490,8 @@ export async function runMergeSimulation(
     const indexTextB = await readFile(repoPaths(cloneBRoot).indexFile, "utf8");
     const localIndexDivergedBeforeMerge = indexTextA !== indexTextB;
 
-    // --- Pre-merge D14/D16 sanity: neither clone ever tracked the derived
-    // index or transcripts, so a divergent index can't possibly conflict —
+    // --- Pre-merge D14 sanity: neither clone ever tracked the derived
+    // index, so a divergent index can't possibly conflict —
     // it isn't in the merge's input set at all. ---------------------------
     const trackedFilesA = must(runGit(["ls-files"], cloneARoot), "git ls-files (A)")
       .stdout.split("\n")
@@ -661,19 +661,11 @@ export async function runMergeSimulation(
 export function checkHardInvariants(report: MergeSimReport): string[] {
   const problems: string[] = [];
 
-  if (
-    report.trackedFilesA.some((f) => f.endsWith("index.jsonc") || f.includes(".slop/transcripts/"))
-  ) {
-    problems.push(
-      "clone A tracked index.jsonc or a transcript file in git before the merge (D14/D16 violated)",
-    );
+  if (report.trackedFilesA.some((f) => f.endsWith("index.jsonc"))) {
+    problems.push("clone A tracked index.jsonc in git before the merge (D14 violated)");
   }
-  if (
-    report.trackedFilesB.some((f) => f.endsWith("index.jsonc") || f.includes(".slop/transcripts/"))
-  ) {
-    problems.push(
-      "clone B tracked index.jsonc or a transcript file in git before the merge (D14/D16 violated)",
-    );
+  if (report.trackedFilesB.some((f) => f.endsWith("index.jsonc"))) {
+    problems.push("clone B tracked index.jsonc in git before the merge (D14 violated)");
   }
   if (report.graph.indexFileTrackedByGitPostMerge) {
     problems.push("index.jsonc is tracked by git after the merge (D14 violated)");
@@ -773,8 +765,8 @@ export function formatReport(report: MergeSimReport): string[] {
     "PASS  new tickets/sessions/events on both sides: distinct ULID filenames, zero create-conflicts",
   );
   push(
-    `PASS  .slop/db/index.jsonc and .slop/transcripts/ were never tracked by git on either clone (D14/D16) — ` +
-      `${report.trackedFilesA.length} file(s) tracked on A, ${report.trackedFilesB.length} on B, none of them derived/transcript files`,
+    `PASS  .slop/db/index.jsonc was never tracked by git on either clone (D14) — ` +
+      `${report.trackedFilesA.length} file(s) tracked on A, ${report.trackedFilesB.length} on B, none of them derived files`,
   );
   push();
 

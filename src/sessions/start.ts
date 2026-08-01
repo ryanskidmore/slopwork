@@ -97,7 +97,6 @@ export function buildNewSession(input: NewSessionInput, clock: Clock = systemClo
     ended_at: null,
     plan: [],
     end_summary: null,
-    transcript_ref: null,
   };
   const parsed = sessionSchema.safeParse(candidate);
   if (!parsed.success) {

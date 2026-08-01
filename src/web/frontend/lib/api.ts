@@ -12,7 +12,6 @@ import type {
   StaleResponseDTO,
   TicketDetailDTO,
   TicketListResponseDTO,
-  TranscriptResponseDTO,
   TreeResponseDTO,
 } from "../../api/types.js";
 
@@ -68,27 +67,6 @@ export function fetchTree(): Promise<TreeResponseDTO> {
 
 export function fetchTicketDetail(ref: string): Promise<TicketDetailDTO> {
   return getJson(`/api/tickets/${encodeURIComponent(ref)}`);
-}
-
-export interface TranscriptQuery {
-  offset?: number;
-  limit?: number;
-  includeSystem?: boolean;
-}
-
-export function fetchTranscript(
-  ref: string,
-  sessionId: string,
-  query: TranscriptQuery = {},
-): Promise<TranscriptResponseDTO> {
-  const params = new URLSearchParams();
-  if (query.offset !== undefined) params.set("offset", String(query.offset));
-  if (query.limit !== undefined) params.set("limit", String(query.limit));
-  if (query.includeSystem) params.set("all", "1");
-  const qs = params.toString();
-  return getJson(
-    `/api/tickets/${encodeURIComponent(ref)}/sessions/${encodeURIComponent(sessionId)}/transcript${qs ? `?${qs}` : ""}`,
-  );
 }
 
 export function fetchReview(): Promise<ReviewResponseDTO> {

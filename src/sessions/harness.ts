@@ -9,8 +9,7 @@
  * "which session is mine" later via a newest-mtime heuristic, since two
  * concurrent agents in one repo is a first-class scenario here, and that
  * heuristic answers "which session touched this project most recently",
- * not "which one is *mine*". C4 (transcript capture) needs this exact
- * detection result too — import {@link detectHarness}/
+ * not "which one is *mine*". Import {@link detectHarness}/
  * {@link sniffHarnessKind} from here rather than re-deriving the sniff.
  * `src/cli/actor.ts`'s D17 actor `kind` (human/agent) resolution is also
  * built directly on {@link sniffHarnessKind} (see that module).

@@ -136,7 +136,6 @@ describe("D1: init + agent onboarding", () => {
         ".slop/db/tickets",
         ".slop/db/sessions",
         ".slop/db/events",
-        ".slop/transcripts",
       ]) {
         expect(existsSync(join(dir, rel)), `expected ${rel} to exist`).toBe(true);
       }
@@ -159,7 +158,6 @@ describe("D1: init + agent onboarding", () => {
       expect(config.remotes.jira).toBeUndefined();
       expect(config.defaults.stale_after).toBe("60m");
       expect(config.defaults.review_stale_after).toBe("24h");
-      expect(config.transcripts).toBe("local");
     });
 
     it("--project/--user/--jira override autodetection", async () => {
@@ -221,38 +219,15 @@ describe("D1: init + agent onboarding", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Gitignore entries (D14/D16)
+  // Gitignore entries (D14)
   // ---------------------------------------------------------------------------
 
-  describe("gitignore entries (D14/D16)", () => {
-    it("always ignores .slop/db/index.jsonc, and ignores .slop/transcripts/ under the default transcripts: local", async () => {
+  describe("gitignore entries (D14)", () => {
+    it("always ignores .slop/db/index.jsonc", async () => {
       const dir = await makeScratchRepo("slop-d1-gitignore-local-");
       runSlop(["init", "--yes"], dir);
       const gitignore = readFileSync(join(dir, ".gitignore"), "utf8");
       expect(gitignore).toContain(".slop/db/index.jsonc");
-      expect(gitignore).toContain(".slop/transcripts/");
-    });
-
-    it("does NOT ignore .slop/transcripts/ once config.yaml is set to transcripts: commit", async () => {
-      const dir = await makeScratchRepo("slop-d1-gitignore-commit-");
-      runSlop(["init", "--yes"], dir);
-
-      const configPath = join(dir, ".slop", "config.yaml");
-      const original = readFileSync(configPath, "utf8");
-      writeFileSync(configPath, original.replace(/transcripts:.*/, "transcripts: commit"));
-
-      // Re-running init refreshes the gitignore section against the
-      // (hand-edited) current config, without touching config.yaml itself.
-      const result = runSlop(["init", "--yes"], dir);
-      expect(result.status, result.stderr).toBe(0);
-
-      const gitignore = readFileSync(join(dir, ".gitignore"), "utf8");
-      expect(gitignore).toContain(".slop/db/index.jsonc");
-      expect(gitignore).not.toContain(".slop/transcripts/");
-
-      // config.yaml itself was left untouched (still says transcripts: commit).
-      const config = readConfig(dir);
-      expect(config.transcripts).toBe("commit");
     });
   });
 
@@ -289,8 +264,6 @@ describe("D1: init + agent onboarding", () => {
       const gitignore = readFileSync(join(dir, ".gitignore"), "utf8");
       const indexLines = gitignore.split("\n").filter((l) => l.includes("index.jsonc"));
       expect(indexLines).toHaveLength(1);
-      const transcriptLines = gitignore.split("\n").filter((l) => l.includes("transcripts/"));
-      expect(transcriptLines).toHaveLength(1);
 
       // Running a third time is equally harmless.
       const third = runSlop(["init", "--yes"], dir);
@@ -508,13 +481,10 @@ describe("D1: init + agent onboarding", () => {
      * Every harness-identity env var a real harness sets, stripped for
      * every loop step AFTER `init` (which needs CLAUDECODE=1 to install
      * the skill — see the "SKILL.md installation" describe block above).
-     * Confirmed necessary by manual verification of this exact loop: left
-     * unstripped, `start`/`review`/`done` detect THIS TEST PROCESS's own
-     * real Claude Code session (this suite is routinely run from inside
-     * one, via `CLAUDE_CODE_SESSION_ID`) and `review`/`done` then try to
-     * locate-and-copy that live, multi-megabyte, still-being-written
-     * transcript into the scratch repo. Stripping keeps the loop
-     * deterministic and exercises exactly what an untagged/unknown
+     * Left unstripped, `start`/`review`/`done` would detect THIS TEST
+     * PROCESS's own real Claude Code session (this suite is routinely run
+     * from inside one, via `CLAUDE_CODE_SESSION_ID`). Stripping keeps the
+     * loop deterministic and exercises exactly what an untagged/unknown
      * harness sees (`harness: "other"`) — the loop's own mechanics under
      * test don't depend on which harness got detected.
      */
