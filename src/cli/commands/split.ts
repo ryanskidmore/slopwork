@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { Ticket } from "../../core/index.js";
 import { EXIT_CODES, nowIso, systemClock } from "../../core/index.js";
-import { repoPaths, requireRepoRoot } from "../../repo/index.js";
+import { repoPaths, requireRepoRoot, ticketEventContext } from "../../repo/index.js";
 import { openStorage } from "../../storage/index.js";
 import { TICKET_FIELDS, diffTicketPatch } from "../../tickets/patch.js";
 import { buildSplitChild } from "../../tickets/split.js";
@@ -125,7 +125,10 @@ export async function runSplit(
       });
       await backend.createTicket(
         ticket,
-        { actor, session: null },
+        // A split child has no session of its own yet. Its creation is still
+        // work performed in the split target's current session, so attribute
+        // the creation to the fresh parent snapshot read under this lock.
+        ticketEventContext(actor, target),
         {
           verb: "ticket.created",
           payload: {
@@ -146,7 +149,7 @@ export async function runSplit(
       target.id,
       diffTicketPatch(target, updatedTarget, TICKET_FIELDS),
       updatedTarget,
-      { actor, session: null },
+      ticketEventContext(actor, target),
       {
         verb: "ticket.split",
         payload: {

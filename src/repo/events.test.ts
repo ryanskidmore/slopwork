@@ -4,7 +4,14 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ulid } from "ulid";
 import { fixedClock } from "../core/clock.js";
-import { type Event, type EventId, eventSchema, newEventId, newTicketId } from "../core/index.js";
+import {
+  type Event,
+  type EventId,
+  eventSchema,
+  newEventId,
+  newSessionId,
+  newTicketId,
+} from "../core/index.js";
 import { writeCanonical } from "../core/jsonc.js";
 import * as eventsModule from "./events.js";
 import {
@@ -18,6 +25,7 @@ import {
   migrateFlatEventsToShards,
   queryEvents,
   readEvent,
+  ticketEventContext,
   withMutationEvent,
 } from "./events.js";
 import { ensureDbDirs } from "./paths.js";
@@ -106,6 +114,22 @@ describe("immutability", () => {
   it("this module exports no updateEvent or deleteEvent", () => {
     expect("updateEvent" in eventsModule).toBe(false);
     expect("deleteEvent" in eventsModule).toBe(false);
+  });
+});
+
+describe("ticketEventContext", () => {
+  const actor = { name: "ryan", kind: "human" } as const;
+
+  it("attributes ticket work to the ticket snapshot's active session", () => {
+    const activeSession = newSessionId();
+    expect(ticketEventContext(actor, { active_session: activeSession })).toEqual({
+      actor,
+      session: activeSession,
+    });
+  });
+
+  it("preserves null for ticket work performed outside a session", () => {
+    expect(ticketEventContext(actor, { active_session: null })).toEqual({ actor, session: null });
   });
 });
 

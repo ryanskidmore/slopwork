@@ -7,10 +7,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
 import { EXIT_CODES } from "../../core/exit-codes.js";
-import type { TicketId } from "../../core/index.js";
+import type { SessionId, TicketId } from "../../core/index.js";
 import { listSessions, queryEvents, readTicket, repoPaths } from "../../repo/index.js";
 import { FlatfileBackend } from "../../storage/flatfile.js";
 import { runNew } from "./new.js";
+import { runStart } from "./start.js";
 import { runUpdate } from "./update.js";
 
 // Regression test for ticket_01KY93E2BKH5JCMAV3JWPNN63G: `update` (and
@@ -718,7 +719,11 @@ function baseOpts(overrides: Partial<Parameters<typeof runUpdate>[1]> = {}) {
   };
 }
 
-async function jsonNewTicket(root: string, name: string): Promise<TicketId> {
+async function jsonNewTicket(
+  root: string,
+  name: string,
+  extra: Partial<Parameters<typeof runNew>[1]> = {},
+): Promise<TicketId> {
   const out = captureOutput();
   try {
     await withCwd(root, () =>
@@ -729,9 +734,20 @@ async function jsonNewTicket(root: string, name: string): Promise<TicketId> {
         acceptance: [],
         context: [],
         json: true,
+        ...extra,
       }),
     );
     return (JSON.parse(out.stdout()) as { id: TicketId }).id;
+  } finally {
+    out.restore();
+  }
+}
+
+async function jsonStartTicket(root: string, id: TicketId): Promise<SessionId> {
+  const out = captureOutput();
+  try {
+    await withCwd(root, () => runStart(id, { harness: "codex", json: true }));
+    return (JSON.parse(out.stdout()) as { session: { id: SessionId } }).session.id;
   } finally {
     out.restore();
   }
@@ -809,6 +825,91 @@ describe("runUpdate (in-process)", () => {
     expect(after).toEqual(before); // never rewritten — pure progress is event-only
     const events = await queryEvents(paths, { ticket: id });
     expect(events.some((e) => e.payload.progress === "made some headway")).toBe(true);
+  });
+
+  it("attributes lock-free progress and locked field updates to the active session, while open-ticket updates stay null", async () => {
+    const root = await makeTempRepo("slop-update-inproc-session-context-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const active = await jsonNewTicket(root, "Active update ticket");
+    const open = await jsonNewTicket(root, "Open update ticket");
+    const session = await jsonStartTicket(root, active);
+
+    for (const [refs, opts] of [
+      [[active], baseOpts({ progress: "session progress" })],
+      [[active], baseOpts({ priority: 1 })],
+      [[open], baseOpts({ priority: 1 })],
+    ] as const) {
+      const out = captureOutput();
+      try {
+        await withCwd(root, () => runUpdate([...refs], opts));
+      } finally {
+        out.restore();
+      }
+    }
+
+    const paths = repoPaths(root);
+    const activeEvents = await queryEvents(paths, { ticket: active });
+    expect(activeEvents.find((e) => e.payload.progress === "session progress")?.session).toBe(
+      session,
+    );
+    expect(activeEvents.findLast((e) => e.verb === "ticket.updated")?.session).toBe(session);
+    const openEvents = await queryEvents(paths, { ticket: open });
+    expect(openEvents.findLast((e) => e.verb === "ticket.updated")?.session).toBeNull();
+  });
+
+  it("bulk updates retain each ticket's distinct active session", async () => {
+    const root = await makeTempRepo("slop-update-inproc-bulk-sessions-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const first = await jsonNewTicket(root, "First bulk session ticket");
+    const second = await jsonNewTicket(root, "Second bulk session ticket");
+    const firstSession = await jsonStartTicket(root, first);
+    const secondSession = await jsonStartTicket(root, second);
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runUpdate([first, second], baseOpts({ priority: 1 })));
+    } finally {
+      out.restore();
+    }
+
+    const paths = repoPaths(root);
+    const firstEvent = (await queryEvents(paths, { ticket: first })).findLast(
+      (e) => e.verb === "ticket.updated",
+    );
+    const secondEvent = (await queryEvents(paths, { ticket: second })).findLast(
+      (e) => e.verb === "ticket.updated",
+    );
+    expect(firstEvent?.session).toBe(firstSession);
+    expect(secondEvent?.session).toBe(secondSession);
+    expect(firstEvent?.session).not.toBe(secondEvent?.session);
+  });
+
+  it("a reparent attributes the root and every descendant cascade to that ticket's own active session", async () => {
+    const root = await makeTempRepo("slop-update-inproc-reparent-sessions-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const oldParent = await jsonNewTicket(root, "Old ancestry root");
+    const newParent = await jsonNewTicket(root, "New ancestry root");
+    const child = await jsonNewTicket(root, "Reparented child", { parent: oldParent });
+    const grandchild = await jsonNewTicket(root, "Cascaded grandchild", { parent: child });
+    const childSession = await jsonStartTicket(root, child);
+    const grandchildSession = await jsonStartTicket(root, grandchild);
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runUpdate([child], baseOpts({ parent: newParent })));
+    } finally {
+      out.restore();
+    }
+
+    const paths = repoPaths(root);
+    const childEvent = (await queryEvents(paths, { ticket: child })).findLast(
+      (e) => e.verb === "ticket.updated",
+    );
+    const cascadeEvent = (await queryEvents(paths, { ticket: grandchild })).findLast(
+      (e) => e.payload.reparent_root === child,
+    );
+    expect(childEvent?.session).toBe(childSession);
+    expect(cascadeEvent?.session).toBe(grandchildSession);
   });
 
   it("--priority changes the stored priority", async () => {

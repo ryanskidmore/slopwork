@@ -408,6 +408,15 @@ describe("D5: slop web", () => {
       expect(events.length).toBeGreaterThanOrEqual(1);
     });
 
+    it("preserves event session ids in the ticket-detail DTO for the audit spine", async () => {
+      const implementOauth = ticketBySlug("implement-oauth-provider");
+      const { body } = await getJson<TicketDetailDTO>(`/api/tickets/${implementOauth.id}`);
+      const sessionEvent = body.events.find((event) => event.session !== null);
+      expect(sessionEvent, "no session-attributed event in the timeline").toBeDefined();
+      const fixtureEvent = fixtureEvents.find((event) => event.id === sessionEvent?.id);
+      expect(sessionEvent?.session).toBe(fixtureEvent?.session);
+    });
+
     it("renders sessions with actor/harness/git/plan-versions/checked-steps", async () => {
       const implementOauth = ticketBySlug("implement-oauth-provider");
       const { status, body } = await getJson<TicketDetailDTO>(`/api/tickets/${implementOauth.id}`);

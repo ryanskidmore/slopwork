@@ -68,6 +68,7 @@ import {
   type EventId,
   type EventVerb,
   type SessionId,
+  type Ticket,
   type TicketId,
   eventSchema,
   isEventId,
@@ -360,6 +361,19 @@ export interface EventContext {
   actor: Actor;
   /** The session this mutation happens under, or `null` outside any session. */
   session: SessionId | null;
+}
+
+/**
+ * Event context for work performed on a ticket. The caller chooses the
+ * ticket snapshot deliberately: lock-free event-only commands use the
+ * snapshot they resolved before appending, while read-modify-write commands
+ * pass the fresh snapshot read inside their transaction.
+ */
+export function ticketEventContext(
+  actor: Actor,
+  ticket: Pick<Ticket, "active_session">,
+): EventContext {
+  return { actor, session: ticket.active_session };
 }
 
 /**

@@ -13,7 +13,12 @@ import { EXIT_CODES } from "../../core/exit-codes.js";
 // (a remote backend has no local file to hand $EDITOR at all). The
 // structured, backend-portable write still goes through
 // `backend.updateTicket` below once the edit is validated.
-import { atomicWriteFile, repoPaths, requireRepoRoot } from "../../repo/index.js";
+import {
+  atomicWriteFile,
+  repoPaths,
+  requireRepoRoot,
+  ticketEventContext,
+} from "../../repo/index.js";
 import { openStorage } from "../../storage/index.js";
 import { validateEditedTicketText } from "../../tickets/edit.js";
 import { validateTicketEdges } from "../../tickets/edges.js";
@@ -252,6 +257,7 @@ export async function runEdit(ref: string): Promise<void> {
   try {
     await backend.transact(async () => {
       const all = await backend.listTickets();
+      const current = all.find((t) => t.id === candidate.id) ?? candidate;
       const others = all.filter((t) => t.id !== candidate.id);
 
       validateTicketEdges(candidate, others);
@@ -267,7 +273,7 @@ export async function runEdit(ref: string): Promise<void> {
         reparented.id,
         patch,
         reparented,
-        { actor, session: null },
+        ticketEventContext(actor, current),
         {
           verb: "ticket.updated",
           payload: { method: "edit", reparented: changed, descendants: descendants.length },
@@ -287,7 +293,7 @@ export async function runEdit(ref: string): Promise<void> {
           descendant.id,
           descendantPatch,
           descendant,
-          { actor, session: null },
+          ticketEventContext(actor, descendant),
           {
             verb: "ticket.updated",
             payload: { method: "reparent-cascade", reparent_root: reparented.id },

@@ -1,17 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
-import { EXIT_CODES } from "../../core/index.js";
+import { type SessionId, type TicketId, EXIT_CODES } from "../../core/index.js";
+import { queryEvents, repoPaths } from "../../repo/index.js";
 import { runAnswer } from "./answer.js";
 import { runAsk } from "./ask.js";
 import { runNew } from "./new.js";
+import { runStart } from "./start.js";
+import { runStop } from "./stop.js";
 
 // In-process coverage of `runAnswer` (G4, t-jggg9) — real v8 coverage, no
 // subprocess. Acceptance-level (spawned-binary) coverage already lives in
 // tests/acceptance/G4.test.ts; this file exercises `runAnswer` directly so
 // `src/cli/commands/answer.ts` isn't 0%-covered.
 
-async function jsonNewTicket(root: string, name: string): Promise<{ id: string; slug: string }> {
+async function jsonNewTicket(root: string, name: string): Promise<{ id: TicketId; slug: string }> {
   const out = captureOutput();
   try {
     await withCwd(root, () =>
@@ -24,7 +27,7 @@ async function jsonNewTicket(root: string, name: string): Promise<{ id: string; 
         json: true,
       }),
     );
-    return JSON.parse(out.stdout()) as { id: string; slug: string };
+    return JSON.parse(out.stdout()) as { id: TicketId; slug: string };
   } finally {
     out.restore();
   }
@@ -35,6 +38,16 @@ async function jsonAsk(root: string, ticketRef: string, text: string): Promise<{
   try {
     await withCwd(root, () => runAsk(ticketRef, text, { option: [], json: true }));
     return (JSON.parse(out.stdout()) as { question: { id: string } }).question;
+  } finally {
+    out.restore();
+  }
+}
+
+async function jsonStartTicket(root: string, id: TicketId): Promise<SessionId> {
+  const out = captureOutput();
+  try {
+    await withCwd(root, () => runStart(id, { harness: "codex", json: true }));
+    return (JSON.parse(out.stdout()) as { session: { id: SessionId } }).session.id;
   } finally {
     out.restore();
   }
@@ -114,6 +127,38 @@ describe("runAnswer (in-process)", () => {
     await expect(withCwd(root, () => runAnswer(q.id, "Second answer", {}))).rejects.toMatchObject({
       exitCode: EXIT_CODES.CONFLICT,
     });
+  });
+
+  it("attributes ask to its old session and an answer after stop/restart to the new current session", async () => {
+    const root = await makeTempRepo("slop-answer-inproc-restarted-session-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const t = await jsonNewTicket(root, "Restarted answer ticket");
+    const oldSession = await jsonStartTicket(root, t.id);
+    const q = await jsonAsk(root, t.id, "Carry this question forward?");
+
+    const stopOut = captureOutput();
+    try {
+      await withCwd(root, () => runStop(t.id, { note: "question remains open" }));
+    } finally {
+      stopOut.restore();
+    }
+    const newSession = await jsonStartTicket(root, t.id);
+
+    const answerOut = captureOutput();
+    try {
+      await withCwd(root, () => runAnswer(q.id, "Answered after restart", {}));
+    } finally {
+      answerOut.restore();
+    }
+
+    const events = await queryEvents(repoPaths(root), { ticket: t.id });
+    const asked = events.find((event) => event.id === q.id);
+    const answered = events.find(
+      (event) => event.verb === "question.answered" && event.payload.question_id === q.id,
+    );
+    expect(asked?.session).toBe(oldSession);
+    expect(answered?.session).toBe(newSession);
+    expect(newSession).not.toBe(oldSession);
   });
 
   it("rejects an empty answer as a USAGE_ERROR", async () => {
