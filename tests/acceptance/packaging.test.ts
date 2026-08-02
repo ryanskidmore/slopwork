@@ -126,7 +126,7 @@ describe("packaging: package.json metadata", () => {
   });
 
   it('"bin.slop" points at the Node-runnable launcher, not the raw bun-shebang source', () => {
-    expect(pkg.bin.slop).toBe("./bin/slop.mjs");
+    expect(pkg.bin.slop).toBe("bin/slop.mjs");
   });
 
   it('"engines" still requires bun (v0 genuinely needs it at runtime)', () => {

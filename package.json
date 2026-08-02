@@ -26,7 +26,7 @@
     "url": "git+https://github.com/ryanskidmore/slopwork.git"
   },
   "bin": {
-    "slop": "./bin/slop.mjs"
+    "slop": "bin/slop.mjs"
   },
   "files": [
     "bin",
@@ -42,6 +42,7 @@
     "dev:web": "bun scripts/build-frontend.ts --watch",
     "prebuild": "bun run build:web",
     "build": "bun build ./src/cli/index.ts --compile --outfile dist/slop",
+    "check:required": "bun run lint && bun run format:check && bun run typecheck && bun run test:coverage && bun run build && bun run verify:dist && bun run verify:package",
     "start": "bun src/cli/index.ts",
     "pretest": "bun run build:web",
     "test": "vitest run",
@@ -53,7 +54,9 @@
     "format:check": "oxfmt --check .",
     "typecheck": "tsc --noEmit && bun run typecheck:web",
     "typecheck:web": "tsc --noEmit -p src/web/frontend/tsconfig.json",
-    "prepublishOnly": "bun run build:web && npm run typecheck"
+    "verify:dist": "./dist/slop --version && ./dist/slop --help > /dev/null",
+    "verify:package": "bun scripts/verify-package.ts",
+    "prepack": "bun run build:web"
   },
   "dependencies": {
     "commander": "^15.0.0",

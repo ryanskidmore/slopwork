@@ -86,6 +86,8 @@ bun run format          # apply formatting (oxfmt, in place)
 bun run format:check     # check formatting without writing
 bun run typecheck        # tsc --noEmit (src/ + src/web/frontend/'s own tsconfig)
 bun run build            # compile the standalone binary to dist/slop
+bun run verify:package   # pack, install, and execute the npm tarball in a temp project
+bun run check:required   # the complete CI/release gate
 bun run start            # run the CLI from source (bun src/cli/index.ts ...)
 ```
 
@@ -97,8 +99,10 @@ bun run start            # run the CLI from source (bun src/cli/index.ts ...)
 ./dist/slop --help
 ```
 
-CI (`.github/workflows/ci.yml`) runs on every push and pull request: install → lint → format
-check → typecheck → test → build → smoke-test the compiled binary.
+CI (`.github/workflows/ci.yml`) runs `check:required` on every push and pull request: lint → format
+check → typecheck → tests with coverage thresholds → build → compiled-binary smoke → installed
+npm-tarball verification. The release workflow invokes the same script rather than maintaining a
+second, weaker command list.
 
 ### Web UI development
 
