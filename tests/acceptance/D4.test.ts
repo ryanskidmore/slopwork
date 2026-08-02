@@ -24,6 +24,7 @@ import {
   ticketFilePath,
   writeIndex,
 } from "../../src/repo/index.js";
+import { perfBudgetMs } from "../support/perf-scale.js";
 
 // D4: status
 //
@@ -281,8 +282,13 @@ describe("D4: status", () => {
 
       // Real measured number goes in this work item's report. Bounded
       // well under 1s so a loaded CI box doesn't flake, but still a real
-      // bound — not a rubber stamp.
-      expect(elapsedMs).toBeLessThan(800);
+      // bound — not a rubber stamp. `perfBudgetMs` scales this (via
+      // SLOP_TEST_PERF_SCALE) for runs KNOWN to be racing other full-suite
+      // runs on the same machine — see tests/support/perf-scale.ts's doc
+      // for the concurrent-repro evidence that motivated this (t-ebgqb).
+      // The default (scale 1) is this exact, unchanged 800ms, so CI and
+      // solo local runs still enforce the real bound.
+      expect(elapsedMs).toBeLessThan(perfBudgetMs(800));
 
       const lineCount = result.stdout.trim().split("\n").length;
       // Genuinely "one screen": nowhere near 1000 rows (one per ticket

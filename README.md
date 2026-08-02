@@ -222,6 +222,58 @@ and `--version`).
   spawned-subprocess acceptance tests (see `tests/acceptance/`), which v8 can't instrument across a
   process boundary, not because they're untested.
 
+### Running the suite concurrently (multiple agents, one machine)
+
+`bun run test` (and `test:coverage`/`test:browser`) is safe to run at the same time as another
+agent's own full gate, each in its own `git worktree` — no serialization needed. This was root-caused
+and fixed for real (t-ebgqb), not assumed:
+
+- **Isolation that already worked**: every test's `.slop/` fixture lives under a fresh `mkdtemp()`
+  temp directory (never shared, never this repo's own root — enforced by
+  `tests/support/repo-slop-guard.ts`), and every acceptance test that spawns `slop web` already
+  passes `--port 0` (OS-assigned, parsed back out of the server's own startup line) — no fixed port
+  to collide over. A `git worktree` also gives each concurrent run its own `dist/slop` and
+  `src/web/generated/` build output, so two agents racing their gates never see each other's
+  in-progress build. (Running two agents' gates in the SAME checkout, without separate worktrees,
+  is still unsafe — that means sharing one mutable `dist/slop` between two unrelated processes,
+  which is not something this fix set out to make safe.)
+- **Fixed**: `playwright.config.ts`'s fixture-server port used to be a hardcoded `4765` — two
+  concurrent `bun run test:browser` runs would race for it, one failing outright with slop's own
+  `PortInUseError`. It now picks a free port at config-load time, same ephemeral-port idea as
+  `--port 0` above.
+- **Fixed**: `tests/acceptance/D4.test.ts`'s real-wall-clock `< 800ms` budget for a spawned `slop
+  status` call (1000 tickets) is a genuine performance assertion, not a mock — and genuinely
+  contends for the same CPUs as every other concurrent full-suite run. `SLOP_TEST_PERF_SCALE`
+  (read by `tests/support/perf-scale.ts`) multiplies every such budget; unset (or `1`) is today's
+  exact strict budget, which CI and a solo local run should still get. A caller that KNOWS it's
+  racing other full-suite runs on the same box sets it explicitly — `bench/concurrent-repro.ts`
+  does this for you via `--perf-scale`.
+- **Deliberately not changed**: vitest's worker/fork count. The originally-suspected failure mode —
+  `spawnSync` returning `status: null` under an OOM-killer fork-storm from too many concurrent
+  vitest workers each forking the ~96MB compiled binary — was never reproduced, including under
+  escalated stress (a dedicated 48-way concurrent `spawnSync` load generator running *alongside* a
+  4-way concurrent `test:coverage` race, pushing this dev box's load average to ~129 on 32 cores
+  with free RAM down to ~3.2GB). See `bench/evidence/` for the raw numbers. If this ever IS observed
+  (e.g. on a smaller/more memory-constrained CI runner), `--maxWorkers` is vitest's own env-agnostic
+  lever (`vitest run --maxWorkers=<n or "50%">`) — not added here speculatively, since nothing in
+  Phase 1's evidence called for it.
+
+**The regression tool**: `bench/concurrent-repro.ts` creates N throwaway `git worktree`s off a given
+ref, builds each, then launches `bun run <cmd>` in all of them at the same instant — real concurrent
+OS processes, not staggered — capturing per-worktree pass/fail, timing, a system load/memory
+timeline, and a `dmesg` diff for OOM-killer activity. Repeats `--repeat` times back-to-back against
+the same prepared worktrees.
+
+```sh
+bun bench/concurrent-repro.ts --n 3 --cmd test --repeat 2 --perf-scale 3   # the Phase-3 proof shape
+bun bench/concurrent-repro.ts --n 2 --cmd test:browser                    # racing the Playwright port
+bun bench/spawn-stress.ts --workers 48 --iterations 8 --cmd init          # spawnSync under raw fork/exec load
+```
+
+`bench/evidence/` holds the before/after JSON from the runs that root-caused and proved this fix
+(`before-3way.json`/`after-3way.json`, `playwright-before.json`/`playwright-after.json`,
+`spawn-stress-under-load.json`, `stress-4way-coverage.json`).
+
 ## Source layout
 
 ```
