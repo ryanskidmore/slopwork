@@ -15,6 +15,7 @@ same ticket.
   tickets/ticket_<ulid>.jsonc
   sessions/session_<ulid>.jsonc
   events/event_<ulid>.jsonc
+  events/archive/ticket_<ulid>.jsonc   # compacted, one file per CLOSED ticket
   mutation-journal/event_<ulid>.jsonc  # pending only, GITIGNORED
   event-cursors/cursor_v1_<hex>.jsonc  # polling state, GITIGNORED
   index.jsonc      # derived, GITIGNORED
@@ -38,7 +39,11 @@ essentially no manual conflict surgery:
    once and never updated or deleted (`src/repo/events.ts`). An event
    file can never conflict on merge for the same reason two independent
    commits adding two different files never conflict — there is nothing
-   to reconcile.
+   to reconcile. (This holds for a LOOSE event file exactly as stated; see
+   [Event-archive compaction](#event-archive-compaction-t-7eq5s) below for
+   the one narrow, rare exception a closed ticket's archive file can
+   introduce, and why it's still a small, ordinary, human-resolvable
+   conflict when it happens.)
 
 3. **The index doesn't exist in git.** `index.jsonc` — the one file that
    *would* conflict on almost every merge, since it's rebuilt from
@@ -137,6 +142,99 @@ out from under a stale index. You never need to remember to run
 `slop reindex` after a merge; the next `slop` command that reads the index
 rebuilds it itself. `slop reindex` remains the explicit manual escape
 hatch (e.g. to force-surface every unreadable ticket file in one pass).
+
+## Event-archive compaction (t-7eq5s)
+
+One-file-per-event is load-bearing for a LIVE ticket — it's exactly what
+makes properties 1 and 2 above true (conflict-free creation, conflict-free
+append). It stops paying for itself the instant a ticket closes: nothing
+ever appends a new event for a `done`/`dropped` ticket again (barring the
+residual race described below), so every one of its historical event files
+just sits there forever, contributing to `readdir`/parse cost on every
+read of whichever `events/YYYY-MM/` shard it happens to share.
+
+`slop done`/`slop drop` fix this by folding a closing ticket's events —
+full records, never summaries — into one file,
+`events/archive/<ticket_id>.jsonc`, and deleting the now-redundant loose
+originals, inside the SAME write transaction as the terminal-state write.
+Reads never notice: `slop show`, `slop events` (including `--poll`/
+`--since`), and the web audit spine all merge archived and loose events
+transparently, by id, so a merge-safe poll cursor taken before a close
+resumes correctly after it (same ids, same order, nothing repeated or
+missed) and every other output is byte-identical before and after
+compaction.
+
+**Design choice: one archive file per TICKET, not embedded on the ticket
+entity.** Ticket reads are the single hottest path in this codebase —
+`list`/`status`/`ready`/every `loadIndex()` call reads every ticket file,
+on every single `slop` invocation — while a ticket's full historical event
+count only matters to a handful of commands. Embedding would mean every
+bulk ticket read pays to parse a growing blob of history it never asked
+for; a separate file means that cost is paid only by the commands that
+actually want it. `src/repo/db-index.ts`'s `buildIndex` (the thing
+`loadIndex()` reruns on nearly every mutation) deliberately never reads
+archives at all — a closed ticket's effective `latest_note`/
+`last_activity_at` are provably already final by the time it closes (the
+close itself is always the most recent activity, by construction), so
+nothing there is lost by skipping them; a `ticket.ready`-dedup check
+inside the done-cascade (`src/tickets/cascade.ts`) reads the same
+loose-only surface for the identical reason (its candidates are always
+still-open tickets, whose events are, by definition, never archived).
+
+**The cross-clone merge story — two scenarios, told honestly:**
+
+- **The normal case: a close racing a concurrent, unrelated append.**
+  Clone A closes ticket T and compacts it; clone B, unaware T closed yet,
+  appends a genuinely new loose event for T (a lock-free `update
+  --progress`, a `question.answered`, ...) before ever pulling A's
+  change. Neither clone's git tree touches a path the other one touched —
+  A only adds `archive/T.jsonc` and deletes pre-existing loose files B
+  never wrote; B only adds a brand-new loose file (a fresh ULID name) A
+  never saw. **Git merges this with zero conflicts.** The result is T with
+  its compacted history in the archive PLUS one residual loose event
+  sitting in a shard directory — this is normal, not corruption, and
+  exactly the shape the read side (above) is built to union transparently.
+  `slop reindex --compact` (below) idempotently folds the residual back
+  into the archive whenever it's next run.
+- **The rare case: a genuine cross-clone double-close.** The state machine
+  (`src/tickets/state.ts`) makes double-closing a ticket illegal *within
+  one db* — but two clones that haven't seen each other's commits yet can
+  each legally close the SAME ticket from their own, still-live local view.
+  Both write DIFFERENT content to `archive/T.jsonc` (each compacting
+  whatever it locally knew, differing by exactly the one new
+  `ticket.done`/`session.ended` event each side minted for its own close)
+  — a real conflict, on both the ticket file (which already conflicts
+  today, on `state`/`updated_at`, independent of this feature — see
+  "Known cross-clone limitations" below) and now the archive file too.
+  **This is not a new class of conflict compaction introduces** — it's the
+  identical "two clones raced the same entity" story property 4 above
+  already describes for a ticket file alone, just spanning one more file.
+  Resolving it is safe by construction: the archive is nothing more than a
+  sorted-by-id array of self-contained, immutable event records, so a
+  human resolving the conflict by keeping BOTH sides' entries (the
+  natural, minimal-effort thing to do with two JSON arrays in conflict
+  markers) loses nothing — every read path dedupes by event id, so even an
+  accidental duplicate left behind by a clumsy resolution is silently
+  collapsed, never double-counted or double-rendered. A follow-up worth
+  doing (not implemented): a `.gitattributes` `merge=union` driver for
+  `events/archive/*.jsonc`, so this exact shape auto-resolves without
+  human intervention at all — deferred because it would mean reformatting
+  archives as one-event-per-line (NDJSON-like) to make a line-based union
+  merge safe, a departure from this codebase's uniform pretty-printed
+  JSONC convention that didn't seem worth making for what should be a rare
+  event.
+
+**`slop reindex --compact`** retroactively runs the identical per-ticket
+compaction for every ALREADY-closed ticket a repo has — the migration path
+for a db whose closed tickets predate this feature, or that had a
+`done`/`drop` compaction attempt fail and warn (compaction failure is
+non-fatal to `done`/`drop` itself: a ticket has already durably closed by
+the time compaction runs in the same transaction, so a rare I/O failure
+there is reported as a warning, never a reason to report the whole command
+as failed). Idempotent, and — like `--shard-events` — **never runs
+implicitly**: compaction rewrites git-tracked files (deletes loose event
+files, writes an archive), so it always lands as a deliberate, visible
+commit. See [CLI reference → `reindex`](cli-reference.md#reindex).
 
 ## The db lock: serializing the write path
 
