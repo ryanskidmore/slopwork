@@ -116,10 +116,12 @@ async function doneOneRef(
     // directly from `in_progress` — i.e. this ticket never went through
     // `review` — is legal per `checkDoneEntry` above, but a non-`adhoc`
     // ticket still gets a soft warning, printed on stderr AFTER the
-    // transaction commits (below). `adhoc` tickets (D13: exempt from the usual planning
-    // ceremony) never nag, and neither does the unchanged `review -> done`
-    // path.
-    const skippedReview = current.state === "in_progress" && current.adhoc !== true;
+    // transaction commits (below). `adhoc` tickets (D13: exempt from the
+    // usual planning ceremony) never nag, and neither does the unchanged
+    // `review -> done` path. G5 (t-uy8vo): "adhoc" is no longer its own
+    // stored boolean — `provenance.method === "adhoc"` is the single
+    // source of truth, and this nag exemption is its only behavior.
+    const skippedReview = current.state === "in_progress" && current.provenance.method !== "adhoc";
 
     const activeSessionId = current.active_session;
     if (activeSessionId === null) {

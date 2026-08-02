@@ -59,8 +59,9 @@ Full flag reference: [CLI reference → `init`](cli-reference.md#init).
 
 ## A first end-to-end walkthrough
 
-The full agent loop is: **ready → start → plan → update --progress → review
---mr → done**. Here it is end to end.
+The full agent loop is: **ready → start → plan → update --progress → (ask
+→ answer, if something needs a human's call) → review --mr → done**. Here
+it is end to end.
 
 ### 1. File a ticket
 
@@ -92,6 +93,18 @@ ready (1):
 
 `ready` = open, no live blockers, no active session. Drafts and
 in-review tickets never show up here.
+
+Want to just browse — every ticket, or filtered by state/label/owner,
+regardless of whether it's workable right now? That's `slop list`:
+
+```sh
+slop list --state open --state in_progress
+slop list "password reset"    # free-text match against name/slug/summary
+```
+
+`ready` answers "what's workable now"; `list` is plain, deterministic
+browsing with no such filter — see [CLI reference →
+`list`](cli-reference.md#list).
 
 ### 3. Start it
 
@@ -129,7 +142,30 @@ A pure `--progress` call is cheap and lock-free — see
 [Concurrency & merging](concurrency-and-merging.md) for why that matters
 when several agents are working the same repo at once.
 
-### 6. Open a review
+### 6. Hit a decision only a human can make? Ask
+
+```sh
+slop ask add-password-reset-flow "Should reset links expire in 15 or 30 minutes?" \
+  --option 15m --option 30m
+```
+
+This records a structured question (optionally multiple-choice via
+`--option`) and marks the ticket `awaiting_input` — `slop status`/`slop
+ready` surface it so it doesn't get silently picked up again on the same
+snag. A human answers with the question id `ask` printed:
+
+```sh
+slop answer <question-id> "30 minutes"
+```
+
+`slop questions` is the inbox — every open question, oldest first,
+across the whole repo:
+
+```sh
+slop questions
+```
+
+### 7. Open a review
 
 ```sh
 slop review add-password-reset-flow --mr https://github.com/example/repo/pull/42
@@ -139,7 +175,7 @@ Moves the ticket `in_progress → review` and records the MR link. This is
 the checkpoint a human looks for. (`--mr` is recommended, not required —
 see [Concepts → state machine](concepts.md#state-machine).)
 
-### 7. Complete it
+### 8. Complete it
 
 ```sh
 slop done add-password-reset-flow \
@@ -151,7 +187,15 @@ slop done add-password-reset-flow \
 other ticket that was blocked *only* by this one flips to unblocked and
 is reported.
 
-### 8. Check the pulse
+Closing several tickets at once (a batch of small, already-merged fixes)?
+`done`/`drop` accept more than one ref, applied independently — one bad
+ref never blocks the rest:
+
+```sh
+slop done ticket-a ticket-b ticket-c --note "batch: all merged and verified"
+```
+
+### 9. Check the pulse
 
 ```sh
 slop status

@@ -21,7 +21,6 @@ full schema):
 | `review` | `{mr, requested_at, by}` — present **iff** `state === "review"` |
 | `priority` | `0` (urgent) .. `3` (low), default `2` |
 | `labels` | `key:value` strings |
-| `adhoc` | created outside normal planning (`--adhoc`) — exempts `done` from the review-skip nag |
 | `parent` | a local `ticket_<ULID>` or an external ref like `jira:PROJ-123` |
 | `blocks` / `relates_to` / `discovered_from` | outgoing edges, see [Edges](#edge) |
 | `root_id`, `path` | materialized ancestry: `root_id` is this ticket's own id if it has no local parent (a true root, or its parent is external); `path` is the ordered list of local ancestor ids |
@@ -29,7 +28,7 @@ full schema):
 | `last_activity_at`, `latest_note` | bumped by `update --progress`; see the note on **effective values** below |
 | `resolution` | long-form outcome writeup, set via `done --outcome` (absent unless ever set) |
 | `owner` | an `Actor`, or `null` |
-| `provenance` | `{method: new\|split\|draft\|adhoc, created_by, split_from?}` |
+| `provenance` | `{method: new\|split\|draft\|adhoc, created_by, split_from?}` — `method === "adhoc"` (set by `--adhoc`, `slop new`) is the single source of truth for "created outside normal planning," exempting `done` from the review-skip nag (no separate stored `adhoc` field) |
 
 **Effective, not stored-verbatim `latest_note`/`last_activity_at`:** a pure
 `update --progress` call appends an event without rewriting the ticket

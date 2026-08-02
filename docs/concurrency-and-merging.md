@@ -74,14 +74,17 @@ hatch (e.g. to force-surface every unreadable ticket file in one pass).
 Single-file writes never need locking — an atomic rename already makes
 any *one* file's write all-or-nothing. But `.slop/db/.lock` isn't scoped
 to multi-file operations alone: it serializes the **whole write path** —
-every one of the 13 mutating commands (`new`, `update` with any real
+every one of the 14 mutating commands (`new`, `update` with any real
 field, `edit`, `draft`, `undraft`, `start`, `stop`, `review`, `done`,
-`drop`, `plan`, `split`, `reindex --heal`) takes it around its
-read-modify-write, both for genuine multi-file units (the done-cascade, a
-reparent) AND to keep a plain single-ticket read-modify-write from
-clobbering a concurrent writer's change. The one mutating operation that
-skips it is the lock-free pure `update --progress` event append (below).
-Through the [storage-backend interface](storage-backends.md), this is
+`drop`, `plan`, `split`, `reindex --heal`, `answer` — the last closing the
+race between two concurrent answers to the same question) takes it around
+its read-modify-write, both for genuine multi-file units (the
+done-cascade, a reparent) AND to keep a plain single-ticket
+read-modify-write from clobbering a concurrent writer's change. Two
+mutating operations skip it, both lock-free pure event appends needing no
+read-modify-write of the ticket file itself: `update --progress` (below)
+and `ask` (src/cli/commands/ask.ts). Through the [storage-backend
+interface](storage-backends.md), this is
 `StorageBackend.transact(fn)` — the flatfile driver implements it as the
 lock acquisition described here; a remote backend implements the
 equivalent exclusivity server-side (see
@@ -184,6 +187,47 @@ There are no leases or claims separate from a session. Starting a ticket
 - `slop status`/`slop web` show every active session, its actor, and its
   harness, so a human can see at a glance who is working what across all
   running agents.
+
+## Known cross-clone limitations (G5, t-drz1d)
+
+Everything above is true and load-bearing, but it describes what's
+*handled*. Three cross-clone scenarios are worth being honest about
+rather than implying the merge story above covers everything:
+
+- **Same-slug creation on two clones is now detected and healable.**
+  Two clones creating a ticket with the same auto-generated or explicit
+  slug at the same time both write successfully (different ULID
+  filenames, property 1 above) — but the two files then collide on
+  `slug`. `slop reindex` (with or without `--heal`) detects this loudly
+  on stderr, and `slop reindex --heal` repairs it deterministically (the
+  older ticket, by id, keeps the bare slug; younger duplicates get
+  git-style `-2`/`-3` suffixes) — see [`reindex`](cli-reference.md#reindex)
+  and [Concepts → slug uniqueness](concepts.md#slug-uniqueness). Handled,
+  not a gap.
+- **`active_session` double-claims across clones are unhandled.** Two
+  clones can both `slop start` the same ticket before either one's
+  branch is merged into the other — each clone's own lock only serializes
+  writers *within that clone*, not across clones that haven't seen each
+  other's commits yet. Whichever ticket file merges in last silently wins
+  the `active_session` field; `ready`/`status` on either clone confidently
+  report whatever that file says, with no indication a second, now-hidden
+  session also claims to be active. There is no detection today — tracked
+  as ticket `t-621mr` ("Cross-clone active_session honesty"): detect the
+  double-claim on merge (as an index problem + warning) and define
+  resolution semantics, mirroring how same-slug creation is already
+  handled above.
+- **Unconditional `updated_at` merge conflicts are accepted v0 behavior,
+  not a bug.** Two clones editing *different* fields of the *same* ticket
+  still conflict on merge — every write bumps `updated_at`, always the
+  ticket file's last line, so that line collides even when the clones'
+  real edits don't overlap at all. This is a deliberate, documented
+  trade-off (DECISIONS.md's "Fix 5"), not silent data loss: git surfaces
+  a normal one-hunk conflict a human resolves same as any other
+  same-ticket edit, both clones' real changes are visible in the conflict
+  markers, and nothing is dropped. The principled fix — deriving
+  `updated_at` from the immutable event log instead of stamping it on
+  every write, so this bookkeeping field stops colliding too — is tracked
+  as ticket `t-687rg` ("Derive updated_at from the event log").
 
 ## See also
 

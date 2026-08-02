@@ -145,4 +145,79 @@ describe("rewriteLabelArgv", () => {
     const argv = ["update", "ref", "--discovered-from-ish", "something"];
     expect(rewriteLabelArgv(argv)).toEqual(argv);
   });
+
+  // G5 (t-z4ci3, post-G3 polish): `update --blocks <±ref>`/`update
+  // --relates-to <±ref>` hit the exact same Commander limitation as
+  // --label/--discovered-from — added to the same allowlist.
+  describe("--blocks / --relates-to (t-z4ci3)", () => {
+    it("rewrites the `update --blocks -ref` form (a lone `-ref` value) into an unambiguous --blocks=-ref token", () => {
+      expect(rewriteLabelArgv(["update", "ref", "--blocks", "-ref"])).toEqual([
+        "update",
+        "ref",
+        "--blocks=-ref",
+      ]);
+    });
+
+    it("rewrites the `--blocks +x -y` form into repeated --blocks=value tokens", () => {
+      expect(rewriteLabelArgv(["update", "ref", "--blocks", "+x", "-y"])).toEqual([
+        "update",
+        "ref",
+        "--blocks=+x",
+        "--blocks=-y",
+      ]);
+    });
+
+    it("rewrites the `--relates-to +x -y` form into repeated --relates-to=value tokens", () => {
+      expect(rewriteLabelArgv(["update", "ref", "--relates-to", "+x", "-y"])).toEqual([
+        "update",
+        "ref",
+        "--relates-to=+x",
+        "--relates-to=-y",
+      ]);
+    });
+
+    it("leaves the already-unambiguous --blocks=value / --relates-to=value forms untouched", () => {
+      const argv = ["update", "ref", "--blocks=-x", "--relates-to=+y"];
+      expect(rewriteLabelArgv(argv)).toEqual(argv);
+    });
+
+    it("a bare trailing --blocks/--relates-to (nothing after it) is left untouched", () => {
+      expect(rewriteLabelArgv(["update", "ref", "--blocks"])).toEqual([
+        "update",
+        "ref",
+        "--blocks",
+      ]);
+      expect(rewriteLabelArgv(["update", "ref", "--relates-to"])).toEqual([
+        "update",
+        "ref",
+        "--relates-to",
+      ]);
+    });
+
+    it("--label, --blocks, and --relates-to together in one invocation are each rewritten independently", () => {
+      expect(
+        rewriteLabelArgv([
+          "update",
+          "ref",
+          "--label",
+          "+bug",
+          "--blocks",
+          "-old-blocker",
+          "--relates-to",
+          "+spike-1",
+        ]),
+      ).toEqual([
+        "update",
+        "ref",
+        "--label=+bug",
+        "--blocks=-old-blocker",
+        "--relates-to=+spike-1",
+      ]);
+    });
+  });
+
+  it("only ever rewrites the literal allowlisted flag tokens, never a substring match on --blocks/--relates-to", () => {
+    const argv = ["update", "ref", "--blocks-ish", "something", "--relates-to-ish", "something"];
+    expect(rewriteLabelArgv(argv)).toEqual(argv);
+  });
 });

@@ -43,13 +43,14 @@
  * ## Clock seam
  *
  * Humanised ages, and now (C5) the live stale/review-stale booleans, are
- * a function of "now". Real usage always uses {@link systemClock}.
- * `SLOP_STATUS_FAKE_NOW`, mirroring `slop web`'s `SLOP_WEB_FAKE_NOW` (see
- * `src/cli/commands/web.ts`, DECISIONS.md's D5 entries), pins the clock
- * instead when set to a parseable date — undocumented as a user-facing
- * flag, read only here, and how `tests/acceptance/D4.test.ts` and
- * `tests/acceptance/C5.test.ts` get deterministic output out of a real
- * spawned `dist/slop status` process.
+ * a function of "now". Real usage always uses the system clock.
+ * `SLOP_FAKE_NOW` (G5, t-uy8vo — one shared var honored everywhere a
+ * clock is injected, `slop ready`/`slop web` included; see
+ * `core/clock.ts`'s `resolveFakeClock`) pins the clock instead when set to
+ * a parseable date — undocumented as a user-facing flag, read only there,
+ * and how `tests/acceptance/D4.test.ts` and `tests/acceptance/C5.test.ts`
+ * get deterministic output out of a real spawned `dist/slop status`
+ * process.
  *
  * ## `--json` shape
  *
@@ -83,15 +84,13 @@
  * "every read respects budget" acceptance clause). Without `--budget`,
  * behavior is unchanged — `--json` still returns everything, `capRows`
  * still keeps the human view to one screen. With it, this command elides
- * whole rows least-important-first: `stale` rows first (the section
- * already implied by the `stale`/`review_stale` flags elsewhere), then
- * `review` rows (from the least-long-waiting end), then `in_progress` rows
- * (from the least-stale end) — `counts`/`derived`/`problems` are always
- * kept in full (small, fixed-size, and the whole point of a "pulse" view).
- * `--json`'s new `elided` array (always present, like `ready`/`search`/
- * `events`) names what was dropped; never corrupts the JSON at any budget
- * (`core/budget.ts`'s `renderEntriesWithBudget`, same helper `ready`/
- * `search`/`events` use).
+ * whole rows from {@link buildStatusEntries}'s combined, least-important
+ * -last order via `core/budget.ts`'s `renderEntriesWithBudget` — the ONE
+ * shared cap-and-report strategy every budget-taking command uses (G5,
+ * t-5vj9o); `counts`/`derived`/`problems` are always kept in full
+ * (small, fixed-size, and the whole point of a "pulse" view). `--json`'s
+ * `elided` array (always present, like every other budget-taking command)
+ * names what was dropped; never corrupts the JSON at any budget.
  */
 import type { Command } from "commander";
 import type {
@@ -103,10 +102,9 @@ import type {
   TicketId,
 } from "../../core/index.js";
 import {
-  fixedClock,
   renderEntriesWithBudget,
+  resolveFakeClock,
   shortTicketCode,
-  systemClock,
   TICKET_STATES,
 } from "../../core/index.js";
 import type { IndexTicketRow } from "../../repo/index.js";
@@ -145,15 +143,6 @@ interface StatusCommandOptions {
 interface StatusProblem {
   id: string;
   message: string;
-}
-
-/** Testing-only clock override — see this file's module doc, "Clock seam". */
-function resolveClock(): Clock {
-  const raw = process.env.SLOP_STATUS_FAKE_NOW;
-  if (!raw) return systemClock;
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return systemClock;
-  return fixedClock(parsed);
 }
 
 /** C5: `stale`/`reviewStale` are computed LIVE here, against `now` — never
@@ -564,7 +553,7 @@ function filterStatusData(data: StatusData, kept: readonly StatusEntry[]): Statu
 export async function runStatus(opts: StatusCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
-  const clock = resolveClock();
+  const clock = resolveFakeClock();
   const backend = await openStorage(paths);
 
   const data = await gatherStatus(backend, clock);
@@ -598,8 +587,8 @@ export function registerStatusCommand(program: Command): void {
     .option("--json", "machine-readable output")
     .option(
       "--budget <n>",
-      `cap output size to N ${CONTEXT_PACK_BUDGET_UNIT} (elides stale rows, then review rows, then ` +
-        "in_progress rows, least-important-first; counts/derived are always kept in full)",
+      `cap output size to N ${CONTEXT_PACK_BUDGET_UNIT} (elides least-important rows first; ` +
+        "counts/derived/problems are always kept in full — see 'Budget' in docs/cli-reference.md)",
       parseBudgetOption,
     )
     .action(runStatus);

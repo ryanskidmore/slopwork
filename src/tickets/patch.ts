@@ -27,7 +27,6 @@ const TICKET_FIELD_MARKERS: Record<keyof Ticket, true> = {
   review: true,
   priority: true,
   labels: true,
-  adhoc: true,
   parent: true,
   blocks: true,
   relates_to: true,

@@ -112,7 +112,6 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
     expect(ticket.state).toBe("open");
     expect(ticket.priority).toBe(2);
     expect(ticket.labels).toEqual([]);
-    expect(ticket.adhoc).toBe(false);
     expect(ticket.parent).toBeUndefined();
     expect(ticket.root_id).toBe(ticket.id);
     expect(ticket.path).toEqual([]);
@@ -299,9 +298,14 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
     expect(ticket.state).toBe("draft");
   });
 
-  it("--adhoc", async () => {
+  it("--adhoc (G5, t-uy8vo: folded into provenance.method, not its own field)", async () => {
     const { ticket } = await buildNewTicket(backend, baseInput({ adhoc: true }), clock);
-    expect(ticket.adhoc).toBe(true);
+    expect(ticket.provenance.method).toBe("adhoc");
+  });
+
+  it('without --adhoc: provenance.method stays "new"', async () => {
+    const { ticket } = await buildNewTicket(backend, baseInput({ adhoc: false }), clock);
+    expect(ticket.provenance.method).toBe("new");
   });
 
   it("--owner", async () => {
@@ -356,7 +360,7 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
     expect(ticket.discovered_from).toEqual([origin.id]);
     expect(ticket.labels).toEqual(["a:b"]);
     expect(ticket.state).toBe("draft");
-    expect(ticket.adhoc).toBe(true);
+    expect(ticket.provenance.method).toBe("adhoc");
     expect(ticket.owner).toEqual({ name: "ryan", kind: "human" });
     expect(ticket.priority).toBe(0);
     expect(warnings).toEqual([]);

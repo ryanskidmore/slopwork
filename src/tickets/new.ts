@@ -219,7 +219,6 @@ export async function buildNewTicket(
     state: input.draft ? ("draft" as const) : ("open" as const),
     priority: input.priority,
     labels: input.labels,
-    adhoc: input.adhoc,
     parent: ancestry.parent,
     blocks,
     relates_to: relatesTo,
@@ -233,13 +232,19 @@ export async function buildNewTicket(
     // kind explicitly; a bare name (no prefix) stays "human" — unchanged
     // back-compat behavior. See tickets/owner.ts's own doc.
     owner: input.ownerRaw !== undefined ? parseOwnerRaw(input.ownerRaw) : null,
-    // Always "new": D13's draft/adhoc creation affordances are already
-    // fully captured by `state`/`adhoc` above, so `--draft`/`--adhoc`
-    // don't also need a distinct provenance.method here — see B1's report
-    // for the full reasoning and the ambiguity flagged for B2 (which owns
-    // "provenance stamps" per the plan, for the `split` case: method
-    // "split" + `split_from`).
-    provenance: { method: "new" as const, created_by: input.actor },
+    // G5 (t-uy8vo): `adhoc` used to be its own standalone stored boolean;
+    // it's now folded into `provenance.method` — `"adhoc"` when `--adhoc`
+    // was given, `"new"` otherwise — so `provenance.method === "adhoc"` is
+    // the single source of truth for adhoc-ness (see `done.ts`'s
+    // review-skip nag exemption, its only behavioral consumer). `--draft`
+    // does NOT get its own provenance.method the same way: draft-ness is
+    // already fully captured by `state` above, with no other behavior
+    // riding on it, so folding it in too would just be a second way to ask
+    // the same question `state === "draft"` already answers.
+    provenance: {
+      method: input.adhoc ? ("adhoc" as const) : ("new" as const),
+      created_by: input.actor,
+    },
     created_at: now,
     updated_at: now,
   };

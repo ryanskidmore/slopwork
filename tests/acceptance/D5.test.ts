@@ -199,7 +199,7 @@ async function getJson<T>(path: string): Promise<{ status: number; body: T }> {
 beforeAll(async () => {
   server = await spawnAndWaitForUrl("bun", [cliEntry, "web", "--port", "0"], fixtureParentDir, {
     ...process.env,
-    SLOP_WEB_FAKE_NOW: FIXTURE_NOW_ISO,
+    SLOP_FAKE_NOW: FIXTURE_NOW_ISO,
   });
 }, 20_000);
 
@@ -620,7 +620,7 @@ describe("D5: slop web — compiled binary (build-artifact smoke test)", () => {
     }
     binServer = await spawnAndWaitForUrl(binaryPath, ["web", "--port", "0"], fixtureParentDir, {
       ...process.env,
-      SLOP_WEB_FAKE_NOW: FIXTURE_NOW_ISO,
+      SLOP_FAKE_NOW: FIXTURE_NOW_ISO,
     });
   }, 60_000);
 

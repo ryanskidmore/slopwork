@@ -218,7 +218,8 @@ export function registerQuestionsCommand(program: Command): void {
     .option("--json", "machine-readable output")
     .option(
       "--budget <n>",
-      `cap output size to N ${CONTEXT_PACK_BUDGET_UNIT} (elides the newest/least-urgent questions first)`,
+      `cap output size to N ${CONTEXT_PACK_BUDGET_UNIT} (elides the newest/least-urgent questions ` +
+        "first — see 'Budget' in docs/cli-reference.md)",
       parseBudgetOption,
     )
     .action(runQuestions);

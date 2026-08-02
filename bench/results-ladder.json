@@ -4,308 +4,308 @@
     "cpus": "32x AMD Ryzen 9 9950X3D 16-Core Processor",
     "memoryGb": 30,
     "bunVersion": "1.3.11",
-    "fixtureDir": "/home/ryan/go/src/github.com/ryanskidmore/slopwork/.bench-work",
+    "fixtureDir": "/home/ryan/go/src/github.com/ryanskidmore/slopwork/.claude/worktrees/agent-ae1664e09319d4a6b/.bench-work",
     "fixtureFs": "ext4",
     "warning": null
   },
-  "generatedAt": "2026-07-24T22:03:53.233Z",
+  "generatedAt": "2026-08-02T10:20:29.992Z",
   "scales": [
     {
       "tickets": 1000,
-      "events": 2000,
+      "events": 9000,
       "seed": {
         "label": "fixture seed (not an op)",
         "runs": 1,
-        "medianMs": 108.75,
-        "minMs": 108.75,
-        "maxMs": 108.75,
+        "medianMs": 336.67,
+        "minMs": 336.67,
+        "maxMs": 336.67,
         "n": 1000
       },
-      "dbBytes": 2342339,
-      "indexBytes": 667962,
+      "dbBytes": 4820627,
+      "indexBytes": 791058,
       "timings": [
         {
           "label": "index: cold build (no index.jsonc)",
           "runs": 3,
-          "medianMs": 48.25,
-          "minMs": 43.94,
-          "maxMs": 65.65,
+          "medianMs": 164.35,
+          "minMs": 150.52,
+          "maxMs": 261.95,
           "n": 1000,
           "notes": "rebuilt from every entity file; what a fresh clone pays"
         },
         {
           "label": "index: warm load (fingerprint verify + parse)",
           "runs": 5,
-          "medianMs": 13.68,
-          "minMs": 12.56,
-          "maxMs": 17.78,
+          "medianMs": 21.07,
+          "minMs": 19.94,
+          "maxMs": 30.12,
           "n": 1000,
           "notes": "no rebuild; readdir+stat fingerprint then parse index.jsonc"
         },
         {
           "label": "resolve ref: by slug (index map lookup)",
           "runs": 5,
-          "medianMs": 14.34,
-          "minMs": 12.56,
-          "maxMs": 16.97,
+          "medianMs": 20.87,
+          "minMs": 20.35,
+          "maxMs": 20.92,
           "n": 1000
         },
         {
           "label": "resolve ref: by id prefix (row scan, 33-char prefix)",
           "runs": 5,
-          "medianMs": 0.15,
+          "medianMs": 0.13,
           "minMs": 0.13,
-          "maxMs": 0.16,
+          "maxMs": 0.24,
           "n": 1000,
           "notes": "shortest unambiguous prefix at this scale was 33 chars of 33"
         },
         {
           "label": "read: parse + validate every ticket (listTicketsTolerant)",
           "runs": 3,
-          "medianMs": 16.03,
-          "minMs": 15.18,
-          "maxMs": 16.3,
+          "medianMs": 15.87,
+          "minMs": 14.99,
+          "maxMs": 17.91,
           "n": 1000,
           "notes": "the floor under `search` and `reindex`"
         },
         {
           "label": "cli: slop status",
           "runs": 3,
-          "medianMs": 85.03,
-          "minMs": 83.47,
-          "maxMs": 87.72,
+          "medianMs": 109.74,
+          "minMs": 103.22,
+          "maxMs": 128.34,
           "notes": "end-to-end, includes binary startup"
         },
         {
           "label": "cli: slop ready --json",
           "runs": 3,
-          "medianMs": 88.44,
-          "minMs": 85.91,
-          "maxMs": 94.22,
+          "medianMs": 104.84,
+          "minMs": 95.5,
+          "maxMs": 146.15,
           "notes": "end-to-end, includes binary startup"
         },
         {
           "label": "cli: slop show <slug>",
           "runs": 3,
-          "medianMs": 110.58,
-          "minMs": 109.18,
-          "maxMs": 117.76,
+          "medianMs": 305.37,
+          "minMs": 277.73,
+          "maxMs": 331.8,
           "notes": "end-to-end, includes binary startup"
         },
         {
           "label": "cli: slop search",
           "runs": 3,
-          "medianMs": 121.73,
-          "minMs": 120.92,
-          "maxMs": 122.95,
+          "medianMs": 293.25,
+          "minMs": 287.46,
+          "maxMs": 333.53,
           "notes": "end-to-end, includes binary startup"
         },
         {
           "label": "cli: slop new (write path)",
           "runs": 3,
-          "medianMs": 202.7,
-          "minMs": 129.53,
-          "maxMs": 214.51,
+          "medianMs": 352.49,
+          "minMs": 155.4,
+          "maxMs": 397.23,
           "notes": "one full mutation: lock, write ticket, append event, invalidate index"
         }
       ]
     },
     {
       "tickets": 10000,
-      "events": 20000,
+      "events": 90000,
       "seed": {
         "label": "fixture seed (not an op)",
         "runs": 1,
-        "medianMs": 946.1,
-        "minMs": 946.1,
-        "maxMs": 946.1,
+        "medianMs": 3550.78,
+        "minMs": 3550.78,
+        "maxMs": 3550.78,
         "n": 10000
       },
-      "dbBytes": 23484441,
-      "indexBytes": 6715164,
+      "dbBytes": 48334729,
+      "indexBytes": 7945260,
       "timings": [
         {
           "label": "index: cold build (no index.jsonc)",
           "runs": 3,
-          "medianMs": 440.87,
-          "minMs": 410.8,
-          "maxMs": 454.79,
+          "medianMs": 2025.72,
+          "minMs": 1788.9,
+          "maxMs": 2133.58,
           "n": 10000,
           "notes": "rebuilt from every entity file; what a fresh clone pays"
         },
         {
           "label": "index: warm load (fingerprint verify + parse)",
           "runs": 5,
-          "medianMs": 121.53,
-          "minMs": 118.16,
-          "maxMs": 150.8,
+          "medianMs": 200.11,
+          "minMs": 192.12,
+          "maxMs": 227.33,
           "n": 10000,
           "notes": "no rebuild; readdir+stat fingerprint then parse index.jsonc"
         },
         {
           "label": "resolve ref: by slug (index map lookup)",
           "runs": 5,
-          "medianMs": 122.76,
-          "minMs": 115.62,
-          "maxMs": 125.91,
+          "medianMs": 215.89,
+          "minMs": 171.08,
+          "maxMs": 239.54,
           "n": 10000
         },
         {
           "label": "resolve ref: by id prefix (row scan, 33-char prefix)",
           "runs": 5,
-          "medianMs": 0.14,
-          "minMs": 0.12,
-          "maxMs": 0.15,
+          "medianMs": 0.13,
+          "minMs": 0.13,
+          "maxMs": 0.16,
           "n": 10000,
           "notes": "shortest unambiguous prefix at this scale was 33 chars of 33"
         },
         {
           "label": "read: parse + validate every ticket (listTicketsTolerant)",
           "runs": 3,
-          "medianMs": 153.81,
-          "minMs": 147.83,
-          "maxMs": 160.45,
+          "medianMs": 152.31,
+          "minMs": 151.57,
+          "maxMs": 194.02,
           "n": 10000,
           "notes": "the floor under `search` and `reindex`"
         },
         {
           "label": "cli: slop status",
           "runs": 3,
-          "medianMs": 246,
-          "minMs": 225.26,
-          "maxMs": 248.33,
+          "medianMs": 379.14,
+          "minMs": 300.01,
+          "maxMs": 396.89,
           "notes": "end-to-end, includes binary startup"
         },
         {
           "label": "cli: slop ready --json",
           "runs": 3,
-          "medianMs": 282.64,
-          "minMs": 280.85,
-          "maxMs": 303.13,
+          "medianMs": 421.47,
+          "minMs": 346.96,
+          "maxMs": 460.69,
           "notes": "end-to-end, includes binary startup"
         },
         {
           "label": "cli: slop show <slug>",
           "runs": 3,
-          "medianMs": 431.04,
-          "minMs": 422.85,
-          "maxMs": 463.95,
+          "medianMs": 1848.67,
+          "minMs": 1758.51,
+          "maxMs": 1954.01,
           "notes": "end-to-end, includes binary startup"
         },
         {
           "label": "cli: slop search",
           "runs": 3,
-          "medianMs": 537.84,
-          "minMs": 514.04,
-          "maxMs": 557.44,
+          "medianMs": 2004.92,
+          "minMs": 1993.37,
+          "maxMs": 2267.23,
           "notes": "end-to-end, includes binary startup"
         },
         {
           "label": "cli: slop new (write path)",
           "runs": 3,
-          "medianMs": 915.64,
-          "minMs": 459.66,
-          "maxMs": 1003.24,
+          "medianMs": 2429.55,
+          "minMs": 576.47,
+          "maxMs": 2595.54,
           "notes": "one full mutation: lock, write ticket, append event, invalidate index"
         }
       ]
     },
     {
       "tickets": 100000,
-      "events": 200000,
+      "events": 900000,
       "seed": {
         "label": "fixture seed (not an op)",
         "runs": 1,
-        "medianMs": 10572.95,
-        "minMs": 10572.95,
-        "maxMs": 10572.95,
+        "medianMs": 43985.84,
+        "minMs": 43985.84,
+        "maxMs": 43985.84,
         "n": 100000
       },
-      "dbBytes": 235058443,
-      "indexBytes": 67079166,
+      "dbBytes": 484258731,
+      "indexBytes": 79379262,
       "timings": [
         {
           "label": "index: cold build (no index.jsonc)",
           "runs": 3,
-          "medianMs": 4845.19,
-          "minMs": 4291.65,
-          "maxMs": 5013.17,
+          "medianMs": 20598.98,
+          "minMs": 19707.74,
+          "maxMs": 22001.24,
           "n": 100000,
           "notes": "rebuilt from every entity file; what a fresh clone pays"
         },
         {
           "label": "index: warm load (fingerprint verify + parse)",
           "runs": 5,
-          "medianMs": 1349.79,
-          "minMs": 1280.38,
-          "maxMs": 1433.58,
+          "medianMs": 2211.59,
+          "minMs": 2154.25,
+          "maxMs": 2339.63,
           "n": 100000,
           "notes": "no rebuild; readdir+stat fingerprint then parse index.jsonc"
         },
         {
           "label": "resolve ref: by slug (index map lookup)",
           "runs": 5,
-          "medianMs": 1296.22,
-          "minMs": 1272.19,
-          "maxMs": 1347.98,
+          "medianMs": 2361.95,
+          "minMs": 2286.18,
+          "maxMs": 2848.28,
           "n": 100000
         },
         {
           "label": "resolve ref: by id prefix (row scan, 33-char prefix)",
           "runs": 5,
-          "medianMs": 0.17,
-          "minMs": 0.14,
-          "maxMs": 2.67,
+          "medianMs": 0.19,
+          "minMs": 0.18,
+          "maxMs": 0.2,
           "n": 100000,
           "notes": "shortest unambiguous prefix at this scale was 33 chars of 33"
         },
         {
           "label": "read: parse + validate every ticket (listTicketsTolerant)",
           "runs": 3,
-          "medianMs": 1522.32,
-          "minMs": 1509.48,
-          "maxMs": 1525.73,
+          "medianMs": 1743.18,
+          "minMs": 1728.02,
+          "maxMs": 1875.97,
           "n": 100000,
           "notes": "the floor under `search` and `reindex`"
         },
         {
           "label": "cli: slop status",
           "runs": 3,
-          "medianMs": 1544.98,
-          "minMs": 1488.66,
-          "maxMs": 1667.88,
+          "medianMs": 2592.16,
+          "minMs": 2485.18,
+          "maxMs": 2622.7,
           "notes": "end-to-end, includes binary startup"
         },
         {
           "label": "cli: slop ready --json",
           "runs": 3,
-          "medianMs": 1965.29,
-          "minMs": 1933.1,
-          "maxMs": 1979.03,
+          "medianMs": 3026.97,
+          "minMs": 2880.31,
+          "maxMs": 3054.62,
           "notes": "end-to-end, includes binary startup"
         },
         {
           "label": "cli: slop show <slug>",
           "runs": 3,
-          "medianMs": 3494.54,
-          "minMs": 3424.42,
-          "maxMs": 3532.23,
+          "medianMs": 20462.55,
+          "minMs": 19998.48,
+          "maxMs": 21459.23,
           "notes": "end-to-end, includes binary startup"
         },
         {
           "label": "cli: slop search",
           "runs": 3,
-          "medianMs": 4512.95,
-          "minMs": 4454.47,
-          "maxMs": 4572.94,
+          "medianMs": 23077.54,
+          "minMs": 22515.85,
+          "maxMs": 23077.99,
           "notes": "end-to-end, includes binary startup"
         },
         {
           "label": "cli: slop new (write path)",
           "runs": 3,
-          "medianMs": 8675.03,
-          "minMs": 3233.89,
-          "maxMs": 9352.12,
+          "medianMs": 27601.59,
+          "minMs": 4299.28,
+          "maxMs": 28544.69,
           "notes": "one full mutation: lock, write ticket, append event, invalidate index"
         }
       ]
@@ -317,20 +317,20 @@
       {
         "label": "concurrency: 64x lock-free 'update --progress'",
         "runs": 1,
-        "medianMs": 1109.42,
-        "minMs": 1109.42,
-        "maxMs": 1109.42,
+        "medianMs": 1288.35,
+        "minMs": 1288.35,
+        "maxMs": 1288.35,
         "n": 64,
         "notes": "no db lock taken; each writer appends its own ULID-named event file; 64/64 succeeded"
       },
       {
         "label": "concurrency: 64x 'new' (db lock contention)",
         "runs": 1,
-        "medianMs": 5550.75,
-        "minMs": 5550.75,
-        "maxMs": 5550.75,
+        "medianMs": 5604.09,
+        "minMs": 5604.09,
+        "maxMs": 5604.09,
         "n": 64,
-        "notes": "every writer serializes through .slop/db/.lock (5s acquisition timeout); 14/64 succeeded"
+        "notes": "every writer serializes through .slop/db/.lock (5s acquisition timeout); 15/64 succeeded"
       }
     ],
     "startRace": {
@@ -345,8 +345,8 @@
         "other": 0
       },
       "concurrency: 64x 'new' (db lock contention)": {
-        "ok": 14,
-        "conflict": 50,
+        "ok": 15,
+        "conflict": 49,
         "other": 0
       }
     }

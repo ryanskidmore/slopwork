@@ -54,10 +54,12 @@
  *       D1's root-ownership question is about roots specifically — quietly
  *       propagating a human owner down through every split, at any depth,
  *       is not what D1 asks for.
- *     - `adhoc`: always `false`. D13's `adhoc` means "created outside
- *       normal planning" — a split is ITSELF an act of planning (a
- *       deliberate breakdown of known work), so its children are never
- *       adhoc regardless of whether the split target happened to be.
+ *     - adhoc-ness (G5: `provenance.method === "adhoc"`, folded from the
+ *       old standalone `adhoc` field): always `false` — `provenance.method`
+ *       is `"split"` here regardless of whether the split target happened
+ *       to be adhoc. D13's `adhoc` means "created outside normal
+ *       planning" — a split is ITSELF an act of planning (a deliberate
+ *       breakdown of known work), so its children are never adhoc.
  *     - `state`: always `"open"`, regardless of the split target's current
  *       state (even `draft`/`done`/`dropped`) — every child starts ready
  *       to be worked; nothing about the target's own state should be
@@ -154,7 +156,6 @@ export async function buildSplitChild(
     state: "open" as const,
     priority: input.parent.priority,
     labels: input.parent.labels,
-    adhoc: false,
     parent: ancestry.parent,
     blocks: [],
     relates_to: [],

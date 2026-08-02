@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { type Clock, EXIT_CODES, fixedClock } from "../../core/index.js";
+import { EXIT_CODES, resolveFakeClock } from "../../core/index.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { openStorage } from "../../storage/index.js";
 import { PortInUseError, StorageDataSource, startWebServer } from "../../web/index.js";
@@ -7,21 +7,17 @@ import { SlopError } from "../errors.js";
 import { parseIntegerOption } from "./shared.js";
 
 /**
- * Testing-only clock override. `slop web`'s staleness derivation
- * (src/web/overlays.ts) is a function of wall-clock "now", which is
- * exactly right for real usage and exactly wrong for a deterministic test
- * against a fixture db with fixed timestamps (tests/fixtures/web-db-meta.ts
- * explains why). `SLOP_WEB_FAKE_NOW`, if set to a parseable date, pins the
- * server's clock instead of using the real one — read only here, never
- * documented as a user-facing flag, and absent in every real invocation.
+ * `slop web`'s staleness derivation (src/web/overlays.ts) is a function of
+ * wall-clock "now", which is exactly right for real usage and exactly
+ * wrong for a deterministic test against a fixture db with fixed
+ * timestamps (tests/fixtures/web-db-meta.ts explains why).
+ * `core/clock.ts`'s {@link resolveFakeClock} — the one shared
+ * `SLOP_FAKE_NOW` clock seam every clock-injecting command honors (G5,
+ * t-uy8vo; this file's override used to be its own separately-named
+ * `SLOP_WEB_FAKE_NOW`) — pins the server's clock instead of the real one
+ * when set to a parseable date; absent in every real invocation, so real
+ * usage always gets the system clock.
  */
-function resolveClock(): Clock | undefined {
-  const raw = process.env.SLOP_WEB_FAKE_NOW;
-  if (!raw) return undefined;
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return undefined;
-  return fixedClock(parsed);
-}
 
 /**
  * `--port <n>` — bound-checked to the valid TCP port range, 0-65535 (0
@@ -72,7 +68,7 @@ export function registerWebCommand(program: Command): void {
 
       let server: ReturnType<typeof startWebServer>;
       try {
-        server = startWebServer(dataSource, { port: opts.port, clock: resolveClock() });
+        server = startWebServer(dataSource, { port: opts.port, clock: resolveFakeClock() });
       } catch (err) {
         if (err instanceof PortInUseError) {
           throw new SlopError(

@@ -15,7 +15,8 @@ design.md §4.2 are implemented and covered by acceptance tests — setup (`init
 `show`, `search`, `events`, `web`). See
 [`docs/v0-implementation-plan.md`](docs/v0-implementation-plan.md) §3 for the work-item breakdown
 behind each one. Since then, `slop list` (filtered ticket enumeration, G3) joined the inspection
-group, bringing the current total to 23 — see
+group, and `slop ask`/`answer`/`questions` (elicitations, G4) joined the agent loop and inspection
+groups respectively, bringing the current total to 26 — see
 [`docs/cli-reference.md`](docs/cli-reference.md) for the full, up-to-date command reference.
 
 ## Installation
@@ -61,7 +62,7 @@ against the shipped CLI:
   db lock, and lock-free progress updates
 - [`docs/storage-backends.md`](docs/storage-backends.md) — the pluggable storage-backend
   interface, selecting flatfile vs. remote, and the remote wire contract
-- [`docs/benchmarks.md`](docs/benchmarks.md) — measured scaling limits (1k → 1M tickets) and
+- [`docs/benchmarks.md`](docs/benchmarks.md) — measured scaling limits (1k → 100k tickets) and
   behavior under concurrent writers
 
 [`CHANGELOG.md`](CHANGELOG.md) records what changed in each release, including the breaking
@@ -168,10 +169,13 @@ scraping output:
 | 0    | `SUCCESS`         | Command completed successfully.                            |
 | 1    | `GENERIC_ERROR`   | Unexpected runtime error (I/O failure, bug, etc).           |
 | 2    | `USAGE_ERROR`     | Bad invocation — missing/invalid arguments or flags.        |
-| 3    | `NOT_IMPLEMENTED` | **Reserved, currently unreachable.** Scaffolding for a command registered but not yet built during early v0; every §4.2 command now ships a real implementation, so no command throws this today. Kept defined (not repurposed) in case a future command is scaffolded the same way. |
 | 4    | `NOT_FOUND`       | A `<ref>` did not resolve to any entity, or no `.slop/` repo was found (see below). |
 | 5    | `AMBIGUOUS_REF`   | A short-prefix or slug `<ref>` matched more than one entity.|
 | 6    | `CONFLICT`        | Illegal state transition or other conflicting operation.    |
+
+Code `3` is intentionally absent — it was `NOT_IMPLEMENTED`, reserved-but-unreachable scaffolding
+no command ever threw, removed entirely rather than kept around. `4`/`5`/`6` keep their original
+numbers (not renumbered down to fill the gap).
 
 `NOT_FOUND` (4) also covers "not a slopwork repo" — every command that needs `.slop/` (including
 `slop web`) discovers it via the shared `requireRepoRoot` walk-up (`src/repo/paths.ts`, the same
@@ -212,7 +216,7 @@ src/
     index.ts            entrypoint: builds the Commander program, top-level exit-code mapping
     errors.ts            SlopError + reportError — shared error-reporting used by every command
     commands/
-      index.ts            registers all 23 commands, grouped as in design.md §4.2 (plus G3's `list`)
+      index.ts            registers all 26 commands, grouped as in design.md §4.2 (plus G3's `list`, G4's `ask`/`answer`/`questions`)
       <command>.ts          one file per command (new.ts, start.ts, review.ts, ...)
       shared.ts             tiny option-parsing helpers (collect, parseIntegerOption)
   core/                 entity types, schemas, ids, serialization, exit codes

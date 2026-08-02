@@ -96,7 +96,7 @@ async function makeScratchRepo(prefix: string): Promise<RepoPaths> {
  * actor/harness-dependent behavior stays deterministic even when this
  * suite runs inside a real agent harness — same convention as
  * B1.test.ts/D2.test.ts's `runSlop`. `extraEnv` is how tests pin
- * `SLOP_STATUS_FAKE_NOW` (this file's clock seam — see status.ts's module
+ * `SLOP_FAKE_NOW` (this file's clock seam — see status.ts's module
  * doc). */
 function runSlop(
   args: string[],
@@ -417,7 +417,7 @@ describe("D4: status", () => {
       await writeSession(paths, newerSession);
       await rebuildIndex(paths);
 
-      const fakeNow = { SLOP_STATUS_FAKE_NOW: "2026-07-23T10:00:00.000Z" };
+      const fakeNow = { SLOP_FAKE_NOW: "2026-07-23T10:00:00.000Z" };
 
       const human = status(paths.root, [], fakeNow);
       expect(human.status, human.stderr).toBe(0);
@@ -495,7 +495,7 @@ describe("D4: status", () => {
       await writeTicket(paths, withoutMr);
       await rebuildIndex(paths);
 
-      const fakeNow = { SLOP_STATUS_FAKE_NOW: "2026-07-23T10:00:00.000Z" };
+      const fakeNow = { SLOP_FAKE_NOW: "2026-07-23T10:00:00.000Z" };
 
       const human = status(paths.root, [], fakeNow);
       expect(human.status, human.stderr).toBe(0);
@@ -560,7 +560,7 @@ describe("D4: status", () => {
       expect(json.stale).toEqual([]);
     });
 
-    it("renders real blocked counts (B4) and real, live-computed stale counts/listing (C5) from a real fixture + SLOP_STATUS_FAKE_NOW", async () => {
+    it("renders real blocked counts (B4) and real, live-computed stale counts/listing (C5) from a real fixture + SLOP_FAKE_NOW", async () => {
       const paths = await makeScratchRepo("slop-d4-derived-populated-");
       // Stale threshold in this fixture's config.yaml is 60m — see CONFIG_YAML.
       const staleInProgress = makeTicket({
@@ -581,7 +581,7 @@ describe("D4: status", () => {
       await writeTicket(paths, blocker);
       await rebuildIndex(paths);
 
-      const fakeNow = { SLOP_STATUS_FAKE_NOW: "2026-07-23T10:00:00.000Z" };
+      const fakeNow = { SLOP_FAKE_NOW: "2026-07-23T10:00:00.000Z" };
 
       const human = status(paths.root, [], fakeNow);
       expect(human.status, human.stderr).toBe(0);

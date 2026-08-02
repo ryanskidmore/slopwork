@@ -32,7 +32,25 @@ export const labelSchema = z.string().trim().min(1).max(100);
 export const PROVENANCE_METHODS = ["new", "split", "draft", "adhoc"] as const;
 export type ProvenanceMethod = (typeof PROVENANCE_METHODS)[number];
 
-/** How, and by whom, a ticket came to exist (design.md §4.1 item 1, "provenance"; D13, B2). */
+/**
+ * How, and by whom, a ticket came to exist (design.md §4.1 item 1,
+ * "provenance"; D13, B2).
+ *
+ * **G5 (t-uy8vo): `method === "adhoc"` is the single source of truth for
+ * adhoc-ness.** This ticket schema used to ALSO carry its own standalone
+ * `adhoc: boolean` field alongside this already-declared `"adhoc"`
+ * provenance method — `new --adhoc` set the boolean but never actually
+ * stamped `provenance.method`, so the two could (and in `new.ts`, always
+ * did) disagree. The standalone field is removed; `new --adhoc` now sets
+ * `provenance.method: "adhoc"` directly, and every prior reader of
+ * `ticket.adhoc` (the review-skip nag exemption in `done.ts`, `slop
+ * show`'s `(adhoc)` tag, `slop web`'s API) reads `provenance.method ===
+ * "adhoc"` instead. Since this is a plain (non-strict) `z.object`, a
+ * ticket file written before this change that still carries a standalone
+ * `adhoc:` key loads fine — the unknown key is silently stripped, the
+ * same ignore-unknown-legacy-key pattern G1 established for session
+ * files' `transcript_ref` (see `session.test.ts`).
+ */
 export const provenanceSchema = z.object({
   method: z.enum(PROVENANCE_METHODS),
   created_by: actorSchema,
@@ -114,8 +132,6 @@ export const ticketSchema = z
     review: reviewSchema.optional(),
     priority: prioritySchema,
     labels: z.array(labelSchema).default([]),
-    /** D13: adhoc creation affordance — ad hoc tickets skip the usual planning ceremony. */
-    adhoc: z.boolean().default(false),
 
     // Edges embedded on the ticket — see edge.ts / DECISIONS.md for why
     // there is no separate edges/ store.

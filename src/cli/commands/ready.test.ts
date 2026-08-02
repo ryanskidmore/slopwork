@@ -8,10 +8,10 @@ import { runReady } from "./ready.js";
 import { runReview } from "./review.js";
 import { runStart } from "./start.js";
 
-const originalFakeNow = process.env.SLOP_READY_FAKE_NOW;
+const originalFakeNow = process.env.SLOP_FAKE_NOW;
 afterEach(() => {
-  if (originalFakeNow === undefined) delete process.env.SLOP_READY_FAKE_NOW;
-  else process.env.SLOP_READY_FAKE_NOW = originalFakeNow;
+  if (originalFakeNow === undefined) delete process.env.SLOP_FAKE_NOW;
+  else process.env.SLOP_FAKE_NOW = originalFakeNow;
 });
 
 // In-process coverage of `runReady` (real v8 coverage, no subprocess).
@@ -130,7 +130,7 @@ describe("runReady (in-process)", () => {
 
     // Default stale_after is 60m — pin "now" far enough past session
     // start that the still-active session reads as stale (C5).
-    process.env.SLOP_READY_FAKE_NOW = new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString();
+    process.env.SLOP_FAKE_NOW = new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString();
     const out = captureOutput();
     try {
       await withCwd(root, () => runReady({ json: true, resumable: true }));
@@ -164,7 +164,7 @@ describe("runReady (in-process)", () => {
 
     // Default review_stale_after is 24h — pin "now" far enough past the
     // review request that the still-active session reads as review-stale.
-    process.env.SLOP_READY_FAKE_NOW = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    process.env.SLOP_FAKE_NOW = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
     const out = captureOutput();
     try {
       await withCwd(root, () => runReady({ json: true, resumable: true }));

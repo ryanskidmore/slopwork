@@ -146,7 +146,6 @@ const STRIPPED_ENV_KEYS = [
   "CODEX_SANDBOX",
   "CODEX_SANDBOX_NETWORK_DISABLED",
   "CODEX_HOME",
-  "SLOP_TEST_CLAUDE_HOME",
 ] as const;
 
 function runSlop(args: string[], cwd: string): SpawnSyncReturns<string> {
@@ -221,7 +220,7 @@ describe("done — review made optional (ticket_01KY9RWFDR9QEWQ5B1ZACQJ338)", ()
     const started = runSlop(["start", slug], root);
     expect(started.status, started.stderr).toBe(0);
     const ticketAfterStart = await readTicket(paths, id);
-    expect(ticketAfterStart.adhoc).toBe(true);
+    expect(ticketAfterStart.provenance.method).toBe("adhoc");
     const sessionId = ticketAfterStart.active_session;
     if (sessionId === null) throw new Error("expected an active session after start");
 
@@ -252,7 +251,7 @@ describe("done — review made optional (ticket_01KY9RWFDR9QEWQ5B1ZACQJ338)", ()
       const started = runSlop(["start", slug], root);
       expect(started.status, started.stderr).toBe(0);
       const ticketAfterStart = await readTicket(paths, id);
-      expect(ticketAfterStart.adhoc).toBe(false);
+      expect(ticketAfterStart.provenance.method).not.toBe("adhoc");
       const sessionId = ticketAfterStart.active_session;
       if (sessionId === null) throw new Error("expected an active session after start");
 

@@ -41,9 +41,15 @@
  * completely independently of the others (a `--label`/`--discovered-from`
  * mix in one invocation is handled correctly either way, since the loop
  * below matches one flag token at a time).
+ *
+ * G5 (t-z4ci3, post-G3 polish): `update --blocks <±ref>`/`update
+ * --relates-to <±ref>` are the same repeatable, `±`-sigil-prefixed,
+ * potentially-space-separated-multi-value flags `--label`/
+ * `--discovered-from` already needed this fix for — added to the same
+ * allowlist rather than growing a second copy of this rewriter.
  */
 
-const SIGIL_VALUE_FLAGS = new Set(["--label", "--discovered-from"]);
+const SIGIL_VALUE_FLAGS = new Set(["--label", "--discovered-from", "--blocks", "--relates-to"]);
 
 const SIGIL_VALUE_PATTERN = /^[+-][^\s-].*$/;
 

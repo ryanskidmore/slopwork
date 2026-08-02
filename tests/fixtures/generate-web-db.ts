@@ -91,7 +91,6 @@ interface TicketSpec {
   state: Ticket["state"];
   priority: number;
   labels?: string[];
-  adhoc?: boolean;
   owner?: Actor | null;
   parent?: string;
   blocks?: TicketId[];
@@ -129,7 +128,6 @@ function makeTicket(spec: TicketSpec, rootId?: TicketId, path: TicketId[] = []):
         : undefined,
     priority: spec.priority,
     labels: spec.labels ?? [],
-    adhoc: spec.adhoc ?? false,
     parent: spec.parent,
     blocks: spec.blocks ?? [],
     discovered_from: spec.discoveredFrom ?? [],
@@ -696,7 +694,6 @@ const investigateMemLeak = makeTicket({
   state: "open",
   priority: 0,
   labels: ["bug", "perf"],
-  adhoc: true,
   owner: null,
   discoveredFrom: [implementOauth.id],
   createdBy: AGENT_1,

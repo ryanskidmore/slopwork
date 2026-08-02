@@ -303,7 +303,8 @@ export function registerSearchCommand(program: Command): void {
     .option("--limit <n>", "cap the number of results returned", parseIntegerOption("--limit"))
     .option(
       "--budget <n>",
-      `cap output size to N ${CONTEXT_PACK_BUDGET_UNIT} (elides lowest-ranked results first)`,
+      `cap output size to N ${CONTEXT_PACK_BUDGET_UNIT} (elides lowest-ranked results first — ` +
+        "see 'Budget' in docs/cli-reference.md)",
       parseBudgetOption,
     )
     .action(runSearch);

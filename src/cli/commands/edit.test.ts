@@ -337,22 +337,28 @@ describe("runEdit (in-process)", () => {
     expect(after).toBe(before);
   });
 
-  it("no $VISUAL/$EDITOR and non-TTY: the error names update --parent/--blocks/--owner/--relates-to as the non-interactive alternative", async () => {
-    const root = await makeTempRepo("slop-edit-inproc-nontty-alt-");
-    await bootstrapRepo(root, { project: "p", user: "ryan" });
-    const id = await jsonNewTicket(root, "Non-TTY alternative-pointer ticket");
-    delete process.env.VISUAL;
-    delete process.env.EDITOR;
+  it(
+    "no $VISUAL/$EDITOR and non-TTY: the error names update --parent/--clear-parent/--blocks/" +
+      "--relates-to/--discovered-from/--owner/--clear-owner as the non-interactive alternative " +
+      "(G5, t-z4ci3: the full current set of update's edge/owner-repair flags, not just the " +
+      "original four)",
+    async () => {
+      const root = await makeTempRepo("slop-edit-inproc-nontty-alt-");
+      await bootstrapRepo(root, { project: "p", user: "ryan" });
+      const id = await jsonNewTicket(root, "Non-TTY alternative-pointer ticket");
+      delete process.env.VISUAL;
+      delete process.env.EDITOR;
 
-    const out = captureOutput();
-    try {
-      await expect(withCwd(root, () => runEdit(id))).rejects.toThrow(
-        /update <ref> --parent.*--blocks.*--owner.*--relates-to/s,
-      );
-    } finally {
-      out.restore();
-    }
-  });
+      const out = captureOutput();
+      try {
+        await expect(withCwd(root, () => runEdit(id))).rejects.toThrow(
+          /update <ref> --parent.*--clear-parent.*--blocks.*--relates-to.*--discovered-from.*--owner.*--clear-owner/s,
+        );
+      } finally {
+        out.restore();
+      }
+    },
+  );
 
   it("throws NOT_FOUND for an unresolvable ref before ever touching $EDITOR", async () => {
     const root = await makeTempRepo("slop-edit-inproc-notfound-");

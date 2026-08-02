@@ -262,7 +262,8 @@ export function ticketSummaryDto(
     priority: ticket.priority,
     labels: ticket.labels,
     owner: ticket.owner,
-    adhoc: ticket.adhoc,
+    // G5 (t-uy8vo): derived from provenance, not its own stored field.
+    adhoc: ticket.provenance.method === "adhoc",
     last_activity_at: ticket.last_activity_at,
     latest_note: ticket.latest_note,
     created_at: ticket.created_at,
