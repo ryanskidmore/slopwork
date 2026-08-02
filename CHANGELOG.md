@@ -37,6 +37,46 @@ where breaking changes land.
 - `defaults.lock_timeout` in `config.yaml` — how long a mutating command
   waits for the db write lock before giving up with `CONFLICT` (exit `6`).
   Defaults to `5s`, matching the previous hardcoded value.
+- **`slop list`** (t-km7mb): filtered ticket enumeration —
+  `--state`/`--label`/`--owner`/`--priority`/`--parent`/`--subtree` plus a
+  free-text positional match against name/slug/spec summary,
+  `--limit`/`--offset`, `--json`/`--budget`. Deterministic sort (state,
+  then priority, then age). Everything the web UI's ticket-list filters
+  can express is now expressible from the CLI too — see
+  [CLI reference → `list`](docs/cli-reference.md#list).
+- **`ready` gains `--owner`/`--priority`, and `--label` is now repeatable**
+  (t-175oq, AND semantics — every given label must be present), so
+  multiple actors/queues can scope their own pull without a separate
+  `slop list` round-trip. Ordering and `--resumable` semantics unchanged.
+- **Bulk multi-ref on `done`/`drop`/`update`** (t-mmngo): all three now
+  accept multiple refs (or `-` to read refs from stdin, one per line),
+  applied per-ref rather than all-or-nothing — one bad ref never blocks
+  the others. `--json` gains a `results[]` array with per-ref
+  `{ref, ok, exit_code, result | error}`; text output is one line per ref.
+  The process exits `0` only if every ref succeeded, otherwise the most
+  severe per-ref exit code. Given exactly one ref, output is unchanged
+  (byte-for-byte) from before this ticket. See
+  [CLI reference → `done`](docs/cli-reference.md#done).
+- **`update` can now clear owner/parent and edit `discovered-from`, and
+  `--owner` accepts an explicit actor kind** (t-9uvbr): `--clear-owner`/
+  `--clear-parent` (mutually exclusive with `--owner`/`--parent`
+  respectively) give a non-interactive way to remove either field —
+  previously only possible via `slop edit`'s `$EDITOR`, which refuses to
+  launch on a non-TTY. `--discovered-from <±ref>` (repeatable, same `±`
+  convention as `--label`/`--blocks`) makes `discovered-from` editable
+  after creation for the first time. `--owner` now accepts `agent:<name>`/
+  `human:<name>` prefixes to set the stored actor kind explicitly (a bare
+  name still stores `kind: "human"`, unchanged back-compat behavior) —
+  applies to `new --owner` too.
+- **Slug-shadowing detection and healing** (t-trqk9): a cross-clone merge
+  producing two tickets with the same slug is now detected at index build
+  time (a loud stderr warning, never silent last-writer-wins) and
+  resolving the duplicated slug as a `<ref>` returns `AMBIGUOUS_REF`
+  (exit `5`) listing every candidate — never a silent pick. `slop reindex
+  --heal` additionally repairs it deterministically: the OLDEST ticket
+  (by id) keeps the slug, newer duplicates are re-suffixed (`-2`, `-3`,
+  ..., git-style). See
+  [Concepts → slug uniqueness](docs/concepts.md#slug-uniqueness).
 
 ### Changed
 

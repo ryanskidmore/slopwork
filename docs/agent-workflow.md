@@ -19,7 +19,9 @@ the durable, cross-project explanation of *why*.
 | Need a human decision | `slop update <ref> --progress "QUESTION: …"`, then stop or keep going on unblocked parts |
 | Code done, MR opened | `slop review <ref> --mr <url>` |
 | MR merged / work verified | `slop done <ref> --note "…"` |
+| Closing several tickets at once (batch-close) | `slop done <ref> <ref> … --note "…"` (or `drop`/`update`) — never one process per ticket |
 | Stopping without finishing | `slop stop <ref> --note "<handoff: state, next step, gotchas>"` |
+| Need to browse/filter tickets beyond ready (state/label/owner/parent) | `slop list --state open --label area:auth --json` |
 | Asked "what's the status?" | `slop status`, summarize — don't recite raw output |
 
 ## The loop
@@ -59,10 +61,14 @@ the durable, cross-project explanation of *why*.
 5. **Prefer structured spec fields.** Put acceptance criteria in
    `spec.acceptance[]` and file/URL pointers in `spec.context[]`, not
    buried in prose.
-6. **Budget your reads.** `ready`, `status`, `search`, `events`, and
+6. **Budget your reads.** `ready`, `list`, `status`, `search`, `events`, and
    `context` all take `--json --budget N` to cap output (`show --context`
    too); use `slop context <ref>` to reload your bearings after
    compaction instead of re-exploring the repo from scratch.
+7. **Bulk-close, don't loop.** `slop done`/`drop`/`update` accept multiple
+   refs (`slop done a b c --note "…"`) or `-` for stdin, applying per-ref
+   with per-ref outcomes — never spawn one process per ticket to close
+   out a batch (see "Session ownership" above for the fuller writeup).
 
 ## Session ownership
 
@@ -97,6 +103,16 @@ This is informational, never a block — the command underneath it always
 still succeeds. If you see it and you're *not* deliberately coordinating
 another actor's session, that's worth a second look: it usually means
 you're operating on the wrong ticket, or a stale `<ref>`.
+
+**Closing several tickets at once** (t-mmngo) is exactly this coordinator
+pattern's other common need: `slop done a b c --note "…"` (or `drop`/
+`update`) applies to every ref independently — one bad ref never blocks
+the rest — and reports each ref's own outcome, so a coordinator batch
+-closing 40 stale tickets does it in one invocation instead of 40 process
+spawns. Refs can also come from stdin (`slop done - --note "…" < refs.txt`,
+one ref per line) for scripting. See
+[CLI reference → `done`](cli-reference.md#done) for the full contract
+(text/`--json` shapes, exit-code rule).
 
 ## Reference resolution
 

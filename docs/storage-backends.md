@@ -164,6 +164,19 @@ any stable placeholder value; nothing reads `fingerprint` through the
 `StorageBackend` interface itself (only the flatfile driver's own
 internal staleness check does, entirely inside `src/repo/db-index.ts`).
 
+G3 (t-175oq/t-trqk9) added two fields to every `IndexTicketRow`/`DbIndex`
+a real remote implementation must also populate (schema `v4` — no
+interface *method* signature changed, only this response shape):
+- `IndexTicketRow.owner` — the row's `Actor | null`, mirroring
+  `ticket.owner` (used by `ready --owner`/`slop list --owner`).
+- `DbIndex.slug_problems` — every slug currently claimed by more than one
+  ticket, `{slug, ids: TicketId[]}[]` (see
+  [Concepts → slug uniqueness](concepts.md#slug-uniqueness)). A backend
+  whose storage layer enforces slug uniqueness server-side (e.g. a unique
+  index in a real database) can always return `[]` here; one that
+  doesn't should compute it the same way the flatfile driver does — group
+  by slug, any group with more than one id is a problem entry.
+
 ### Transactions
 
 `StorageBackend.transact(fn)` is a **client-side** call: `fn` runs
