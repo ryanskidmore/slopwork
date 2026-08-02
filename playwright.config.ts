@@ -21,7 +21,7 @@ export default defineConfig({
   webServer: {
     command:
       `bun run build:web && cd tests/fixtures/web-db && ` +
-      `SLOP_WEB_FAKE_NOW=2026-07-20T12:00:00.000Z bun ../../../src/cli/index.ts web --port ${port}`,
+      `SLOP_FAKE_NOW=2026-07-20T12:00:00.000Z bun ../../../src/cli/index.ts web --port ${port}`,
     url: `http://127.0.0.1:${port}/api/config`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
