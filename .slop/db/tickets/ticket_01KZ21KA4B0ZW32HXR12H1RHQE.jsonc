@@ -1,0 +1,39 @@
+{
+  "id": "ticket_01KZ21KA4B0ZW32HXR12H1RHQE",
+  "name": "Auto-compact events into a per-ticket archive on terminal transitions",
+  "slug": "auto-compact-events-into-a",
+  "spec": {
+    "summary": "On done/drop, fold a ticket's loose event files into one archival record with full event fidelity. One-file-per-event stays for LIVE tickets (conflict-free parallel appends); after close it is pure overhead. Design AFTER event-cursors lands — same read paths and cursor semantics.",
+    "details_md": "Requirements: reads transparently merge archive + residual loose events (cross-clone close-vs-append races); idempotent re-compaction via reindex; events --since and the poll-cursor protocol treat archived events identically; implemented in the flatfile driver behind StorageBackend. Helps t-407xr (show/search full-log scans). Ryan's original framing: compact on close or status change unless individual files have a benefit — they do for live tickets (merge-cleanliness, lock-free progress), hence terminal-transition-only.",
+    "acceptance": [
+      "Closing a ticket compacts its events; reads and cursors indistinguishable before/after",
+      "Cross-clone merge of a close plus concurrent append reconciles without loss"
+    ],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "source:product"
+  ],
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ21KA4B0ZW32HXR12H1RHQE",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-08-02T20:10:43.723Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-02T20:10:43.723Z",
+  "updated_at": "2026-08-02T20:10:43.723Z"
+}

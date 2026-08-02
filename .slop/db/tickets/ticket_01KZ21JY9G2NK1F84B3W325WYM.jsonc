@@ -1,0 +1,36 @@
+{
+  "id": "ticket_01KZ21JY9G2NK1F84B3W325WYM",
+  "name": "Re-rebase PRs 14 and 18 after second merge wave",
+  "slug": "re-rebase-prs-14-and",
+  "spec": {
+    "summary": "PRs 7/13/15/16/19 merged; 14 and 18 conflict again (expect: session-attribution event-writer sites vs 14/18 event threading, web api files vs 15/16, lock.ts vs 7, CHANGELOG unions). Rebase 14 onto main, 18 onto rebased 14, full gates, force-push, MERGEABLE.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "in_progress",
+  "priority": 1,
+  "labels": [
+    "source:salvage"
+  ],
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ21JY9G2NK1F84B3W325WYM",
+  "path": [],
+  "active_session": "session_01KZ21KAC04ZT1SKVEJAA4NDCA",
+  "last_activity_at": "2026-08-02T20:10:43.982Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-02T20:10:31.601Z",
+  "updated_at": "2026-08-02T20:10:43.982Z"
+}
