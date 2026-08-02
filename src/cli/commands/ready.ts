@@ -81,6 +81,7 @@ interface ReadyCommandOptions {
   owner?: string;
   priority?: number;
   resumable?: boolean;
+  includeAwaiting?: boolean;
   json?: boolean;
   budget?: number;
 }
@@ -225,7 +226,14 @@ export async function runReady(opts: ReadyCommandOptions): Promise<void> {
   // t-175oq: --label is now repeatable (AND, matching `slop list`'s own
   // semantics) and joined by --owner/--priority — every given filter must
   // match (see `tickets/ready.ts`'s `ReadyQueryOptions` doc).
-  const queryOptions = { labels: opts.label ?? [], owner: opts.owner, priority: opts.priority };
+  const queryOptions = {
+    labels: opts.label ?? [],
+    owner: opts.owner,
+    priority: opts.priority,
+    // G4 (t-jggg9): excludes awaiting_input rows by default — see
+    // tickets/ready.ts's ReadyQueryOptions.includeAwaiting doc.
+    includeAwaiting: opts.includeAwaiting,
+  };
   const ready = filterReadyRows(index.tickets, queryOptions);
   const resumable = resumableRequested
     ? filterResumableRows(index.tickets, clock.now(), queryOptions)
@@ -265,6 +273,11 @@ export function registerReadyCommand(program: Command): void {
     .option(
       "--resumable",
       "also include stopped or stale in_progress/review tickets worth resuming",
+    )
+    .option(
+      "--include-awaiting",
+      "include tickets with an unanswered question (awaiting_input) — excluded by default " +
+        "(G4): a ticket blocked on a human answer just stalls an agent that starts it",
     )
     .option("--json", "machine-readable output")
     .option(

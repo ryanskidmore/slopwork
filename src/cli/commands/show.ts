@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import type { Config, Ticket } from "../../core/index.js";
+import type { Config, Event, Ticket } from "../../core/index.js";
 import { isTicketId, shortTicketCode } from "../../core/index.js";
 import { deriveEffectiveOverlay } from "../../repo/index.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
@@ -13,6 +13,8 @@ import {
 import { buildContextPackData } from "../../sessions/context-pack.js";
 import { formatTicketDetail } from "../../tickets/detail.js";
 import { jiraBrowseUrl } from "../../tickets/jira.js";
+import type { Question } from "../../tickets/questions.js";
+import { deriveQuestions, unansweredQuestions } from "../../tickets/questions.js";
 import type { TreeNode } from "../../tickets/tree.js";
 import { buildTree, renderTreeLines } from "../../tickets/tree.js";
 import { loadConfig } from "../actor.js";
@@ -75,10 +77,25 @@ interface TreeNodeJson {
  * `deriveEffectiveOverlay` is a no-op whenever no event is newer than the
  * ticket's own stored `last_activity_at`.
  */
-async function effectiveTicket(backend: StorageBackend, ticket: Ticket): Promise<Ticket> {
-  const events = await backend.queryEvents({ ticket: ticket.id });
+/** All of `ticket`'s own events, fetched ONCE and reused for both the
+ * effective-overlay fold above and the G4 open-questions section below —
+ * a single `queryEvents({ ticket })` call, not two. */
+async function loadTicketEvents(backend: StorageBackend, ticket: Ticket): Promise<Event[]> {
+  return backend.queryEvents({ ticket: ticket.id });
+}
+
+function effectiveTicketFrom(ticket: Ticket, events: readonly Event[]): Ticket {
   const overlay = deriveEffectiveOverlay(ticket, events);
   return { ...ticket, ...overlay };
+}
+
+/**
+ * G4 (t-jggg9): "`show <ref>` surfaces open questions prominently" —
+ * still-unanswered `question.asked` events for `ticket`, oldest first
+ * (`src/tickets/questions.ts`'s `deriveQuestions`/`unansweredQuestions`).
+ */
+function openQuestionsFrom(events: readonly Event[]): Question[] {
+  return unansweredQuestions(deriveQuestions(events));
 }
 
 function treeNodeJson(node: TreeNode, targetId: string): TreeNodeJson {
@@ -125,6 +142,8 @@ async function runShowJson(
     ticket.parent !== undefined && !isTicketId(ticket.parent)
       ? jiraBrowseUrl(config, ticket.parent)
       : null;
+  const events = await loadTicketEvents(backend, ticket);
+  const openQuestions = openQuestionsFrom(events);
   // ticket_01KY9RVF2DCG6TDQ8EBSGXQXT1: the short t-<code> handle, derived
   // (never stored — core/ids.ts's shortTicketCode) and added as a
   // top-level key so it's always present regardless of --tree/--context,
@@ -133,10 +152,22 @@ async function runShowJson(
   // covers `context`; a stray extra top-level key never risks it).
   const body: Record<string, unknown> = {
     // ticket_01KY9RWFM80BKNE2CDX85QMKGS: effective, not stored-verbatim —
-    // see effectiveTicket's doc.
-    ticket: await effectiveTicket(backend, ticket),
+    // see effectiveTicketFrom's doc.
+    ticket: effectiveTicketFrom(ticket, events),
     handle: shortTicketCode(ticket.id),
     jira_url: jiraUrl,
+    // G4 (t-jggg9): open questions surfaced prominently — see this
+    // module's doc / tickets/detail.ts's formatOpenQuestionsSection.
+    awaiting_input: {
+      open: openQuestions.length > 0,
+      questions: openQuestions.map((q) => ({
+        id: q.id,
+        text: q.text,
+        options: q.options,
+        asked_by: q.askedBy,
+        asked_at: q.askedAt,
+      })),
+    },
   };
 
   if (opts.tree) {
@@ -197,17 +228,22 @@ export async function runShow(ref: string, opts: ShowCommandOptions): Promise<vo
     // ticket_01KY9RVF2DCG6TDQ8EBSGXQXT1: surface the t-<code> handle here
     // too — but only on this plain (no --tree/--context) path.
     // formatTicketDetail (tickets/detail.ts) itself is left untouched
-    // (detail.test.ts pins its output directly), and --context's own
-    // printed text is exactly `renderContextPackWithBudget`'s budgeted
-    // output with nothing else around it (E1: `bounded.stdout.length <=
-    // budget + 1` — prepending a line here would inflate that past the
-    // budget by the line's own length), so this stays out of that path.
+    // (detail.test.ts pins its output directly when `openQuestions` is
+    // omitted), and --context's own printed text is exactly
+    // `renderContextPackWithBudget`'s budgeted output with nothing else
+    // around it (E1: `bounded.stdout.length <= budget + 1` — prepending a
+    // line here would inflate that past the budget by the line's own
+    // length), so this stays out of that path.
     // ticket_01KY9RWFM80BKNE2CDX85QMKGS: formatTicketDetail itself stays
     // untouched (detail.test.ts pins its output directly against whatever
     // Ticket it's handed) — the effective `latest_note`/`last_activity_at`
     // are folded in here, before the call, instead.
+    // G4 (t-jggg9): open questions surfaced prominently — see
+    // tickets/detail.ts's formatOpenQuestionsSection.
+    const events = await loadTicketEvents(backend, ticket);
     process.stdout.write(
-      `handle: ${shortTicketCode(ticket.id)}\n${formatTicketDetail(await effectiveTicket(backend, ticket), config)}\n`,
+      `handle: ${shortTicketCode(ticket.id)}\n` +
+        `${formatTicketDetail(effectiveTicketFrom(ticket, events), config, openQuestionsFrom(events))}\n`,
     );
   }
 }

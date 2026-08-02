@@ -116,6 +116,7 @@ import type { StorageBackend } from "../../storage/index.js";
 import { openStorage } from "../../storage/index.js";
 import { isReviewStale, isStale } from "../../tickets/staleness.js";
 import type {
+  AwaitingInputTicketRow,
   DerivedOverlayCounts,
   InProgressTicketRow,
   ReviewTicketRow,
@@ -126,6 +127,7 @@ import type {
 import {
   aggregateDerivedCounts,
   aggregateStateCounts,
+  awaitingInputTicketRows,
   capRows,
   humanizeAge,
   msSince,
@@ -166,6 +168,11 @@ function toStatusRow(row: IndexTicketRow, now: Date): StatusTicketRow {
     blockedCount: row.blocked_count,
     stale: isStale(row, now),
     reviewStale: isReviewStale(row, now),
+    // G4 (t-jggg9): already content-derived at index-build time (unlike
+    // stale/reviewStale, this needs no live clock comparison — see
+    // src/tickets/overlay.ts's computeAwaitingInputOverlay).
+    awaitingInputCount: row.open_question_count,
+    oldestOpenQuestionAt: row.oldest_open_question_at,
   };
 }
 
@@ -217,6 +224,8 @@ interface StatusData {
   inProgress: InProgressTicketRow[];
   review: ReviewTicketRow[];
   stale: StaleTicketRow[];
+  /** G4 (t-jggg9): tickets with >=1 unanswered question, oldest-first. */
+  awaitingInput: AwaitingInputTicketRow[];
   problems: StatusProblem[];
 }
 
@@ -230,6 +239,7 @@ async function gatherStatus(backend: StorageBackend, clock: Clock): Promise<Stat
   const counts = aggregateStateCounts(statusRows);
   const derived = aggregateDerivedCounts(statusRows);
   const stale = staleTicketRows(statusRows);
+  const awaitingInput = awaitingInputTicketRows(statusRows);
 
   const problems: StatusProblem[] = [];
 
@@ -287,7 +297,15 @@ async function gatherStatus(backend: StorageBackend, clock: Clock): Promise<Stat
     });
   }
 
-  return { counts, derived, inProgress, review: sortReviewRows(review), stale, problems };
+  return {
+    counts,
+    derived,
+    inProgress,
+    review: sortReviewRows(review),
+    stale,
+    awaitingInput,
+    problems,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -357,6 +375,33 @@ function renderReviewSection(rows: readonly ReviewTicketRow[]): string[] {
   return lines;
 }
 
+/** G4 (t-jggg9): "Awaiting input" section — ticket, question count, oldest
+ * question age. `now`/`nowMs` mirrors `renderInProgressSection`'s own
+ * age-humanising: age is computed here (not stored) so the same on-disk
+ * `oldest_open_question_at` reads as a different "N ago" depending purely
+ * on when `status` is run. */
+function renderAwaitingInputSection(
+  rows: readonly AwaitingInputTicketRow[],
+  nowMs: number,
+): string[] {
+  const lines: string[] = [`Awaiting input (${rows.length}):`];
+  if (rows.length === 0) {
+    lines.push("  (none)");
+    return lines;
+  }
+  const { shown, omitted } = capRows(rows);
+  for (const row of shown) {
+    const ageMs = msSince(row.oldestOpenQuestionAt, nowMs);
+    const questionWord = row.openQuestionCount === 1 ? "question" : "questions";
+    lines.push(
+      `  ${row.slug.padEnd(30)}  ${row.id}  (${shortTicketCode(row.id)})  ` +
+        `${row.openQuestionCount} open ${questionWord}, oldest ${humanizeAge(ageMs)}`,
+    );
+  }
+  if (omitted > 0) lines.push(`  … and ${omitted} more`);
+  return lines;
+}
+
 function renderStaleSection(rows: readonly StaleTicketRow[]): string[] {
   const lines: string[] = [`Stale (${rows.length}):`];
   if (rows.length === 0) {
@@ -371,7 +416,7 @@ function renderStaleSection(rows: readonly StaleTicketRow[]): string[] {
   return lines;
 }
 
-function buildHuman(data: StatusData, elisions: readonly string[]): string {
+function buildHuman(data: StatusData, elisions: readonly string[], nowMs: number): string {
   if (data.counts.total === 0) {
     return 'no tickets yet — `slop new "..."` to create one\n';
   }
@@ -382,6 +427,8 @@ function buildHuman(data: StatusData, elisions: readonly string[]): string {
   lines.push(...renderInProgressSection(data.inProgress));
   lines.push("");
   lines.push(...renderReviewSection(data.review));
+  lines.push("");
+  lines.push(...renderAwaitingInputSection(data.awaitingInput, nowMs));
   lines.push("");
   lines.push(...renderStaleSection(data.stale));
 
@@ -398,7 +445,12 @@ function buildHuman(data: StatusData, elisions: readonly string[]): string {
 // --json rendering
 // ---------------------------------------------------------------------------
 
-function buildJson(data: StatusData, generatedAtIso: string, elisions: readonly string[]): string {
+function buildJson(
+  data: StatusData,
+  generatedAtIso: string,
+  elisions: readonly string[],
+  nowMs: number,
+): string {
   const body = {
     generated_at: generatedAtIso,
     counts: data.counts,
@@ -446,6 +498,16 @@ function buildJson(data: StatusData, generatedAtIso: string, elisions: readonly 
       name: row.name,
       state: row.state,
     })),
+    // G4 (t-jggg9): tickets with >=1 unanswered question, oldest-first.
+    awaiting_input: data.awaitingInput.map((row) => ({
+      id: row.id,
+      slug: row.slug,
+      handle: shortTicketCode(row.id),
+      name: row.name,
+      open_question_count: row.openQuestionCount,
+      oldest_question_at: row.oldestOpenQuestionAt,
+      oldest_question_age_ms: msSince(row.oldestOpenQuestionAt, nowMs),
+    })),
     problems: data.problems,
     elided: elisions,
   };
@@ -454,24 +516,27 @@ function buildJson(data: StatusData, generatedAtIso: string, elisions: readonly 
 
 // ---------------------------------------------------------------------------
 // E1: `--budget` — elide whole rows, least-important-last, across the
-// three list sections in ONE combined elision-priority order:
-// in_progress (most important — active work) > review (awaiting a human)
-// > stale (a derived, largely-redundant-with-the-above overlay). Dropping
-// from the tail of the combined array therefore drops stale rows first,
-// then review, then in_progress — see this file's module doc. `counts`/
-// `derived`/`problems` are never elided (small, fixed-size, and the whole
-// point of a pulse view).
+// four list sections in ONE combined elision-priority order: in_progress
+// (most important — active work) > review (awaiting a human) >
+// awaiting_input (G4 — also awaiting a human, but on a specific question
+// rather than a whole MR) > stale (a derived, largely-redundant-with-the
+// -above overlay). Dropping from the tail of the combined array therefore
+// drops stale rows first, then awaiting_input, then review, then
+// in_progress — see this file's module doc. `counts`/`derived`/`problems`
+// are never elided (small, fixed-size, and the whole point of a pulse view).
 // ---------------------------------------------------------------------------
 
 type StatusEntry =
   | { kind: "in_progress"; row: InProgressTicketRow }
   | { kind: "review"; row: ReviewTicketRow }
+  | { kind: "awaiting_input"; row: AwaitingInputTicketRow }
   | { kind: "stale"; row: StaleTicketRow };
 
 function buildStatusEntries(data: StatusData): StatusEntry[] {
   return [
     ...data.inProgress.map((row): StatusEntry => ({ kind: "in_progress", row })),
     ...data.review.map((row): StatusEntry => ({ kind: "review", row })),
+    ...data.awaitingInput.map((row): StatusEntry => ({ kind: "awaiting_input", row })),
     ...data.stale.map((row): StatusEntry => ({ kind: "stale", row })),
   ];
 }
@@ -484,6 +549,11 @@ function filterStatusData(data: StatusData, kept: readonly StatusEntry[]): Statu
       .map((e) => e.row),
     review: kept
       .filter((e): e is Extract<StatusEntry, { kind: "review" }> => e.kind === "review")
+      .map((e) => e.row),
+    awaitingInput: kept
+      .filter(
+        (e): e is Extract<StatusEntry, { kind: "awaiting_input" }> => e.kind === "awaiting_input",
+      )
       .map((e) => e.row),
     stale: kept
       .filter((e): e is Extract<StatusEntry, { kind: "stale" }> => e.kind === "stale")
@@ -499,6 +569,7 @@ export async function runStatus(opts: StatusCommandOptions): Promise<void> {
 
   const data = await gatherStatus(backend, clock);
   const generatedAtIso = clock.now().toISOString();
+  const nowMs = clock.now().getTime();
   const format: RenderFormat = opts.json ? "json" : "text";
 
   const entries = buildStatusEntries(data);
@@ -507,8 +578,8 @@ export async function runStatus(opts: StatusCommandOptions): Promise<void> {
     (kept, elisions) => {
       const filtered = filterStatusData(data, kept);
       return opts.json
-        ? buildJson(filtered, generatedAtIso, elisions)
-        : buildHuman(filtered, elisions);
+        ? buildJson(filtered, generatedAtIso, elisions, nowMs)
+        : buildHuman(filtered, elisions, nowMs);
     },
     opts.budget,
     { format, noun: "row" },
@@ -521,8 +592,8 @@ export function registerStatusCommand(program: Command): void {
   program
     .command("status")
     .description(
-      "Project pulse: counts by state, in-progress tickets with sessions, stale " +
-        "items, and tickets awaiting review with MR links.",
+      "Project pulse: counts by state, in-progress tickets with sessions, awaiting-input " +
+        "tickets (G4 — unanswered questions), and stale items awaiting review with MR links.",
     )
     .option("--json", "machine-readable output")
     .option(
