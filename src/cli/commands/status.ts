@@ -109,15 +109,11 @@ import {
   systemClock,
   TICKET_STATES,
 } from "../../core/index.js";
-import type { IndexTicketRow, RepoPaths } from "../../repo/index.js";
-import {
-  loadIndex,
-  readSession,
-  readTicket,
-  repoPaths,
-  requireRepoRoot,
-} from "../../repo/index.js";
+import type { IndexTicketRow } from "../../repo/index.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
+import type { StorageBackend } from "../../storage/index.js";
+import { openStorage } from "../../storage/index.js";
 import { isReviewStale, isStale } from "../../tickets/staleness.js";
 import type {
   DerivedOverlayCounts,
@@ -182,12 +178,12 @@ function errorMessage(err: unknown): string {
  * session file degrades that one ticket's `session` to `null` (recorded
  * in `problems`, warned on stderr) rather than crashing `status`. */
 async function fetchSessionSafe(
-  paths: RepoPaths,
+  backend: StorageBackend,
   id: SessionId,
   problems: StatusProblem[],
 ): Promise<Session | null> {
   try {
-    return await readSession(paths, id);
+    return await backend.readSession(id);
   } catch (err) {
     const message = errorMessage(err);
     problems.push({ id, message });
@@ -201,12 +197,12 @@ async function fetchSessionSafe(
  * this is the only way to get `review.mr`/`requested_at`/`by`. Same
  * fault-tolerance contract as {@link fetchSessionSafe}. */
 async function fetchTicketSafe(
-  paths: RepoPaths,
+  backend: StorageBackend,
   id: TicketId,
   problems: StatusProblem[],
 ): Promise<Ticket | null> {
   try {
-    return await readTicket(paths, id);
+    return await backend.readTicket(id);
   } catch (err) {
     const message = errorMessage(err);
     problems.push({ id, message });
@@ -224,10 +220,10 @@ interface StatusData {
   problems: StatusProblem[];
 }
 
-async function gatherStatus(paths: RepoPaths, clock: Clock): Promise<StatusData> {
+async function gatherStatus(backend: StorageBackend, clock: Clock): Promise<StatusData> {
   const now = clock.now();
   const nowMs = now.getTime();
-  const { index } = await loadIndex(paths, clock);
+  const { index } = await backend.loadIndex(clock);
   const rows = index.tickets;
   const statusRows = rows.map((row) => toStatusRow(row, now));
 
@@ -242,7 +238,7 @@ async function gatherStatus(paths: RepoPaths, clock: Clock): Promise<StatusData>
       .filter((row) => row.state === "in_progress")
       .map(async (row) => {
         const session = row.active_session
-          ? await fetchSessionSafe(paths, row.active_session, problems)
+          ? await fetchSessionSafe(backend, row.active_session, problems)
           : null;
         return { row, session };
       }),
@@ -268,7 +264,7 @@ async function gatherStatus(paths: RepoPaths, clock: Clock): Promise<StatusData>
   const reviewPairs = await Promise.all(
     rows
       .filter((row) => row.state === "review")
-      .map(async (row) => ({ row, ticket: await fetchTicketSafe(paths, row.id, problems) })),
+      .map(async (row) => ({ row, ticket: await fetchTicketSafe(backend, row.id, problems) })),
   );
   const review: ReviewTicketRow[] = [];
   for (const { row, ticket } of reviewPairs) {
@@ -499,8 +495,9 @@ export async function runStatus(opts: StatusCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
   const clock = resolveClock();
+  const backend = await openStorage(paths);
 
-  const data = await gatherStatus(paths, clock);
+  const data = await gatherStatus(backend, clock);
   const generatedAtIso = clock.now().toISOString();
   const format: RenderFormat = opts.json ? "json" : "text";
 

@@ -15,8 +15,8 @@ import {
   listEvents,
   readTicket,
   updateTicket,
-  withLock,
 } from "../../src/repo/index.js";
+import { FlatfileBackend } from "../../src/storage/flatfile.js";
 import { cascadeOnClose } from "../../src/tickets/cascade.js";
 import { TICKET_FIELDS, diffTicketPatch } from "../../src/tickets/patch.js";
 
@@ -33,9 +33,9 @@ import { TICKET_FIELDS, diffTicketPatch } from "../../src/tickets/patch.js";
 //     tests/acceptance/B3.test.ts's degree-cap fixtures) — `done`/`drop`
 //     (C3) don't exist yet, so "closing" a ticket means writing its
 //     terminal state directly, which is `cascadeOnClose`'s own documented
-//     precondition. One case additionally runs the cascade under a REAL
-//     `.slop/db/.lock` acquisition (`withLock`) for genuine end-to-end
-//     coverage of the locking contract.
+//     precondition. Every cascade call here runs under a REAL
+//     `.slop/db/.lock` acquisition (`FlatfileBackend.transact`) for genuine
+//     end-to-end coverage of the locking contract.
 //   - `slop ready` itself (ordering, --label, --resumable, --json,
 //     --budget, empty-result exit code) is driven as a real CLI: spawning
 //     the compiled `dist/slop` binary, per this project's convention for
@@ -154,6 +154,7 @@ function readyJson(root: string, extraArgs: string[] = []): ReadyJsonOutput {
 interface RepoFixture {
   root: string;
   paths: RepoPaths;
+  backend: FlatfileBackend;
 }
 
 async function makeRepoFixture(): Promise<RepoFixture> {
@@ -169,7 +170,7 @@ async function makeRepoFixture(): Promise<RepoFixture> {
     "  review_stale_after: 24h",
   ];
   await writeFile(join(paths.slopDir, "config.yaml"), `${lines.join("\n")}\n`, "utf8");
-  return { root, paths };
+  return { root, paths, backend: new FlatfileBackend(paths) };
 }
 
 const ctx: EventContext = { actor: { name: "ryan", kind: "human" }, session: null };
@@ -218,7 +219,7 @@ describe("B4: Derivations", () => {
 
   describe('"Cascade test: close 1, verify N flip + events"', () => {
     it("closing a ticket that fans out to N blockees flips exactly those N to unblocked, with exactly N ticket.ready events", async () => {
-      const { paths } = await makeRepoFixture();
+      const { paths, backend } = await makeRepoFixture();
       const a = makeTicket();
       const b = makeTicket();
       const c = makeTicket();
@@ -226,8 +227,8 @@ describe("B4: Derivations", () => {
       for (const t of [a, b, c, closer]) await createTicket(paths, t, ctx, createdEvent);
 
       await closeTicket(paths, closer.id, "done");
-      const result = await withLock(paths.lockFile, () =>
-        cascadeOnClose(paths, closer.id, ctx, clock),
+      const result = await backend.transact((tx) =>
+        cascadeOnClose(backend, tx, closer.id, ctx, clock),
       );
 
       expect(result.unblocked.slice().sort()).toEqual([a.id, b.id, c.id].sort());
@@ -241,7 +242,7 @@ describe("B4: Derivations", () => {
     });
 
     it("a fan-out WITH a diamond: only the tickets with no OTHER live blocker flip; the diamond and a wrong-state blockee do not; the index reflects it; ticket.ready fires only for the right subset", async () => {
-      const { paths } = await makeRepoFixture();
+      const { paths, backend } = await makeRepoFixture();
 
       // Plain fan-out members — each blocked ONLY by `closer`.
       const plainA = makeTicket();
@@ -268,8 +269,8 @@ describe("B4: Derivations", () => {
       }
 
       await closeTicket(paths, closer.id, "done");
-      const result = await withLock(paths.lockFile, () =>
-        cascadeOnClose(paths, closer.id, ctx, clock),
+      const result = await backend.transact((tx) =>
+        cascadeOnClose(backend, tx, closer.id, ctx, clock),
       );
 
       // --- exactly the right subset flips ---
@@ -310,22 +311,22 @@ describe("B4: Derivations", () => {
     });
 
     it("a diamond becomes unblocked once its LAST live blocker closes (two separate cascades)", async () => {
-      const { paths } = await makeRepoFixture();
+      const { paths, backend } = await makeRepoFixture();
       const target = makeTicket();
       const first = makeTicket({ blocks: [target.id] });
       const second = makeTicket({ blocks: [target.id] });
       for (const t of [target, first, second]) await createTicket(paths, t, ctx, createdEvent);
 
       await closeTicket(paths, first.id, "done");
-      const afterFirst = await withLock(paths.lockFile, () =>
-        cascadeOnClose(paths, first.id, ctx, clock),
+      const afterFirst = await backend.transact((tx) =>
+        cascadeOnClose(backend, tx, first.id, ctx, clock),
       );
       expect(afterFirst.unblocked).toEqual([]);
       expect(afterFirst.events).toEqual([]);
 
       await closeTicket(paths, second.id, "done");
-      const afterSecond = await withLock(paths.lockFile, () =>
-        cascadeOnClose(paths, second.id, ctx, clock),
+      const afterSecond = await backend.transact((tx) =>
+        cascadeOnClose(backend, tx, second.id, ctx, clock),
       );
       expect(afterSecond.unblocked).toEqual([target.id]);
       expect(afterSecond.events).toHaveLength(1);
@@ -339,15 +340,15 @@ describe("B4: Derivations", () => {
     });
 
     it("a DROPPED blocker also stops blocking, exactly like done", async () => {
-      const { paths } = await makeRepoFixture();
+      const { paths, backend } = await makeRepoFixture();
       const target = makeTicket();
       const closer = makeTicket({ blocks: [target.id] });
       await createTicket(paths, target, ctx, createdEvent);
       await createTicket(paths, closer, ctx, createdEvent);
 
       await closeTicket(paths, closer.id, "dropped");
-      const result = await withLock(paths.lockFile, () =>
-        cascadeOnClose(paths, closer.id, ctx, clock),
+      const result = await backend.transact((tx) =>
+        cascadeOnClose(backend, tx, closer.id, ctx, clock),
       );
       expect(result.unblocked).toEqual([target.id]);
       expect(result.events).toHaveLength(1);

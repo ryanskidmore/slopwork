@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { DEFAULT_PRIORITY, shortTicketCode } from "../../core/index.js";
-import { createTicket, repoPaths, requireRepoRoot, withLock } from "../../repo/index.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
+import { openStorage } from "../../storage/index.js";
 import { buildNewTicket } from "../../tickets/new.js";
 import type { NewTicketInput } from "../../tickets/new.js";
 import { loadConfig, resolveActor } from "../actor.js";
@@ -30,6 +31,7 @@ export async function runNew(name: string, opts: NewCommandOptions): Promise<voi
   const paths = repoPaths(root);
   const config = await loadConfig(paths);
   const actor = resolveActor({ config, cwd: root });
+  const backend = await openStorage(paths);
 
   const specRaw =
     opts.spec === undefined ? undefined : opts.spec === "-" ? await readStdin() : opts.spec;
@@ -64,10 +66,9 @@ export async function runNew(name: string, opts: NewCommandOptions): Promise<voi
   // happen under the same lock so two concurrent `slop new` calls can
   // never race into the same slug (design.md §3's `.lock`, targeted at
   // exactly this kind of multi-step "read then write" transaction).
-  const { ticket, warnings } = await withLock(paths.lockFile, async () => {
-    const built = await buildNewTicket(paths, input);
-    await createTicket(
-      paths,
+  const { ticket, warnings } = await backend.transact(async () => {
+    const built = await buildNewTicket(backend, input);
+    await backend.createTicket(
       built.ticket,
       { actor, session: null },
       {

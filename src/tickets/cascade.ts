@@ -150,16 +150,15 @@
 import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import type { Event, Ticket, TicketId } from "../core/index.js";
-import { EXIT_CODES, newEventId } from "../core/index.js";
+import { EXIT_CODES } from "../core/index.js";
 import { SlopError } from "../cli/errors.js";
-import {
-  computeBlockedCounts,
-  createEvent,
-  isLiveBlockerState,
-  listEvents,
-  listTicketsTolerant,
-} from "../repo/index.js";
-import type { EventContext, RepoPaths, TicketReadProblem } from "../repo/index.js";
+import { computeBlockedCounts, isLiveBlockerState } from "./overlay.js";
+import type {
+  EventContext,
+  StorageBackend,
+  StorageTxScope,
+  TicketReadProblem,
+} from "../storage/backend.js";
 
 export interface CascadeOnCloseResult {
   /** Every ticket that is, per THIS call's fresh read of disk,
@@ -186,23 +185,6 @@ export interface CascadeOnCloseResult {
   problems: TicketReadProblem[];
 }
 
-function buildTicketReadyEvent(
-  ticketId: TicketId,
-  closedTicketId: TicketId,
-  ctx: EventContext,
-  clock: Clock,
-): Event {
-  return {
-    id: newEventId(),
-    actor: ctx.actor,
-    session: ctx.session,
-    verb: "ticket.ready",
-    entity: { kind: "ticket", id: ticketId },
-    payload: { unblocked_by: closedTicketId },
-    at: clock.now().toISOString(),
-  };
-}
-
 function isDefined<T>(value: T | undefined): value is T {
   return value !== undefined;
 }
@@ -220,11 +202,11 @@ function isDefined<T>(value: T | undefined): value is T {
  * candidates at all (a closure that unblocks nothing costs nothing here).
  */
 async function priorReadyEventsFor(
-  paths: RepoPaths,
+  backend: StorageBackend,
   candidateIds: ReadonlySet<string>,
 ): Promise<Event[]> {
   if (candidateIds.size === 0) return [];
-  const allEvents = await listEvents(paths);
+  const allEvents = await backend.listEvents();
   return allEvents.filter(
     (event) =>
       event.verb === "ticket.ready" &&
@@ -271,12 +253,17 @@ function alreadyEmittedReadyFor(
  * module doc, "Which tickets are even candidates".
  */
 export async function cascadeOnClose(
-  paths: RepoPaths,
+  backend: StorageBackend,
+  // Unused except as a compile-time gate — see this module's doc,
+  // "Locking contract": requiring the transaction-scope marker `transact`
+  // hands its callback is what makes "must be called inside a
+  // transaction" a property the compiler checks, not just a comment.
+  _tx: StorageTxScope,
   closedTicketId: TicketId,
   ctx: EventContext,
   clock: Clock = systemClock,
 ): Promise<CascadeOnCloseResult> {
-  const { tickets, problems } = await listTicketsTolerant(paths);
+  const { tickets, problems } = await backend.listTicketsTolerant();
 
   const closedTicket = tickets.find((t) => t.id === closedTicketId);
   if (closedTicket === undefined) {
@@ -306,7 +293,7 @@ export async function cascadeOnClose(
   // One read for the whole cascade (module doc: "Emission is deduplicated
   // against the event log") — NOT one `queryEvents`/log-scan per candidate.
   const priorReadyEvents = await priorReadyEventsFor(
-    paths,
+    backend,
     new Set(newlyUnblocked.map((t) => t.id)),
   );
 
@@ -316,8 +303,12 @@ export async function cascadeOnClose(
     // for THIS closure, so a re-invocation (the documented recovery path
     // after a partial cascade) is exactly-once, not at-least-once.
     if (alreadyEmittedReadyFor(priorReadyEvents, ticket.id, closedTicketId)) continue;
-    const event = buildTicketReadyEvent(ticket.id, closedTicketId, ctx, clock);
-    await createEvent(paths, event);
+    const event = await backend.appendEvent(
+      ctx,
+      { kind: "ticket", id: ticket.id },
+      { verb: "ticket.ready", payload: { unblocked_by: closedTicketId } },
+      clock,
+    );
     events.push(event);
   }
 

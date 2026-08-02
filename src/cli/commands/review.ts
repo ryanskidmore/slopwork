@@ -3,14 +3,8 @@ import type { Clock } from "../../core/clock.js";
 import { systemClock } from "../../core/clock.js";
 import type { Actor, Ticket } from "../../core/index.js";
 import { EXIT_CODES, mrUrlSchema, nowIso, ticketSchema } from "../../core/index.js";
-import {
-  readTicket,
-  repoPaths,
-  requireRepoRoot,
-  resolveTicketRef,
-  updateTicket,
-  withLock,
-} from "../../repo/index.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
+import { openStorage } from "../../storage/index.js";
 import { diffTicketPatch, TICKET_FIELDS } from "../../tickets/patch.js";
 import { checkReviewEntry } from "../../tickets/state.js";
 import { formatZodIssuesForUsage } from "../../tickets/validate.js";
@@ -66,6 +60,7 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
   const paths = repoPaths(root);
   const config = await loadConfig(paths);
   const actor = resolveActor({ config, cwd: root });
+  const backend = await openStorage(paths);
 
   // Normalised once, reused for the nag printed AFTER the transaction
   // commits (below — see nags-print-before-validation-review's doc there
@@ -94,7 +89,7 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
     }
   }
 
-  const initialTicket = await resolveTicketRef(paths, ref);
+  const initialTicket = await backend.resolveTicketRef(ref);
 
   // ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC: a fast, UNLOCKED pre-check against
   // this same `initialTicket` read — same `checkReviewEntry` the lock
@@ -111,8 +106,8 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
     throw new SlopError(initialCheck.reason ?? "illegal state transition", EXIT_CODES.CONFLICT);
   }
 
-  const result = await withLock(paths.lockFile, async () => {
-    const current = await readTicket(paths, initialTicket.id);
+  const result = await backend.transact(async () => {
+    const current = await backend.readTicket(initialTicket.id);
 
     const check = checkReviewEntry(current.state, mr !== undefined);
     if (!check.ok) {
@@ -133,8 +128,7 @@ export async function runReview(ref: string, opts: ReviewCommandOptions): Promis
       );
     }
     const reviewedTicket = buildReviewedTicket(current, mr, actor);
-    await updateTicket(
-      paths,
+    await backend.updateTicket(
       current.id,
       diffTicketPatch(current, reviewedTicket, TICKET_FIELDS),
       reviewedTicket,

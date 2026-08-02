@@ -7,6 +7,7 @@ import { newSessionId, newTicketId, type Session, sessionSchema } from "../core/
 import type { EventContext, MutationEventSpec } from "../repo/events.js";
 import { createSession, ensureDbDirs, type RepoPaths } from "../repo/index.js";
 import { sessionFilePath } from "../repo/sessions.js";
+import { FlatfileBackend } from "../storage/flatfile.js";
 import { buildHealedSession, findOrphanedActiveSessions } from "./repair.js";
 
 const ctx: EventContext = { actor: { name: "ryan", kind: "human" }, session: null };
@@ -26,10 +27,12 @@ function makeSession(overrides: Partial<Session> = {}): Session {
 
 let scratch: string;
 let paths: RepoPaths;
+let backend: FlatfileBackend;
 
 beforeEach(async () => {
   scratch = await mkdtemp(join(tmpdir(), "slop-repair-test-"));
   paths = await ensureDbDirs(scratch);
+  backend = new FlatfileBackend(paths);
 });
 
 afterEach(async () => {
@@ -41,7 +44,7 @@ describe("findOrphanedActiveSessions", () => {
     const session = makeSession();
     await createSession(paths, session, ctx, startedEvent);
 
-    const scan = await findOrphanedActiveSessions(paths, new Set());
+    const scan = await findOrphanedActiveSessions(backend, new Set());
     expect(scan.orphans.map((s) => s.id)).toEqual([session.id]);
     expect(scan.problems).toEqual([]);
   });
@@ -50,7 +53,7 @@ describe("findOrphanedActiveSessions", () => {
     const session = makeSession();
     await createSession(paths, session, ctx, startedEvent);
 
-    const scan = await findOrphanedActiveSessions(paths, new Set([session.id]));
+    const scan = await findOrphanedActiveSessions(backend, new Set([session.id]));
     expect(scan.orphans).toEqual([]);
   });
 
@@ -58,7 +61,7 @@ describe("findOrphanedActiveSessions", () => {
     const session = makeSession({ ended_at: "2026-07-23T10:00:00.000Z" });
     await createSession(paths, session, ctx, startedEvent);
 
-    const scan = await findOrphanedActiveSessions(paths, new Set());
+    const scan = await findOrphanedActiveSessions(backend, new Set());
     expect(scan.orphans).toEqual([]);
   });
 
@@ -70,12 +73,12 @@ describe("findOrphanedActiveSessions", () => {
     await createSession(paths, orphan, ctx, startedEvent);
     await createSession(paths, ended, ctx, startedEvent);
 
-    const scan = await findOrphanedActiveSessions(paths, new Set([referenced.id]));
+    const scan = await findOrphanedActiveSessions(backend, new Set([referenced.id]));
     expect(scan.orphans.map((s) => s.id)).toEqual([orphan.id]);
   });
 
   it("returns empty (never throws) when there are no sessions at all", async () => {
-    const scan = await findOrphanedActiveSessions(paths, new Set());
+    const scan = await findOrphanedActiveSessions(backend, new Set());
     expect(scan.orphans).toEqual([]);
     expect(scan.problems).toEqual([]);
   });
@@ -86,7 +89,7 @@ describe("findOrphanedActiveSessions", () => {
     const badId = newSessionId();
     await writeFile(sessionFilePath(paths, badId), "{ not even valid jsonc {{{");
 
-    const scan = await findOrphanedActiveSessions(paths, new Set());
+    const scan = await findOrphanedActiveSessions(backend, new Set());
     expect(scan.orphans.map((s) => s.id)).toEqual([good.id]);
     expect(scan.problems).toHaveLength(1);
     expect(scan.problems[0]?.id).toBe(badId);

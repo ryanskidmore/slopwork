@@ -9,18 +9,8 @@ import {
   nowIso,
   sessionSchema,
 } from "../../core/index.js";
-import {
-  createSession,
-  readSession,
-  readTicket,
-  repoPaths,
-  requireRepoRoot,
-  resolveTicketRef,
-  sessionFilePath,
-  updateTicket,
-  updateSession,
-  withLock,
-} from "../../repo/index.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
+import { openStorage } from "../../storage/index.js";
 import { buildContextPackData } from "../../sessions/context-pack.js";
 import { captureGit } from "../../sessions/git.js";
 import { detectHarness } from "../../sessions/harness.js";
@@ -95,6 +85,7 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
   const paths = repoPaths(root);
   const config = await loadConfig(paths);
   const actor = resolveActor({ asFlag: opts.as, harnessFlag: opts.harness, config, cwd: root });
+  const backend = await openStorage(paths);
 
   const harness = detectHarness({ harnessFlag: opts.harness });
   const git = captureGit(root);
@@ -125,10 +116,10 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
   // quickly on a cold ref; the decisive re-read that the win/lose decision
   // depends on happens fresh, under the lock, below — this is what makes
   // two concurrent `start`s on the same ticket race-free (see C1's report).
-  const initialTicket = await resolveTicketRef(paths, ref);
+  const initialTicket = await backend.resolveTicketRef(ref);
 
-  const result = await withLock(paths.lockFile, async () => {
-    const current = await readTicket(paths, initialTicket.id);
+  const result = await backend.transact(async () => {
+    const current = await backend.readTicket(initialTicket.id);
     assertStartable(current);
 
     // D15 changes-requested re-entry — see buildReenteredSession's doc
@@ -148,7 +139,7 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
       let existing: Session | null = null;
       let readFailed = false;
       try {
-        existing = await readSession(paths, current.active_session);
+        existing = await backend.readSession(current.active_session);
       } catch {
         readFailed = true;
       }
@@ -200,8 +191,7 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
     }
 
     const session = buildNewSession({ ticket: current.id, actor, harness, git });
-    await createSession(
-      paths,
+    await backend.createSession(
       session,
       { actor, session: session.id },
       {
@@ -253,8 +243,7 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
     if (previousSession !== null) {
       if (isReviewReentry) {
         const endedPrevious = buildReenteredSession(previousSession);
-        await updateSession(
-          paths,
+        await backend.updateSession(
           previousSession.id,
           diffSessionPatch(previousSession, endedPrevious),
           endedPrevious,
@@ -269,8 +258,7 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
         );
       } else {
         const endedPrevious = buildSupersededSession(previousSession, actor);
-        await updateSession(
-          paths,
+        await backend.updateSession(
           previousSession.id,
           diffSessionPatch(previousSession, endedPrevious),
           endedPrevious,
@@ -295,8 +283,7 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
       ticketPayload.to = startedTicket.state;
       if (reEntry) ticketPayload.re_entry = true;
     }
-    await updateTicket(
-      paths,
+    await backend.updateTicket(
       current.id,
       diffTicketPatch(current, startedTicket, TICKET_FIELDS),
       startedTicket,
@@ -320,10 +307,16 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
   // repair or delete it, per the ticket's "warn naming the unreadable
   // session file" requirement.
   if (result.unreadableActiveSessionId !== null) {
+    // `localSessionFilePath` is a flatfile-only capability (StorageBackend's
+    // doc, "optional local-file capabilities") — a remote backend has no
+    // single local file to name, so this falls back to just the id.
+    const location =
+      backend.localSessionFilePath?.(result.unreadableActiveSessionId) ??
+      result.unreadableActiveSessionId;
     printWarning(
       `ticket ${result.ticket.id} (${result.ticket.slug}) had an active session recorded ` +
         `(${result.unreadableActiveSessionId}) whose file could not be read (missing or ` +
-        `corrupt): ${sessionFilePath(paths, result.unreadableActiveSessionId)}\n` +
+        `corrupt): ${location}\n` +
         "  proceeded via --takeover, but that broken session could not be ended/logged as " +
         "superseded — only this new session's own session.started event records the takeover. " +
         "Inspect/repair or remove the file above manually.",
@@ -387,7 +380,7 @@ export async function runStart(ref: string, opts: StartCommandOptions): Promise<
   // (which would send a retrying agent straight into `activeSessionConflict`
   // on the session it just started).
   try {
-    const data = await buildContextPackData(paths, result.ticket, config);
+    const data = await buildContextPackData(backend, result.ticket, config);
     process.stdout.write(`\n${renderContextPack(data)}\n`);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

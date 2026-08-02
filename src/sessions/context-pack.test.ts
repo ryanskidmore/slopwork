@@ -18,10 +18,12 @@ import {
   sessionFilePath,
   ticketFilePath,
 } from "../repo/index.js";
+import { FlatfileBackend } from "../storage/flatfile.js";
 import { buildContextPackData } from "./context-pack.js";
 
 let scratch: string;
 let paths: RepoPaths;
+let backend: FlatfileBackend;
 
 const ctx: EventContext = { actor: { name: "ryan", kind: "human" }, session: null };
 const createdEvent: MutationEventSpec = { verb: "ticket.created" };
@@ -59,6 +61,7 @@ function makeSession(ticket: Ticket, startedAt: string): Session {
 beforeEach(async () => {
   scratch = await mkdtemp(join(tmpdir(), "slop-context-pack-"));
   paths = await ensureDbDirs(scratch);
+  backend = new FlatfileBackend(paths);
 });
 
 afterEach(async () => {
@@ -92,7 +95,7 @@ describe("buildContextPackData", () => {
     await createSession(paths, older, ctx, startedEvent);
     await createSession(paths, newer, ctx, startedEvent);
 
-    const data = await buildContextPackData(paths, child, config);
+    const data = await buildContextPackData(backend, child, config);
 
     expect(data.ancestors.map((a) => a.id)).toEqual([parent.id]);
     expect(data.blockers.map((b) => b.id)).toEqual([liveBlocker.id]);
@@ -102,14 +105,14 @@ describe("buildContextPackData", () => {
   it("has no external parent ref when the root has none", async () => {
     const ticket = makeTicket();
     await createTicket(paths, ticket, ctx, createdEvent);
-    const data = await buildContextPackData(paths, ticket, config);
+    const data = await buildContextPackData(backend, ticket, config);
     expect(data.externalParentRef).toBeUndefined();
   });
 
   it("surfaces the external parent ref from the local root", async () => {
     const ticket = makeTicket({ parent: "jira:PROJ-1" });
     await createTicket(paths, ticket, ctx, createdEvent);
-    const data = await buildContextPackData(paths, ticket, config);
+    const data = await buildContextPackData(backend, ticket, config);
     expect(data.externalParentRef).toBe("jira:PROJ-1");
   });
 });
@@ -132,7 +135,7 @@ describe("buildContextPackData tolerates corrupt files elsewhere in the db", () 
     // Corrupt it on disk after creation — invalid JSONC, unparseable.
     await writeFile(ticketFilePath(paths, unrelated.id), "{ not valid jsonc !!!", "utf8");
 
-    const data = await buildContextPackData(paths, ticket, config);
+    const data = await buildContextPackData(backend, ticket, config);
     expect(data.ticket.id).toBe(ticket.id);
   });
 
@@ -149,7 +152,7 @@ describe("buildContextPackData tolerates corrupt files elsewhere in the db", () 
     // Corrupt the unrelated session on disk — invalid JSONC, unparseable.
     await writeFile(sessionFilePath(paths, otherSession.id), "{ broken !!!", "utf8");
 
-    const data = await buildContextPackData(paths, ticket, config);
+    const data = await buildContextPackData(backend, ticket, config);
     expect(data.sessions.map((s) => s.id)).toEqual([goodSession.id]);
   });
 });

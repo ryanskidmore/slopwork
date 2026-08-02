@@ -7,18 +7,17 @@
  * assignment.
  */
 import { nextAvailableSlug, slugify } from "../core/index.js";
-import { loadIndex } from "../repo/db-index.js";
-import type { RepoPaths } from "../repo/paths.js";
+import type { StorageBackend } from "../storage/backend.js";
 
 /** Every slug currently on disk, via the (self-healing) index. */
-export async function takenSlugs(paths: RepoPaths): Promise<Set<string>> {
-  const { index } = await loadIndex(paths);
+export async function takenSlugs(backend: StorageBackend): Promise<Set<string>> {
+  const { index } = await backend.loadIndex();
   return new Set(Object.keys(index.slugs));
 }
 
 /** The slug a new ticket named `name` should get: `slugify(name)`, or
  * `-2`/`-3`/... appended if that base is already taken. */
-export async function pickSlug(paths: RepoPaths, name: string): Promise<string> {
-  const taken = await takenSlugs(paths);
+export async function pickSlug(backend: StorageBackend, name: string): Promise<string> {
+  const taken = await takenSlugs(backend);
   return nextAvailableSlug(slugify(name), taken);
 }

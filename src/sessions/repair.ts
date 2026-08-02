@@ -24,8 +24,7 @@ import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import { EXIT_CODES, nowIso, type Session, type SessionId, sessionSchema } from "../core/index.js";
 import { SlopError } from "../cli/errors.js";
-import { type SessionReadProblem, listSessionsTolerant } from "../repo/sessions.js";
-import type { RepoPaths } from "../repo/paths.js";
+import type { SessionReadProblem, StorageBackend } from "../storage/backend.js";
 import { formatZodIssuesForUsage } from "../tickets/validate.js";
 
 export interface OrphanedSessionScan {
@@ -58,10 +57,10 @@ export interface OrphanedSessionScan {
  * output when its own ticket read was clean (no `IndexTicketRow` skipped).
  */
 export async function findOrphanedActiveSessions(
-  paths: RepoPaths,
+  backend: StorageBackend,
   referencedActiveSessionIds: ReadonlySet<SessionId>,
 ): Promise<OrphanedSessionScan> {
-  const { sessions, problems } = await listSessionsTolerant(paths);
+  const { sessions, problems } = await backend.listSessionsTolerant();
   const orphans = sessions.filter(
     (session) => session.ended_at === null && !referencedActiveSessionIds.has(session.id),
   );

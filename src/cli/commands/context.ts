@@ -1,5 +1,6 @@
 import type { Command } from "commander";
-import { repoPaths, requireRepoRoot, resolveTicketRef } from "../../repo/index.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
+import { openStorage } from "../../storage/index.js";
 import {
   CONTEXT_PACK_BUDGET_UNIT,
   renderContextPackJsonWithBudget,
@@ -36,12 +37,13 @@ export async function runContext(ref: string, opts: ContextCommandOptions): Prom
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
   const config = await loadConfig(paths);
+  const backend = await openStorage(paths);
 
   // Read-only, start to finish: resolveTicketRef/buildContextPackData never
   // write anything, and nothing here calls a repo-layer mutation function
   // — design.md §4.2 is explicit that `context` is "no state change".
-  const ticket = await resolveTicketRef(paths, ref);
-  const data = await buildContextPackData(paths, ticket, config);
+  const ticket = await backend.resolveTicketRef(ref);
+  const data = await buildContextPackData(backend, ticket, config);
 
   if (opts.json) {
     // E1: structured form, budget-aware without ever corrupting JSON — see

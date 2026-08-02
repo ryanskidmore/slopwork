@@ -1,7 +1,8 @@
 import type { Command } from "commander";
 import { type Clock, EXIT_CODES, fixedClock } from "../../core/index.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
-import { FixtureDataSource, PortInUseError, startWebServer } from "../../web/index.js";
+import { openStorage } from "../../storage/index.js";
+import { PortInUseError, StorageDataSource, startWebServer } from "../../web/index.js";
 import { SlopError } from "../errors.js";
 import { parseIntegerOption } from "./shared.js";
 
@@ -50,7 +51,7 @@ export function registerWebCommand(program: Command): void {
         "ticket detail, review panel, stale panel.",
     )
     .option("--port <n>", "port to listen on (0 = pick a free port)", parsePort, 4553)
-    .action((opts: { port: number }) => {
+    .action(async (opts: { port: number }) => {
       // Shared repo-root discovery (src/repo/paths.ts) — the same walk-up
       // every other command uses, and the same exit code: NOT_FOUND (4).
       // `slop web` used to run its own local copy of this walk and throw
@@ -58,16 +59,16 @@ export function registerWebCommand(program: Command): void {
       // exit-code-4-is-overloaded unified the two so "not a slopwork repo"
       // means the same thing (message + exit code) everywhere.
       const root = requireRepoRoot(process.cwd());
-      const slopRoot = repoPaths(root).slopDir;
+      const paths = repoPaths(root);
+      const slopRoot = paths.slopDir;
 
-      // src/web/'s data-source seam doesn't need the real repo layer's
-      // locking/atomic-write machinery for a read-only viewer (see
-      // src/web/fixture-data-source.ts's doc comment) — the same
-      // FixtureDataSource class this work item builds against a committed
-      // fixture db is pointed here at whatever `.slop` directory was
-      // discovered, which is what makes `slop web` usable today rather
-      // than only against fixtures.
-      const dataSource = new FixtureDataSource(slopRoot);
+      // G2: the data source goes through StorageBackend now — config's
+      // `backend:` key (docs/configuration.md) selects flatfile (default,
+      // the flatfile driver's own in-process read cache resolves
+      // ticket_01KYAVM4GJVG34MC95VDNT7JVQ) or remote, same as every other
+      // command. See src/web/storage-data-source.ts's doc comment.
+      const backend = await openStorage(paths);
+      const dataSource = new StorageDataSource(backend, slopRoot);
 
       let server: ReturnType<typeof startWebServer>;
       try {

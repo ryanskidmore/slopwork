@@ -1,16 +1,8 @@
 import type { Command } from "commander";
 import { fixedClock, shortTicketCode, systemClock } from "../../core/index.js";
 import type { JsoncPatchEntry, Ticket } from "../../core/index.js";
-import {
-  appendEvent,
-  listTickets,
-  readTicket,
-  repoPaths,
-  requireRepoRoot,
-  resolveTicketRef,
-  updateTicket,
-  withLock,
-} from "../../repo/index.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
+import { openStorage } from "../../storage/index.js";
 import { validateTicketEdges } from "../../tickets/edges.js";
 import { recomputeAncestry, resolveParentRef } from "../../tickets/parent.js";
 import { buildUpdate, parseBlocksOpText, parseRelatesToOpText } from "../../tickets/update.js";
@@ -117,6 +109,7 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
   const paths = repoPaths(root);
   const config = await loadConfig(paths);
   const actor = resolveActor({ config, cwd: root });
+  const backend = await openStorage(paths);
 
   // A read outside the lock is fine for resolving <ref> -> id (and
   // surfacing NOT_FOUND/AMBIGUOUS_REF quickly on a cold ref); the decisive
@@ -125,7 +118,7 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
   // `initialTicket`) — otherwise a concurrent `start`/`stop`/`done` landing
   // between this read and the write below would be silently reverted by
   // `updateTicket`'s `writeCanonical(expectedAfter)` fallback.
-  const initialTicket = await resolveTicketRef(paths, ref);
+  const initialTicket = await backend.resolveTicketRef(ref);
 
   // ticket_01KY9RWFM80BKNE2CDX85QMKGS: a pure `--progress` call never
   // reads/writes the ticket file and never takes `paths.lockFile` — it
@@ -150,8 +143,7 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
     // optimization; it never has to be right for correctness; another
     // agent's genuinely different note is unaffected.
     if (note !== initialTicket.latest_note) {
-      await appendEvent(
-        paths,
+      await backend.appendEvent(
         { actor, session: null },
         { kind: "ticket", id: initialTicket.id },
         { verb: "ticket.updated", payload: { progress: note } },
@@ -180,8 +172,8 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
   // same `--blocks` flags).
   const warnings: string[] = [];
 
-  const { ticket, reparentedDescendants } = await withLock(paths.lockFile, async () => {
-    const current = await readTicket(paths, initialTicket.id);
+  const { ticket, reparentedDescendants } = await backend.transact(async () => {
+    const current = await backend.readTicket(initialTicket.id);
 
     // `--relates-to <±ref>` refs are resolved here, fresh, under the same
     // lock as `current` above — mirroring `new`'s `--blocks` resolution
@@ -193,7 +185,7 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
     const relatesToOps: RelatesToOp[] = [];
     for (const raw of opts.relatesTo) {
       const { op, ref } = parseRelatesToOpText(raw);
-      const target = await resolveTicketRef(paths, ref);
+      const target = await backend.resolveTicketRef(ref);
       relatesToOps.push({ op, id: target.id });
     }
 
@@ -203,7 +195,7 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
     const blocksOps: BlocksOp[] = [];
     for (const raw of opts.blocks) {
       const { op, ref } = parseBlocksOpText(raw);
-      const target = await resolveTicketRef(paths, ref);
+      const target = await backend.resolveTicketRef(ref);
       blocksOps.push({ op, id: target.id });
     }
 
@@ -214,7 +206,7 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
     // when `--parent` was omitted — mirrors `relatesToOps`/`blocksOps`
     // only ever being resolved from what was actually given.
     const parentResolution =
-      opts.parent !== undefined ? await resolveParentRef(paths, opts.parent) : undefined;
+      opts.parent !== undefined ? await resolveParentRef(backend, opts.parent) : undefined;
     if (parentResolution?.kind === "external" && parentResolution.warning) {
       warnings.push(parentResolution.warning);
     }
@@ -269,7 +261,7 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
       ),
     );
     if (touchesEdges) {
-      const others = await listTickets(paths);
+      const others = await backend.listTickets();
       validateTicketEdges(ticket, others);
 
       // `--parent` changed: `buildUpdate` only ever sets `ticket.parent`
@@ -300,8 +292,7 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
           // `patch` is guaranteed non-empty here — it already contained a
           // `parent` entry to reach this branch at all, plus the
           // `root_id`/`path` entries just appended above.
-          await updateTicket(
-            paths,
+          await backend.updateTicket(
             current.id,
             patch,
             ticket,
@@ -320,8 +311,7 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
               { path: ["path"], value: descendant.path },
               { path: ["updated_at"], value: descendant.updated_at },
             ];
-            await updateTicket(
-              paths,
+            await backend.updateTicket(
               descendant.id,
               descendantPatch,
               descendant,
@@ -349,8 +339,7 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
       return { ticket, reparentedDescendants };
     }
 
-    await updateTicket(
-      paths,
+    await backend.updateTicket(
       current.id,
       patch,
       ticket,

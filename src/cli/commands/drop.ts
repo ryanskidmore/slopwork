@@ -3,17 +3,9 @@ import type { Clock } from "../../core/clock.js";
 import { systemClock } from "../../core/clock.js";
 import type { Session, Ticket } from "../../core/index.js";
 import { END_SUMMARY_MAX_LENGTH, EXIT_CODES, nowIso, ticketSchema } from "../../core/index.js";
-import {
-  formatIndexProblems,
-  readSession,
-  readTicket,
-  repoPaths,
-  requireRepoRoot,
-  resolveTicketRef,
-  updateSession,
-  updateTicket,
-  withLock,
-} from "../../repo/index.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
+import { formatIndexProblems } from "../../storage/backend.js";
+import { openStorage } from "../../storage/index.js";
 import { buildFinalizedSession } from "../../sessions/finalize.js";
 import { diffSessionPatch, SESSION_END_FIELDS } from "../../sessions/patch.js";
 import { cascadeOnClose } from "../../tickets/cascade.js";
@@ -68,6 +60,7 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
   const paths = repoPaths(root);
   const config = await loadConfig(paths);
   const actor = resolveActor({ config, cwd: root });
+  const backend = await openStorage(paths);
 
   if (opts.reason === undefined || opts.reason.trim().length === 0) {
     // Commander's `.requiredOption` already refuses a wholly-missing
@@ -81,10 +74,10 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
   }
   assertMaxLength("--reason", opts.reason, END_SUMMARY_MAX_LENGTH);
 
-  const initialTicket = await resolveTicketRef(paths, ref);
+  const initialTicket = await backend.resolveTicketRef(ref);
 
-  const result = await withLock(paths.lockFile, async () => {
-    const current = await readTicket(paths, initialTicket.id);
+  const result = await backend.transact(async (tx) => {
+    const current = await backend.readTicket(initialTicket.id);
 
     const check = checkDropEntry(current.state);
     if (!check.ok) {
@@ -98,7 +91,7 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
     // active session at all, so there is nothing to finalize; only
     // in_progress/review tickets carry one.
     if (current.active_session !== null) {
-      const session = await readSession(paths, current.active_session);
+      const session = await backend.readSession(current.active_session);
       // ticket_01KYAPN9NXY6RPSV6WGR42CJHJ: session ownership is a
       // warning, not an enforced gate — see sessionOwnershipWarning's own
       // doc. `null` (never warned) when there's no session to compare
@@ -106,8 +99,7 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
       ownershipWarning = sessionOwnershipWarning(session, actor);
       finalSession = buildFinalizedSession(session, opts.reason);
 
-      await updateSession(
-        paths,
+      await backend.updateSession(
         session.id,
         diffSessionPatch(session, finalSession, SESSION_END_FIELDS),
         finalSession,
@@ -123,8 +115,7 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
     }
 
     const droppedTicket = buildDroppedTicket(current, opts.reason);
-    await updateTicket(
-      paths,
+    await backend.updateTicket(
       current.id,
       diffTicketPatch(current, droppedTicket, TICKET_FIELDS),
       droppedTicket,
@@ -136,7 +127,7 @@ export async function runDrop(ref: string, opts: DropCommandOptions): Promise<vo
     // (cascade.ts treats done/dropped identically as "no longer a live
     // blocker", see its own module doc / db-index.ts's
     // `isLiveBlockerState`).
-    const cascade = await cascadeOnClose(paths, current.id, {
+    const cascade = await cascadeOnClose(backend, tx, current.id, {
       actor,
       session: finalSession?.id ?? null,
     });

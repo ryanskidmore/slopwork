@@ -98,16 +98,10 @@ import {
   isEventId,
   renderEntriesWithBudget,
 } from "../../core/index.js";
-import {
-  listSessions,
-  queryEvents,
-  readEvent,
-  repoPaths,
-  type RepoPaths,
-  requireRepoRoot,
-  resolveTicketRef,
-} from "../../repo/index.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
+import type { StorageBackend } from "../../storage/index.js";
+import { openStorage } from "../../storage/index.js";
 import { SlopError } from "../errors.js";
 import { parseBudgetOption, parseIntegerOption } from "./shared.js";
 
@@ -137,9 +131,9 @@ function parseSinceCursor(raw: string): EventId {
  * it, returning whatever happens to sort after it; that's the wrong
  * failure mode for a cursor a caller is expected to page from.
  */
-async function verifyCursorExists(paths: RepoPaths, since: EventId): Promise<void> {
+async function verifyCursorExists(backend: StorageBackend, since: EventId): Promise<void> {
   try {
-    await readEvent(paths, since);
+    await backend.readEvent(since);
   } catch (err) {
     if (err instanceof SlopError && err.exitCode === EXIT_CODES.NOT_FOUND) {
       throw new SlopError(
@@ -169,10 +163,10 @@ function parseLimit(raw: number): number {
 
 /** See this file's module doc, "The `--ticket` widening decision". */
 async function ticketEventPredicate(
-  paths: RepoPaths,
+  backend: StorageBackend,
   ticketId: TicketId,
 ): Promise<(event: Event) => boolean> {
-  const sessions = await listSessions(paths);
+  const sessions = await backend.listSessions();
   // `Set<string>`, not `Set<SessionId>`: `event.entity.id` is deliberately
   // an unbranded `string` (event.ts's doc on `eventEntitySchema`), so the
   // membership check below needs a plain-string set to compare against.
@@ -203,12 +197,12 @@ interface EventsPage {
  * changes where the array is truncated, not how much is read.
  */
 async function fetchPage(
-  paths: RepoPaths,
+  backend: StorageBackend,
   since: EventId | undefined,
   predicate: ((event: Event) => boolean) | undefined,
   limit: number | undefined,
 ): Promise<EventsPage> {
-  const fetched = await queryEvents(paths, { since });
+  const fetched = await backend.queryEvents({ since });
   const matched = predicate ? fetched.filter(predicate) : fetched;
 
   let page = matched;
@@ -311,11 +305,12 @@ function buildJson(
 export async function runEvents(opts: EventsOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
+  const backend = await openStorage(paths);
 
   let since: EventId | undefined;
   if (opts.since !== undefined) {
     since = parseSinceCursor(opts.since);
-    await verifyCursorExists(paths, since);
+    await verifyCursorExists(backend, since);
   }
 
   // housekeeping-gitignore-lock-stale: `--limit` always has an EFFECTIVE
@@ -327,12 +322,12 @@ export async function runEvents(opts: EventsOptions): Promise<void> {
   let predicate: ((event: Event) => boolean) | undefined;
   let ticketId: TicketId | undefined;
   if (opts.ticket !== undefined) {
-    const ticket = await resolveTicketRef(paths, opts.ticket);
+    const ticket = await backend.resolveTicketRef(opts.ticket);
     ticketId = ticket.id;
-    predicate = await ticketEventPredicate(paths, ticket.id);
+    predicate = await ticketEventPredicate(backend, ticket.id);
   }
 
-  const page = await fetchPage(paths, since, predicate, limit);
+  const page = await fetchPage(backend, since, predicate, limit);
 
   const rendered = renderEntriesWithBudget(
     page.events,

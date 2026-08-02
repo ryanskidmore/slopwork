@@ -13,10 +13,21 @@ import {
   listEvents,
   readTicket,
   updateTicket,
-  withLock,
 } from "../repo/index.js";
+import { FlatfileBackend } from "../storage/flatfile.js";
+import type { StorageTxScope } from "../storage/backend.js";
 import { TICKET_FIELDS, diffTicketPatch } from "./patch.js";
 import { cascadeOnClose } from "./cascade.js";
+
+// `cascadeOnClose` now takes a `StorageBackend` + the opaque
+// transaction-scope marker `StorageBackend.transact` hands its callback
+// (see cascade.ts's module doc, "Locking contract"). Only drivers
+// construct one in production; a fixed test-local marker is fine here
+// since it carries no runtime capability at all — it exists purely to
+// make "must run inside a transaction" a compile-time property of
+// `cascadeOnClose`'s signature, not something this test needs to actually
+// hold a real lock to satisfy.
+const TX_SCOPE: StorageTxScope = { kind: "storage-transaction" };
 
 // Perf fix regression coverage (see cascade.ts's module doc, "Emission is
 // deduplicated against the event log"): the dedup check used to call
@@ -58,10 +69,12 @@ function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
 
 let scratch: string;
 let paths: RepoPaths;
+let backend: FlatfileBackend;
 
 beforeEach(async () => {
   scratch = await mkdtemp(join(tmpdir(), "slop-cascade-test-"));
   paths = await ensureDbDirs(scratch);
+  backend = new FlatfileBackend(paths);
   readFileMock.mockClear();
 });
 
@@ -85,7 +98,9 @@ async function closeTicket(id: TicketId, toState: "done" | "dropped"): Promise<v
 describe("cascadeOnClose", () => {
   describe("preconditions", () => {
     it("throws if the closed ticket doesn't exist on disk", async () => {
-      await expect(cascadeOnClose(paths, newTicketId(), ctx, clock)).rejects.toMatchObject({
+      await expect(
+        cascadeOnClose(backend, TX_SCOPE, newTicketId(), ctx, clock),
+      ).rejects.toMatchObject({
         exitCode: 1,
       });
     });
@@ -93,7 +108,7 @@ describe("cascadeOnClose", () => {
     it("throws if the ticket is still in a live state (caller forgot to write the closure first)", async () => {
       const t = makeTicket({ state: "open" });
       await createTicket(paths, t, ctx, createdEvent);
-      await expect(cascadeOnClose(paths, t.id, ctx, clock)).rejects.toMatchObject({
+      await expect(cascadeOnClose(backend, TX_SCOPE, t.id, ctx, clock)).rejects.toMatchObject({
         exitCode: 1,
       });
     });
@@ -108,7 +123,7 @@ describe("cascadeOnClose", () => {
       for (const t of [a, b, c, closer]) await createTicket(paths, t, ctx, createdEvent);
 
       await closeTicket(closer.id, "done");
-      const result = await cascadeOnClose(paths, closer.id, ctx, clock);
+      const result = await cascadeOnClose(backend, TX_SCOPE, closer.id, ctx, clock);
 
       expect(result.unblocked.sort()).toEqual([a.id, b.id, c.id].sort());
       expect(result.events).toHaveLength(3);
@@ -131,7 +146,7 @@ describe("cascadeOnClose", () => {
       for (const t of [target, other, closer]) await createTicket(paths, t, ctx, createdEvent);
 
       await closeTicket(closer.id, "done");
-      const result = await cascadeOnClose(paths, closer.id, ctx, clock);
+      const result = await cascadeOnClose(backend, TX_SCOPE, closer.id, ctx, clock);
 
       expect(result.unblocked).toEqual([]);
       expect(result.events).toEqual([]);
@@ -149,11 +164,11 @@ describe("cascadeOnClose", () => {
       for (const t of [target, first, second]) await createTicket(paths, t, ctx, createdEvent);
 
       await closeTicket(first.id, "done");
-      const firstResult = await cascadeOnClose(paths, first.id, ctx, clock);
+      const firstResult = await cascadeOnClose(backend, TX_SCOPE, first.id, ctx, clock);
       expect(firstResult.unblocked).toEqual([]); // `second` still blocks it
 
       await closeTicket(second.id, "done");
-      const secondResult = await cascadeOnClose(paths, second.id, ctx, clock);
+      const secondResult = await cascadeOnClose(backend, TX_SCOPE, second.id, ctx, clock);
       expect(secondResult.unblocked).toEqual([target.id]);
       expect(secondResult.events).toHaveLength(1);
       expect(secondResult.events[0]?.payload).toEqual({ unblocked_by: second.id });
@@ -173,7 +188,7 @@ describe("cascadeOnClose", () => {
       await createTicket(paths, closer, ctx, createdEvent);
 
       await closeTicket(closer.id, "dropped");
-      const result = await cascadeOnClose(paths, closer.id, ctx, clock);
+      const result = await cascadeOnClose(backend, TX_SCOPE, closer.id, ctx, clock);
       expect(result.unblocked).toEqual([target.id]);
     });
   });
@@ -191,7 +206,7 @@ describe("cascadeOnClose", () => {
       await createTicket(paths, closer, ctx, createdEvent);
 
       await closeTicket(closer.id, "done");
-      const result = await cascadeOnClose(paths, closer.id, ctx, clock);
+      const result = await cascadeOnClose(backend, TX_SCOPE, closer.id, ctx, clock);
       expect(result.unblocked).toEqual([]);
     });
   });
@@ -206,7 +221,7 @@ describe("cascadeOnClose", () => {
       for (const t of [a, b, c, closer]) await createTicket(paths, t, ctx, createdEvent);
 
       await closeTicket(closer.id, "done");
-      const result = await cascadeOnClose(paths, closer.id, ctx, clock);
+      const result = await cascadeOnClose(backend, TX_SCOPE, closer.id, ctx, clock);
       expect(result.unblocked).toEqual([a.id, b.id, c.id].sort());
     });
   });
@@ -220,13 +235,13 @@ describe("cascadeOnClose", () => {
 
       await closeTicket(closer.id, "done");
 
-      const first = await cascadeOnClose(paths, closer.id, ctx, clock);
+      const first = await cascadeOnClose(backend, TX_SCOPE, closer.id, ctx, clock);
       expect(first.unblocked).toEqual([target.id]);
       expect(first.events).toHaveLength(1);
       expect(first.events[0]?.verb).toBe("ticket.ready");
       expect(first.events[0]?.payload).toEqual({ unblocked_by: closer.id });
 
-      const second = await cascadeOnClose(paths, closer.id, ctx, clock);
+      const second = await cascadeOnClose(backend, TX_SCOPE, closer.id, ctx, clock);
       // `target` is still truthfully open with blocked_count 0, so
       // `unblocked` — recompute-from-truth, unchanged by this fix — still
       // names it. But it was ALREADY notified by the first call, so the
@@ -245,13 +260,13 @@ describe("cascadeOnClose", () => {
   });
 
   describe("end-to-end: real .slop/db/.lock, one transaction covering the close + cascade", () => {
-    it("closing a ticket under a real withLock acquisition cascades correctly", async () => {
+    it("closing a ticket under a real backend.transact acquisition cascades correctly", async () => {
       const target = makeTicket({ state: "open" });
       const closer = makeTicket({ state: "open", blocks: [target.id] });
       await createTicket(paths, target, ctx, createdEvent);
       await createTicket(paths, closer, ctx, createdEvent);
 
-      const result = await withLock(paths.lockFile, async () => {
+      const result = await backend.transact(async (tx) => {
         const before = closer;
         const after: Ticket = { ...before, state: "done", active_session: null };
         await updateTicket(
@@ -262,7 +277,7 @@ describe("cascadeOnClose", () => {
           ctx,
           { verb: "ticket.done" },
         );
-        return cascadeOnClose(paths, closer.id, ctx, clock);
+        return cascadeOnClose(backend, tx, closer.id, ctx, clock);
       });
 
       expect(result.unblocked).toEqual([target.id]);
@@ -291,7 +306,7 @@ describe("cascadeOnClose", () => {
       expect(totalEventsBeforeCascade).toBe(M + 2);
 
       readFileMock.mockClear();
-      const result = await cascadeOnClose(paths, closer.id, ctx, clock);
+      const result = await cascadeOnClose(backend, TX_SCOPE, closer.id, ctx, clock);
       expect(result.unblocked).toHaveLength(M);
       expect(result.events).toHaveLength(M);
 

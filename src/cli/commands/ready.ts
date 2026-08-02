@@ -63,9 +63,10 @@
 import type { Command } from "commander";
 import type { Clock, TicketId } from "../../core/index.js";
 import { fixedClock, shortTicketCode, systemClock } from "../../core/index.js";
-import { loadIndex, readTicket, repoPaths, requireRepoRoot } from "../../repo/index.js";
-import type { RepoPaths } from "../../repo/index.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
+import type { StorageBackend } from "../../storage/index.js";
+import { openStorage } from "../../storage/index.js";
 import type { ReadyEntry } from "../../tickets/ready.js";
 import {
   buildReadyEntries,
@@ -111,13 +112,13 @@ function resolveClock(): Clock {
  * an unreadable ticket degrades to `mr: null` for that row rather than
  * crashing the command, same contract as `status.ts`'s `fetchTicketSafe`. */
 async function fetchReviewMrLinks(
-  paths: RepoPaths,
+  backend: StorageBackend,
   ids: readonly TicketId[],
 ): Promise<Map<TicketId, string | null>> {
   const pairs = await Promise.all(
     ids.map(async (id): Promise<[TicketId, string | null]> => {
       try {
-        const ticket = await readTicket(paths, id);
+        const ticket = await backend.readTicket(id);
         return [id, ticket.review?.mr ?? null];
       } catch (err) {
         process.stderr.write(
@@ -215,7 +216,8 @@ export async function runReady(opts: ReadyCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
   const clock = resolveClock();
-  const { index } = await loadIndex(paths, clock);
+  const backend = await openStorage(paths);
+  const { index } = await backend.loadIndex(clock);
 
   const resumableRequested = opts.resumable === true;
   const ready = filterReadyRows(index.tickets, { label: opts.label });
@@ -228,7 +230,7 @@ export async function runReady(opts: ReadyCommandOptions): Promise<void> {
   // C5: MR links for every resumable review-state row (ready's own
   // section never carries review-state rows — design.md §2).
   const reviewIds = resumable.filter((r) => r.row.state === "review").map((r) => r.row.id);
-  const mrLinks = await fetchReviewMrLinks(paths, reviewIds);
+  const mrLinks = await fetchReviewMrLinks(backend, reviewIds);
 
   const rendered = renderReadyWithBudget(
     entries,

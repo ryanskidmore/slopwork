@@ -9,17 +9,9 @@ import {
   RESOLUTION_MAX_LENGTH,
   ticketSchema,
 } from "../../core/index.js";
-import {
-  formatIndexProblems,
-  readSession,
-  readTicket,
-  repoPaths,
-  requireRepoRoot,
-  resolveTicketRef,
-  updateSession,
-  updateTicket,
-  withLock,
-} from "../../repo/index.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
+import { formatIndexProblems } from "../../storage/backend.js";
+import { openStorage } from "../../storage/index.js";
 import { buildFinalizedSession } from "../../sessions/finalize.js";
 import { diffSessionPatch, SESSION_END_FIELDS } from "../../sessions/patch.js";
 import { cascadeOnClose } from "../../tickets/cascade.js";
@@ -87,12 +79,13 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
   const paths = repoPaths(root);
   const config = await loadConfig(paths);
   const actor = resolveActor({ config, cwd: root });
+  const backend = await openStorage(paths);
 
   if (opts.note !== undefined) {
     assertMaxLength("--note", opts.note, END_SUMMARY_MAX_LENGTH);
   }
 
-  const initialTicket = await resolveTicketRef(paths, ref);
+  const initialTicket = await backend.resolveTicketRef(ref);
 
   // `--outcome -` reads stdin, mirroring `--spec -` (new/update — see
   // shared.ts's `readStdin` doc). Read OUTSIDE the lock: I/O that isn't
@@ -114,8 +107,8 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
     assertMaxLength("--outcome", outcomeRaw.trim(), RESOLUTION_MAX_LENGTH);
   }
 
-  const result = await withLock(paths.lockFile, async () => {
-    const current = await readTicket(paths, initialTicket.id);
+  const result = await backend.transact(async (tx) => {
+    const current = await backend.readTicket(initialTicket.id);
 
     // D15/§2, revised (ticket_01KY9RWFDR9QEWQ5B1ZACQJ338): review is now
     // OPTIONAL — legal from `review` OR directly from `in_progress`. See
@@ -154,15 +147,14 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
         EXIT_CODES.GENERIC_ERROR,
       );
     }
-    const session = await readSession(paths, activeSessionId);
+    const session = await backend.readSession(activeSessionId);
     // ticket_01KYAPN9NXY6RPSV6WGR42CJHJ: session ownership is a warning,
     // not an enforced gate — see sessionOwnershipWarning's own doc.
     const ownershipWarning = sessionOwnershipWarning(session, actor);
 
     const finalSession = buildFinalizedSession(session, opts.note ?? null);
 
-    await updateSession(
-      paths,
+    await backend.updateSession(
       session.id,
       diffSessionPatch(session, finalSession, SESSION_END_FIELDS),
       finalSession,
@@ -177,8 +169,7 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
     );
 
     const doneTicket = buildDoneTicket(current, opts.note, outcomeRaw);
-    await updateTicket(
-      paths,
+    await backend.updateTicket(
       current.id,
       diffTicketPatch(current, doneTicket, TICKET_FIELDS),
       doneTicket,
@@ -190,7 +181,7 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
     // state write it depends on, inside this SAME lock acquisition (see
     // cascade.ts's module doc, "Locking contract"). This is what emits
     // `ticket.ready` for any dependent this ticket was blocking.
-    const cascade = await cascadeOnClose(paths, current.id, { actor, session: session.id });
+    const cascade = await cascadeOnClose(backend, tx, current.id, { actor, session: session.id });
 
     return {
       session: finalSession,

@@ -73,8 +73,7 @@ import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import type { Actor, Ticket } from "../core/index.js";
 import { EXIT_CODES, newTicketId, nowIso, ticketSchema } from "../core/index.js";
-import type { RepoPaths } from "../repo/paths.js";
-import { listTickets } from "../repo/tickets.js";
+import type { StorageBackend } from "../storage/backend.js";
 import { SlopError } from "../cli/errors.js";
 import { validateTicketEdges } from "./edges.js";
 import { ancestryFor } from "./parent.js";
@@ -121,7 +120,7 @@ export interface BuildSplitChildResult {
  *     kept for the same "one uniform validated-write code path" reasoning
  *     `buildNewTicket` documents rather than special-casing it away.
  *
- * `paths` is read (not written): `pickSlug` for a live, collision-safe
+ * `backend` is read (not written): `pickSlug` for a live, collision-safe
  * slug, and a fresh `listTickets` for edge validation against the CURRENT
  * on-disk set — both of which is exactly why the CLI layer must build
  * -then-write each child in sequence, one at a time, rather than building
@@ -130,7 +129,7 @@ export interface BuildSplitChildResult {
  * across a multi-name split.
  */
 export async function buildSplitChild(
-  paths: RepoPaths,
+  backend: StorageBackend,
   input: BuildSplitChildInput,
   clock: Clock = systemClock,
 ): Promise<BuildSplitChildResult> {
@@ -144,7 +143,7 @@ export async function buildSplitChild(
   const id = newTicketId();
   const parentResolution: ParentResolution = { kind: "local", ticket: input.parent };
   const ancestry = ancestryFor(parentResolution, id);
-  const slug = await pickSlug(paths, input.name);
+  const slug = await pickSlug(backend, input.name);
   const now = nowIso(clock);
 
   const candidate = {
@@ -186,7 +185,7 @@ export async function buildSplitChild(
   // B3: same uniform pre-persist validation `buildNewTicket` runs — see
   // this function's doc for why it's structurally a no-op for a split
   // child specifically, and why it still runs anyway.
-  const others = await listTickets(paths);
+  const others = await backend.listTickets();
   validateTicketEdges(parsed.data, others);
 
   return { ticket: parsed.data };
