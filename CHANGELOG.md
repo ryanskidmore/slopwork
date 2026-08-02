@@ -11,6 +11,47 @@ where breaking changes land.
 
 ### Added
 
+- **Elicitations: structured questions, `awaiting_input`, questions inbox**
+  (G4, t-jggg9). The only agent→human escalation channel used to be a
+  string convention (`update --progress "QUESTION: …"`) with no state, no
+  inbox, and no filter. Three new commands replace it:
+  - `slop ask <ticket-ref> "<question>" [--option "<text>"]...` records a
+    `question.asked` event (ticket-scoped, actor-attributed; `--option` is
+    repeatable, for multiple-choice questions).
+  - `slop answer <question-id> "<answer>"` records a `question.answered`
+    event referencing the question it closes (`<question-id>` accepts a
+    full event id or a unique short prefix, same as any other ref).
+    Answering an already-answered question is a `CONFLICT` (exit `6`).
+  - `slop questions` is the inbox: unanswered questions, oldest first,
+    grouped by ticket; `--all` includes answered ones; `--ticket <ref>`
+    scopes to one ticket; `--json`/`--budget` throughout.
+
+  Questions are events, not a new stored entity — this keeps the
+  merge-clean, immutable one-file-per-event property and puts them on the
+  same audit spine as everything else. `awaiting_input` is a new derived
+  overlay (never stored, computed identically by the CLI and `slop web`,
+  `src/tickets/overlay.ts`): a ticket has it iff it has `>=1` unanswered
+  question. It surfaces in `slop status` (a new "Awaiting input" section),
+  `slop list` (a badge + `--awaiting-input` filter), and `slop show` (open
+  questions rendered prominently, before `spec`). **`slop ready` excludes
+  `awaiting_input` tickets by default** (`--include-awaiting` overrides) —
+  an agent picking up a ticket blocked on an unanswered question just
+  stalls on the same question the last session already hit. The web UI
+  gains a Questions panel (`/questions`, `GET /api/questions`) mirroring
+  the review panel's "longest-waiting-first" shape, an `awaiting_input`
+  overlay badge on the ticket list/detail (same treatment as
+  `blocked`/`stale`), and `question.asked`/`question.answered` events on
+  the ticket-detail audit spine, with an answer visually paired with the
+  question it closes. See
+  [CLI reference → `ask`](docs/cli-reference.md#ask)/
+  [`answer`](docs/cli-reference.md#answer)/
+  [`questions`](docs/cli-reference.md#questions) and
+  [Concepts → derived overlays](docs/concepts.md#derived-overlays-blocked-stale-ready-awaiting_input).
+
+  The old `update --progress "QUESTION: …"` convention still works (it's
+  just a progress note, never validated) but is no longer the recommended
+  path — onboarding docs (`slop instructions`, the Claude Code skill) point
+  at `slop ask` instead.
 - **Pluggable storage backend** (G2). Every command and `slop web` now go
   through a `StorageBackend` interface (`src/storage/`) instead of
   importing the flatfile repo layer directly — sized to what the 22
@@ -37,6 +78,46 @@ where breaking changes land.
 - `defaults.lock_timeout` in `config.yaml` — how long a mutating command
   waits for the db write lock before giving up with `CONFLICT` (exit `6`).
   Defaults to `5s`, matching the previous hardcoded value.
+- **`slop list`** (t-km7mb): filtered ticket enumeration —
+  `--state`/`--label`/`--owner`/`--priority`/`--parent`/`--subtree` plus a
+  free-text positional match against name/slug/spec summary,
+  `--limit`/`--offset`, `--json`/`--budget`. Deterministic sort (state,
+  then priority, then age). Everything the web UI's ticket-list filters
+  can express is now expressible from the CLI too — see
+  [CLI reference → `list`](docs/cli-reference.md#list).
+- **`ready` gains `--owner`/`--priority`, and `--label` is now repeatable**
+  (t-175oq, AND semantics — every given label must be present), so
+  multiple actors/queues can scope their own pull without a separate
+  `slop list` round-trip. Ordering and `--resumable` semantics unchanged.
+- **Bulk multi-ref on `done`/`drop`/`update`** (t-mmngo): all three now
+  accept multiple refs (or `-` to read refs from stdin, one per line),
+  applied per-ref rather than all-or-nothing — one bad ref never blocks
+  the others. `--json` gains a `results[]` array with per-ref
+  `{ref, ok, exit_code, result | error}`; text output is one line per ref.
+  The process exits `0` only if every ref succeeded, otherwise the most
+  severe per-ref exit code. Given exactly one ref, output is unchanged
+  (byte-for-byte) from before this ticket. See
+  [CLI reference → `done`](docs/cli-reference.md#done).
+- **`update` can now clear owner/parent and edit `discovered-from`, and
+  `--owner` accepts an explicit actor kind** (t-9uvbr): `--clear-owner`/
+  `--clear-parent` (mutually exclusive with `--owner`/`--parent`
+  respectively) give a non-interactive way to remove either field —
+  previously only possible via `slop edit`'s `$EDITOR`, which refuses to
+  launch on a non-TTY. `--discovered-from <±ref>` (repeatable, same `±`
+  convention as `--label`/`--blocks`) makes `discovered-from` editable
+  after creation for the first time. `--owner` now accepts `agent:<name>`/
+  `human:<name>` prefixes to set the stored actor kind explicitly (a bare
+  name still stores `kind: "human"`, unchanged back-compat behavior) —
+  applies to `new --owner` too.
+- **Slug-shadowing detection and healing** (t-trqk9): a cross-clone merge
+  producing two tickets with the same slug is now detected at index build
+  time (a loud stderr warning, never silent last-writer-wins) and
+  resolving the duplicated slug as a `<ref>` returns `AMBIGUOUS_REF`
+  (exit `5`) listing every candidate — never a silent pick. `slop reindex
+  --heal` additionally repairs it deterministically: the OLDEST ticket
+  (by id) keeps the slug, newer duplicates are re-suffixed (`-2`, `-3`,
+  ..., git-style). See
+  [Concepts → slug uniqueness](docs/concepts.md#slug-uniqueness).
 
 ### Changed
 

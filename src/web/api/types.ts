@@ -35,7 +35,9 @@ export type EventVerb =
   | "plan.set"
   | "plan.revised"
   | "plan.step_checked"
-  | "review.requested";
+  | "review.requested"
+  | "question.asked"
+  | "question.answered";
 
 export interface ActorDTO {
   name: string;
@@ -79,14 +81,17 @@ export type ParentDTO =
   | { kind: "local"; ref: RefOrDanglingDTO }
   | { kind: "external"; parent: ExternalParentDTO };
 
-/** blocked/stale — derived, never stored (design.md D5). Present on every
- * ticket-shaped DTO so list/tree/detail/panels all read the identical
- * overlay facts. */
+/** blocked/stale/awaiting_input — derived, never stored (design.md D5).
+ * Present on every ticket-shaped DTO so list/tree/detail/panels all read
+ * the identical overlay facts. */
 export interface OverlayDTO {
   blocked: boolean;
   blocked_by: TicketRefDTO[];
   stale: boolean;
   stale_reason: StaleReasonDTO | null;
+  /** G4 (t-jggg9): `true` iff this ticket has >=1 unanswered question. */
+  awaiting_input: boolean;
+  awaiting_input_reason: AwaitingInputReasonDTO | null;
 }
 
 export interface StaleReasonDTO {
@@ -94,6 +99,13 @@ export interface StaleReasonDTO {
   since: string;
   idle_ms: number;
   threshold: string;
+}
+
+/** G4: the `awaiting_input` overlay's "why" — `null` iff `overlay.awaiting_input` is `false`. */
+export interface AwaitingInputReasonDTO {
+  open_question_count: number;
+  oldest_question_at: string;
+  oldest_question_age_ms: number;
 }
 
 export interface MrLinkDTO {
@@ -246,6 +258,32 @@ export interface StaleRowDTO {
 export interface StaleResponseDTO {
   config: ConfigDTO;
   rows: StaleRowDTO[];
+}
+
+/** G4 (t-jggg9): one `question.asked` event, folded with its answer (if
+ * any) — mirrors `EventDTO`'s shape for the same event verbs, but this is
+ * the QUESTIONS-panel's own richer shape (options, the paired answer),
+ * not the generic audit-spine row. */
+export interface QuestionDTO {
+  id: string;
+  text: string;
+  options: string[];
+  asked_by: ActorDTO;
+  asked_at: string;
+  answer: { id: string; text: string; by: ActorDTO; answered_at: string } | null;
+}
+
+export interface QuestionGroupDTO {
+  ticket: TicketRefDTO;
+  questions: QuestionDTO[];
+}
+
+/** `GET /api/questions` — unanswered questions across the project, oldest
+ * first, grouped by ticket (mirrors `/api/review`'s shape). */
+export interface QuestionsResponseDTO {
+  config: ConfigDTO;
+  groups: QuestionGroupDTO[];
+  total_questions: number;
 }
 
 export interface ApiErrorDTO {

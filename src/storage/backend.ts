@@ -76,9 +76,10 @@ import type { EventContext, EventQuery, MutationEventSpec } from "../repo/events
 import type { ListSessionsTolerantResult } from "../repo/sessions.js";
 import type { ListTicketsTolerantResult } from "../repo/tickets.js";
 
-export { formatIndexProblems } from "../repo/db-index.js";
+export { formatDuplicateSlugProblems, formatIndexProblems } from "../repo/db-index.js";
 export type {
   DbIndex,
+  DuplicateSlugProblem,
   IndexTicketRow,
   LoadIndexResult,
   TicketReadProblem,

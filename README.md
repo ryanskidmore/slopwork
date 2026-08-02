@@ -8,12 +8,15 @@ MR — ending in `done`. v0 is a local CLI backed by a flatfile JSONC database
 web explorer (`slop web`). See [`docs/design.md`](docs/design.md) for the full spec and
 [`docs/v0-implementation-plan.md`](docs/v0-implementation-plan.md) for how it was built.
 
-This repo is itself the implementation, and v0 ships complete: all 22 commands are implemented
-and covered by acceptance tests — setup (`init`, `instructions`, `reindex`), ticket shaping
-(`new`, `split`, `draft`, `undraft`, `edit`, `update`), the agent loop (`ready`, `start`,
-`context`, `plan`, `review`, `stop`, `done`, `drop`), and inspection (`status`, `show`, `search`,
-`events`, `web`). See [`docs/v0-implementation-plan.md`](docs/v0-implementation-plan.md) §3 for
-the work-item breakdown behind each one.
+This repo is itself the implementation, and v0 shipped complete: all 22 commands from
+design.md §4.2 are implemented and covered by acceptance tests — setup (`init`, `instructions`,
+`reindex`), ticket shaping (`new`, `split`, `draft`, `undraft`, `edit`, `update`), the agent loop
+(`ready`, `start`, `context`, `plan`, `review`, `stop`, `done`, `drop`), and inspection (`status`,
+`show`, `search`, `events`, `web`). See
+[`docs/v0-implementation-plan.md`](docs/v0-implementation-plan.md) §3 for the work-item breakdown
+behind each one. Since then, `slop list` (filtered ticket enumeration, G3) joined the inspection
+group, bringing the current total to 23 — see
+[`docs/cli-reference.md`](docs/cli-reference.md) for the full, up-to-date command reference.
 
 ## Installation
 
@@ -209,7 +212,7 @@ src/
     index.ts            entrypoint: builds the Commander program, top-level exit-code mapping
     errors.ts            SlopError + reportError — shared error-reporting used by every command
     commands/
-      index.ts            registers all 22 commands, grouped as in design.md §4.2
+      index.ts            registers all 23 commands, grouped as in design.md §4.2 (plus G3's `list`)
       <command>.ts          one file per command (new.ts, start.ts, review.ts, ...)
       shared.ts             tiny option-parsing helpers (collect, parseIntegerOption)
   core/                 entity types, schemas, ids, serialization, exit codes

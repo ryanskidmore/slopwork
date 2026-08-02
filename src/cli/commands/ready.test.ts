@@ -100,7 +100,7 @@ describe("runReady (in-process)", () => {
 
     const out = captureOutput();
     try {
-      await withCwd(root, () => runReady({ json: true, label: "team:infra" }));
+      await withCwd(root, () => runReady({ json: true, label: ["team:infra"] }));
     } finally {
       out.restore();
     }

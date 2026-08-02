@@ -8,7 +8,7 @@
  * solid fill) so they read as "attention, layered on top" rather than
  * competing with the primary state pill for the same visual channel.
  */
-import { Ban, Clock } from "lucide-react";
+import { Ban, Clock, HelpCircle } from "lucide-react";
 import type { OverlayDTO, TicketState } from "../../api/types.js";
 import { formatDurationShort } from "../lib/format.js";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip.js";
@@ -111,8 +111,36 @@ export function overlayReasonText(overlay: OverlayDTO): string | undefined {
     : `No activity since ${r.since} (idle ${formatDurationShort(r.idle_ms)}, threshold ${r.threshold})`;
 }
 
+/** G4 (t-jggg9): the `awaiting_input` overlay's "why" text — how many open
+ * questions, and how long the oldest one has waited. */
+export function awaitingInputReasonText(overlay: OverlayDTO): string | undefined {
+  const r = overlay.awaiting_input_reason;
+  if (!r) return undefined;
+  const questionWord = r.open_question_count === 1 ? "question" : "questions";
+  return (
+    `${r.open_question_count} open ${questionWord}, oldest asked ${r.oldest_question_at} ` +
+    `(waiting ${formatDurationShort(r.oldest_question_age_ms)})`
+  );
+}
+
+export function AwaitingInputBadge({ reason }: { reason?: string }) {
+  const badge = (
+    <span className="inline-flex items-center gap-1 rounded-md border border-overlay-awaiting-input/60 px-1.5 py-0.5 text-xs font-medium text-overlay-awaiting-input">
+      <HelpCircle className="size-3" aria-hidden="true" />
+      Awaiting input
+    </span>
+  );
+  if (!reason) return badge;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{badge}</TooltipTrigger>
+      <TooltipContent>{reason}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function OverlayBadges({ overlay }: { overlay: OverlayDTO }) {
-  if (!overlay.blocked && !overlay.stale) return null;
+  if (!overlay.blocked && !overlay.stale && !overlay.awaiting_input) return null;
   return (
     <>
       {overlay.blocked && (
@@ -124,6 +152,7 @@ export function OverlayBadges({ overlay }: { overlay: OverlayDTO }) {
           }
         />
       )}
+      {overlay.awaiting_input && <AwaitingInputBadge reason={awaitingInputReasonText(overlay)} />}
       {overlay.stale && <StaleBadge reason={overlayReasonText(overlay)} />}
     </>
   );

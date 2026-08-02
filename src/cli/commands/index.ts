@@ -9,6 +9,8 @@
  * registration below is not theirs to redo.
  */
 import type { Command } from "commander";
+import { registerAnswerCommand } from "./answer.js";
+import { registerAskCommand } from "./ask.js";
 import { registerContextCommand } from "./context.js";
 import { registerDoneCommand } from "./done.js";
 import { registerDraftCommand } from "./draft.js";
@@ -17,8 +19,10 @@ import { registerEditCommand } from "./edit.js";
 import { registerEventsCommand } from "./events.js";
 import { registerInitCommand } from "./init.js";
 import { registerInstructionsCommand } from "./instructions.js";
+import { registerListCommand } from "./list.js";
 import { registerNewCommand } from "./new.js";
 import { registerPlanCommand } from "./plan.js";
+import { registerQuestionsCommand } from "./questions.js";
 import { registerReadyCommand } from "./ready.js";
 import { registerReindexCommand } from "./reindex.js";
 import { registerReviewCommand } from "./review.js";
@@ -51,6 +55,8 @@ export function registerCommands(program: Command): void {
   registerStartCommand(program);
   registerContextCommand(program);
   registerPlanCommand(program);
+  registerAskCommand(program);
+  registerAnswerCommand(program);
   registerReviewCommand(program);
   registerStopCommand(program);
   registerDoneCommand(program);
@@ -59,7 +65,9 @@ export function registerCommands(program: Command): void {
   program.commandsGroup("Inspecting:");
   registerStatusCommand(program);
   registerShowCommand(program);
+  registerListCommand(program);
   registerSearchCommand(program);
+  registerQuestionsCommand(program);
   registerEventsCommand(program);
   registerWebCommand(program);
 }

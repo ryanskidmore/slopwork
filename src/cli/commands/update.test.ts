@@ -709,6 +709,7 @@ function baseOpts(overrides: Partial<Parameters<typeof runUpdate>[1]> = {}) {
     label: [] as string[],
     relatesTo: [] as string[],
     blocks: [] as string[],
+    discoveredFrom: [] as string[],
     acceptance: [] as string[],
     context: [] as string[],
     ...overrides,
@@ -744,7 +745,7 @@ describe("runUpdate (in-process)", () => {
 
     const out = captureOutput();
     try {
-      await withCwd(root, () => runUpdate(id, baseOpts({ progress: "made some headway" })));
+      await withCwd(root, () => runUpdate([id], baseOpts({ progress: "made some headway" })));
       expect(out.stdout()).toContain(`updated ${id}`);
     } finally {
       out.restore();
@@ -762,7 +763,7 @@ describe("runUpdate (in-process)", () => {
 
     const out = captureOutput();
     try {
-      await withCwd(root, () => runUpdate(id, baseOpts({ priority: 0 })));
+      await withCwd(root, () => runUpdate([id], baseOpts({ priority: 0 })));
     } finally {
       out.restore();
     }
@@ -778,7 +779,7 @@ describe("runUpdate (in-process)", () => {
 
     const out = captureOutput();
     try {
-      await withCwd(root, () => runUpdate(id, baseOpts({ priority: 0, json: true })));
+      await withCwd(root, () => runUpdate([id], baseOpts({ priority: 0, json: true })));
       const body = JSON.parse(out.stdout()) as {
         id: TicketId;
         slug: string;
@@ -806,7 +807,7 @@ describe("runUpdate (in-process)", () => {
     const out = captureOutput();
     try {
       await withCwd(root, () =>
-        runUpdate(id, baseOpts({ progress: "headway via json", json: true })),
+        runUpdate([id], baseOpts({ progress: "headway via json", json: true })),
       );
       const body = JSON.parse(out.stdout()) as { id: TicketId; state: string };
       expect(body.id).toBe(id);
@@ -824,7 +825,7 @@ describe("runUpdate (in-process)", () => {
 
     const out1 = captureOutput();
     try {
-      await withCwd(root, () => runUpdate(id, baseOpts({ label: ["+urgent"] })));
+      await withCwd(root, () => runUpdate([id], baseOpts({ label: ["+urgent"] })));
     } finally {
       out1.restore();
     }
@@ -832,7 +833,7 @@ describe("runUpdate (in-process)", () => {
 
     const out2 = captureOutput();
     try {
-      await withCwd(root, () => runUpdate(id, baseOpts({ label: ["-urgent"] })));
+      await withCwd(root, () => runUpdate([id], baseOpts({ label: ["-urgent"] })));
     } finally {
       out2.restore();
     }
@@ -847,7 +848,7 @@ describe("runUpdate (in-process)", () => {
 
     const out = captureOutput();
     try {
-      await withCwd(root, () => runUpdate(id, baseOpts({ relatesTo: [`+${target}`] })));
+      await withCwd(root, () => runUpdate([id], baseOpts({ relatesTo: [`+${target}`] })));
     } finally {
       out.restore();
     }
@@ -866,7 +867,7 @@ describe("runUpdate (in-process)", () => {
     const out = captureOutput();
     try {
       // Same priority the ticket already has (default 2) — nothing changes.
-      await withCwd(root, () => runUpdate(id, baseOpts({ priority: 2 })));
+      await withCwd(root, () => runUpdate([id], baseOpts({ priority: 2 })));
     } finally {
       out.restore();
     }
@@ -884,7 +885,7 @@ describe("runUpdate (in-process)", () => {
     const out = captureOutput();
     try {
       await expect(
-        withCwd(root, () => runUpdate(id, baseOpts({ relatesTo: ["+no-such-ticket"] }))),
+        withCwd(root, () => runUpdate([id], baseOpts({ relatesTo: ["+no-such-ticket"] }))),
       ).rejects.toMatchObject({ exitCode: EXIT_CODES.NOT_FOUND });
     } finally {
       out.restore();
@@ -897,7 +898,7 @@ describe("runUpdate (in-process)", () => {
     const out = captureOutput();
     try {
       await expect(
-        withCwd(root, () => runUpdate("no-such-ticket", baseOpts({ priority: 1 }))),
+        withCwd(root, () => runUpdate(["no-such-ticket"], baseOpts({ priority: 1 }))),
       ).rejects.toMatchObject({ exitCode: EXIT_CODES.NOT_FOUND });
     } finally {
       out.restore();

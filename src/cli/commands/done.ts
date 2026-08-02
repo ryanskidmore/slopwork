@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { Clock } from "../../core/clock.js";
 import { systemClock } from "../../core/clock.js";
-import type { Ticket } from "../../core/index.js";
+import type { Actor, Session, Ticket } from "../../core/index.js";
 import {
   END_SUMMARY_MAX_LENGTH,
   EXIT_CODES,
@@ -11,9 +11,11 @@ import {
 } from "../../core/index.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { formatIndexProblems } from "../../storage/backend.js";
+import type { StorageBackend } from "../../storage/index.js";
 import { openStorage } from "../../storage/index.js";
 import { buildFinalizedSession } from "../../sessions/finalize.js";
 import { diffSessionPatch, SESSION_END_FIELDS } from "../../sessions/patch.js";
+import type { CascadeOnCloseResult } from "../../tickets/cascade.js";
 import { cascadeOnClose } from "../../tickets/cascade.js";
 import { diffTicketPatch, TICKET_FIELDS } from "../../tickets/patch.js";
 import { checkDoneEntry } from "../../tickets/state.js";
@@ -22,8 +24,11 @@ import { loadConfig, resolveActor } from "../actor.js";
 import { SlopError } from "../errors.js";
 import {
   assertMaxLength,
+  type BulkOutcome,
   printWarning,
   readStdin,
+  resolveBulkRefs,
+  runSingleOrBulk,
   sessionOwnershipWarning,
   ticketJson,
 } from "./shared.js";
@@ -74,40 +79,26 @@ export function buildDoneTicket(
   return parsed.data;
 }
 
-export async function runDone(ref: string, opts: DoneCommandOptions): Promise<void> {
-  const root = requireRepoRoot(process.cwd());
-  const paths = repoPaths(root);
-  const config = await loadConfig(paths);
-  const actor = resolveActor({ config, cwd: root });
-  const backend = await openStorage(paths);
+/** One ref's `done` outcome — what {@link doneOneRef} returns, shared by
+ * both the single-ref and bulk (t-mmngo) rendering paths below. */
+interface DoneOneResult {
+  ticket: Ticket;
+  session: Session;
+  cascade: CascadeOnCloseResult;
+  skippedReview: boolean;
+  ownershipWarning: string | null;
+}
 
-  if (opts.note !== undefined) {
-    assertMaxLength("--note", opts.note, END_SUMMARY_MAX_LENGTH);
-  }
-
+async function doneOneRef(
+  backend: StorageBackend,
+  actor: Actor,
+  note: string | undefined,
+  outcomeRaw: string | undefined,
+  ref: string,
+): Promise<DoneOneResult> {
   const initialTicket = await backend.resolveTicketRef(ref);
 
-  // `--outcome -` reads stdin, mirroring `--spec -` (new/update — see
-  // shared.ts's `readStdin` doc). Read OUTSIDE the lock: I/O that isn't
-  // part of the transactional write shouldn't hold the db lock open.
-  const outcomeRaw =
-    opts.outcome === undefined
-      ? undefined
-      : opts.outcome === "-"
-        ? await readStdin()
-        : opts.outcome;
-  // housekeeping-gitignore-lock-stale: `--outcome -` can read an arbitrary
-  // amount of stdin (readStdin has no size cap) — checked here, right
-  // after the read completes, rather than only much later when it fails
-  // `resolutionSchema`'s own max deep inside `buildDoneTicket`. Trimmed
-  // first, matching `resolutionSchema`'s own `.trim()` before its `.max()`
-  // (see that schema's doc comment) — so this can never reject (or
-  // accept) a length the schema itself would disagree with.
-  if (outcomeRaw !== undefined) {
-    assertMaxLength("--outcome", outcomeRaw.trim(), RESOLUTION_MAX_LENGTH);
-  }
-
-  const result = await backend.transact(async (tx) => {
+  return backend.transact(async (tx) => {
     const current = await backend.readTicket(initialTicket.id);
 
     // D15/§2, revised (ticket_01KY9RWFDR9QEWQ5B1ZACQJ338): review is now
@@ -152,7 +143,7 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
     // not an enforced gate — see sessionOwnershipWarning's own doc.
     const ownershipWarning = sessionOwnershipWarning(session, actor);
 
-    const finalSession = buildFinalizedSession(session, opts.note ?? null);
+    const finalSession = buildFinalizedSession(session, note ?? null);
 
     await backend.updateSession(
       session.id,
@@ -163,12 +154,12 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
         verb: "session.ended",
         payload: {
           reason: "done",
-          ...(opts.note !== undefined ? { note: opts.note } : {}),
+          ...(note !== undefined ? { note } : {}),
         },
       },
     );
 
-    const doneTicket = buildDoneTicket(current, opts.note, outcomeRaw);
+    const doneTicket = buildDoneTicket(current, note, outcomeRaw);
     await backend.updateTicket(
       current.id,
       diffTicketPatch(current, doneTicket, TICKET_FIELDS),
@@ -191,11 +182,34 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
       ownershipWarning,
     };
   });
+}
 
-  // Printed AFTER the transaction commits — a skipped review, a
-  // session-ownership mismatch, or a corrupt-elsewhere-in-the-db
-  // problem is a warning, never a reason `done` itself could fail (same
-  // convention as `stop.ts`; see sessionOwnershipWarning's own doc).
+/** `--json` body for one `done` outcome — same shape whether printed alone
+ * (single ref) or nested under a bulk row's `result` (t-mmngo). */
+function doneJsonBody(result: DoneOneResult): {
+  ticket: ReturnType<typeof ticketJson>;
+  session: { id: string; note: string | null };
+  resolution_set: boolean;
+  unblocked: string[];
+  problems: { id: string; message: string }[];
+  skipped_review: boolean;
+} {
+  return {
+    ticket: ticketJson(result.ticket),
+    session: { id: result.session.id, note: result.session.end_summary },
+    resolution_set: result.ticket.resolution !== undefined,
+    unblocked: result.cascade.unblocked,
+    problems: result.cascade.problems.map((p) => ({ id: p.id, message: p.message })),
+    skipped_review: result.skippedReview,
+  };
+}
+
+/** Printed AFTER the transaction commits — a skipped review, a
+ * session-ownership mismatch, or a corrupt-elsewhere-in-the-db problem is
+ * a warning, never a reason `done` itself could fail (same convention as
+ * `stop.ts`; see `sessionOwnershipWarning`'s own doc). Shared by both the
+ * single-ref and bulk (t-mmngo) rendering paths. */
+function printDoneWarnings(result: DoneOneResult): void {
   if (result.skippedReview) {
     printWarning(
       `${result.ticket.id} (${result.ticket.slug}) done without a review/MR — if this had a code ` +
@@ -207,8 +221,12 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
   if (result.cascade.problems.length > 0) {
     process.stderr.write(`${formatIndexProblems(result.cascade.problems)}\n`);
   }
+}
 
-  if (opts.json) {
+function printDoneSingle(result: DoneOneResult, json: boolean | undefined): void {
+  printDoneWarnings(result);
+
+  if (json) {
     // closing-loop-commands-lack-json: `unblocked` is the field this
     // ticket's own brief calls out by name ("done's unblocked-cascade list
     // is prose only") — a `TicketId[]`, matching `cascade.ts`'s own
@@ -220,23 +238,7 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
     // `resolution`) deliberately avoids a field that would sometimes hold
     // a string and sometimes a boolean depending on `--outcome` — the
     // full resolution text is `show --json`'s job.
-    process.stdout.write(
-      `${JSON.stringify(
-        {
-          ticket: ticketJson(result.ticket),
-          session: {
-            id: result.session.id,
-            note: result.session.end_summary,
-          },
-          resolution_set: result.ticket.resolution !== undefined,
-          unblocked: result.cascade.unblocked,
-          problems: result.cascade.problems.map((p) => ({ id: p.id, message: p.message })),
-          skipped_review: result.skippedReview,
-        },
-        null,
-        2,
-      )}\n`,
-    );
+    process.stdout.write(`${JSON.stringify(doneJsonBody(result), null, 2)}\n`);
     return;
   }
 
@@ -252,6 +254,114 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
   );
 }
 
+/**
+ * t-mmngo: bulk (`refs.length > 1`) rendering — one line of text per ref,
+ * or a `results[]` envelope for `--json`. A failing ref's text line goes
+ * to STDERR (never stdout — see `update.ts`'s `renderBulkUpdate` doc for
+ * why); its `--json` entry still lives in the ONE `results[]` array on
+ * stdout.
+ */
+function renderBulkDone(
+  outcomes: readonly BulkOutcome<DoneOneResult>[],
+  json: boolean | undefined,
+): void {
+  for (const outcome of outcomes) {
+    if (outcome.ok && outcome.data) printDoneWarnings(outcome.data);
+  }
+
+  if (json) {
+    const results = outcomes.map((outcome) =>
+      outcome.ok && outcome.data
+        ? {
+            ref: outcome.ref,
+            ok: true,
+            exit_code: outcome.exitCode,
+            result: doneJsonBody(outcome.data),
+          }
+        : { ref: outcome.ref, ok: false, exit_code: outcome.exitCode, error: outcome.error },
+    );
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          results,
+          ok: outcomes.every((o) => o.ok),
+          succeeded: outcomes.filter((o) => o.ok).length,
+          failed: outcomes.filter((o) => !o.ok).length,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    return;
+  }
+
+  for (const outcome of outcomes) {
+    if (outcome.ok && outcome.data) {
+      const { ticket, cascade } = outcome.data;
+      process.stdout.write(
+        `${outcome.ref} -> done ${ticket.id} (${ticket.slug})  state: ${ticket.state}` +
+          (cascade.unblocked.length > 0 ? `  unblocked: ${cascade.unblocked.join(", ")}` : "") +
+          "\n",
+      );
+    } else {
+      process.stderr.write(`error: ${outcome.ref}: ${outcome.error} (exit ${outcome.exitCode})\n`);
+    }
+  }
+}
+
+export async function runDone(refs: string[], opts: DoneCommandOptions): Promise<void> {
+  const root = requireRepoRoot(process.cwd());
+  const paths = repoPaths(root);
+  const config = await loadConfig(paths);
+  const actor = resolveActor({ config, cwd: root });
+  const backend = await openStorage(paths);
+
+  if (opts.note !== undefined) {
+    assertMaxLength("--note", opts.note, END_SUMMARY_MAX_LENGTH);
+  }
+
+  // t-mmngo: refs from stdin ("-") and "--outcome -" both want the SAME
+  // stdin — reject the ambiguous combination up front.
+  if (refs.length === 1 && refs[0] === "-" && opts.outcome === "-") {
+    throw new SlopError(
+      'cannot combine "-" (read refs from stdin) with --outcome - (which also reads stdin) — ' +
+        "give refs literally, or pass --outcome a real value",
+      EXIT_CODES.USAGE_ERROR,
+    );
+  }
+
+  // `--outcome -` reads stdin, mirroring `--spec -` (new/update — see
+  // shared.ts's `readStdin` doc). Read OUTSIDE the lock, and ONCE for the
+  // whole bulk call (t-mmngo: `--outcome` is a shared flag applying to
+  // every ref) — never part of a per-ref loop, which would starve every
+  // ref after the first.
+  const outcomeRaw =
+    opts.outcome === undefined
+      ? undefined
+      : opts.outcome === "-"
+        ? await readStdin()
+        : opts.outcome;
+  // housekeeping-gitignore-lock-stale: `--outcome -` can read an arbitrary
+  // amount of stdin (readStdin has no size cap) — checked here, right
+  // after the read completes, rather than only much later when it fails
+  // `resolutionSchema`'s own max deep inside `buildDoneTicket`. Trimmed
+  // first, matching `resolutionSchema`'s own `.trim()` before its `.max()`
+  // (see that schema's doc comment) — so this can never reject (or
+  // accept) a length the schema itself would disagree with.
+  if (outcomeRaw !== undefined) {
+    assertMaxLength("--outcome", outcomeRaw.trim(), RESOLUTION_MAX_LENGTH);
+  }
+
+  const resolvedRefs = await resolveBulkRefs(refs);
+
+  await runSingleOrBulk(
+    resolvedRefs,
+    (ref) => doneOneRef(backend, actor, opts.note, outcomeRaw, ref),
+    (result) => printDoneSingle(result, opts.json),
+    (outcomes) => renderBulkDone(outcomes, opts.json),
+  );
+}
+
 /** `slop done` — design.md §2, §4.3, D15; work item C3.
  *
  * `review -> done` OR `in_progress -> done` (see `buildDoneTicket`'s doc —
@@ -260,25 +370,31 @@ export async function runDone(ref: string, opts: DoneCommandOptions): Promise<vo
  * done-cascade exactly once. Completing a non-`adhoc` ticket directly from
  * `in_progress` (skipping review) nags on stderr but still succeeds;
  * `adhoc` tickets and the `review -> done` path never nag.
+ *
+ * t-mmngo: accepts multiple `<refs...>` (or `-` to read refs from stdin,
+ * one per line) — `--note`/`--outcome` apply to every ref, applied per-ref
+ * (never all-or-nothing); see `runSingleOrBulk`'s doc (shared.ts) for the
+ * exact single-vs-bulk output contract.
  */
 export function registerDoneCommand(program: Command): void {
   program
     .command("done")
     .description(
-      "Complete <ref> (from review, or directly from in_progress — review is optional, but non-" +
-        "adhoc tickets nag on stderr if they skip it): finalize the session (end summary), " +
-        "cascade unblocks (B4), and mark done.",
+      "Complete one or more tickets (from review, or directly from in_progress — review is " +
+        "optional, but non-adhoc tickets nag on stderr if they skip it): finalize each session " +
+        "(end summary), cascade unblocks (B4), and mark done. Applied per-ref.",
     )
-    .argument("<ref>", "ticket to complete")
-    .option("--note <text>", "completion note")
+    .argument("<refs...>", 'one or more tickets to complete (or "-" to read refs from stdin)')
+    .option("--note <text>", "completion note (applies to every ref)")
     .option(
       "--outcome <text>",
-      'long-form resolution/outcome writeup, stored on the ticket; pass "-" to read from stdin',
+      'long-form resolution/outcome writeup, stored on every ref; pass "-" to read from stdin',
     )
     .option(
       "--json",
       "machine-readable result (id, slug, handle, name, state, note, resolution_set, " +
-        "unblocked, problems, skipped_review)",
+        "unblocked, problems, skipped_review) for a single ref; {results[], ok, succeeded, " +
+        "failed} for multiple",
     )
     .action(runDone);
 }

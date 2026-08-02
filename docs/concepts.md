@@ -62,17 +62,20 @@ ref is the root of its own local subtree. `blocks`, `relates-to`, and
 **What has a CLI flag today:** `slop new` accepts `--parent`, `--blocks`,
 `--relates-to`, and `--discovered-from` — every one of them add-only, set
 at creation time. `slop update` additionally accepts `--relates-to <±ref>`,
-`--blocks <±ref>` (`+ref` to add, `-ref` to remove either), `--owner
-<actor>`, and `--parent <ref>` (plain set/replace, no sigil) to change an
+`--blocks <±ref>`, and `--discovered-from <±ref>` (t-9uvbr — `+ref` to
+add, `-ref` to remove any of the three), `--owner <actor>`/`--clear-owner`,
+and `--parent <ref>`/`--clear-parent` (t-9uvbr: explicit clear flags,
+mutually exclusive with their set/replace counterpart) to change an
 EXISTING ticket's edges/owner after creation
 (edit-vi-fallback-hangs-agents: a non-interactive alternative to `slop
 edit`, whose `$EDITOR` fallback can hang forever on a non-TTY — see
 [CLI reference → `edit`](cli-reference.md#edit)) — see
 [CLI reference → `new`](cli-reference.md#new) and
-[→ `update`](cli-reference.md#update) for the full flag docs. Only
-`discovered-from` still has no post-creation CLI flag at all — hand-edit
-via `slop edit` remains the only way to change it (or to CLEAR a
-`parent`/`owner`, which `update` can set/replace but not remove).
+[→ `update`](cli-reference.md#update) for the full flag docs. Every graph
+field an agent is told to maintain is now editable via `update` on a
+non-TTY, including clearing owner/parent and touching `discovered-from` —
+`slop edit`'s `$EDITOR` hand-edit is no longer the only way to do any of
+this, though it remains available for anything not covered above.
 
 ### Session
 
@@ -112,6 +115,10 @@ The verb vocabulary is closed (`EVENT_VERBS`), grouped by area:
   payload's `reason` says which), `session.takeover`.
 - **Plans:** `plan.set`, `plan.revised`, `plan.step_checked`.
 - **Review:** `review.requested`.
+- **Elicitations (G4):** `question.asked` (`slop ask`), `question.answered`
+  (`slop answer`) — see
+  [Derived overlays](#derived-overlays-blocked-stale-ready-awaiting_input)
+  below for the `awaiting_input` overlay these two verbs feed.
 
 `slop events` lists these, optionally scoped to a ticket or paged with
 `--since`. See [CLI reference → `events`](cli-reference.md#events).
@@ -123,7 +130,16 @@ value embedded wherever something needs to say who did it (`ticket.owner`,
 `session.actor`, `event.actor`, `ticket.review.by`,
 `ticket.provenance.created_by`). See
 [Configuration → actor/harness identity](configuration.md#actor--harness-identity-d17)
-for how `name`/`kind` are resolved.
+for how the ACTING actor's `name`/`kind` are resolved for an event/session.
+
+`ticket.owner` specifically is set by `new --owner`/`update --owner` (or
+cleared via `update --clear-owner`), whose value grammar (t-9uvbr) is: a
+bare name (e.g. `--owner priya`) stores `kind: "human"`, unchanged
+back-compat behavior; an explicit `agent:`/`human:` prefix (e.g. `--owner
+agent:codex-3`) sets `kind` directly — this is what makes an agent-owned
+subtree (D1's agent-owned-below-root policy) actually representable,
+rather than every owner being forced into `kind: "human"` regardless of
+who's really driving it.
 
 ## State machine
 
@@ -166,7 +182,7 @@ above); a bare re-run is still rejected the same way `done`/`drop` are.
 `src/tickets/state.ts` is the single source of truth for transition
 legality.
 
-## Derived overlays: `blocked`, `stale`, `ready`
+## Derived overlays: `blocked`, `stale`, `ready`, `awaiting_input`
 
 None of these are stored on a ticket (D5: "derived, never asserted") —
 they're computed fresh, every time, from stored data plus (for staleness)
@@ -190,6 +206,18 @@ the current clock.
   computed at read time (`now > deadline`) by `slop ready --resumable` and
   `slop status`, against the thresholds in `.slop/config.yaml` — see
   [Configuration](configuration.md#staleness-thresholds).
+- **`awaiting_input`** (G4, t-jggg9) — a ticket has it iff it has one or
+  more *unanswered* questions: a `question.asked` event (`slop ask`) with
+  no later `question.answered` event (`slop answer`) referencing it by the
+  asked event's own id. Unlike `stale`, this needs no clock — it's a pure
+  fold over the ticket's own events (`src/tickets/overlay.ts`'s
+  `computeAwaitingInputOverlay`, built on `src/tickets/questions.ts`'s
+  `deriveQuestions`), computed identically by the CLI's index build and
+  the web explorer. `slop ready` excludes `awaiting_input` tickets by
+  default (`--include-awaiting` overrides — see
+  [CLI reference → `ready`](cli-reference.md#ready)); `slop status`/`slop
+  list`/`slop show` surface it (a section, a badge/`--awaiting-input`
+  filter, and the open questions themselves, respectively).
 
 ## The flatfile database
 
@@ -234,6 +262,42 @@ a commit you chose to make.
 Why the db merges cleanly across parallel agent branches, and how the
 `.lock` file and lock-free progress updates work, is its own topic — see
 [Concurrency & merging](concurrency-and-merging.md).
+
+## Slug uniqueness
+
+Slugs are meant to be unique — `nextAvailableSlug` (B1) appends a
+`-2`/`-3`/... suffix whenever a new ticket's slug would collide with one
+already on disk. That check only ever sees what its OWN clone can
+currently see, though: two clones can each independently create a ticket
+whose name slugifies to the same thing (or an explicit `--slug` picked by
+two agents working in parallel) before either has seen the other's
+ticket, and a normal `git merge`/`git pull` merges both new ticket files
+cleanly — nothing about a plain file merge notices two tickets now
+sharing a slug.
+
+**Detection is loud, never silent** (t-trqk9). Every index rebuild
+(`slop reindex`, or any command's transparent auto-heal — see "The
+flatfile database" above) detects every slug currently claimed by more
+than one ticket and records it in the index's `slug_problems[]`; any
+command that surfaces index problems (the same `loadIndex()` warning path
+`problems[]`/unreadable-ticket-file detection already uses) warns on
+stderr, naming every candidate id per duplicated slug.
+
+**Resolution never silently picks one.** Looking up a duplicated slug as
+a `<ref>` — via `slop show`, `slop start`, `slop update`, or any other
+command that resolves a ref — returns `AMBIGUOUS_REF` (exit `5`), listing
+every candidate ticket, exactly like a short-id-prefix or `t-<code>`
+handle that happens to match more than one ticket. Nothing ever falls
+back to "pick the first/last one" for a duplicated slug.
+
+**Healing is deterministic**: `slop reindex --heal` repairs every
+duplicated slug it finds — the OLDEST ticket in each group (by id; ids
+are ULIDs, so "oldest by id" is also "created first") keeps the slug
+unchanged, and every newer duplicate is re-suffixed via the same
+`-2`/`-3`/... collision rule `slop new` already uses, git-style. Each
+rename is recorded as a normal `ticket.updated` event — the same audit
+trail any other field change leaves. See
+[CLI reference → `reindex`](cli-reference.md#reindex).
 
 ## Storage backend
 

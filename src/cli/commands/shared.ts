@@ -5,6 +5,7 @@
  */
 import { BUDGET_UNIT } from "../../core/budget.js";
 import { EXIT_CODES } from "../../core/exit-codes.js";
+import type { ExitCode } from "../../core/exit-codes.js";
 import type { Actor, Session } from "../../core/index.js";
 import { SlopError } from "../errors.js";
 import { shortTicketCode } from "../../core/index.js";
@@ -208,4 +209,135 @@ export function ticketJson(ticket: { id: TicketId; slug: string; name: string; s
     name: ticket.name,
     state: ticket.state,
   };
+}
+
+// ---------------------------------------------------------------------------
+// t-mmngo: bulk multi-ref support shared by `done`/`drop`/`update`.
+// ---------------------------------------------------------------------------
+
+/**
+ * Expand a variadic `<refs...>` argument into the actual refs to process.
+ * A single literal `"-"` — and ONLY that, never mixed with a real ref —
+ * means "read refs from stdin, one per line" (blank/whitespace-only lines
+ * dropped), the same `-`-means-stdin convention `--spec -`/`--outcome -`/
+ * `--details -` already use elsewhere in this CLI. Anything else is
+ * returned as-is (one or more literal refs).
+ *
+ * Throws a `USAGE_ERROR` if `-` is mixed with any other ref (`slop done a
+ * - b` has no sane meaning — read stdin, or take literal refs, not both),
+ * or if stdin produced zero non-blank lines (nothing to do is a usage
+ * mistake to surface, not a silent no-op).
+ */
+export async function resolveBulkRefs(rawRefs: readonly string[]): Promise<string[]> {
+  if (rawRefs.includes("-")) {
+    if (rawRefs.length > 1) {
+      throw new SlopError(
+        '"-" (read refs from stdin) must be the only ref given, not mixed with literal refs',
+        EXIT_CODES.USAGE_ERROR,
+      );
+    }
+    const text = await readStdin();
+    const refs = text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    if (refs.length === 0) {
+      throw new SlopError('no refs read from stdin ("-") — nothing to do', EXIT_CODES.USAGE_ERROR);
+    }
+    return refs;
+  }
+  return [...rawRefs];
+}
+
+/** One ref's outcome from {@link runBulk} — `data` present iff `ok`, `error` present iff not. */
+export interface BulkOutcome<T> {
+  ref: string;
+  ok: boolean;
+  exitCode: ExitCode;
+  data?: T;
+  error?: string;
+}
+
+/**
+ * Run `fn` once per ref in `refs`, IN ORDER, catching any error PER REF
+ * rather than letting the first failure abort the rest — bulk
+ * `done`/`drop`/`update` apply per-ref, never all-or-nothing (t-mmngo's
+ * acceptance criterion). `fn` should do everything the single-ref command
+ * already does for one ref (resolve it, run its transaction, return
+ * whatever the caller needs to render this ref's result); this function
+ * only adds the per-ref try/catch and outcome bookkeeping around it.
+ */
+export async function runBulk<T>(
+  refs: readonly string[],
+  fn: (ref: string) => Promise<T>,
+): Promise<BulkOutcome<T>[]> {
+  const outcomes: BulkOutcome<T>[] = [];
+  for (const ref of refs) {
+    try {
+      const data = await fn(ref);
+      outcomes.push({ ref, ok: true, exitCode: EXIT_CODES.SUCCESS, data });
+    } catch (err) {
+      const exitCode = err instanceof SlopError ? err.exitCode : EXIT_CODES.GENERIC_ERROR;
+      const message = err instanceof Error ? err.message : String(err);
+      outcomes.push({ ref, ok: false, exitCode, error: message });
+    }
+  }
+  return outcomes;
+}
+
+/**
+ * "Overall exit is 0 only if every ref succeeded; otherwise the most
+ * severe per-ref code" (t-mmngo's brief, verbatim). Judgment call, recorded
+ * here since {@link EXIT_CODES} has no inherent severity ordering of its
+ * own: the NUMERICALLY GREATEST failing code wins (e.g. one `NOT_FOUND` (4)
+ * plus one `CONFLICT` (6) among the failures reports `CONFLICT`) —
+ * deterministic and simple, without inventing a second, parallel severity
+ * table that could drift from the exit-code table itself. `SUCCESS` (0)
+ * only when every outcome succeeded.
+ */
+export function mostSevereBulkExitCode(
+  outcomes: readonly { ok: boolean; exitCode: ExitCode }[],
+): ExitCode {
+  let worst: ExitCode = EXIT_CODES.SUCCESS;
+  for (const outcome of outcomes) {
+    if (!outcome.ok && outcome.exitCode > worst) worst = outcome.exitCode;
+  }
+  return worst;
+}
+
+/**
+ * The single-vs-bulk dispatch `done`/`drop`/`update`'s CLI layers all
+ * share: run `fn` once per ref, then EITHER print exactly like the
+ * pre-t-mmngo single-ref command (when `refs.length === 1` — this is the
+ * ticket's own "byte-compatible when exactly one ref is given" requirement,
+ * achieved by literally reusing the single-ref code path's error
+ * propagation rather than routing a single ref through the same
+ * per-ref-outcome machinery a real multi-ref call uses) OR print the new
+ * bulk shape (when there's more than one). A single ref's failure is
+ * deliberately left to THROW exactly as it always has (never caught here),
+ * so the top-level error reporter (`src/cli/errors.ts`'s `reportError`)
+ * behaves identically to before this ticket for that — overwhelmingly
+ * common — case. A BULK failure never throws; it's reported via
+ * `process.exitCode` (see {@link mostSevereBulkExitCode}), since only ONE
+ * process exit code exists for however many refs were given, and printing
+ * every ref's own result on stdout/stderr as it's produced (rather than
+ * only surfacing the first failure) is the whole point of "per-ref, not
+ * all-or-nothing" reporting.
+ */
+export async function runSingleOrBulk<T>(
+  refs: readonly string[],
+  fn: (ref: string) => Promise<T>,
+  renderSingle: (data: T) => void,
+  renderBulk: (outcomes: readonly BulkOutcome<T>[]) => void,
+): Promise<void> {
+  if (refs.length === 1) {
+    const only = refs[0];
+    if (only === undefined) return; // unreachable: refs.length === 1
+    renderSingle(await fn(only));
+    return;
+  }
+  const outcomes = await runBulk(refs, fn);
+  renderBulk(outcomes);
+  const worst = mostSevereBulkExitCode(outcomes);
+  if (worst !== EXIT_CODES.SUCCESS) process.exitCode = worst;
 }

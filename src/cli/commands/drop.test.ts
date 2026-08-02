@@ -101,7 +101,7 @@ describe("runDrop (in-process)", () => {
 
     const out = captureOutput();
     try {
-      await withCwd(root, () => runDrop(id, { reason: "duplicate of another ticket" }));
+      await withCwd(root, () => runDrop([id], { reason: "duplicate of another ticket" }));
       expect(out.stdout()).toContain(`dropped ${id}`);
       expect(out.stdout()).toContain("reason: duplicate of another ticket");
     } finally {
@@ -127,7 +127,7 @@ describe("runDrop (in-process)", () => {
 
     const out = captureOutput();
     try {
-      await withCwd(root, () => runDrop(id, { reason: "no longer needed" }));
+      await withCwd(root, () => runDrop([id], { reason: "no longer needed" }));
     } finally {
       out.restore();
     }
@@ -162,7 +162,7 @@ describe("runDrop (in-process)", () => {
 
     const out = captureOutput();
     try {
-      await withCwd(root, () => runDrop(id, { reason: "superseded", json: true }));
+      await withCwd(root, () => runDrop([id], { reason: "superseded", json: true }));
       const body = JSON.parse(out.stdout()) as {
         ticket: { id: string; slug: string; handle: string; name: string; state: string };
         session: { id: string } | null;
@@ -197,7 +197,7 @@ describe("runDrop (in-process)", () => {
 
     const out = captureOutput();
     try {
-      await withCwd(root, () => runDrop(id, { reason: "someone else's call" }), {
+      await withCwd(root, () => runDrop([id], { reason: "someone else's call" }), {
         SLOP_ACTOR: "someone-else",
       });
       expect(out.stderr()).toContain("someone-else");
@@ -219,7 +219,7 @@ describe("runDrop (in-process)", () => {
 
     const out = captureOutput();
     try {
-      await withCwd(root, () => runDrop(id, { reason: "duplicate" }), {
+      await withCwd(root, () => runDrop([id], { reason: "duplicate" }), {
         SLOP_ACTOR: "someone-else",
       });
       expect(out.stderr()).toBe("");
@@ -233,7 +233,7 @@ describe("runDrop (in-process)", () => {
     await bootstrapRepo(root, { project: "p", user: "ryan" });
     const id = await jsonNewTicket(root, "Ticket, blank reason");
 
-    await expect(withCwd(root, () => runDrop(id, { reason: "   " }))).rejects.toMatchObject({
+    await expect(withCwd(root, () => runDrop([id], { reason: "   " }))).rejects.toMatchObject({
       exitCode: EXIT_CODES.USAGE_ERROR,
     });
   });
@@ -244,7 +244,7 @@ describe("runDrop (in-process)", () => {
     const id = await jsonNewTicket(root, "Ticket, absurdly long reason");
 
     const tooLong = "x".repeat(END_SUMMARY_MAX_LENGTH + 1);
-    await expect(withCwd(root, () => runDrop(id, { reason: tooLong }))).rejects.toMatchObject({
+    await expect(withCwd(root, () => runDrop([id], { reason: tooLong }))).rejects.toMatchObject({
       exitCode: EXIT_CODES.USAGE_ERROR,
     });
 
@@ -261,7 +261,7 @@ describe("runDrop (in-process)", () => {
     const atLimit = "x".repeat(END_SUMMARY_MAX_LENGTH);
     const out = captureOutput();
     try {
-      await withCwd(root, () => runDrop(id, { reason: atLimit }));
+      await withCwd(root, () => runDrop([id], { reason: atLimit }));
     } finally {
       out.restore();
     }
@@ -276,12 +276,12 @@ describe("runDrop (in-process)", () => {
     const id = await jsonNewTicket(root, "Already-done ticket");
     const firstDrop = captureOutput();
     try {
-      await withCwd(root, () => runDrop(id, { reason: "wontdo" }));
+      await withCwd(root, () => runDrop([id], { reason: "wontdo" }));
     } finally {
       firstDrop.restore();
     }
 
-    await expect(withCwd(root, () => runDrop(id, { reason: "again" }))).rejects.toMatchObject({
+    await expect(withCwd(root, () => runDrop([id], { reason: "again" }))).rejects.toMatchObject({
       exitCode: EXIT_CODES.CONFLICT,
     });
   });
@@ -290,7 +290,7 @@ describe("runDrop (in-process)", () => {
     const root = await makeTempRepo("slop-drop-inproc-notfound-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });
     await expect(
-      withCwd(root, () => runDrop("no-such-ticket", { reason: "x" })),
+      withCwd(root, () => runDrop(["no-such-ticket"], { reason: "x" })),
     ).rejects.toMatchObject({ exitCode: EXIT_CODES.NOT_FOUND });
   });
 });

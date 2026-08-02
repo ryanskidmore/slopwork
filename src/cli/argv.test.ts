@@ -99,4 +99,50 @@ describe("rewriteLabelArgv", () => {
       "y",
     ]);
   });
+
+  // t-9uvbr: --discovered-from hits the exact same Commander limitation as
+  // --label (a ±ref value is just as `-`-shaped) — same rewrite, different
+  // flag token.
+  describe("--discovered-from (t-9uvbr)", () => {
+    it("rewrites the `--discovered-from +x -y` form into repeated --discovered-from=value tokens", () => {
+      expect(rewriteLabelArgv(["update", "ref", "--discovered-from", "+x", "-y"])).toEqual([
+        "update",
+        "ref",
+        "--discovered-from=+x",
+        "--discovered-from=-y",
+      ]);
+    });
+
+    it("leaves the already-unambiguous --discovered-from=value form untouched", () => {
+      const argv = ["update", "ref", "--discovered-from=+x"];
+      expect(rewriteLabelArgv(argv)).toEqual(argv);
+    });
+
+    it("a bare trailing --discovered-from (nothing after it) is left untouched", () => {
+      expect(rewriteLabelArgv(["update", "ref", "--discovered-from"])).toEqual([
+        "update",
+        "ref",
+        "--discovered-from",
+      ]);
+    });
+
+    it("a --label and a --discovered-from in the same invocation are each rewritten independently", () => {
+      expect(
+        rewriteLabelArgv([
+          "update",
+          "ref",
+          "--label",
+          "+bug",
+          "-triage",
+          "--discovered-from",
+          "+spike-1",
+        ]),
+      ).toEqual(["update", "ref", "--label=+bug", "--label=-triage", "--discovered-from=+spike-1"]);
+    });
+  });
+
+  it("only ever rewrites the literal allowlisted flag tokens, never a substring match on --discovered-from", () => {
+    const argv = ["update", "ref", "--discovered-from-ish", "something"];
+    expect(rewriteLabelArgv(argv)).toEqual(argv);
+  });
 });

@@ -13,9 +13,37 @@
 import type { Config, Ticket } from "../core/index.js";
 import { isTicketId } from "../core/index.js";
 import { jiraBrowseUrl } from "./jira.js";
+import type { Question } from "./questions.js";
 
 function listOrNone(values: readonly string[]): string {
   return values.length > 0 ? values.join(", ") : "(none)";
+}
+
+/**
+ * G4 (t-jggg9): "`show <ref>` surfaces open questions prominently" — one
+ * block per still-unanswered question, right at the top (before `spec`),
+ * so a human/agent reading `show`'s output can't miss that this ticket is
+ * `awaiting_input` without having to scan the whole thing. `openQuestions`
+ * is always caller-supplied (`src/cli/commands/show.ts` folds it from
+ * `deriveQuestions`/`unansweredQuestions`, `src/tickets/questions.ts`) —
+ * this function itself has no event-log access, same "pure formatting,
+ * caller gathers the data" split every other optional section here
+ * (`resolution`, `review`) already follows.
+ */
+function formatOpenQuestionsSection(openQuestions: readonly Question[]): string[] {
+  if (openQuestions.length === 0) return [];
+  const lines: string[] = [
+    `AWAITING INPUT — ${openQuestions.length} open question${openQuestions.length === 1 ? "" : "s"}:`,
+  ];
+  for (const q of openQuestions) {
+    lines.push(`  [${q.id}] asked by ${q.askedBy.name} (${q.askedBy.kind}) at ${q.askedAt}:`);
+    lines.push(`    "${q.text}"`);
+    if (q.options.length > 0) {
+      lines.push(`    options: ${q.options.join(", ")}`);
+    }
+  }
+  lines.push("");
+  return lines;
 }
 
 function formatMetaLines(meta: Record<string, unknown>): string[] {
@@ -37,7 +65,17 @@ function formatReviewLine(ticket: Ticket): string | null {
   return `review: requested_at=${ticket.review.requested_at} by=${ticket.review.by.name} ${mr}`;
 }
 
-export function formatTicketDetail(ticket: Ticket, config: Config): string {
+/**
+ * `openQuestions` (G4, t-jggg9): still-unanswered questions for this
+ * ticket, rendered prominently right after the header lines, before
+ * `spec` — omitted entirely (as before) when `[]`/omitted, so every
+ * existing caller/test that never passes it sees byte-identical output.
+ */
+export function formatTicketDetail(
+  ticket: Ticket,
+  config: Config,
+  openQuestions: readonly Question[] = [],
+): string {
   const lines: string[] = [];
 
   lines.push(ticket.id);
@@ -54,6 +92,7 @@ export function formatTicketDetail(ticket: Ticket, config: Config): string {
   if (reviewLine) lines.push(reviewLine);
 
   lines.push("");
+  lines.push(...formatOpenQuestionsSection(openQuestions));
   lines.push("spec:");
   lines.push(`  summary: ${ticket.spec.summary}`);
   if (ticket.spec.details_md.trim().length > 0) {

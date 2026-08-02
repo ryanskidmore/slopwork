@@ -1,11 +1,13 @@
 import type { Command } from "commander";
-import { EXIT_CODES } from "../../core/exit-codes.js";
+import { EXIT_CODES, nowIso, systemClock, ticketSchema } from "../../core/index.js";
 import type { SessionId } from "../../core/index.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
-import { formatIndexProblems } from "../../storage/backend.js";
+import { formatDuplicateSlugProblems, formatIndexProblems } from "../../storage/backend.js";
 import { openStorage } from "../../storage/index.js";
 import { diffSessionPatch } from "../../sessions/patch.js";
 import { buildHealedSession, findOrphanedActiveSessions } from "../../sessions/repair.js";
+import { planSlugHeal } from "../../tickets/slug-heal.js";
+import { formatZodIssuesForUsage } from "../../tickets/validate.js";
 import { loadConfig, resolveActor } from "../actor.js";
 import { SlopError } from "../errors.js";
 import { printWarning } from "./shared.js";
@@ -48,6 +50,18 @@ interface ReindexOptions {
  * the rename should land as a visible, deliberate commit, not something a
  * routine `reindex` does on every repo's behalf. Idempotent: a repeat run
  * (or a repo that's already fully sharded) reports zero files moved.
+ *
+ * t-trqk9: also reports any DUPLICATE slugs the rebuild detected
+ * (`index.slug_problems` — a cross-clone merge that produced two tickets
+ * sharing one slug). Detection always runs and is reported loudly on
+ * stderr even without `--heal` (never silent — see db-index.ts's own
+ * doc); `--heal` additionally repairs it, deterministically: the OLDEST
+ * ticket in each duplicated group (by id) keeps the slug, every newer
+ * duplicate is re-suffixed via the same `-2`/`-3`/... collision rule
+ * `slop new` already uses (`src/tickets/slug-heal.ts`'s `planSlugHeal`),
+ * each rename persisted as its own `ticket.updated` event under the write
+ * transaction. The index is rebuilt a second time after healing so the
+ * final report (and every subsequent read) reflects the repaired slugs.
  */
 export async function runReindex(options: ReindexOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
@@ -74,17 +88,15 @@ export async function runReindex(options: ReindexOptions): Promise<void> {
         : "; no flat-layout events to shard (already fully sharded)";
   }
 
-  const index = await backend.rebuildIndex();
+  let index = await backend.rebuildIndex();
 
   const swept = await backend.sweepTempFiles();
-
-  const slugCount = Object.keys(index.slugs).length;
   const sweptNote = swept.length > 0 ? `; swept ${swept.length} stale temp file(s)` : "";
 
   if (index.problems.length > 0) {
     process.stderr.write(`${formatIndexProblems(index.problems)}\n`);
     process.stdout.write(
-      `reindexed: ${index.tickets.length} ticket(s) rebuilt, ${index.problems.length} skipped due to errors, ${slugCount} slug(s)${sweptNote}${shardNote}\n`,
+      `reindexed: ${index.tickets.length} ticket(s) rebuilt, ${index.problems.length} skipped due to errors, ${Object.keys(index.slugs).length} slug(s)${sweptNote}${shardNote}\n`,
     );
     // sessions/repair.ts's own doc: an unreadable ticket's own
     // active_session is invisible to the referenced-ids set below, which
@@ -101,6 +113,64 @@ export async function runReindex(options: ReindexOptions): Promise<void> {
       EXIT_CODES.GENERIC_ERROR,
     );
   }
+
+  // t-trqk9: duplicate slugs are reported loudly regardless of --heal (same
+  // "never silent" posture as the ticket-problems block above); --heal
+  // additionally repairs them, deterministically re-suffixing every
+  // duplicate but each group's oldest (by id) ticket.
+  let slugHealNote = "";
+  if (index.slug_problems.length > 0) {
+    process.stderr.write(`${formatDuplicateSlugProblems(index.slug_problems)}\n`);
+    if (options.heal) {
+      const config = await loadConfig(paths);
+      const actor = resolveActor({ config, cwd: root });
+      const plans = planSlugHeal(index.slug_problems, new Set(Object.keys(index.slugs)));
+      await backend.transact(async () => {
+        // Fencing contract (lock.ts): re-checked between each write once
+        // more than one write is happening under this acquisition, same
+        // discipline as the orphaned-session heal loop below.
+        for (const plan of plans) {
+          const current = await backend.readTicket(plan.id);
+          const now = nowIso(systemClock);
+          const candidate = { ...current, slug: plan.to, updated_at: now };
+          const parsed = ticketSchema.safeParse(candidate);
+          if (!parsed.success) {
+            throw new SlopError(
+              formatZodIssuesForUsage(
+                `slug heal produced an invalid ticket for ${plan.id}`,
+                parsed.error,
+              ),
+              EXIT_CODES.GENERIC_ERROR,
+            );
+          }
+          await backend.updateTicket(
+            plan.id,
+            [
+              { path: ["slug"], value: parsed.data.slug },
+              { path: ["updated_at"], value: parsed.data.updated_at },
+            ],
+            parsed.data,
+            { actor, session: null },
+            {
+              verb: "ticket.updated",
+              payload: { method: "slug_heal", from: plan.from, to: plan.to },
+            },
+          );
+        }
+      });
+      // Rebuild so the final report — and every subsequent read — reflects
+      // the repaired slugs rather than the pre-heal duplicate-carrying
+      // snapshot (slug_problems should now be empty).
+      index = await backend.rebuildIndex();
+      slugHealNote = `; healed ${plans.length} duplicate slug(s)`;
+    } else {
+      slugHealNote =
+        `; ${index.slug_problems.length} duplicate slug(s) found ` +
+        "(run `slop reindex --heal` to re-suffix them)";
+    }
+  }
+
+  const slugCount = Object.keys(index.slugs).length;
 
   const referencedActiveSessionIds = new Set<SessionId>(
     index.tickets.flatMap((row) => (row.active_session !== null ? [row.active_session] : [])),
@@ -150,7 +220,7 @@ export async function runReindex(options: ReindexOptions): Promise<void> {
   }
 
   process.stdout.write(
-    `reindexed: ${index.tickets.length} ticket(s), ${slugCount} slug(s)${sweptNote}${orphanNote}${shardNote}\n`,
+    `reindexed: ${index.tickets.length} ticket(s), ${slugCount} slug(s)${sweptNote}${orphanNote}${shardNote}${slugHealNote}\n`,
   );
 }
 
@@ -168,7 +238,9 @@ export function registerReindexCommand(program: Command): void {
     )
     .option(
       "--heal",
-      "also close out any orphaned active sessions found during the scan (sets ended_at + a synthesized end_summary, one session.ended event per orphan)",
+      "also close out any orphaned active sessions found during the scan (sets ended_at + a " +
+        "synthesized end_summary, one session.ended event per orphan), AND re-suffix any " +
+        "duplicate slugs found (oldest ticket keeps the slug, newer duplicates get -2/-3/...)",
     )
     .option(
       "--shard-events",

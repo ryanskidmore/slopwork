@@ -34,6 +34,7 @@ function makeIndexRow(
     root_id: overrides.id,
     path: [],
     labels: [],
+    owner: null,
     latest_note: null,
     last_activity_at: "2026-07-23T10:00:00.000Z",
     active_session: null,
@@ -44,6 +45,9 @@ function makeIndexRow(
     ready: null,
     stale_at: null,
     review_stale_at: null,
+    awaiting_input: false,
+    open_question_count: 0,
+    oldest_open_question_at: null,
     ...overrides,
   };
 }

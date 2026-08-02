@@ -21,6 +21,7 @@ import type { StorageBackend } from "../storage/backend.js";
 import { SlopError } from "../cli/errors.js";
 import { validateTicketEdges } from "./edges.js";
 import { assertLabelHasNoLeadingSigil } from "./labels.js";
+import { parseOwnerRaw } from "./owner.js";
 import { ancestryFor, resolveParentRef } from "./parent.js";
 import { pickSlug, takenSlugs } from "./slug.js";
 import {
@@ -228,7 +229,10 @@ export async function buildNewTicket(
     active_session: null,
     last_activity_at: now,
     latest_note: null,
-    owner: input.ownerRaw !== undefined ? { name: input.ownerRaw, kind: "human" as const } : null,
+    // t-9uvbr: "agent:name"/"human:name" prefixes pick the stored actor
+    // kind explicitly; a bare name (no prefix) stays "human" — unchanged
+    // back-compat behavior. See tickets/owner.ts's own doc.
+    owner: input.ownerRaw !== undefined ? parseOwnerRaw(input.ownerRaw) : null,
     // Always "new": D13's draft/adhoc creation affordances are already
     // fully captured by `state`/`adhoc` above, so `--draft`/`--adhoc`
     // don't also need a distinct provenance.method here — see B1's report

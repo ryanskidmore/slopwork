@@ -8,7 +8,11 @@
 import type { BunRequest } from "bun";
 import { TICKET_STATES, type Ticket, type TicketId, type TicketState } from "../../core/index.js";
 import type { WebDataSource } from "../data-source.js";
-import { deriveEffectiveTickets, staleThresholdsFromConfig } from "../overlays.js";
+import {
+  computeAwaitingInputByTicket,
+  deriveEffectiveTickets,
+  staleThresholdsFromConfig,
+} from "../overlays.js";
 import { configDto, jsonResponse, ticketSummaryDto } from "./shared.js";
 import type { TicketListResponseDTO } from "./types.js";
 
@@ -63,6 +67,9 @@ export async function handleTicketList(
   const tickets = deriveEffectiveTickets(rawTickets, events);
   const byId = new Map<TicketId, Ticket>(tickets.map((t) => [t.id, t]));
   const thresholds = staleThresholdsFromConfig(config);
+  // G4 (t-jggg9): reuses the SAME whole-db event read already fetched
+  // above for deriveEffectiveTickets — no second listEvents() call.
+  const awaitingInputByTicket = computeAwaitingInputByTicket(events);
 
   const allLabels = [...new Set(tickets.flatMap((t) => t.labels))].sort();
   const allOwners = [
@@ -75,7 +82,9 @@ export async function handleTicketList(
 
   const body: TicketListResponseDTO = {
     config: configDto(config, warning),
-    tickets: filtered.map((t) => ticketSummaryDto(t, tickets, byId, thresholds, config, now)),
+    tickets: filtered.map((t) =>
+      ticketSummaryDto(t, tickets, byId, thresholds, config, now, awaitingInputByTicket),
+    ),
     total: tickets.length,
     facets: { labels: allLabels, owners: allOwners, states: [...TICKET_STATES] },
   };

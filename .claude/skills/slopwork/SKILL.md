@@ -26,10 +26,12 @@ Slopwork (`slop`) tracks work as a dependency graph of tickets. You read it to k
 | About to start non-trivial work that has no ticket | `slop new "…"` first (ask the human if unsure it's wanted), then `start` it |
 | Discover a bug/follow-up mid-task | `slop new "…" --discovered-from <current>` — never a TODO comment, never "I'll mention it later" |
 | Blocked by missing work | `slop new "<what's missing>" --blocks <current>` to file the blocker (it blocks this ticket), tell the human |
-| Need a human decision | Put the question + options in `slop update <ref> --progress "QUESTION: …"`, then stop or continue on the unblocked parts |
+| Need a human decision | `slop ask <ref> "<question>" [--option "A"] [--option "B"]`, then stop or continue on the unblocked parts |
 | Code done, MR opened | `slop review <ref> --mr <url>` |
 | MR merged / work verified | `slop done <ref> --note "…"` |
+| Closing several tickets at once (batch-close) | `slop done <ref> <ref> … --note "…"` (or `drop`/`update`) — never one process per ticket |
 | Stopping without finishing | `slop stop <ref> --note "<handoff: state, next step, gotchas>"` |
+| Need to browse/filter tickets beyond ready (state/label/owner/parent) | `slop list --state open --label area:auth --json` |
 | Asked "what's the status?" | `slop status`, summarize; don't recite raw output |
 
 ## The loop (default for every ticket)
@@ -47,7 +49,8 @@ Slopwork (`slop`) tracks work as a dependency graph of tickets. You read it to k
 3. **Don't takeover.** If `start` warns that another session is active, stop and tell the human. Use `--takeover` only when explicitly instructed.
 4. **Stopping requires a handoff note.** The next session (probably another amnesiac you) starts from your `--note`. Write what you'd want to read: current state, next step, traps.
 5. **Prefer structured spec fields.** When creating or updating tickets, put acceptance criteria in `acceptance[]` and file/URL pointers in `context[]`, not buried in prose — use `new`/`update`'s own `--acceptance`/`--context`/`--summary`/`--details` flags (repeatable, plain text) rather than hand-assembling `--spec <json>`; it sidesteps shell-quoting hazards and the unknown-key/malformed-JSON errors `--spec` now raises.
-6. **Budget your reads.** `ready`, `status`, `search`, `events`, and `context` all take `--json --budget N` to cap output (`show --context` too); use `slop context <ref>` to re-load your bearings after compaction instead of re-exploring the repo.
+6. **Budget your reads.** `ready`, `list`, `status`, `search`, `events`, `questions`, and `context` all take `--json --budget N` to cap output (`show --context` too); use `slop context <ref>` to re-load your bearings after compaction instead of re-exploring the repo.
+7. **Bulk-close, don't loop.** `slop done`/`drop`/`update` accept multiple refs (`slop done a b c --note "…"`) or `-` for stdin, applying per-ref with per-ref outcomes — never spawn one process per ticket to close out a batch.
 
 ## Reference resolution
 

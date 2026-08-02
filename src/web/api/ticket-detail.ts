@@ -15,6 +15,7 @@ import type { WebDataSource } from "../data-source.js";
 import { renderMarkdownToString } from "../markdown.js";
 import {
   buildReverseEdgeIndex,
+  computeAwaitingInputByTicket,
   deriveEffectiveTickets,
   liveBlockers,
   matchTicketByRef,
@@ -81,6 +82,12 @@ export async function handleTicketDetail(
   const effectiveTicket = deriveEffectiveTickets([ticket], events)[0] ?? ticket;
   const thresholds = staleThresholdsFromConfig(config);
   const byId = new Map<TicketId, Ticket>(allTickets.map((t) => [t.id, t]));
+  // G4 (t-jggg9): `events` is already scoped to this one ticket (plus its
+  // sessions' events, which computeAwaitingInputByTicket's own
+  // entity.kind==="ticket" filter ignores) — one ticket's worth of
+  // question-verb events is exactly what the awaiting_input overlay
+  // needs, no separate whole-db read.
+  const awaitingInputByTicket = computeAwaitingInputByTicket(events);
   const reverseEdges = buildReverseEdgeIndex(allTickets);
   const children = allTickets.filter((t) => t.parent === ticket.id);
 
@@ -102,7 +109,15 @@ export async function handleTicketDetail(
   const resolutionHtml = ticket.resolution ? renderMarkdownToString(ticket.resolution) : null;
 
   const body: TicketDetailDTO = {
-    ticket: ticketSummaryDto(effectiveTicket, allTickets, byId, thresholds, config, now),
+    ticket: ticketSummaryDto(
+      effectiveTicket,
+      allTickets,
+      byId,
+      thresholds,
+      config,
+      now,
+      awaitingInputByTicket,
+    ),
     ancestry: ticket.path.map((id) => refOrDangling(id, byId)),
     children: children.map(ticketRefDto).sort((a, b) => a.name.localeCompare(b.name)),
     relationships,

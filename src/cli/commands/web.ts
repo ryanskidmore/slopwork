@@ -48,7 +48,7 @@ export function registerWebCommand(program: Command): void {
     .command("web")
     .description(
       "Serve the read-only local web explorer: ticket list/filters, tree view, " +
-        "ticket detail, review panel, stale panel.",
+        "ticket detail, review panel, questions panel, stale panel.",
     )
     .option("--port <n>", "port to listen on (0 = pick a free port)", parsePort, 4553)
     .action(async (opts: { port: number }) => {

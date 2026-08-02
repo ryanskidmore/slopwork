@@ -446,7 +446,7 @@ describe("runStart (in-process)", () => {
     const id = await jsonNewTicket(root, "Terminal ticket");
     const dropOut = captureOutput();
     try {
-      await withCwd(root, () => runDrop(id, { reason: "wontdo" }));
+      await withCwd(root, () => runDrop([id], { reason: "wontdo" }));
     } finally {
       dropOut.restore();
     }

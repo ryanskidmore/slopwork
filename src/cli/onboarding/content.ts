@@ -73,8 +73,13 @@ export const WHEN_TO_ACT: readonly WhenToActRow[] = [
   },
   {
     situation: "Need a human decision",
+    // G4 (t-jggg9): retires the old `update --progress "QUESTION: …"`
+    // string convention — `slop ask` records a structured question
+    // (question.asked event), which makes the ticket `awaiting_input`
+    // (surfaced in `slop status`/`slop list`/`slop show`, excluded from
+    // `slop ready` by default) until answered via `slop answer`.
     action:
-      'Put the question + options in `slop update <ref> --progress "QUESTION: …"`, then stop or continue on the unblocked parts',
+      '`slop ask <ref> "<question>" [--option "A"] [--option "B"]`, then stop or continue on the unblocked parts',
   },
   {
     situation: "Code done, MR opened",
@@ -85,8 +90,21 @@ export const WHEN_TO_ACT: readonly WhenToActRow[] = [
     action: '`slop done <ref> --note "…"`',
   },
   {
+    situation: "Closing several tickets at once (batch-close)",
+    // t-mmngo: bulk multi-ref support on done/drop/update — one invocation,
+    // per-ref outcomes, never all-or-nothing.
+    action:
+      '`slop done <ref> <ref> … --note "…"` (or `drop`/`update`) — never one process per ticket',
+  },
+  {
     situation: "Stopping without finishing",
     action: '`slop stop <ref> --note "<handoff: state, next step, gotchas>"`',
+  },
+  {
+    situation: "Need to browse/filter tickets beyond ready (state/label/owner/parent)",
+    // t-km7mb: slop list — filtered enumeration, distinct from `ready`'s
+    // "workable now" query and `search`'s ranked text search.
+    action: "`slop list --state open --label area:auth --json`",
   },
   {
     situation: 'Asked "what\'s the status?"',
@@ -114,12 +132,16 @@ export const HOUSE_RULES: readonly string[] = [
   // --budget N` on `ready`/`show`", back when `show` had neither flag —
   // only `ready` did). E1 then genuinely landed `--json`/`--budget`
   // across every read command (`ready`, `status`, `search`, `events`,
-  // `context`, and `show --context`), so the rule is updated again here to
-  // match the NOW-shipped CLI, not reverted to the original draft's wrong
-  // claim — see src/cli/commands/*.ts's own `--budget`/`--json` help text
-  // for the authoritative per-command shape (`show`'s plain-ticket output
-  // has a documented floor: `--budget` only bounds its `--context` output).
-  "**Budget your reads.** `ready`, `status`, `search`, `events`, and `context` all take `--json --budget N` to cap output (`show --context` too); use `slop context <ref>` to re-load your bearings after compaction instead of re-exploring the repo.",
+  // `context`, and `show --context`); t-km7mb adds `list` to that set,
+  // G4 adds `questions` — see src/cli/commands/*.ts's own `--budget`/
+  // `--json` help text for the authoritative per-command shape (`show`'s
+  // plain-ticket output has a documented floor: `--budget` only bounds
+  // its `--context` output).
+  "**Budget your reads.** `ready`, `list`, `status`, `search`, `events`, `questions`, and `context` all take `--json --budget N` to cap output (`show --context` too); use `slop context <ref>` to re-load your bearings after compaction instead of re-exploring the repo.",
+  // t-mmngo: batch-close support — surfaced here too (not just the
+  // WHEN_TO_ACT row above) since it changes a standing habit ("one
+  // process per ticket"), not just a one-off situational lookup.
+  '**Bulk-close, don\'t loop.** `slop done`/`drop`/`update` accept multiple refs (`slop done a b c --note "…"`) or `-` for stdin, applying per-ref with per-ref outcomes — never spawn one process per ticket to close out a batch.',
 ] as const;
 
 /**
