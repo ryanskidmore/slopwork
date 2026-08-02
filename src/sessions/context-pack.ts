@@ -59,12 +59,12 @@ export async function buildContextPackData(
       ? rootTicket.parent
       : undefined;
 
-  const { index } = await backend.loadIndex();
-  const row = index.tickets.find((r) => r.id === ticket.id);
-  const blockedByIds = row?.blocked_by ?? [];
-  const blockers = blockedByIds
-    .map((id) => byId.get(id))
-    .filter((t): t is Ticket => t !== undefined && t.state !== "done" && t.state !== "dropped");
+  const blockers = allTickets.filter(
+    (candidate) =>
+      candidate.blocks.includes(ticket.id) &&
+      candidate.state !== "done" &&
+      candidate.state !== "dropped",
+  );
 
   const { sessions: allSessions, problems: sessionProblems } = await backend.listSessionsTolerant();
   if (sessionProblems.length > 0) {

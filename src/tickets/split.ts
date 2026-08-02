@@ -1,11 +1,12 @@
 /**
  * `slop split <ref> "sub1" "sub2" …` (B2) — pure(-ish) domain orchestration
  * for building ONE split child, mirroring B1's `new.ts` split exactly:
- * this module reads the repo (slug uniqueness, edge validation against
- * the live ticket set) but never writes anything — `src/cli/commands/
- * split.ts` owns looping over every requested name, writing each child
- * under one `.lock` transaction (design.md §3: "multi-file transactions"),
- * emitting events, and printing.
+ * this module accepts a caller-provided transaction-local ticket snapshot
+ * for slug uniqueness and edge validation, falling back to one backend
+ * read for standalone callers. It never writes anything — `src/cli/commands/
+ * split.ts` owns looping over every requested name, writing each child under
+ * one `.lock` transaction (design.md §3: "multi-file transactions"),
+ * augmenting that snapshot after each write, emitting events, and printing.
  *
  * ## Provenance (B2's decision — left open by B1; see new.ts's own doc
  * comment, which names this exact call)
@@ -74,13 +75,19 @@
 import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import type { Actor, Ticket } from "../core/index.js";
-import { EXIT_CODES, newTicketId, nowIso, ticketSchema } from "../core/index.js";
+import {
+  EXIT_CODES,
+  newTicketId,
+  nextAvailableSlug,
+  nowIso,
+  slugify,
+  ticketSchema,
+} from "../core/index.js";
 import type { StorageBackend } from "../storage/backend.js";
 import { SlopError } from "../cli/errors.js";
 import { validateTicketEdges } from "./edges.js";
 import { ancestryFor } from "./parent.js";
 import type { ParentResolution } from "./parent.js";
-import { pickSlug } from "./slug.js";
 import { defaultSpec } from "./spec.js";
 import { formatZodIssuesForUsage } from "./validate.js";
 
@@ -91,6 +98,10 @@ export interface BuildSplitChildInput {
    * this once, up front, and reuses it for every child in the batch. */
   parent: Ticket;
   actor: Actor;
+  /** A transaction-local ticket snapshot. The split command appends each
+   * persisted child before building the next one, keeping slug allocation
+   * and validation coherent without rescanning storage per child. */
+  existingTickets?: readonly Ticket[];
 }
 
 export interface BuildSplitChildResult {
@@ -122,13 +133,10 @@ export interface BuildSplitChildResult {
  *     kept for the same "one uniform validated-write code path" reasoning
  *     `buildNewTicket` documents rather than special-casing it away.
  *
- * `backend` is read (not written): `pickSlug` for a live, collision-safe
- * slug, and a fresh `listTickets` for edge validation against the CURRENT
- * on-disk set — both of which is exactly why the CLI layer must build
- * -then-write each child in sequence, one at a time, rather than building
- * the whole batch before persisting any of it (see split.ts's own doc):
- * only that ordering makes "the live taken-set" (B2's brief) actually live
- * across a multi-name split.
+ * `backend` is read (not written) only when `existingTickets` was omitted.
+ * The CLI supplies one snapshot loaded after acquiring its transaction and
+ * appends every persisted child before building the next, so later children
+ * observe earlier slug assignments without repeating a full storage scan.
  */
 export async function buildSplitChild(
   backend: StorageBackend,
@@ -145,7 +153,8 @@ export async function buildSplitChild(
   const id = newTicketId();
   const parentResolution: ParentResolution = { kind: "local", ticket: input.parent };
   const ancestry = ancestryFor(parentResolution, id);
-  const slug = await pickSlug(backend, input.name);
+  const others = input.existingTickets ?? (await backend.listTickets());
+  const slug = nextAvailableSlug(slugify(input.name), new Set(others.map((ticket) => ticket.slug)));
   const now = nowIso(clock);
 
   const candidate = {
@@ -186,7 +195,6 @@ export async function buildSplitChild(
   // B3: same uniform pre-persist validation `buildNewTicket` runs — see
   // this function's doc for why it's structurally a no-op for a split
   // child specifically, and why it still runs anyway.
-  const others = await backend.listTickets();
   validateTicketEdges(parsed.data, others);
 
   return { ticket: parsed.data };

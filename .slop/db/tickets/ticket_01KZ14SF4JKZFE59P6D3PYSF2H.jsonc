@@ -1,0 +1,44 @@
+{
+  "id": "ticket_01KZ14SF4JKZFE59P6D3PYSF2H",
+  "name": "Collapse repeated command snapshot scans",
+  "slug": "collapse-repeated-command-snapshot-scans",
+  "spec": {
+    "summary": "Batch command-local ref resolution and reuse coherent transaction snapshots across new, split, update, and context-pack without weakening freshness or error semantics.",
+    "details_md": "",
+    "acceptance": [
+      "Split resolves and validates all children from one fresh transaction snapshot instead of scanning tickets/index per child.",
+      "Update batches edge refs and preserves mixed-ref, duplicate, ambiguity, conflict, and cycle semantics against one transaction snapshot.",
+      "New slug/ref validation and context-pack reuse command-local snapshots without cross-command caching or stale pre-lock reads.",
+      "Deterministic backend-call tests prove scan collapse and freshness-boundary tests prove each transaction still reads current state."
+    ],
+    "context": [
+      "src/cli/commands/new.ts, split.ts, update.ts",
+      "src/context/ and storage backend abstractions",
+      "Stacked on origin/feat/g5-simplification; neutral module ownership deferred until YAML #5"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "in_progress",
+  "priority": 1,
+  "labels": [],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ14SF4JKZFE59P6D3PYSF2H",
+  "path": [],
+  "active_session": "session_01KZ14SQVWRFJA20EPM3R10X36",
+  "last_activity_at": "2026-08-02T11:47:25.696Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-08-02T11:47:16.840Z",
+  "updated_at": "2026-08-02T11:47:25.696Z"
+}

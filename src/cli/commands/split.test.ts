@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
 import { EXIT_CODES } from "../../core/exit-codes.js";
 import type { TicketId } from "../../core/index.js";
 import { readTicket, repoPaths } from "../../repo/index.js";
+import { FlatfileBackend } from "../../storage/flatfile.js";
 import { runNew } from "./new.js";
 import { runSplit } from "./split.js";
 
@@ -29,6 +30,30 @@ async function jsonNewTicket(root: string, name: string): Promise<TicketId> {
 }
 
 describe("runSplit (in-process)", () => {
+  it("uses one transaction-local ticket scan for every child and advances colliding slugs in memory", async () => {
+    const root = await makeTempRepo("slop-split-inproc-snapshot-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const targetId = await jsonNewTicket(root, "Snapshot split target");
+    const listSpy = vi.spyOn(FlatfileBackend.prototype, "listTickets");
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () =>
+        runSplit(targetId, ["Repeated child", "Repeated child", "Third child"], { json: true }),
+      );
+      const body = JSON.parse(out.stdout()) as { children: { slug: string }[] };
+      expect(body.children.map(({ slug }) => slug)).toEqual([
+        "repeated-child",
+        "repeated-child-2",
+        "third-child",
+      ]);
+      expect(listSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      out.restore();
+      listSpy.mockRestore();
+    }
+  });
+
   it("creates one child ticket per name given, each with discovered_from set to the target", async () => {
     const root = await makeTempRepo("slop-split-inproc-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });

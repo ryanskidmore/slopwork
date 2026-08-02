@@ -1,7 +1,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   configSchema,
   newSessionId,
@@ -65,10 +65,28 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await rm(scratch, { recursive: true, force: true });
 });
 
 describe("buildContextPackData", () => {
+  it("derives blockers from the tolerant ticket snapshot without loading the index", async () => {
+    const ticket = makeTicket({ name: "Snapshot target" });
+    const blocker = makeTicket({ name: "Snapshot blocker", blocks: [ticket.id] });
+    await createTicket(paths, ticket, ctx, createdEvent);
+    await createTicket(paths, blocker, ctx, createdEvent);
+
+    const ticketsSpy = vi.spyOn(backend, "listTicketsTolerant");
+    const sessionsSpy = vi.spyOn(backend, "listSessionsTolerant");
+    const indexSpy = vi.spyOn(backend, "loadIndex");
+    const data = await buildContextPackData(backend, ticket, config);
+
+    expect(ticketsSpy).toHaveBeenCalledTimes(1);
+    expect(sessionsSpy).toHaveBeenCalledTimes(1);
+    expect(indexSpy).not.toHaveBeenCalled();
+    expect(data.blockers.map(({ id }) => id)).toEqual([blocker.id]);
+  });
+
   it("gathers ancestors, blockers (live only), and sessions (most-recent-first) for a ticket", async () => {
     const parent = makeTicket({ name: "Parent" });
     await createTicket(paths, parent, ctx, createdEvent);

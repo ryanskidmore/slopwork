@@ -1,7 +1,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixedClock } from "../core/clock.js";
 import type { Ticket } from "../core/index.js";
 import { EXIT_CODES, newTicketId, ticketSchema, writeCanonical } from "../core/index.js";
@@ -93,6 +93,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await rm(scratch, { recursive: true, force: true });
 });
 
@@ -364,6 +365,48 @@ describe("buildNewTicket — every §4.2 `new` creation flag", () => {
     expect(ticket.owner).toEqual({ name: "ryan", kind: "human" });
     expect(ticket.priority).toBe(0);
     expect(warnings).toEqual([]);
+  });
+
+  it("resolves every local creation ref in one ordered batch and reuses one ticket scan", async () => {
+    const parent = makeTicket({ slug: "snapshot-parent" });
+    const blocker = makeTicket({ slug: "snapshot-blocker" });
+    const related = makeTicket({ slug: "snapshot-related" });
+    const origin = makeTicket({ slug: "snapshot-origin" });
+    for (const ticket of [parent, blocker, related, origin]) {
+      await createTicket(paths, ticket, ctx, createdEvent);
+    }
+
+    const batchSpy = vi.spyOn(backend, "resolveTicketRefs");
+    const singleSpy = vi.spyOn(backend, "resolveTicketRef");
+    const listSpy = vi.spyOn(backend, "listTickets");
+    const indexSpy = vi.spyOn(backend, "loadIndex");
+
+    const { ticket } = await buildNewTicket(
+      backend,
+      baseInput({
+        parentRaw: parent.slug,
+        blocksRaw: [blocker.slug, blocker.id],
+        relatesToRaw: [related.id, blocker.slug],
+        discoveredFromRaw: origin.slug,
+      }),
+      clock,
+    );
+
+    expect(batchSpy).toHaveBeenCalledExactlyOnceWith([
+      parent.slug,
+      blocker.slug,
+      blocker.id,
+      related.id,
+      blocker.slug,
+      origin.slug,
+    ]);
+    expect(singleSpy).not.toHaveBeenCalled();
+    expect(listSpy).toHaveBeenCalledTimes(1);
+    expect(indexSpy).not.toHaveBeenCalled();
+    expect(ticket.parent).toBe(parent.id);
+    expect(ticket.blocks).toEqual([blocker.id]);
+    expect(ticket.relates_to).toEqual([related.id, blocker.id]);
+    expect(ticket.discovered_from).toEqual([origin.id]);
   });
 
   it("throws NOT_FOUND for an unresolvable --blocks ref", async () => {

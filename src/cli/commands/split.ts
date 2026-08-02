@@ -106,6 +106,7 @@ export async function runSplit(
 
   const children: Ticket[] = await backend.transact(async () => {
     const target = await backend.readTicket(initialTarget.id);
+    const ticketSnapshot = await backend.listTickets();
     const created: Ticket[] = [];
 
     for (let i = 0; i < names.length; i++) {
@@ -116,7 +117,12 @@ export async function runSplit(
         // once more than one write happens under this acquisition. The
         // very first write is covered by the acquisition itself.
       }
-      const { ticket } = await buildSplitChild(backend, { name, parent: target, actor });
+      const { ticket } = await buildSplitChild(backend, {
+        name,
+        parent: target,
+        actor,
+        existingTickets: ticketSnapshot,
+      });
       await backend.createTicket(
         ticket,
         { actor, session: null },
@@ -131,6 +137,7 @@ export async function runSplit(
         },
       );
       created.push(ticket);
+      ticketSnapshot.push(ticket);
     }
 
     const now = nowIso(systemClock);

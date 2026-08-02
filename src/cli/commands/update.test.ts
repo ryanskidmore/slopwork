@@ -3,12 +3,13 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
 import { EXIT_CODES } from "../../core/exit-codes.js";
 import type { TicketId } from "../../core/index.js";
 import { listSessions, queryEvents, readTicket, repoPaths } from "../../repo/index.js";
+import { FlatfileBackend } from "../../storage/flatfile.js";
 import { runNew } from "./new.js";
 import { runUpdate } from "./update.js";
 
@@ -40,6 +41,7 @@ const cliEntry = join(repoRoot, "src", "cli", "index.ts");
 const scratchDirs: string[] = [];
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   while (scratchDirs.length > 0) {
     const d = scratchDirs.pop();
     if (d) await rm(d, { recursive: true, force: true });
@@ -736,6 +738,59 @@ async function jsonNewTicket(root: string, name: string): Promise<TicketId> {
 }
 
 describe("runUpdate (in-process)", () => {
+  it("resolves mixed edge and local-parent refs in one ordered transaction-local batch", async () => {
+    const root = await makeTempRepo("slop-update-inproc-snapshot-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const mainId = await jsonNewTicket(root, "Snapshot main");
+    const relatedId = await jsonNewTicket(root, "Snapshot related");
+    const blockerId = await jsonNewTicket(root, "Snapshot blocker");
+    const originId = await jsonNewTicket(root, "Snapshot origin");
+    const parentId = await jsonNewTicket(root, "Snapshot parent");
+    const paths = repoPaths(root);
+    const related = await readTicket(paths, relatedId);
+    const blocker = await readTicket(paths, blockerId);
+    const parent = await readTicket(paths, parentId);
+
+    const batchSpy = vi.spyOn(FlatfileBackend.prototype, "resolveTicketRefs");
+    const singleSpy = vi.spyOn(FlatfileBackend.prototype, "resolveTicketRef");
+    const listSpy = vi.spyOn(FlatfileBackend.prototype, "listTickets");
+    const out = captureOutput();
+    try {
+      await withCwd(root, () =>
+        runUpdate(
+          [mainId],
+          baseOpts({
+            relatesTo: [`+${related.slug}`, `+${relatedId}`],
+            blocks: [`+${blocker.slug}`],
+            discoveredFrom: [`+${originId}`],
+            parent: parent.slug,
+          }),
+        ),
+      );
+    } finally {
+      out.restore();
+    }
+
+    expect(singleSpy).toHaveBeenCalledExactlyOnceWith(mainId);
+    expect(batchSpy).toHaveBeenCalledExactlyOnceWith([
+      related.slug,
+      relatedId,
+      blocker.slug,
+      originId,
+      parent.slug,
+    ]);
+    expect(listSpy).toHaveBeenCalledTimes(1);
+    const updated = await readTicket(paths, mainId);
+    expect(updated.relates_to).toEqual([relatedId]);
+    expect(updated.blocks).toEqual([blockerId]);
+    expect(updated.discovered_from).toEqual([originId]);
+    expect(updated.parent).toBe(parentId);
+
+    batchSpy.mockRestore();
+    singleSpy.mockRestore();
+    listSpy.mockRestore();
+  });
+
   it("a pure --progress call appends a note event without taking the lock or rewriting the ticket file", async () => {
     const root = await makeTempRepo("slop-update-inproc-progress-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });

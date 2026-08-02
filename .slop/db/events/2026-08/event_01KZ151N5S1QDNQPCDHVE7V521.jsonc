@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ151N5S1QDNQPCDHVE7V521",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ14SF4JKZFE59P6D3PYSF2H"
+  },
+  "payload": {
+    "progress": "Mapped new, split, update, and context-pack read paths. Reusing StorageBackend.resolveTicketRefs plus transaction-local ticket snapshots; no datastore API or cross-command cache."
+  },
+  "at": "2026-08-02T11:51:45.081Z"
+}

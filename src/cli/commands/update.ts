@@ -6,7 +6,8 @@ import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import type { StorageBackend } from "../../storage/index.js";
 import { openStorage } from "../../storage/index.js";
 import { validateTicketEdges } from "../../tickets/edges.js";
-import { recomputeAncestry, resolveParentRef } from "../../tickets/parent.js";
+import { parseParentRef, recomputeAncestry } from "../../tickets/parent.js";
+import type { ParentResolution } from "../../tickets/parent.js";
 import {
   buildUpdate,
   parseBlocksOpText,
@@ -266,55 +267,83 @@ async function updateOneRef(
   const { ticket, reparentedDescendants } = await backend.transact(async () => {
     const current = await backend.readTicket(initialTicket.id);
 
-    // `--relates-to <±ref>` refs are resolved here, fresh, under the same
-    // lock as `current` above — mirroring `new`'s `--blocks` resolution
-    // (tickets/new.ts), just relocated to this CLI layer because
-    // `tickets/update.ts` is deliberately kept pure/no-I/O (see its top
-    // doc). A ref that fails to resolve throws NOT_FOUND/AMBIGUOUS_REF/
-    // USAGE_ERROR straight out of `resolveTicketRef`, before `buildUpdate`
-    // (and thus any write) ever runs.
-    const relatesToOps: RelatesToOp[] = [];
-    for (const raw of opts.relatesTo) {
-      const { op, ref: targetRef } = parseRelatesToOpText(raw);
-      const target = await backend.resolveTicketRef(targetRef);
-      relatesToOps.push({ op, id: target.id });
+    // Parse in the same flag-group order the previous per-ref loops used,
+    // then resolve every local target against one index snapshot. The
+    // backend preserves input order and throws the first resolution failure,
+    // while the surrounding transaction keeps this batch fresh relative to
+    // the decisive read and write.
+    const parsedRelatesTo: ReturnType<typeof parseRelatesToOpText>[] = [];
+    const parsedBlocks: ReturnType<typeof parseBlocksOpText>[] = [];
+    const parsedDiscoveredFrom: ReturnType<typeof parseDiscoveredFromOpText>[] = [];
+    const targetRefs: string[] = [];
+    let parseFailure: unknown;
+
+    // Preserve the old loop's failure precedence when a later flag is
+    // malformed: refs parsed before that flag still resolve first, so an
+    // earlier NOT_FOUND/AMBIGUOUS_REF continues to win over the later usage
+    // error. Fully valid input takes the single batch path below.
+    parseFlags: {
+      for (const raw of opts.relatesTo) {
+        try {
+          const parsed = parseRelatesToOpText(raw);
+          parsedRelatesTo.push(parsed);
+          targetRefs.push(parsed.ref);
+        } catch (err) {
+          parseFailure = err;
+          break parseFlags;
+        }
+      }
+      for (const raw of opts.blocks) {
+        try {
+          const parsed = parseBlocksOpText(raw);
+          parsedBlocks.push(parsed);
+          targetRefs.push(parsed.ref);
+        } catch (err) {
+          parseFailure = err;
+          break parseFlags;
+        }
+      }
+      for (const raw of opts.discoveredFrom) {
+        try {
+          const parsed = parseDiscoveredFromOpText(raw);
+          parsedDiscoveredFrom.push(parsed);
+          targetRefs.push(parsed.ref);
+        } catch (err) {
+          parseFailure = err;
+          break parseFlags;
+        }
+      }
+    }
+    if (parseFailure !== undefined) {
+      if (targetRefs.length > 0) await backend.resolveTicketRefs(targetRefs);
+      throw parseFailure;
     }
 
-    // `--blocks <±ref>` — identical resolution shape, edit-vi-fallback
-    // -hangs-agents's extension of the same pattern (see tickets/update.ts's
-    // `BlocksOp` doc for the `blocks`-vs-`relates_to` distinction).
-    const blocksOps: BlocksOp[] = [];
-    for (const raw of opts.blocks) {
-      const { op, ref: targetRef } = parseBlocksOpText(raw);
-      const target = await backend.resolveTicketRef(targetRef);
-      blocksOps.push({ op, id: target.id });
-    }
+    const parsedParent = opts.parent === undefined ? undefined : parseParentRef(opts.parent);
+    if (parsedParent?.kind === "local") targetRefs.push(parsedParent.ref);
+    const resolvedTargets =
+      targetRefs.length > 0 ? await backend.resolveTicketRefs(targetRefs) : [];
+    let resolvedIndex = 0;
 
-    // `--discovered-from <±ref>` (t-9uvbr) — same shape again; see
-    // tickets/update.ts's `DiscoveredFromOp` doc for why this one isn't
-    // cycle-checked (same as `relates-to`).
-    const discoveredFromOps: DiscoveredFromOp[] = [];
-    for (const raw of opts.discoveredFrom) {
-      const { op, ref: targetRef } = parseDiscoveredFromOpText(raw);
-      const target = await backend.resolveTicketRef(targetRef);
-      discoveredFromOps.push({ op, id: target.id });
-    }
+    const relatesToOps: RelatesToOp[] = parsedRelatesTo.map(({ op }) => ({
+      op,
+      id: resolvedTargets[resolvedIndex++]!.id,
+    }));
+    const blocksOps: BlocksOp[] = parsedBlocks.map(({ op }) => ({
+      op,
+      id: resolvedTargets[resolvedIndex++]!.id,
+    }));
+    const discoveredFromOps: DiscoveredFromOp[] = parsedDiscoveredFrom.map(({ op }) => ({
+      op,
+      id: resolvedTargets[resolvedIndex++]!.id,
+    }));
 
-    // `--parent <ref>` / `--clear-parent` (t-9uvbr) — resolved the exact
-    // same way `new --parent` is (tickets/parent.ts's `resolveParentRef`: a
-    // local ref via `resolveTicketRef`, or an external `jira:`-shaped ref
-    // accepted as-is with a warn-only format check) when a ref was given;
-    // `--clear-parent` needs no resolution at all — it constructs
-    // `{kind: "none"}` directly, which `buildUpdate`'s
-    // `parentValueFromResolution` already knows means "clear". Mutual
-    // exclusivity between the two flags is enforced by the CLI layer
-    // before this ever runs (see `runUpdate`).
-    const parentResolution =
+    const parentResolution: ParentResolution | undefined =
       opts.clearParent === true
-        ? ({ kind: "none" } as const)
-        : opts.parent !== undefined
-          ? await resolveParentRef(backend, opts.parent)
-          : undefined;
+        ? { kind: "none" }
+        : parsedParent?.kind === "local"
+          ? { kind: "local", ticket: resolvedTargets[resolvedIndex++]! }
+          : parsedParent;
     if (parentResolution?.kind === "external" && parentResolution.warning) {
       warnings.push(parentResolution.warning);
     }

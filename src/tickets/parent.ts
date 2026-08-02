@@ -19,6 +19,23 @@ export type ParentResolution =
   | { kind: "external"; ref: string; warning?: string }
   | { kind: "local"; ticket: Ticket };
 
+/** A parent flag classified without touching storage. Local refs remain
+ * unresolved so callers with several refs can include them in one ordered
+ * {@link StorageBackend.resolveTicketRefs} batch. */
+export type ParsedParentRef =
+  | { kind: "none" }
+  | { kind: "external"; ref: string; warning?: string }
+  | { kind: "local"; ref: string };
+
+export function parseParentRef(raw: string | undefined): ParsedParentRef {
+  if (raw === undefined) return { kind: "none" };
+  if (EXTERNAL_REF_PATTERN.test(raw)) {
+    const check = checkJiraRefFormat(raw);
+    return { kind: "external", ref: raw, warning: check.warning };
+  }
+  return { kind: "local", ref: raw };
+}
+
 /**
  * Resolve `raw` (the `--parent` flag's value, or `undefined` if omitted).
  * An external-shaped ref (`<system>:<key>`, e.g. `jira:PROJ-123`) is never
@@ -35,12 +52,9 @@ export async function resolveParentRef(
   backend: StorageBackend,
   raw: string | undefined,
 ): Promise<ParentResolution> {
-  if (raw === undefined) return { kind: "none" };
-  if (EXTERNAL_REF_PATTERN.test(raw)) {
-    const check = checkJiraRefFormat(raw);
-    return { kind: "external", ref: raw, warning: check.warning };
-  }
-  const ticket = await backend.resolveTicketRef(raw);
+  const parsed = parseParentRef(raw);
+  if (parsed.kind !== "local") return parsed;
+  const ticket = await backend.resolveTicketRef(parsed.ref);
   return { kind: "local", ticket };
 }
 
