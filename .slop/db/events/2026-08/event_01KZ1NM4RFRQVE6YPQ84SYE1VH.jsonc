@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ1NM4RFRQVE6YPQ84SYE1VH",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ1CM70EA5ZW0Y73BTFG2RSB"
+  },
+  "payload": {
+    "progress": "Batch C: all 4 MERGE-READY. PR10 source-hygiene (caught real AGENTS.md drift — coordinator regenerated it now; NUL bytes + mojibake on main confirmed), PR9 release-guardrails (main's release.yml can npm publish an untagged ref today; release gate drifted from CI gate), PR17 command-snapshots (retargeted to main; redundant scans orthogonal to storage cache, compounds with bulk update), PR13 session-attribution (retargeted; 10 session:null call sites, correctly covers question verbs). Caution recorded: 17 and 13 touch the same two test files — merge one, re-rebase the other. Spawning Batch D (WIP salvage assessment)."
+  },
+  "at": "2026-08-02T16:41:28.079Z"
+}

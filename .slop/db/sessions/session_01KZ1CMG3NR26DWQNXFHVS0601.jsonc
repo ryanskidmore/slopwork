@@ -59,7 +59,7 @@
         },
         {
           "text": "Batch C: session-attribution, release-guardrails, command-snapshots, source-hygiene",
-          "checked": false
+          "checked": true
         },
         {
           "text": "Batch D: assess three wip/salvage-* WIPs",
