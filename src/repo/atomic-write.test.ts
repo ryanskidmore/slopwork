@@ -6,6 +6,7 @@ import {
   DEFAULT_SWEEP_MIN_AGE_MS,
   TEMP_FILE_PREFIX,
   atomicWriteFile,
+  durableRemoveFile,
   isTempFileName,
   sweepStaleTempFiles,
 } from "./atomic-write.js";
@@ -64,6 +65,25 @@ describe("isTempFileName", () => {
     expect(isTempFileName("ticket_01ARZ3NDEKTSV4RRFFQ69G5FAV.jsonc")).toBe(false);
     expect(isTempFileName("index.jsonc")).toBe(false);
     expect(isTempFileName(".lock")).toBe(false);
+  });
+});
+
+describe("durableRemoveFile", () => {
+  it("removes an existing file", async () => {
+    const path = join(scratch, "gone.txt");
+    await writeFile(path, "bye");
+    await durableRemoveFile(path);
+    await expect(readFile(path, "utf8")).rejects.toThrow();
+  });
+
+  it('with missing: "ignore", resolves silently when the file is already gone', async () => {
+    const path = join(scratch, "already-gone.txt");
+    await expect(durableRemoveFile(path, { missing: "ignore" })).resolves.toBeUndefined();
+  });
+
+  it('without missing: "ignore" (the default), rejects with ENOENT when the file is already gone', async () => {
+    const path = join(scratch, "also-already-gone.txt");
+    await expect(durableRemoveFile(path)).rejects.toMatchObject({ code: "ENOENT" });
   });
 });
 

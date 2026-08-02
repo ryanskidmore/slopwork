@@ -233,6 +233,7 @@ the current clock.
     sessions/session_<ulid>.jsonc      # plan embedded, versioned
     events/event_<ulid>.jsonc          # immutable — flat layout (pre-sharding, or never migrated)
     events/2026-08/event_<ulid>.jsonc  # immutable — sharded layout (G2), one dir per UTC month
+    mutation-journal/event_<ulid>.jsonc # pending entity/event intent — GITIGNORED
     index.jsonc                        # derived — GITIGNORED, auto-healed
     .lock                              # write-path transaction lock
 ```
@@ -243,6 +244,16 @@ never authoritative and self-heals transparently — a deleted index, a
 fresh clone, or a repo that just went through `git merge`/`git pull`/a
 hand-edit all rebuild it on the next command that needs it. `slop reindex`
 is the manual escape hatch.
+
+`mutation-journal/` is local recovery state, not project history. A
+ticket/session mutation records its exact before and after file text plus
+its pre-minted event there before changing either durable record. The
+entry disappears after both land; a leftover entry means the prior
+process was interrupted and is replayed automatically on the next
+flatfile storage open. Corrupt or divergent entries fail loudly instead
+of overwriting human edits. See
+[Concurrency & merging → Crash recovery](concurrency-and-merging.md#crash-recovery-for-entity--event-pairs)
+for the state machine and operational details.
 
 **Events shard by month (G2).** A freshly-written event lands under
 `events/YYYY-MM/` — the UTC calendar month derived from the event's own

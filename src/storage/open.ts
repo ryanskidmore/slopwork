@@ -33,14 +33,18 @@ import { RemoteBackend } from "./remote.js";
 
 /**
  * Construct the {@link StorageBackend} `.slop/config.yaml` selects for the
- * repo at `paths`. Never throws — an unreadable/invalid config.yaml
- * degrades to the flatfile default (see module doc), exactly like every
- * other tolerant config read in this codebase.
+ * repo at `paths`. An unreadable/invalid config.yaml degrades to the
+ * flatfile default (see module doc). Opening a flatfile backend can still
+ * throw if a pending mutation journal is corrupt or conflicts with the
+ * current entity/event state; recovery refuses to hide or overwrite that
+ * evidence.
  */
 export async function openStorage(paths: RepoPaths): Promise<StorageBackend> {
   const { backend, lockTimeoutMs } = await loadBackendSelectionTolerant(paths);
   if (backend.kind === "remote") {
     return new RemoteBackend({ url: backend.url });
   }
-  return new FlatfileBackend(paths, { lockTimeoutMs });
+  const storage = new FlatfileBackend(paths, { lockTimeoutMs });
+  await storage.recoverPendingMutations();
+  return storage;
 }

@@ -19,13 +19,12 @@ import {
   isSessionId,
   sessionSchema,
 } from "../core/index.js";
-import type { JsoncPatchEntry } from "../core/jsonc.js";
+import { type JsoncPatchEntry, writeCanonical } from "../core/jsonc.js";
 import {
-  createEntityFileCanonical,
   deleteEntityFile,
   listEntityIds,
+  prepareEntityFileUpdate,
   readEntityFile,
-  updateEntityFile,
 } from "./entity-file.js";
 import type { EventContext, MutationEventSpec } from "./events.js";
 import { withMutationEvent } from "./events.js";
@@ -62,7 +61,7 @@ export async function createSession(
     ctx,
     { kind: "session", id: session.id },
     event,
-    () => createEntityFileCanonical(sessionFilePath(paths, session.id), session),
+    { operation: "create", before_text: null, after_text: writeCanonical(session) },
     clock,
   );
 }
@@ -89,7 +88,18 @@ export async function updateSession(
     ctx,
     { kind: "session", id },
     event,
-    () => updateEntityFile(sessionFilePath(paths, id), patch, expectedAfter),
+    async () => {
+      const prepared = await prepareEntityFileUpdate(
+        sessionFilePath(paths, id),
+        patch,
+        expectedAfter,
+      );
+      return {
+        operation: "update",
+        before_text: prepared.beforeText,
+        after_text: prepared.afterText,
+      };
+    },
     clock,
   );
 }

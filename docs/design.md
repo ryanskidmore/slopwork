@@ -72,12 +72,13 @@ Drafts and review items never appear themselves.
   db/
     tickets/ticket_<ulid>.jsonc
     sessions/session_<ulid>.jsonc      # plan embedded, versioned
-    events/event_<ulid>.jsonc          # immutable, one per event
+    events/YYYY-MM/event_<ulid>.jsonc  # immutable, one per event
+    mutation-journal/event_<ulid>.jsonc # pending entity/event intent — GITIGNORED
     index.jsonc                        # derived — GITIGNORED
   transcripts/session_<ulid>.jsonl     # GITIGNORED by default (D16)
 ```
 
-Merge story: ULID filenames → create-conflicts impossible; events immutable → conflict-free; index gitignored → the always-conflicting file doesn't exist; same-ticket edits → ordinary small JSONC diffs. Atomic writes (tmp+rename) everywhere; `.slop/db/.lock` for multi-file transactions (done-cascade, reparent). Event ordering cursors on the event ULID itself.
+Merge story: ULID filenames → create-conflicts impossible; events immutable → conflict-free; index and the local mutation journal gitignored → coordination/derived files don't merge; same-ticket edits → ordinary small JSONC diffs. Atomic writes (tmp+rename) everywhere; durable journal replay keeps each ticket/session mutation paired with its audit event after a crash; `.slop/db/.lock` serializes write transactions (done-cascade, reparent) without promising whole-transaction rollback. Event ordering cursors on the event ULID itself.
 
 **config.yaml:**
 

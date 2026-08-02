@@ -38,12 +38,15 @@ endpoint maps 1:1 to one interface method.
   their plain branded strings (`ticket_<ULID>`, etc.); a server need not
   validate the brand's regex beyond treating the field as an opaque
   string key.
-- **Idempotency**: none of these endpoints are automatically retried by
-  the client on a timeout — a caller that retries a `POST`/`PATCH` after a
-  network failure may durably create a duplicate on the server unless the
-  server itself de-duplicates. This mirrors the flatfile driver's own
-  crash semantics (see "Crash semantics" in `backend.ts`'s module doc):
-  mutual exclusion, not automatic exactly-once delivery.
+- **Idempotency**: none of these remote endpoints are automatically
+  retried by the client on a timeout — a caller that retries a
+  `POST`/`PATCH` after a network failure may durably create a duplicate on
+  the server unless the server itself de-duplicates. The flatfile driver
+  is stronger for local ticket/session writes: its ignored write-ahead
+  journal replays one pre-minted event id until the paired entity and
+  event both exist. A remote implementation should provide equivalent
+  atomicity or accept an idempotency key before it is production-ready;
+  the current wire contract does not yet carry one.
 
 ### Authentication
 
@@ -201,6 +204,14 @@ flatfile lock provides locally.
 Reads (`GET`) never need a lease — exactly like the flatfile driver, where
 every read is either lock-free or (`loadIndex`) self-healing regardless of
 what any writer is doing.
+
+A lease supplies exclusivity, not multi-request rollback. The flatfile
+driver separately journals each ticket/session entity write with its
+audit event and recovers it by roll-forward after restart; it still does
+not roll back a whole multi-entity `transact` callback. A real remote
+backend should execute each create/update endpoint's entity + event write
+as one server-side database transaction. Atomicity spanning several
+calls in one lease is deliberately outside the current interface.
 
 ### Maintenance (`slop reindex`)
 

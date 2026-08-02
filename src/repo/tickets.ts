@@ -17,14 +17,13 @@ import { join } from "node:path";
 import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import { type Event, type Ticket, type TicketId, isTicketId, ticketSchema } from "../core/index.js";
-import type { JsoncPatchEntry } from "../core/jsonc.js";
+import { type JsoncPatchEntry, writeCanonical } from "../core/jsonc.js";
 import type { TicketReadProblem } from "./db-index.js";
 import {
-  createEntityFileCanonical,
   deleteEntityFile,
   listEntityIds,
+  prepareEntityFileUpdate,
   readEntityFile,
-  updateEntityFile,
 } from "./entity-file.js";
 import type { EventContext, MutationEventSpec } from "./events.js";
 import { withMutationEvent } from "./events.js";
@@ -57,7 +56,7 @@ export async function createTicket(
     ctx,
     { kind: "ticket", id: ticket.id },
     event,
-    () => createEntityFileCanonical(ticketFilePath(paths, ticket.id), ticket),
+    { operation: "create", before_text: null, after_text: writeCanonical(ticket) },
     clock,
   );
 }
@@ -85,7 +84,18 @@ export async function updateTicket(
     ctx,
     { kind: "ticket", id },
     event,
-    () => updateEntityFile(ticketFilePath(paths, id), patch, expectedAfter),
+    async () => {
+      const prepared = await prepareEntityFileUpdate(
+        ticketFilePath(paths, id),
+        patch,
+        expectedAfter,
+      );
+      return {
+        operation: "update",
+        before_text: prepared.beforeText,
+        after_text: prepared.afterText,
+      };
+    },
     clock,
   );
 }

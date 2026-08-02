@@ -16,6 +16,7 @@ import { writeCanonical } from "../core/jsonc.js";
 import * as eventsModule from "./events.js";
 import {
   type EventContext,
+  appendEvent,
   createEvent,
   eventFilePath,
   eventShardMonth,
@@ -26,7 +27,6 @@ import {
   queryEvents,
   readEvent,
   ticketEventContext,
-  withMutationEvent,
 } from "./events.js";
 import { ensureDbDirs } from "./paths.js";
 import type { RepoPaths } from "./paths.js";
@@ -399,24 +399,19 @@ describe("migrateFlatEventsToShards", () => {
   });
 });
 
-describe("withMutationEvent — the emit-on-mutation hook", () => {
+describe("appendEvent — event-only mutations", () => {
   const ctx: EventContext = { actor: { name: "ryan", kind: "human" }, session: null };
   const clock = fixedClock(new Date("2026-07-23T12:00:00.000Z"));
 
-  it("runs the write, then emits exactly one event carrying ctx/verb/entity/payload", async () => {
-    let wrote = false;
-    const event = await withMutationEvent(
+  it("emits exactly one event carrying ctx/verb/entity/payload", async () => {
+    const event = await appendEvent(
       paths,
       ctx,
       { kind: "ticket", id: newTicketId() },
       { verb: "ticket.updated", payload: { note: "hi" } },
-      async () => {
-        wrote = true;
-      },
       clock,
     );
 
-    expect(wrote).toBe(true);
     expect(event.actor).toEqual(ctx.actor);
     expect(event.session).toBeNull();
     expect(event.verb).toBe("ticket.updated");
@@ -428,43 +423,25 @@ describe("withMutationEvent — the emit-on-mutation hook", () => {
   });
 
   it("defaults payload to {} when omitted", async () => {
-    const event = await withMutationEvent(
+    const event = await appendEvent(
       paths,
       ctx,
       { kind: "ticket", id: newTicketId() },
       { verb: "ticket.created" },
-      async () => {},
       clock,
     );
     expect(event.payload).toEqual({});
   });
 
-  it("emits no event when write() throws", async () => {
-    await expect(
-      withMutationEvent(
-        paths,
-        ctx,
-        { kind: "ticket", id: newTicketId() },
-        { verb: "ticket.created" },
-        async () => {
-          throw new Error("boom");
-        },
-        clock,
-      ),
-    ).rejects.toThrow("boom");
-    await expect(listEvents(paths)).resolves.toEqual([]);
-  });
-
-  it("N calls under a tight loop (simulating a multi-mutation transaction) produce N durable, distinctly-ordered events", async () => {
+  it("N calls under a tight loop produce N durable, distinctly-ordered events", async () => {
     const N = 5;
     const emitted: Event[] = [];
     for (let i = 0; i < N; i++) {
-      const event = await withMutationEvent(
+      const event = await appendEvent(
         paths,
         ctx,
         { kind: "ticket", id: newTicketId() },
         { verb: "ticket.updated", payload: { i } },
-        async () => {},
         clock,
       );
       emitted.push(event);
@@ -551,21 +528,19 @@ describe("queryEvents — the cursor D3's `slop events --since` builds on", () =
     expect(page.every((e) => e.entity.kind === "ticket" && e.entity.id === ticketA)).toBe(true);
   });
 
-  it("uses withMutationEvent-produced events too — a realistic end-to-end page", async () => {
+  it("uses appendEvent-produced events too — a realistic end-to-end page", async () => {
     const ticket = newTicketId();
-    const first = await withMutationEvent(
+    const first = await appendEvent(
       paths,
       ctx,
       { kind: "ticket", id: ticket },
       { verb: "ticket.created" },
-      async () => {},
     );
-    const second = await withMutationEvent(
+    const second = await appendEvent(
       paths,
       ctx,
       { kind: "ticket", id: ticket },
       { verb: "ticket.updated" },
-      async () => {},
     );
     const page = await queryEvents(paths, { since: first.id });
     expect(page.map((e) => e.id)).toEqual([second.id]);

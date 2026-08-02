@@ -19,13 +19,13 @@ import {
 import {
   createSession,
   createTicket,
+  appendEvent,
   ensureDbDirs,
   type EventContext,
   listEvents,
   type RepoPaths,
   updateSession,
   updateTicket,
-  withMutationEvent,
 } from "../../src/repo/index.js";
 
 // D3: `events` command
@@ -347,12 +347,11 @@ async function buildSubstantialFixture(): Promise<SubstantialFixture> {
   // factory is what actually guarantees this).
   const burstCtx: EventContext = { actor: { name: "burst-agent", kind: "agent" }, session: null };
   for (let i = 0; i < BURST_COUNT; i++) {
-    const ev = await withMutationEvent(
+    const ev = await appendEvent(
       paths,
       burstCtx,
       { kind: "ticket", id: ticket5.id },
       { verb: "ticket.updated", payload: { i } },
-      async () => {},
     );
     allIds.push(ev.id);
     ticket5EventIds.push(ev.id);

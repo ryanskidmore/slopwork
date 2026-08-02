@@ -6,6 +6,10 @@ describe("computeGitignoreLines", () => {
     expect(computeGitignoreLines()).toContain(".slop/db/index.jsonc");
   });
 
+  it("always ignores pending mutation journals", () => {
+    expect(computeGitignoreLines()).toContain(".slop/db/mutation-journal/");
+  });
+
   it("always ignores the lock file and atomic-write temp-file globs", () => {
     const lines = computeGitignoreLines();
     expect(lines).toContain(".slop/db/.lock");
