@@ -24,7 +24,6 @@ describe("ticketSchema — minimal ticket + defaults", () => {
     const parsed = ticketSchema.parse(input);
     expect(parsed.priority).toBe(2);
     expect(parsed.labels).toEqual([]);
-    expect(parsed.adhoc).toBe(false);
     expect(parsed.blocks).toEqual([]);
     expect(parsed.relates_to).toEqual([]);
     expect(parsed.discovered_from).toEqual([]);
@@ -38,6 +37,19 @@ describe("ticketSchema — minimal ticket + defaults", () => {
 
   it("covers all six stored states, and exactly those six", () => {
     expect(TICKET_STATES).toEqual(["draft", "open", "in_progress", "review", "done", "dropped"]);
+  });
+
+  // G5 (t-uy8vo): `adhoc` used to be its own standalone stored boolean;
+  // folded into `provenance.method === "adhoc"`. A ticket file written
+  // before this change may still carry a standalone `adhoc:` key — loading
+  // it must not fail, the unknown key is simply stripped by the
+  // (non-strict) object schema, same ignore-unknown-legacy-key pattern G1
+  // established for session files' `transcript_ref`.
+  it("still loads a legacy ticket file carrying a standalone adhoc key (ignored, not fatal)", () => {
+    const input = { ...baseTicket(), adhoc: true };
+    const result = ticketSchema.safeParse(input);
+    expect(result.success).toBe(true);
+    expect(result.success && "adhoc" in result.data).toBe(false);
   });
 });
 

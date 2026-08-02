@@ -253,7 +253,7 @@ describe("B2: split + draft/undraft", () => {
       expect(child.labels).toEqual(["team:core"]);
       expect(child.priority).toBe(0);
       expect(child.owner).toBeNull();
-      expect(child.adhoc).toBe(false);
+      expect(child.provenance.method).toBe("split");
       expect(child.state).toBe("open");
     });
 

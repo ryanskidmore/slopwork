@@ -192,7 +192,7 @@ describe("status: surfaces the t-<code> short handle (ticket_01KY9RVF2DCG6TDQ8EB
     await writeTicket(paths, ticket);
     await rebuildIndex(paths);
 
-    const fakeNow = { SLOP_STATUS_FAKE_NOW: "2026-07-23T10:00:00.000Z" };
+    const fakeNow = { SLOP_FAKE_NOW: "2026-07-23T10:00:00.000Z" };
     const expectedHandle = shortTicketCode(ticket.id);
 
     const human = runSlop(["status"], paths.root, fakeNow);
@@ -249,10 +249,10 @@ async function jsonNewTicket(root: string, name: string): Promise<TicketId> {
   }
 }
 
-const originalFakeNow = process.env.SLOP_STATUS_FAKE_NOW;
+const originalFakeNow = process.env.SLOP_FAKE_NOW;
 afterEach(() => {
-  if (originalFakeNow === undefined) delete process.env.SLOP_STATUS_FAKE_NOW;
-  else process.env.SLOP_STATUS_FAKE_NOW = originalFakeNow;
+  if (originalFakeNow === undefined) delete process.env.SLOP_FAKE_NOW;
+  else process.env.SLOP_FAKE_NOW = originalFakeNow;
 });
 
 describe("runStatus (in-process)", () => {
@@ -326,7 +326,7 @@ describe("runStatus (in-process)", () => {
     expect(body.review[0]?.mr).toBe("https://example.com/pr/9");
   });
 
-  it("SLOP_STATUS_FAKE_NOW pins the clock: a session started long ago reads as stale", async () => {
+  it("SLOP_FAKE_NOW pins the clock: a session started long ago reads as stale", async () => {
     const root = await makeTempRepo("slop-status-inproc-stale-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });
     const id = await jsonNewTicket(root, "Soon-to-be-stale ticket");
@@ -339,7 +339,7 @@ describe("runStatus (in-process)", () => {
 
     // Default stale_after is 60m (DEFAULT_STALE_AFTER) — pin "now" far
     // enough past session start that the ticket must read as stale.
-    process.env.SLOP_STATUS_FAKE_NOW = new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString();
+    process.env.SLOP_FAKE_NOW = new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString();
     const out = captureOutput();
     try {
       await withCwd(root, () => runStatus({ json: true }));

@@ -168,7 +168,7 @@ describe("B1: new / show / edit / update", () => {
       expect(ticket.spec.summary).toBe("Add auth provider");
       expect(ticket.state).toBe("open");
       expect(ticket.priority).toBe(2);
-      expect(ticket.adhoc).toBe(false);
+      expect(ticket.provenance.method).toBe("new");
       expect(ticket.parent).toBeUndefined();
       expect(ticket.root_id).toBe(ticket.id);
       expect(ticket.path).toEqual([]);
@@ -395,11 +395,11 @@ describe("B1: new / show / edit / update", () => {
       expect(ticket.state).toBe("draft");
     });
 
-    it("--adhoc", async () => {
+    it("--adhoc (G5, t-uy8vo: folded into provenance.method)", async () => {
       const fixture = await makeFixture();
       const { id } = await createTicketViaCli(fixture, "Adhoc ticket", ["--adhoc"]);
       const ticket = await readTicketFile(fixture.paths, id);
-      expect(ticket.adhoc).toBe(true);
+      expect(ticket.provenance.method).toBe("adhoc");
     });
 
     it("--owner ryan", async () => {
@@ -480,7 +480,7 @@ describe("B1: new / show / edit / update", () => {
       expect(ticket.discovered_from).toEqual([originId]);
       expect(ticket.labels).toEqual(["a:b"]);
       expect(ticket.state).toBe("draft");
-      expect(ticket.adhoc).toBe(true);
+      expect(ticket.provenance.method).toBe("adhoc");
       expect(ticket.owner).toEqual({ name: "ryan", kind: "human" });
       expect(ticket.priority).toBe(0);
     });

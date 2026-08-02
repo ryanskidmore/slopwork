@@ -38,7 +38,6 @@ const STRIPPED_HARNESS_ENV: NodeJS.ProcessEnv = {
   CODEX_SANDBOX: undefined,
   CODEX_SANDBOX_NETWORK_DISABLED: undefined,
   CODEX_HOME: undefined,
-  SLOP_TEST_CLAUDE_HOME: undefined,
 };
 
 function runSlop(args: string[], cwd: string): SpawnSyncReturns<string> {

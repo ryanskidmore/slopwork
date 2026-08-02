@@ -29,8 +29,8 @@ import {
 // get one), and reused here for in_progress fixtures too so every
 // timestamp (last_activity_at / review.requested_at) is exactly
 // controlled. `status` and `ready --resumable` themselves are always
-// driven as a real CLI (spawned `dist/slop`), with their clock overrides
-// (`SLOP_STATUS_FAKE_NOW` / `SLOP_READY_FAKE_NOW`) pinning "now" for
+// driven as a real CLI (spawned `dist/slop`), with the shared
+// `SLOP_FAKE_NOW` clock override (G5, t-uy8vo) pinning "now" for
 // deterministic assertions — this IS the "clock-injected tests" the
 // criterion names.
 
@@ -235,7 +235,7 @@ describe("C5: Staleness", () => {
       expect(earlyIndex.built_at).not.toBe(lateIndex.built_at);
     });
 
-    describe("in_progress: stale_after boundary, via `status --json` + SLOP_STATUS_FAKE_NOW", () => {
+    describe("in_progress: stale_after boundary, via `status --json` + SLOP_FAKE_NOW", () => {
       it("NOT stale 1 second before the deadline", async () => {
         const paths = await makeScratchRepo("slop-c5-inprogress-before-");
         const t = makeTicket({
@@ -246,7 +246,7 @@ describe("C5: Staleness", () => {
         await writeTicket(paths, t);
         await rebuildIndex(paths);
 
-        const json = statusJson(paths.root, { SLOP_STATUS_FAKE_NOW: "2026-07-23T10:59:59.000Z" });
+        const json = statusJson(paths.root, { SLOP_FAKE_NOW: "2026-07-23T10:59:59.000Z" });
         expect(json.derived.stale).toBe(0);
         expect(json.stale).toEqual([]);
       });
@@ -261,7 +261,7 @@ describe("C5: Staleness", () => {
         await writeTicket(paths, t);
         await rebuildIndex(paths);
 
-        const json = statusJson(paths.root, { SLOP_STATUS_FAKE_NOW: "2026-07-23T11:00:01.000Z" });
+        const json = statusJson(paths.root, { SLOP_FAKE_NOW: "2026-07-23T11:00:01.000Z" });
         expect(json.derived.stale).toBe(1);
         expect(json.stale).toEqual([
           {
@@ -275,7 +275,7 @@ describe("C5: Staleness", () => {
       });
     });
 
-    describe("review: review_stale_after boundary, via `status --json` + SLOP_STATUS_FAKE_NOW", () => {
+    describe("review: review_stale_after boundary, via `status --json` + SLOP_FAKE_NOW", () => {
       it("NOT review-stale 1 second before the deadline", async () => {
         const paths = await makeScratchRepo("slop-c5-review-before-");
         const t = makeTicket({
@@ -290,7 +290,7 @@ describe("C5: Staleness", () => {
         await writeTicket(paths, t);
         await rebuildIndex(paths);
 
-        const json = statusJson(paths.root, { SLOP_STATUS_FAKE_NOW: "2026-07-23T09:59:59.000Z" });
+        const json = statusJson(paths.root, { SLOP_FAKE_NOW: "2026-07-23T09:59:59.000Z" });
         expect(json.derived.stale).toBe(0);
         expect(json.review[0]?.review_stale).toBe(false);
       });
@@ -309,7 +309,7 @@ describe("C5: Staleness", () => {
         await writeTicket(paths, t);
         await rebuildIndex(paths);
 
-        const json = statusJson(paths.root, { SLOP_STATUS_FAKE_NOW: "2026-07-23T10:00:01.000Z" });
+        const json = statusJson(paths.root, { SLOP_FAKE_NOW: "2026-07-23T10:00:01.000Z" });
         expect(json.derived.stale).toBe(1);
         expect(json.review[0]?.review_stale).toBe(true);
       });
@@ -349,8 +349,8 @@ describe("C5: Staleness", () => {
       return { staleReview, freshReview };
     }
 
-    const FAKE_NOW = { SLOP_STATUS_FAKE_NOW: "2026-07-23T12:00:00.000Z" };
-    const FAKE_NOW_READY = { SLOP_READY_FAKE_NOW: "2026-07-23T12:00:00.000Z" };
+    const FAKE_NOW = { SLOP_FAKE_NOW: "2026-07-23T12:00:00.000Z" };
+    const FAKE_NOW_READY = { SLOP_FAKE_NOW: "2026-07-23T12:00:00.000Z" };
 
     it("`status --json`: the stale review ticket is marked review_stale AND still carries its mr link; the fresh one does not surface as stale", async () => {
       const paths = await makeScratchRepo("slop-c5-status-review-");
@@ -418,7 +418,7 @@ describe("C5: Staleness", () => {
   // -------------------------------------------------------------------------
 
   describe("ready --resumable widened by staleness (active-session tickets)", () => {
-    const FAKE_NOW_READY = { SLOP_READY_FAKE_NOW: "2026-07-23T12:00:00.000Z" };
+    const FAKE_NOW_READY = { SLOP_FAKE_NOW: "2026-07-23T12:00:00.000Z" };
 
     it("in_progress WITH an active session: excluded while fresh, included once stale, with reason in_progress_stale", async () => {
       const paths = await makeScratchRepo("slop-c5-resumable-inprogress-session-");

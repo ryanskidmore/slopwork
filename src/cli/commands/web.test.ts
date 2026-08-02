@@ -65,7 +65,6 @@ function runSlop(
       CODEX_SANDBOX: undefined,
       CODEX_SANDBOX_NETWORK_DISABLED: undefined,
       CODEX_HOME: undefined,
-      SLOP_TEST_CLAUDE_HOME: undefined,
     },
   });
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };

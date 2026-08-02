@@ -81,7 +81,7 @@ export function formatTicketDetail(
   lines.push(ticket.id);
   lines.push(`slug: ${ticket.slug}`);
   lines.push(`name: ${ticket.name}`);
-  lines.push(`state: ${ticket.state}${ticket.adhoc ? "  (adhoc)" : ""}`);
+  lines.push(`state: ${ticket.state}${ticket.provenance.method === "adhoc" ? "  (adhoc)" : ""}`);
   lines.push(`priority: ${ticket.priority}`);
   lines.push(`labels: ${listOrNone(ticket.labels)}`);
   lines.push(`owner: ${ticket.owner ? `${ticket.owner.name} (${ticket.owner.kind})` : "(none)"}`);

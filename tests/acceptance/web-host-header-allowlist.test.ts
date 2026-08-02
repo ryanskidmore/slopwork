@@ -41,7 +41,7 @@ function spawnAndWaitForUrl(timeoutMs = 15_000): Promise<RunningServer> {
   return new Promise((resolve, reject) => {
     const proc = spawn("bun", [cliEntry, "web", "--port", "0"], {
       cwd: fixtureParentDir,
-      env: { ...process.env, SLOP_WEB_FAKE_NOW: FIXTURE_NOW_ISO },
+      env: { ...process.env, SLOP_FAKE_NOW: FIXTURE_NOW_ISO },
     });
     let stdout = "";
     let stderr = "";

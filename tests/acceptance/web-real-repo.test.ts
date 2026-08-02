@@ -53,7 +53,7 @@ import { shortTicketCode } from "../../src/core/index.js";
 // containing both a `javascript:` link and raw HTML — the read-side half
 // of D5's "no field rendered raw/unescaped" acceptance criterion, now
 // proven against real CLI output rather than only a hand-built fixture.
-// `SLOP_WEB_FAKE_NOW` (src/cli/commands/web.ts's testing-only clock
+// `SLOP_FAKE_NOW` (src/cli/commands/web.ts's testing-only clock
 // override, same convention D5.test.ts uses) pins the server's "now" far
 // enough past every ticket's real activity timestamp to make the
 // intentionally-stalled tickets read as stale without this file actually
@@ -96,7 +96,6 @@ const STRIPPED_HARNESS_ENV: NodeJS.ProcessEnv = {
   CODEX_SANDBOX: undefined,
   CODEX_SANDBOX_NETWORK_DISABLED: undefined,
   CODEX_HOME: undefined,
-  SLOP_TEST_CLAUDE_HOME: undefined,
 };
 
 /** {@link runSlop}'s general form — same harness-env stripping, plus
@@ -347,9 +346,9 @@ let parentTicket: NewTicketJson; // has one local child.
 let childTicket: NewTicketJson; // --parent parentTicket.
 let relatesTarget: NewTicketJson; // relates-to mainTicket, set via a scripted `slop edit` (no --relates-to flag exists).
 let discoveredTicket: NewTicketJson; // --discovered-from mainTicket; created by an actor name with an XSS payload.
-let staleTicket: NewTicketJson; // started, then left in_progress forever — stale under SLOP_WEB_FAKE_NOW below.
+let staleTicket: NewTicketJson; // started, then left in_progress forever — stale under SLOP_FAKE_NOW below.
 let staleSessionId: string;
-let reviewTicket: NewTicketJson; // started, reviewed, then left in review forever — review-stale under SLOP_WEB_FAKE_NOW below.
+let reviewTicket: NewTicketJson; // started, reviewed, then left in review forever — review-stale under SLOP_FAKE_NOW below.
 
 const JIRA_BASE = "https://real-repo-fixture.atlassian.net";
 const MR_URL = "https://github.com/real-repo-fixture/real-repo-fixture/pull/7";
@@ -505,7 +504,7 @@ beforeAll(async () => {
   review(root, reviewTicket.slug, REVIEW_TICKET_MR_URL);
   // Never done — stays in review for the lifetime of this fixture.
 
-  // SLOP_WEB_FAKE_NOW (src/cli/commands/web.ts's testing-only clock
+  // SLOP_FAKE_NOW (src/cli/commands/web.ts's testing-only clock
   // override, same convention D5.test.ts uses): every OTHER ticket in
   // this fixture ends in a terminal or never-started state (done/open),
   // which `isTicketStale` never flags regardless of the clock — only
@@ -521,7 +520,7 @@ beforeAll(async () => {
     OPENCODE: undefined,
     CODEX_SANDBOX: undefined,
     CODEX_SANDBOX_NETWORK_DISABLED: undefined,
-    SLOP_WEB_FAKE_NOW: fakeNowIso,
+    SLOP_FAKE_NOW: fakeNowIso,
   });
 }, 90_000);
 

@@ -76,7 +76,8 @@ export async function runNew(name: string, opts: NewCommandOptions): Promise<voi
         payload: {
           method: "new",
           state: built.ticket.state,
-          adhoc: built.ticket.adhoc,
+          // G5 (t-uy8vo): derived from provenance, not its own stored field.
+          adhoc: built.ticket.provenance.method === "adhoc",
           parent: built.ticket.parent ?? null,
         },
       },

@@ -11,18 +11,20 @@
  * | 0    | SUCCESS        | Command completed successfully.                         |
  * | 1    | GENERIC_ERROR  | Unexpected runtime error (I/O failure, bug, etc.).       |
  * | 2    | USAGE_ERROR    | Bad invocation — missing/invalid args or flags.          |
- * | 3    | NOT_IMPLEMENTED| RESERVED, currently unreachable — see below.             |
  * | 4    | NOT_FOUND      | A `<ref>` did not resolve to any entity, or no `.slop/`  |
  * |      |                | repo was found (`requireRepoRoot`, src/repo/paths.ts).   |
  * | 5    | AMBIGUOUS_REF  | A short-prefix or slug `<ref>` matched more than one.    |
  * | 6    | CONFLICT       | Illegal state transition / conflicting operation.        |
  *
- * NOT_IMPLEMENTED (3) was scaffolding for a command registered but not yet
- * built during early v0. By design every §4.2 command shipped a real
- * implementation before v0 was done, so no command throws this today (and
- * no test asserts one does — see tests/acceptance/A1.test.ts's own note on
- * this). Left defined, not repurposed or removed, in case a future command
- * is scaffolded the same way.
+ * Code `3` is a deliberate gap, not a typo: it was `NOT_IMPLEMENTED`,
+ * scaffolding for a command registered but not yet built during early v0.
+ * No command ever threw it (every §4.2 command shipped a real
+ * implementation before v0 was done), so G5's simplification sweep
+ * (t-uy8vo) removed it outright rather than leave reserved-but-unreachable
+ * surface around. The remaining codes keep their original numbers —
+ * `4`/`5`/`6` are NOT renumbered down to fill the gap, since any of them
+ * appearing in an agent's existing exit-code-branching logic must keep
+ * meaning exactly what it always has.
  *
  * See also README.md, which documents this table for humans.
  */
@@ -30,7 +32,6 @@ export const EXIT_CODES = {
   SUCCESS: 0,
   GENERIC_ERROR: 1,
   USAGE_ERROR: 2,
-  NOT_IMPLEMENTED: 3,
   NOT_FOUND: 4,
   AMBIGUOUS_REF: 5,
   CONFLICT: 6,

@@ -14,10 +14,10 @@
  * has gone stale (`stale_at`/`review_stale_at`, computed content-derived
  * at index-build time — db-index.ts — compared against `now` at READ time
  * — tickets/staleness.ts's `isStale`/`isReviewStale`). This command
- * supplies that `now` via {@link resolveClock}, mirroring `status.ts`'s
- * `SLOP_STATUS_FAKE_NOW` clock seam (this file's is `SLOP_READY_FAKE_NOW`
- * — `ready` had no clock override before C5; this introduces one,
- * following the same pattern) — real usage always uses `systemClock`, and
+ * supplies that `now` via `core/clock.ts`'s {@link resolveFakeClock} — the
+ * one shared `SLOP_FAKE_NOW` clock seam every clock-injecting command
+ * honors (G5, t-uy8vo; `ready` had no clock override before C5, this
+ * introduced one) — real usage always uses the system clock, and
  * `tests/acceptance/C5.test.ts` pins it for deterministic assertions.
  *
  * ## C5: a stale review ticket surfaces WITH its MR link
@@ -61,8 +61,8 @@
  * entering review without `--mr` is allowed, just nagged).
  */
 import type { Command } from "commander";
-import type { Clock, TicketId } from "../../core/index.js";
-import { fixedClock, shortTicketCode, systemClock } from "../../core/index.js";
+import type { TicketId } from "../../core/index.js";
+import { resolveFakeClock, shortTicketCode } from "../../core/index.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
 import type { StorageBackend } from "../../storage/index.js";
@@ -98,16 +98,6 @@ interface ReadyJsonRow {
   why: string;
   /** C5: only present on `review`-state rows — see module doc. */
   mr?: string | null;
-}
-
-/** Testing-only clock override — mirrors `status.ts`'s `SLOP_STATUS_FAKE_NOW`
- * (see this file's module doc, "C5: staleness feeds --resumable"). */
-function resolveClock(): Clock {
-  const raw = process.env.SLOP_READY_FAKE_NOW;
-  if (!raw) return systemClock;
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return systemClock;
-  return fixedClock(parsed);
 }
 
 /** One `readTicket` per resumable review-state ticket, to surface its MR
@@ -218,7 +208,7 @@ function hintFor(entryCount: number, resumableRequested: boolean): string | null
 export async function runReady(opts: ReadyCommandOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
-  const clock = resolveClock();
+  const clock = resolveFakeClock();
   const backend = await openStorage(paths);
   const { index } = await backend.loadIndex(clock);
 
@@ -282,7 +272,8 @@ export function registerReadyCommand(program: Command): void {
     .option("--json", "machine-readable output")
     .option(
       "--budget <n>",
-      `cap output size to N ${CONTEXT_PACK_BUDGET_UNIT} (elides lowest-priority/least-relevant tickets first)`,
+      `cap output size to N ${CONTEXT_PACK_BUDGET_UNIT} (elides least-important tickets first — ` +
+        "see 'Budget' in docs/cli-reference.md)",
       parseBudgetOption,
     )
     .action(runReady);

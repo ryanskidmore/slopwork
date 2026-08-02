@@ -154,7 +154,7 @@ describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
     const target = makeTicket({
       slug: "no-inherit-target",
       owner: { name: "ryan", kind: "human" },
-      adhoc: true,
+      provenance: { method: "adhoc", created_by: { name: "ryan", kind: "human" } },
       state: "in_progress",
       spec: {
         summary: "Target summary",
@@ -174,7 +174,7 @@ describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
     );
 
     expect(child.owner).toBeNull();
-    expect(child.adhoc).toBe(false);
+    expect(child.provenance.method).toBe("split");
     expect(child.state).toBe("open");
     expect(child.spec.summary).toBe("Fresh child");
     expect(child.spec.details_md).toBe("");

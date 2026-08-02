@@ -23,10 +23,13 @@ describe("EXIT_CODES", () => {
       SUCCESS: 0,
       GENERIC_ERROR: 1,
       USAGE_ERROR: 2,
-      NOT_IMPLEMENTED: 3,
       NOT_FOUND: 4,
       AMBIGUOUS_REF: 5,
       CONFLICT: 6,
     });
+  });
+
+  it("no longer defines NOT_IMPLEMENTED (G5, t-uy8vo: removed as reserved-unreachable surface)", () => {
+    expect(EXIT_CODES).not.toHaveProperty("NOT_IMPLEMENTED");
   });
 });
