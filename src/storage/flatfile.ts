@@ -63,6 +63,7 @@ import { isSessionId, isTicketId } from "../core/index.js";
 import type { JsoncPatchEntry } from "../core/jsonc.js";
 import type { DbIndex, DirFingerprint, LoadIndexResult } from "../core/db-index.js";
 import type {
+  EventCompactionResult,
   EventContext,
   EventQuery,
   EventShardMigrationResult,
@@ -87,8 +88,11 @@ import {
   loadIndex,
   writeIndex,
 } from "../repo/db-index.js";
+import { listAllArchivedEventBatches } from "../repo/event-archive-format.js";
+import { compactTicketEvents as compactTicketEventsInternal } from "../repo/event-compaction.js";
 import {
   appendEvent,
+  listAllEvents,
   listEvents,
   listEventShardDirs,
   listEventsInDirTolerant,
@@ -264,7 +268,16 @@ export class FlatfileBackend implements StorageBackend {
     return queryEvents(this.paths, query);
   }
 
+  /** Archive-inclusive (t-7eq5s) — see `StorageBackend.listEvents`'s doc. */
   listEvents(): Promise<Event[]> {
+    return listAllEvents(this.paths);
+  }
+
+  /** Loose-only, never touches archives (t-7eq5s) — see
+   * `StorageBackend.listLooseEvents`'s doc. No caching, matching this
+   * method's pre-compaction behavior exactly (only the TOLERANT listing
+   * below has ever been cached). */
+  listLooseEvents(): Promise<Event[]> {
     return listEvents(this.paths);
   }
 
@@ -276,8 +289,13 @@ export class FlatfileBackend implements StorageBackend {
    * second time here). A shard whose fingerprint hasn't moved since the
    * last call is served from cache untouched; only a changed (or
    * never-seen) shard is actually read + parsed.
+   *
+   * Loose-only (t-7eq5s) — never touches `events/archive/`; see
+   * {@link listEventsTolerant} (public, archive-inclusive) below, which
+   * merges this in with an (uncached — a documented follow-up, not a
+   * correctness gap) archive read every call.
    */
-  async listEventsTolerant(): Promise<ListEventsTolerantResult> {
+  private async cachedLooseEventsTolerant(): Promise<ListEventsTolerantResult> {
     const fp = await computeEventsFingerprint(this.paths);
     const shardEntries = Object.entries(fp)
       // Preserve readEvent's shard-first precedence when an id exists in
@@ -323,6 +341,35 @@ export class FlatfileBackend implements StorageBackend {
     }
 
     return mergeEventReadResults(perShard);
+  }
+
+  /**
+   * Archive-inclusive (t-7eq5s) — merges the cached loose-only listing
+   * above with every per-ticket archive (`events/archive/*.jsonc`),
+   * uncached: repos with many closed/compacted tickets pay a fresh
+   * archive re-scan on every call. See docs/storage-backends.md and this
+   * feature's PR body for why that trade-off was accepted for v0 (the hot,
+   * always-invoked paths — `loadIndex`/`buildIndex` and the done-cascade —
+   * route through the loose-only surface instead, and never pay this cost
+   * at all) and a per-archive cache (mirroring the per-shard cache above)
+   * as the natural follow-up for a `slop web` server with a large closed
+   * -ticket history.
+   */
+  async listEventsTolerant(): Promise<ListEventsTolerantResult> {
+    const [looseResult, archiveBatches] = await Promise.all([
+      this.cachedLooseEventsTolerant(),
+      listAllArchivedEventBatches(this.paths),
+    ]);
+    const merged = mergeEventReadResults([
+      { dir: this.paths.eventsDir, events: looseResult.events, problems: [] },
+      ...archiveBatches,
+    ]);
+    return {
+      events: merged.events,
+      problems: [...looseResult.problems, ...merged.problems].sort(
+        (a, b) => a.path.localeCompare(b.path) || a.kind.localeCompare(b.kind),
+      ),
+    };
   }
 
   createEventPollCursor() {
@@ -414,6 +461,23 @@ export class FlatfileBackend implements StorageBackend {
   async migrateEventShards(): Promise<EventShardMigrationResult> {
     this.invalidateCaches();
     return this.transact(() => migrateFlatEventsToShards(this.paths));
+  }
+
+  /**
+   * t-7eq5s. Deliberately does NOT wrap itself in {@link transact} — every
+   * caller (`done.ts`/`drop.ts`, right after their own terminal-state
+   * write; `slop reindex --compact`'s retroactive sweep) already invokes
+   * this from INSIDE its own `transact(...)` callback, and a second
+   * acquisition of the same lock from the same process would deadlock
+   * (lock.ts's module doc) — same convention `updateTicket`/`appendEvent`
+   * etc. already follow (no `tx` parameter enforcing this at compile time;
+   * `cascade.ts`'s `cascadeOnClose` is the one place that pattern was
+   * judged worth the extra ceremony, being a plain function outside this
+   * interface).
+   */
+  async compactTicketEvents(id: TicketId): Promise<EventCompactionResult> {
+    this.invalidateCaches();
+    return compactTicketEventsInternal(this.paths, id);
   }
 
   // --- local-file capabilities -----------------------------------------

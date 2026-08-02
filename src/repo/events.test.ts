@@ -13,6 +13,8 @@ import {
   newTicketId,
 } from "../core/index.js";
 import { writeCanonical } from "../core/jsonc.js";
+import { createEntityFileCanonical } from "./entity-file.js";
+import { EVENT_ARCHIVE_VERSION, eventArchiveFilePath } from "./event-archive-format.js";
 import * as eventsModule from "./events.js";
 import {
   type EventContext,
@@ -20,6 +22,8 @@ import {
   createEvent,
   eventFilePath,
   eventShardMonth,
+  listAllEvents,
+  listAllEventsTolerant,
   listEventIds,
   listEventShardDirs,
   listEvents,
@@ -726,5 +730,144 @@ describe("queryEvents — bounded reads (perf: since/limit bound what gets read,
 
     const page = await queryEvents(paths, { since: cursor.id, ticket: ticketA, limit: 2 });
     expect(page).toEqual(expected);
+  });
+});
+
+// t-7eq5s: archive-inclusive reads. A closed, compacted ticket's events no
+// longer sit loose at all — every read primitive that's supposed to see
+// "the complete event log" (queryEvents, readEvent's fallback,
+// listAllEvents/listAllEventsTolerant) must still find them; listEvents/
+// listEventsTolerant/listEventIds themselves stay loose-only, UNCHANGED
+// (db-index.ts's buildIndex and cascade.ts depend on that).
+describe("archive-inclusive reads (t-7eq5s)", () => {
+  async function archiveEvent(event: Event): Promise<void> {
+    await createEntityFileCanonical(eventArchiveFilePath(paths, event.entity.id as never), {
+      version: EVENT_ARCHIVE_VERSION,
+      ticket: event.entity.id,
+      events: [event],
+    });
+  }
+
+  it("listEvents/listEventsTolerant/listEventIds stay loose-only — an archived-only event is invisible to them", async () => {
+    const ticketId = newTicketId();
+    const archived = makeEvent({ entity: { kind: "ticket", id: ticketId } });
+    await archiveEvent(archived);
+
+    await expect(listEvents(paths)).resolves.toEqual([]);
+    await expect(listEventsTolerant(paths)).resolves.toEqual({ events: [], problems: [] });
+    await expect(listEventIds(paths)).resolves.toEqual([]);
+  });
+
+  it("readEvent falls back to scanning archives when an id isn't loose anywhere", async () => {
+    const ticketId = newTicketId();
+    const archived = makeEvent({ entity: { kind: "ticket", id: ticketId } });
+    await archiveEvent(archived);
+
+    await expect(readEvent(paths, archived.id)).resolves.toEqual(archived);
+  });
+
+  it("readEvent still reports NOT_FOUND for a genuinely unknown id, even with archives present", async () => {
+    const ticketId = newTicketId();
+    await archiveEvent(makeEvent({ entity: { kind: "ticket", id: ticketId } }));
+    await expect(readEvent(paths, newEventId())).rejects.toMatchObject({ exitCode: 4 });
+  });
+
+  it("queryEvents({ticket}) merges that ticket's archive with any residual loose events", async () => {
+    const ticketId = newTicketId();
+    const archived = makeEvent({ entity: { kind: "ticket", id: ticketId } });
+    await archiveEvent(archived);
+    const residual = makeEvent({ entity: { kind: "ticket", id: ticketId } });
+    await createEvent(paths, residual);
+
+    const page = await queryEvents(paths, { ticket: ticketId });
+    expect(page.map((e) => e.id).sort()).toEqual([archived.id, residual.id].sort());
+  });
+
+  it("queryEvents({ticket}) never touches a DIFFERENT ticket's archive", async () => {
+    const ticketA = newTicketId();
+    const ticketB = newTicketId();
+    await archiveEvent(makeEvent({ entity: { kind: "ticket", id: ticketA } }));
+    const bEvent = makeEvent({ entity: { kind: "ticket", id: ticketB } });
+    await createEvent(paths, bEvent);
+
+    const page = await queryEvents(paths, { ticket: ticketB });
+    expect(page.map((e) => e.id)).toEqual([bEvent.id]);
+  });
+
+  it("unscoped queryEvents (no ticket) merges every archive with the loose set", async () => {
+    const ticketA = newTicketId();
+    const ticketB = newTicketId();
+    const archivedA = makeEvent({ entity: { kind: "ticket", id: ticketA } });
+    const archivedB = makeEvent({ entity: { kind: "ticket", id: ticketB } });
+    await archiveEvent(archivedA);
+    await archiveEvent(archivedB);
+    const loose = makeEvent();
+    await createEvent(paths, loose);
+
+    const page = await queryEvents(paths);
+    expect(page.map((e) => e.id).sort()).toEqual([archivedA.id, archivedB.id, loose.id].sort());
+  });
+
+  it("unscoped queryEvents honors `since` against archived events too", async () => {
+    const ticketId = newTicketId();
+    const older = makeEventAt(Date.now() - 60_000, { entity: { kind: "ticket", id: ticketId } });
+    const newer = makeEventAt(Date.now(), { entity: { kind: "ticket", id: ticketId } });
+    await archiveEvent(older);
+    await archiveEvent(newer);
+
+    const page = await queryEvents(paths, { since: older.id });
+    expect(page.map((e) => e.id)).toEqual([newer.id]);
+  });
+
+  it("a duplicate id present both loose AND archived resolves to the loose copy (precedence)", async () => {
+    const ticketId = newTicketId();
+    const event = makeEvent({ entity: { kind: "ticket", id: ticketId } });
+    await createEvent(paths, event);
+    await archiveEvent(event);
+
+    const page = await queryEvents(paths, { ticket: ticketId });
+    expect(page).toEqual([event]);
+    await expect(readEvent(paths, event.id)).resolves.toEqual(event);
+  });
+
+  it("listAllEventsTolerant merges loose + every archive, tolerantly", async () => {
+    const ticketId = newTicketId();
+    const archived = makeEvent({ entity: { kind: "ticket", id: ticketId } });
+    await archiveEvent(archived);
+    const loose = makeEvent();
+    await createEvent(paths, loose);
+
+    const result = await listAllEventsTolerant(paths);
+    expect(result.events.map((e) => e.id).sort()).toEqual([archived.id, loose.id].sort());
+    expect(result.problems).toEqual([]);
+  });
+
+  it("listAllEvents (strict) merges loose + every archive", async () => {
+    const ticketId = newTicketId();
+    const archived = makeEvent({ entity: { kind: "ticket", id: ticketId } });
+    await archiveEvent(archived);
+    const loose = makeEvent();
+    await createEvent(paths, loose);
+
+    const events = await listAllEvents(paths);
+    expect(events.map((e) => e.id).sort()).toEqual([archived.id, loose.id].sort());
+  });
+
+  it("listAllEventsTolerant reports a wrong_shard problem for a misfiled event inside an otherwise-valid archive", async () => {
+    const ticketId = newTicketId();
+    const otherTicketId = newTicketId();
+    const belongs = makeEvent({ entity: { kind: "ticket", id: ticketId } });
+    const misfiled = makeEvent({ entity: { kind: "ticket", id: otherTicketId } });
+    await createEntityFileCanonical(eventArchiveFilePath(paths, ticketId), {
+      version: EVENT_ARCHIVE_VERSION,
+      ticket: ticketId,
+      events: [belongs, misfiled],
+    });
+
+    const result = await listAllEventsTolerant(paths);
+    expect(result.events.map((e) => e.id)).toEqual([belongs.id]);
+    expect(result.problems.some((p) => p.kind === "wrong_shard" && p.id === misfiled.id)).toBe(
+      true,
+    );
   });
 });

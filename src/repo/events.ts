@@ -85,6 +85,12 @@ export type {
 import type { EventReadProblem } from "../core/db-index.js";
 export type { EventReadProblem } from "../core/db-index.js";
 import { createEntityFileCanonical, listEntityIds, readEntityFile } from "./entity-file.js";
+import {
+  findEventInArchives,
+  listAllArchivedEventBatches,
+  listArchivedTicketIds,
+  readTicketArchive,
+} from "./event-archive-format.js";
 import { isEnoent, readDirSafe } from "./fs-utils.js";
 import type { RepoPaths } from "./paths.js";
 import {
@@ -144,6 +150,17 @@ export function eventShardMonth(id: EventId): string {
   return `${year}-${month}`;
 }
 
+/** The sharded DIRECTORY for a given `YYYY-MM` month — `events/<month>/`
+ * — regardless of whether it exists yet. Exported for
+ * `event-compaction.ts`'s post-compaction emptiness check (t-7eq5s: does
+ * this month shard have any loose files left, now that this ticket's were
+ * just folded into its archive?) — the one caller outside this module
+ * that needs a shard's directory path without already holding a specific
+ * event id to derive it from. */
+export function shardedEventDirFor(paths: RepoPaths, month: string): string {
+  return join(paths.eventsDir, month);
+}
+
 /** The sharded path `id` WOULD live at — `events/<eventShardMonth(id)>/<id>.jsonc`
  * — regardless of whether a file actually exists there yet. Private: every
  * external caller wants either the always-flat {@link eventFilePath} or
@@ -151,7 +168,7 @@ export function eventShardMonth(id: EventId): string {
  * createEvent} already do internally; nothing outside this module needs
  * to compute a shard path it hasn't verified exists. */
 function shardedEventFilePath(paths: RepoPaths, id: EventId): string {
-  return join(paths.eventsDir, eventShardMonth(id), `${id}.jsonc`);
+  return join(shardedEventDirFor(paths, eventShardMonth(id)), `${id}.jsonc`);
 }
 
 /** Whether a file exists at `path` — `stat`, ENOENT mapped to `false`,
@@ -169,6 +186,30 @@ async function fileExists(path: string): Promise<boolean> {
     if (isEnoent(err)) return false;
     throw err;
   }
+}
+
+/**
+ * Where `id` currently lives LOOSE (flat or sharded), or `null` if it
+ * doesn't — never checks archives (t-7eq5s's {@link findEventInArchives}
+ * is the archive-side counterpart). The one place `event-compaction.ts`'s
+ * `compactTicketEvents` gets a real filesystem path to remove once an
+ * event has been safely folded into its ticket's archive; `null` means
+ * "already gone" (a benign race with a concurrent/prior compaction
+ * attempt), which that caller treats as a no-op, not an error. Same
+ * shard-then-flat precedence and same-ULID-decode-failure tolerance as
+ * {@link readEvent} — see that function's doc for why.
+ */
+export async function resolveLooseEventPath(paths: RepoPaths, id: EventId): Promise<string | null> {
+  try {
+    const shardPath = shardedEventFilePath(paths, id);
+    if (await fileExists(shardPath)) return shardPath;
+  } catch {
+    // Not a valid ULID timestamp — can't have been sharded; fall through
+    // to the flat check below.
+  }
+  const flatPath = eventFilePath(paths, id);
+  if (await fileExists(flatPath)) return flatPath;
+  return null;
 }
 
 /**
@@ -198,16 +239,34 @@ async function fileExists(path: string): Promise<boolean> {
  * never-issued id exactly like any other, rather than letting a raw,
  * uncaught `ULIDError` escape this function (and surface as a GENERIC_ERROR,
  * not the NOT_FOUND every other unresolvable id gets).
+ *
+ * t-7eq5s: when `id` isn't loose ANYWHERE (flat or sharded), one more
+ * fallback runs before giving up — {@link findEventInArchives} scans every
+ * per-ticket archive for it, since a closed, compacted ticket's events no
+ * longer sit at either loose location at all. This is an O(archived
+ * tickets) scan, only ever reached for a genuinely archived-only id (see
+ * that function's own doc) — every hot, frequently-called read path in
+ * this codebase either already has the event in hand from a bulk
+ * archive-inclusive read ({@link queryEvents}, {@link listAllEvents}) or
+ * never touches archived ids at all by construction (cascade.ts).
  */
 export async function readEvent(paths: RepoPaths, id: EventId): Promise<Event> {
   const flatPath = eventFilePath(paths, id);
   let path = flatPath;
+  let foundLoose = false;
   try {
     const shardPath = shardedEventFilePath(paths, id);
-    if (await fileExists(shardPath)) path = shardPath;
+    if (await fileExists(shardPath)) {
+      path = shardPath;
+      foundLoose = true;
+    }
   } catch {
     // Not a valid ULID timestamp — can't have been sharded; fall through
     // to the flat path, which reports this id's absence normally.
+  }
+  if (!foundLoose && !(await fileExists(flatPath))) {
+    const archived = await findEventInArchives(paths, id);
+    if (archived !== null) return archived;
   }
   return readEntityFile(path, eventSchema);
 }
@@ -370,6 +429,74 @@ export async function listEventsTolerant(paths: RepoPaths): Promise<ListEventsTo
     listEventsInDirTolerant(paths.eventsDir),
   ]);
   return mergeEventReadResults(batches);
+}
+
+// --- t-7eq5s: archive-inclusive whole-db reads -----------------------------
+
+/**
+ * Like {@link listEventsTolerant}, but ALSO merges in every per-ticket
+ * archive (event-archive-format.ts) — full historical fidelity regardless
+ * of whether a given event currently sits loose or has already been
+ * compacted. This is what `StorageBackend.listEventsTolerant()` is wired
+ * to (search.ts's note-history scan, `slop questions`'s whole-db
+ * elicitations inbox, the web explorer's bulk overlay reads): every
+ * caller that wants "the complete event log," not just "today's
+ * still-live events."
+ *
+ * Deliberately a SEPARATE function from {@link listEventsTolerant}, which
+ * stays loose-only and UNCHANGED, for the two callers that must never pay
+ * archive-scanning cost on their hot paths: db-index.ts's `buildIndex`
+ * (see that module's own doc, and this feature's PR body, for why a
+ * closed/archived ticket's derived overlay never needs its archived
+ * events — anything already archived is provably superseded by the
+ * ticket's own close-time baseline; only a RESIDUAL, still-loose event can
+ * ever move it, and residual events are — by definition — still covered by
+ * the loose-only scan), and `StorageBackend.listLooseEvents()`
+ * (cascade.ts's done-cascade dedup check, whose candidates are always
+ * currently-open — hence never archived — tickets).
+ *
+ * Precedence on a duplicate id (the residual-race transitional window, or
+ * a resolved cross-clone double-close conflict — see event-archive-format.ts's
+ * module doc): the loose copy wins, matching {@link readEvent}'s own
+ * shard/flat-over-archive precedence.
+ */
+export async function listAllEventsTolerant(paths: RepoPaths): Promise<ListEventsTolerantResult> {
+  const [looseResult, archiveBatches] = await Promise.all([
+    listEventsTolerant(paths),
+    listAllArchivedEventBatches(paths),
+  ]);
+  const merged = mergeEventReadResults([
+    { dir: paths.eventsDir, events: looseResult.events, problems: [] },
+    ...archiveBatches,
+  ]);
+  return {
+    events: merged.events,
+    problems: [...looseResult.problems, ...merged.problems].sort(
+      (a, b) => a.path.localeCompare(b.path) || a.kind.localeCompare(b.kind),
+    ),
+  };
+}
+
+/** Strict counterpart to {@link listAllEventsTolerant} — throws on the
+ * first unreadable loose OR archive file (same "direct read, no
+ * skip-and-report" posture {@link listEvents} already has for the loose
+ * case; extended here to archives too). Wired to
+ * `StorageBackend.listEvents()`. */
+export async function listAllEvents(paths: RepoPaths): Promise<Event[]> {
+  const [looseEvents, ticketIds] = await Promise.all([
+    listEvents(paths),
+    listArchivedTicketIds(paths),
+  ]);
+  const archivedEventLists = await Promise.all(ticketIds.map((id) => readTicketArchive(paths, id)));
+
+  const byId = new Map<string, Event>();
+  for (const event of looseEvents) byId.set(event.id, event);
+  for (const events of archivedEventLists) {
+    for (const event of events) {
+      if (!byId.has(event.id)) byId.set(event.id, event);
+    }
+  }
+  return [...byId.values()].sort((a, b) => a.id.localeCompare(b.id));
 }
 
 /**
@@ -614,59 +741,108 @@ export function recoverMutationEvents(paths: RepoPaths): Promise<Event[]> {
  * tests/acceptance/A4.test.ts for that property exercised directly.
  *
  * Bounded read (perf): unlike a naive `listEvents` + filter-afterward, this
- * never reads or parses a file it doesn't need to. `since` is honored on
- * the id LIST first — ids sort chronologically as plain strings (this
- * module's `listEventIds` doc), so every id `<= since` is dropped before
- * any file is opened, not after. `limit` is honored while collecting
- * matches: with no `ticket` filter the id list itself is truncated to
- * `limit` before reading (so files past the window are never touched at
- * all); with a `ticket` filter — which can't be decided without reading
- * each candidate event — the scan instead stops as soon as `limit` matches
- * have been found, so files past the last match are never touched either.
- * Same events, same order as the old read-everything-then-filter version —
- * this only changes how much gets read.
+ * never reads or parses a LOOSE file it doesn't need to. `since` is
+ * honored on the id LIST first — ids sort chronologically as plain
+ * strings (this module's `listEventIds` doc), so every id `<= since` is
+ * dropped before any file is opened, not after. `limit` is honored while
+ * collecting matches: with no `ticket` filter the id list itself is
+ * truncated to `limit` before reading (so files past the window are never
+ * touched at all); with a `ticket` filter — which can't be decided without
+ * reading each candidate event — the scan instead stops as soon as
+ * `limit` matches have been found, so files past the last match are never
+ * touched either. Same events, same order as the old
+ * read-everything-then-filter version — this only changes how much gets
+ * read.
+ *
+ * t-7eq5s: ALSO merges in archived events (a closed, compacted ticket's
+ * history no longer sits loose at all) — bounded to that ONE ticket's own
+ * archive when `ticket` is given (a single extra file, cheap regardless of
+ * how much history it holds), or every archive in the db when it isn't
+ * (still bounded by closed-ticket COUNT, never by total historical event
+ * count — the whole point of compaction). `limit`, when given, is applied
+ * to EACH side (loose ids / archived events) independently before merging,
+ * not just to the final result: the true top-`limit` of the merged stream
+ * can only ever be drawn from the top-`limit` of each side considered
+ * alone (interleaving more candidates from the other side can only push a
+ * given item's rank up, never down), so slicing both sides to `limit`
+ * first is lossless and keeps the loose side's read exactly as bounded as
+ * it always was. A duplicate id (the residual cross-clone race window, or
+ * a resolved double-close conflict — event-archive-format.ts's module doc)
+ * resolves loose-wins, matching {@link readEvent}'s own precedence.
  */
 export async function queryEvents(paths: RepoPaths, query: EventQuery = {}): Promise<Event[]> {
+  const { since, ticket, limit } = query;
+
   const ids = await listEventIds(paths);
   let candidateIds: EventId[] = ids;
-  if (query.since !== undefined) {
-    const since = query.since;
+  if (since !== undefined) {
     candidateIds = candidateIds.filter((id) => id > since);
   }
 
-  const { ticket, limit } = query;
+  let archiveCandidates: Event[] =
+    ticket !== undefined
+      ? await readTicketArchive(paths, ticket)
+      : (await listAllArchivedEventBatches(paths)).flatMap((batch) => batch.events);
+  if (since !== undefined) {
+    archiveCandidates = archiveCandidates.filter((event) => event.id > since);
+  }
+  archiveCandidates.sort((a, b) => a.id.localeCompare(b.id));
 
   if (ticket === undefined) {
     // No per-event predicate beyond `since` — `limit` can bound how many
-    // files get read at all, not just how many survive a post-hoc slice.
-    if (limit !== undefined) candidateIds = candidateIds.slice(0, limit);
-    return Promise.all(candidateIds.map((id) => readEvent(paths, id)));
+    // LOOSE files get read at all, not just how many survive a post-hoc
+    // slice; the (typically far smaller) archive side is sliced the same
+    // way rather than read in full.
+    if (limit !== undefined) {
+      candidateIds = candidateIds.slice(0, limit);
+      archiveCandidates = archiveCandidates.slice(0, limit);
+    }
+    const looseEvents = await Promise.all(candidateIds.map((id) => readEvent(paths, id)));
+    const merged = mergeEventsById(looseEvents, archiveCandidates);
+    return limit !== undefined ? merged.slice(0, limit) : merged;
   }
 
+  let looseMatches: Event[];
   if (limit === undefined) {
     // A `ticket` filter can't be decided from the id alone, but with no
     // `limit` every since-filtered candidate has to be read regardless —
     // no early stop is possible — so read them in parallel exactly like
     // the unfiltered branch above, then apply the ticket predicate.
     const candidates = await Promise.all(candidateIds.map((id) => readEvent(paths, id)));
-    return candidates.filter(
+    looseMatches = candidates.filter(
       (event) => event.entity.kind === "ticket" && event.entity.id === ticket,
     );
+  } else {
+    // `ticket` + `limit` together: which ids match can't be known without
+    // reading them, so read candidates in ascending (= cursor) order and
+    // stop the moment `limit` matches have been found — still bounded to
+    // the since-filtered window above, never the whole log.
+    looseMatches = [];
+    for (const id of candidateIds) {
+      const event = await readEvent(paths, id);
+      if (event.entity.kind === "ticket" && event.entity.id === ticket) {
+        looseMatches.push(event);
+        if (looseMatches.length >= limit) break;
+      }
+    }
+    archiveCandidates = archiveCandidates.slice(0, limit);
   }
 
-  // `ticket` + `limit` together: which ids match can't be known without
-  // reading them, so read candidates in ascending (= cursor) order and
-  // stop the moment `limit` matches have been found — still bounded to
-  // the since-filtered window above, never the whole log.
-  const events: Event[] = [];
-  for (const id of candidateIds) {
-    const event = await readEvent(paths, id);
-    if (event.entity.kind === "ticket" && event.entity.id === ticket) {
-      events.push(event);
-      if (events.length >= limit) break;
+  const merged = mergeEventsById(looseMatches, archiveCandidates);
+  return limit !== undefined ? merged.slice(0, limit) : merged;
+}
+
+/** Union `groups` by event id, earlier groups winning a tie, re-sorted
+ * ascending — the one place {@link queryEvents} reconciles loose and
+ * archived candidates into a single cursor-ordered result. */
+function mergeEventsById(...groups: readonly Event[][]): Event[] {
+  const byId = new Map<string, Event>();
+  for (const group of groups) {
+    for (const event of group) {
+      if (!byId.has(event.id)) byId.set(event.id, event);
     }
   }
-  return events;
+  return [...byId.values()].sort((a, b) => a.id.localeCompare(b.id));
 }
 
 // --- G2 (shard-event-storage): explicit, opt-in migration -----------------

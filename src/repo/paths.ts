@@ -32,6 +32,11 @@ export interface RepoPaths {
   ticketsDir: string;
   sessionsDir: string;
   eventsDir: string;
+  /** Per-ticket compacted event archives (t-7eq5s) — `<ticket_id>.jsonc`,
+   * one file per ticket, written only on a terminal transition (`done`/
+   * `drop`) or by `slop reindex --compact`. Git-tracked, same as
+   * `eventsDir` itself — never gitignored. */
+  eventArchiveDir: string;
   /** Durable local state for merge-safe event polling cursors (gitignored). */
   eventCursorsDir: string;
   /** Serializes read/advance/delete operations on cursor state. */
@@ -55,6 +60,7 @@ export function repoPaths(root: string): RepoPaths {
     ticketsDir: join(dbDir, "tickets"),
     sessionsDir: join(dbDir, "sessions"),
     eventsDir: join(dbDir, "events"),
+    eventArchiveDir: join(dbDir, "events", "archive"),
     eventCursorsDir: join(dbDir, "event-cursors"),
     eventCursorLockFile: join(dbDir, ".event-cursors.lock"),
     mutationJournalDir: join(dbDir, "mutation-journal"),

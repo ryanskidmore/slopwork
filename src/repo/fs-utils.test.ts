@@ -9,7 +9,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { errorCode, isEexist, isEnoent, readDirSafe } from "./fs-utils.js";
+import { errorCode, isEexist, isEnoent, isEnotempty, readDirSafe } from "./fs-utils.js";
 
 let scratch: string;
 
@@ -52,6 +52,12 @@ describe("isEnoent / isEexist", () => {
     expect(isEexist({ code: "EEXIST" })).toBe(true);
     expect(isEexist({ code: "ENOENT" })).toBe(false);
     expect(isEexist(null)).toBe(false);
+  });
+
+  it("isEnotempty is true only for code ENOTEMPTY (t-7eq5s: best-effort shard-directory rmdir)", () => {
+    expect(isEnotempty({ code: "ENOTEMPTY" })).toBe(true);
+    expect(isEnotempty({ code: "ENOENT" })).toBe(false);
+    expect(isEnotempty(null)).toBe(false);
   });
 });
 

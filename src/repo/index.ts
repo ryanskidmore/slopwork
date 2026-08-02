@@ -17,6 +17,8 @@ export * from "./atomic-write.js";
 export * from "./config.js";
 export * from "./db-index.js";
 export * from "./entity-file.js";
+export * from "./event-archive-format.js";
+export * from "./event-compaction.js";
 export * from "./events.js";
 export * from "./event-cursor.js";
 export * from "./fs-utils.js";
