@@ -14,7 +14,7 @@
     "commit_at_start": "0633b520894ff95160feba502553bc49f3dd4689"
   },
   "started_at": "2026-08-02T14:04:22.517Z",
-  "ended_at": null,
+  "ended_at": "2026-08-02T16:50:13.826Z",
   "plan": [
     {
       "version": 1,
@@ -63,11 +63,11 @@
         },
         {
           "text": "Batch D: assess three wip/salvage-* WIPs",
-          "checked": false
+          "checked": true
         }
       ],
       "created_at": "2026-08-02T14:08:55.828Z"
     }
   ],
-  "end_summary": null
+  "end_summary": "Wrangling complete. 11 PRs vetted MERGE-READY with load-bearing evidence (5,6,7,9,10,12,13,14,15,16,17,18 minus closed 11 = 12 open... final: 5,6,7,9,10,12,13,14,15,16,17,18). PR11 closed as superseded. 3 WIP snapshots assessed: cursors+boundaries near-done (finish tickets filed), web-bounds parked on web chain. Merge-order guidance recorded in each PR body."
 }

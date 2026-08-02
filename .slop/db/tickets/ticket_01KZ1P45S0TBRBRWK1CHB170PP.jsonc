@@ -1,0 +1,36 @@
+{
+  "id": "ticket_01KZ1P45S0TBRBRWK1CHB170PP",
+  "name": "Finish wip/salvage-audit-dependency-boundaries: enforceable import boundaries",
+  "slug": "finish-wip-salvage-audit-dependency",
+  "spec": {
+    "summary": "Batch D verdict: NEAR-DONE, finish second (~1hr) — AFTER event-cursors lands (both rewrite src/storage/backend.ts). Fix CSS-import handling in the recursive cycle detector (3 failing tests), run lint/format. In-snapshot ticket ticket_01KZ15K9Z7QSNR003PSSDJ2M25.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "source:salvage"
+  ],
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ1P45S0TBRBRWK1CHB170PP",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-08-02T16:50:13.525Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-02T16:50:13.525Z",
+  "updated_at": "2026-08-02T16:50:13.525Z"
+}

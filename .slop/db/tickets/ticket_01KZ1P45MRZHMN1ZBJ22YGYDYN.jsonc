@@ -1,0 +1,36 @@
+{
+  "id": "ticket_01KZ1P45MRZHMN1ZBJ22YGYDYN",
+  "name": "Finish wip/salvage-audit-event-cursors: merge-safe polling cursors",
+  "slug": "finish-wip-salvage-audit-event",
+  "spec": {
+    "summary": "Batch D verdict: NEAR-DONE, finish first (~1hr). Fix 2 stale D3 assertions (new cursor_mode/poll_cursor JSON fields), CHANGELOG, then PR. Dead session's own ticket rides the branch (ticket_01KZ1635GW62FJ9XX71X743JHG) — reconcile on merge. Scalar ULID watermarks permanently drop late-merged events; cursor_v1 protocol fixes it.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "source:salvage"
+  ],
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ1P45MRZHMN1ZBJ22YGYDYN",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-08-02T16:50:13.330Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-02T16:50:13.330Z",
+  "updated_at": "2026-08-02T16:50:13.330Z"
+}
