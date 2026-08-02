@@ -74,10 +74,12 @@ import {
   filterResumableRows,
   renderReadyWithBudget,
 } from "../../tickets/ready.js";
-import { parseBudgetOption } from "./shared.js";
+import { collect, parseBudgetOption, parsePriority } from "./shared.js";
 
 interface ReadyCommandOptions {
-  label?: string;
+  label?: string[];
+  owner?: string;
+  priority?: number;
   resumable?: boolean;
   json?: boolean;
   budget?: number;
@@ -220,9 +222,13 @@ export async function runReady(opts: ReadyCommandOptions): Promise<void> {
   const { index } = await backend.loadIndex(clock);
 
   const resumableRequested = opts.resumable === true;
-  const ready = filterReadyRows(index.tickets, { label: opts.label });
+  // t-175oq: --label is now repeatable (AND, matching `slop list`'s own
+  // semantics) and joined by --owner/--priority — every given filter must
+  // match (see `tickets/ready.ts`'s `ReadyQueryOptions` doc).
+  const queryOptions = { labels: opts.label ?? [], owner: opts.owner, priority: opts.priority };
+  const ready = filterReadyRows(index.tickets, queryOptions);
   const resumable = resumableRequested
-    ? filterResumableRows(index.tickets, clock.now(), { label: opts.label })
+    ? filterResumableRows(index.tickets, clock.now(), queryOptions)
     : [];
   const entries = buildReadyEntries(ready, resumable);
   const hint = hintFor(entries.length, resumableRequested);
@@ -248,7 +254,14 @@ export function registerReadyCommand(program: Command): void {
   program
     .command("ready")
     .description("List ready tickets: open, no live blockers, no active session.")
-    .option("--label <label>", "filter to tickets carrying this label")
+    .option(
+      "--label <label>",
+      "filter to tickets carrying this label (repeatable; AND — every given label must be present)",
+      collect,
+      [] as string[],
+    )
+    .option("--owner <name>", "filter to tickets owned by this exact actor name")
+    .option("--priority <0-3>", "filter to tickets at exactly this priority", parsePriority)
     .option(
       "--resumable",
       "also include stopped or stale in_progress/review tickets worth resuming",

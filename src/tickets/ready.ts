@@ -50,9 +50,24 @@ import { renderEntriesWithBudget } from "../core/index.js";
 import type { IndexTicketRow } from "../repo/db-index.js";
 import { isReviewStale, isStale } from "./staleness.js";
 
+/**
+ * t-175oq: `ready`'s filter set, widened from a single `--label` to
+ * `--label` (repeatable, AND — every given label must be present, matching
+ * `slop list`'s own `--label` semantics, `tickets/list.ts`), plus `--owner`
+ * and `--priority`, so multiple actors/queues can scope their own pull
+ * request without a separate `slop list --state open` roundtrip. All three
+ * are optional and compose with AND: a row must satisfy every filter given
+ * to be kept. Preserves `ready`'s existing ordering
+ * ({@link compareReadyOrder}) and `--resumable` semantics untouched — this
+ * is purely an additional filter stage before that ordering runs.
+ */
 export interface ReadyQueryOptions {
-  /** Only rows carrying this exact label (design.md §4.2 `--label x`). */
-  label?: string;
+  /** Every label here must be present on the row (AND, not OR) — `[]`/`undefined` means no label filter. */
+  labels?: readonly string[];
+  /** Only rows owned by an actor with exactly this name (matches `slop list --owner`/the web UI's owner filter — name only, `kind` ignored, same as `sessionOwnershipWarning`'s identity axis). `IndexTicketRow.owner` (added alongside this ticket) carries the row's owner, so this needs no extra ticket read. */
+  owner?: string;
+  /** Only rows at exactly this priority (0..3). */
+  priority?: number;
 }
 
 /**
@@ -81,8 +96,26 @@ export function compareReadyOrder(a: IndexTicketRow, b: IndexTicketRow): number 
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
-function matchesLabel(row: IndexTicketRow, label: string | undefined): boolean {
-  return label === undefined || row.labels.includes(label);
+/** t-175oq: AND semantics — every one of `labels` must be present on `row.labels`; `[]`/`undefined` never filters anything out. */
+function matchesLabels(row: IndexTicketRow, labels: readonly string[] | undefined): boolean {
+  return labels === undefined || labels.every((label) => row.labels.includes(label));
+}
+
+/** Name-only comparison, matching `slop list --owner`/the web UI's owner filter and `sessionOwnershipWarning`'s identity axis — `kind` is never part of the match. */
+function matchesOwner(row: IndexTicketRow, owner: string | undefined): boolean {
+  return owner === undefined || row.owner?.name === owner;
+}
+
+function matchesPriority(row: IndexTicketRow, priority: number | undefined): boolean {
+  return priority === undefined || row.priority === priority;
+}
+
+function matchesReadyOptions(row: IndexTicketRow, options: ReadyQueryOptions): boolean {
+  return (
+    matchesLabels(row, options.labels) &&
+    matchesOwner(row, options.owner) &&
+    matchesPriority(row, options.priority)
+  );
 }
 
 /** design.md §2's `ready` query — filter + sort. See module doc for the
@@ -92,7 +125,7 @@ export function filterReadyRows(
   options: ReadyQueryOptions = {},
 ): IndexTicketRow[] {
   return rows
-    .filter((row) => row.ready === true && matchesLabel(row, options.label))
+    .filter((row) => row.ready === true && matchesReadyOptions(row, options))
     .slice()
     .sort(compareReadyOrder);
 }
@@ -141,7 +174,7 @@ export function filterResumableRows(
     if (!isResumableCandidate(row, now)) continue;
     const reason = resumableReasonFor(row.state, row.active_session !== null);
     if (reason === null) continue;
-    if (!matchesLabel(row, options.label)) continue;
+    if (!matchesReadyOptions(row, options)) continue;
     matched.push({ row, reason });
   }
   return matched.sort((a, b) => compareReadyOrder(a.row, b.row));

@@ -25,6 +25,7 @@ function makeRow(overrides: Partial<IndexTicketRow> = {}): IndexTicketRow {
     root_id: id,
     path: [],
     labels: [],
+    owner: null,
     latest_note: null,
     last_activity_at: "2026-07-23T10:00:00.000Z",
     active_session: null,
@@ -105,7 +106,7 @@ describe("filterReadyRows", () => {
   it("--label filters to rows carrying the exact label", () => {
     const withLabel = makeRow({ labels: ["area:auth"], ready: true });
     const withoutLabel = makeRow({ labels: ["area:web"], ready: true });
-    const result = filterReadyRows([withLabel, withoutLabel], { label: "area:auth" });
+    const result = filterReadyRows([withLabel, withoutLabel], { labels: ["area:auth"] });
     expect(result.map((r) => r.id)).toEqual([withLabel.id]);
   });
 
@@ -200,7 +201,7 @@ describe("filterResumableRows", () => {
   it("applies --label", () => {
     const matches = makeRow({ state: "in_progress", active_session: null, labels: ["x"] });
     const noMatch = makeRow({ state: "in_progress", active_session: null, labels: ["y"] });
-    const result = filterResumableRows([matches, noMatch], NOW, { label: "x" });
+    const result = filterResumableRows([matches, noMatch], NOW, { labels: ["x"] });
     expect(result.map((r) => r.row.id)).toEqual([matches.id]);
   });
 
