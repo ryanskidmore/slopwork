@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ11YD7HAY1EHYZ2VV34FA2H",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ11CQSZDEPJRS4V057PVAYN"
+  },
+  "payload": {
+    "progress": "Implemented claimed-directory locking with unique tokens, same-host dead-pid-only recovery, and deterministic three-party/release/same-pid race regressions; focused 56-test suite, typecheck, lint, and format checks pass."
+  },
+  "at": "2026-08-02T10:57:32.914Z"
+}

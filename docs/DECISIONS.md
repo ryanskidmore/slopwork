@@ -990,3 +990,69 @@ schema-invalid configuration; tolerant storage/index/web consumers still
 fall back exactly as documented. A shared conformance matrix covers bare
 values, quoted escapes, YAML booleans, flow maps, and block scalars through
 the core codec and through real CLI/storage/web processes.
+
+## Lock safety audit - releaseLock made token-safe, minimally (ticket_01KZ11CQSZDEPJRS4V057PVAYN)
+
+G2's simplified lock (`src/repo/lock.ts`) already closed the stale-BREAK
+TOCTOU (two contenders judging the same stale lock breakable) via an
+atomic rename-away-then-verify-by-content-match. `releaseLock` did NOT get
+the same treatment: it read the lock file, compared the recorded `pid` to
+`process.pid`, and — on a match — called a plain `rm`. That compare-then-
+delete is a TOCTOU distinct from the already-fixed break race: if THIS
+process's own release call runs late (it stalled long enough that someone
+else legitimately declared its lock stale, broke it, and reacquired
+before this process got around to releasing), a same-process reacquisition
+reads as "still mine" under a `pid`-only check — same pid, different
+acquisition — so the blind `rm` deletes the *new* rightful holder's lock
+instead of this process's own (already-gone) one. Proven directly: a
+deterministic interleaving test (`src/repo/lock.test.ts`, "release TOCTOU")
+plants a stale-by-age lock, pauses a real `releaseLock` call immediately
+after it confirms the match, lets a concurrent `acquireLock` legitimately
+reclaim and re-acquire the lock in the gap, then lets the paused release
+proceed — against `pid`-only compare-then-`rm`, the contender's fresh lock
+is destroyed; against the fix below, it survives untouched.
+
+The fix is the minimal addition that closes it, NOT a resurrection of the
+pre-G2 ~518-line fencing protocol and NOT the heavier claimed-directory
+redesign considered and rejected during this audit (see below): every
+acquisition now also records a `token` (a fresh `randomUUID()`, unique
+even across successive acquisitions by the same pid) via `LockInfo`;
+`acquireLock` returns a `LockHandle` carrying it. `releaseLock(lockPath,
+handle)` uses the SAME rename-away-then-verify shape `tryBreakStaleLock`
+already uses for breaking: rename `lockPath` to a unique
+`.lock.released-<token>` retirement path, re-read it, and only `rm` it if
+the token still matches `handle`'s — otherwise the relocated content isn't
+this acquisition's to discard, and it's renamed back untouched. No other
+lock semantics changed: acquisition is still plain `O_EXCL` file creation,
+stale-breaking is still both dead-pid (instant) and age-based
+(`staleTimeoutMs`, default 5 minutes, still able to break a live-but-slow
+holder — the accepted trade-off from G2's own decision log is unchanged),
+and there is still no per-transaction renewal or dispossession callback.
+
+**Considered and rejected: a `mkdir`-based lock directory with an
+`owner.json`/`.claim` protocol and host-scoped, dead-pid-only recovery**
+(dropping the age-based `staleTimeoutMs` fallback and requiring manual
+removal for any ambiguous case, including cross-host locks). That design
+also closes the release race above, but it is a materially bigger
+behavior change than the bug warrants: it trades away the existing
+"self-heals within one `staleTimeoutMs`" guarantee entirely (a genuinely
+hung-but-alive holder's lock would never auto-recover, full stop, not just
+in the already-accepted "broken while still alive" trade-off case) and
+adds host-identity plumbing no current call site needs. The token
+addition above closes the SAME concrete race with a much smaller diff and
+without changing any behavior this codebase's own tests already
+depend on.
+
+**Known residual, pre-existing, out of scope for this ticket:** the
+rename-then-verify-then-restore-if-mismatched shape (both `tryBreakStaleLock`
+and now `releaseLock`) has a narrower, deeper gap if a *third* independent
+acquisition lands in the brief window between a contender's rename-away and
+its restore-on-mismatch rename-back — the restore could clobber that third
+acquisition's fresh lock (`rename` replaces an existing destination on
+POSIX). This requires three genuinely concurrent actors racing the same
+lock path within a microsecond-scale window; it already exists on
+unpatched G2 main today (this ticket's fix does not introduce or worsen
+it), and closing it properly needs verify-before-relocate (e.g. the
+claim-inside-the-live-directory shape from the rejected redesign above),
+which is exactly the bigger change this ticket deliberately did not take
+on. Flagged here rather than silently left undocumented.

@@ -92,8 +92,11 @@ equivalent exclusivity server-side (see
 
 - **Acquisition** is exclusive file creation (`O_EXCL`) — atomic at the OS
   level, so it's never a check-then-create race between two processes.
-  Retries with capped backoff until the configured timeout elapses (`5s`
-  by default — configurable per repo via `config.yaml`'s
+  Every acquisition records `{pid, acquired_at, token}` — `token` is a
+  fresh random value, unique even across successive acquisitions by the
+  same pid (t-cloj2 follow-up, "make acquisition and release token-safe";
+  see below). Retries with capped backoff until the configured timeout
+  elapses (`5s` by default — configurable per repo via `config.yaml`'s
   `defaults.lock_timeout`, see
   [Configuration](configuration.md#slopconfigyaml)) before giving up
   with a `CONFLICT` (exit `6`) naming what's blocking it.
@@ -108,21 +111,33 @@ equivalent exclusivity server-side (see
   lock). This is what stops one `kill -9` from bricking the repo
   permanently.
 - **Release** always runs in a `finally`, so a thrown error mid-transaction
-  still releases the lock; release itself is a compare-and-delete against
-  the holder's own recorded pid — a process never deletes a lock that was
-  declared stale, broken, and re-acquired by someone else while it was
-  stalled, only its own still-current hold.
+  still releases the lock; release itself is the SAME rename-away
+  -then-verify shape as stale-breaking above (t-cloj2 follow-up), keyed
+  on the acquisition's `token` rather than a blind `rm`. A `pid`-only
+  compare-then-delete (the pre-follow-up shape) is a distinct TOCTOU: if
+  this process's own release call is running late — because it stalled
+  long enough for someone else to legitimately declare its lock stale,
+  break it, and reacquire — a same-pid reacquisition reads as "still
+  mine" under a `pid`-only check, so a plain `rm` would delete the *new*
+  rightful holder's lock instead of this process's own (already-gone)
+  one. `token` distinguishes the two acquisitions where `pid` alone
+  can't; renaming away and re-verifying before discarding — restoring it
+  untouched otherwise — closes the gap the same way it's already closed
+  for breaking.
 
-There is no per-acquisition fencing token or mid-transaction renewal —
-an earlier design had both (a holder doing multiple writes checked back in
-between each one, and a dispossessed holder failed loudly on its next
-check), removed because no real transaction in this codebase runs
-anywhere near the 5-minute stale timeout (every one is a handful of
-millisecond-scale file writes); the accepted trade-off is that a holder
-that genuinely runs that long could have its lock broken while still
-alive, with nothing to detect the overlap. If a future transaction ever
-needs to run long, that transaction needs redesigning, not this lock
-re-complicating.
+There is no per-acquisition fencing token that a holder checks back in
+between writes, no mid-transaction renewal, and no dispossession
+callback — an earlier design had all three (a holder doing multiple
+writes checked back in between each one, and a dispossessed holder failed
+loudly on its next check), removed because no real transaction in this
+codebase runs anywhere near the 5-minute stale timeout (every one is a
+handful of millisecond-scale file writes); the accepted trade-off is that
+a holder that genuinely runs that long could have its lock broken while
+still alive, with nothing to detect the overlap. The token this doc
+describes above is narrower and purely about release/break safety
+(telling two acquisitions apart), not that removed fencing protocol. If a
+future transaction ever needs to run long, that transaction needs
+redesigning, not this lock re-complicating.
 
 You'll only ever see this surface as an occasional retry delay under real
 contention, or a `CONFLICT` if something is genuinely stuck for the

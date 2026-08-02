@@ -33,12 +33,20 @@ const SECTION_END = "# --- end slopwork ---";
  * disk — same "ephemeral, never meant to be committed" hazard as the bare
  * `.lock`/`.tmp-*` entries above, just one glob widened to catch the
  * `.stale-*` suffix too.
+ *
+ * t-cloj2 follow-up ("make acquisition and release token-safe"): `releaseLock`
+ * uses the SAME rename-then-verify shape, via its own
+ * `.lock.released-<token>` retirement path — a crash between that rename
+ * and the matching `rm` is the identical "ephemeral artifact, never meant
+ * to be committed" hazard as `.lock.stale-*` above, just for the release
+ * side of the same protocol.
  */
 export function computeGitignoreLines(): string[] {
   return [
     ".slop/db/index.jsonc",
     ".slop/db/.lock",
     ".slop/db/.lock.stale-*",
+    ".slop/db/.lock.released-*",
     ".slop/db/.tmp-*",
     ".slop/db/*/.tmp-*",
   ];

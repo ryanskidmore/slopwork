@@ -44,10 +44,24 @@
  *     fresh, live lock contender A just legitimately created after
  *     breaking the same stale lock B read. That race is real and cheap to
  *     prevent; the fencing protocol was neither.
- *   - **Release** always runs in a `finally` and is a compare-and-delete
- *     on the recorded pid, so a process never deletes a lock that is no
- *     longer its own (e.g. its stale lock was broken and re-acquired by
- *     someone else while it slept).
+ *   - **Release** (t-cloj2 follow-up, "make acquisition and release
+ *     token-safe") always runs in a `finally` and, like stale-breaking
+ *     above, is an atomic rename-away-then-verify — NOT a read-then-
+ *     `rm`. Every acquisition records a unique `token` (a fresh
+ *     `randomUUID()`, not reused even by the same pid across successive
+ *     acquisitions); `releaseLock` takes the {@link LockHandle} `acquireLock`
+ *     returned and only ever retires the file it renamed away AFTER
+ *     re-reading it and confirming that `token` still matches. A bare
+ *     compare-then-`rm` (the pre-t-cloj2-follow-up shape) is a TOCTOU race
+ *     distinct from the stale-break one above: if a concurrent stale-break
+ *     -and-reacquire cycle lands in the gap between this process's read and
+ *     its `rm`, a `pid`-only check can't tell the two acquisitions apart
+ *     (same process, same pid, different acquisition) and the blind `rm`
+ *     deletes the fresh reacquisition instead of the (already-gone) hold it
+ *     meant to release. The rename-first shape closes it the same way it's
+ *     already closed for breaking: whatever's relocated is re-verified
+ *     before being discarded, and put back untouched if it turns out to be
+ *     someone else's live lock.
  *
  * The accepted trade (documented, deliberate): a holder that genuinely
  * runs longer than `staleTimeoutMs` can have its lock broken while still
@@ -67,6 +81,17 @@ import { isEexist, isEnoent } from "./fs-utils.js";
 export interface LockInfo {
   pid: number;
   acquired_at: string;
+  /** Unique per acquisition (a fresh `randomUUID()`, never reused — not
+   * even by the same pid across back-to-back acquisitions). `pid` alone
+   * can't distinguish "this exact hold" from "some other hold by the same
+   * process" (see {@link releaseLock}'s doc); `token` can. */
+  token: string;
+}
+
+/** Opaque handle `acquireLock` returns and `releaseLock` consumes — the
+ * caller never inspects `token` itself, just passes the handle back. */
+export interface LockHandle {
+  readonly token: string;
 }
 
 export interface AcquireLockOptions {
@@ -127,9 +152,11 @@ function tryParseLockInfo(raw: string): LockInfo | null {
       parsed !== null &&
       typeof parsed === "object" &&
       typeof (parsed as { pid?: unknown }).pid === "number" &&
-      typeof (parsed as { acquired_at?: unknown }).acquired_at === "string"
+      typeof (parsed as { acquired_at?: unknown }).acquired_at === "string" &&
+      typeof (parsed as { token?: unknown }).token === "string"
     ) {
-      return { pid: (parsed as LockInfo).pid, acquired_at: (parsed as LockInfo).acquired_at };
+      const info = parsed as LockInfo;
+      return { pid: info.pid, acquired_at: info.acquired_at, token: info.token };
     }
     return null;
   } catch {
@@ -239,12 +266,13 @@ async function tryBreakStaleLock(
  * Acquire `lockPath` exclusively, breaking a stale lock and retrying with
  * capped backoff until `timeoutMs` elapses. Throws a {@link SlopError}
  * (CONFLICT, exit 6) naming the holder if the lock is genuinely contended
- * and the timeout is reached.
+ * and the timeout is reached. Returns a {@link LockHandle} carrying this
+ * acquisition's unique `token` — pass it to {@link releaseLock}.
  */
 export async function acquireLock(
   lockPath: string,
   options: AcquireLockOptions = {},
-): Promise<void> {
+): Promise<LockHandle> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
   const staleTimeoutMs = options.staleTimeoutMs ?? DEFAULT_STALE_TIMEOUT_MS;
@@ -255,7 +283,8 @@ export async function acquireLock(
 
   for (;;) {
     try {
-      const info: LockInfo = { pid: process.pid, acquired_at: clock.now().toISOString() };
+      const token = randomUUID();
+      const info: LockInfo = { pid: process.pid, acquired_at: clock.now().toISOString(), token };
       const handle = await open(lockPath, "wx");
       try {
         await handle.writeFile(lockInfoText(info), "utf8");
@@ -263,7 +292,7 @@ export async function acquireLock(
       } finally {
         await handle.close();
       }
-      return;
+      return { token };
     } catch (err) {
       if (!isEexist(err)) throw err;
 
@@ -302,15 +331,25 @@ export async function acquireLock(
 }
 
 /**
- * Release `lockPath`, but only if it's still recorded as held by this
- * process — a compare-and-delete on the recorded pid, never a blind
- * delete. This matters for the (rare, but real) case where this process
- * held the lock, stalled long enough to be declared stale and broken by
- * someone else, and then woke back up — a blind delete here would remove
- * the *new* rightful holder's lock instead of this process's own
- * (already-gone) one. Never throws if the lock is already gone.
+ * Release the acquisition `handle` names, but only if `lockPath` is still
+ * recorded as that exact acquisition — an atomic rename-away-then-verify,
+ * the same shape {@link tryBreakStaleLock} already uses to break a stale
+ * lock, NOT a read-then-`rm`. Never throws if the lock is already gone.
+ *
+ * A plain compare-then-`rm` (comparing `pid`, since a lock file predating
+ * `token` had nothing finer) is a TOCTOU race distinct from the stale-break
+ * one `tryBreakStaleLock` already closes: if this call's own read races a
+ * concurrent stale-break-and-reacquire cycle — this process held the lock,
+ * stalled long enough to be declared stale and broken by someone else, and
+ * only then got around to releasing — a same-process reacquisition (same
+ * `pid`, fresh `token`) reads as "still mine" under a `pid`-only check, so
+ * the blind `rm` would delete the *new* rightful holder's lock instead of
+ * this process's own (already-gone) one. Renaming away first, then
+ * re-reading and confirming `token` still matches before discarding —
+ * putting it back untouched otherwise — closes that gap the same way
+ * `tryBreakStaleLock`'s rename-then-verify already closes it for breaking.
  */
-export async function releaseLock(lockPath: string): Promise<void> {
+export async function releaseLock(lockPath: string, handle: LockHandle): Promise<void> {
   let raw: string;
   try {
     raw = await readFile(lockPath, "utf8");
@@ -320,14 +359,50 @@ export async function releaseLock(lockPath: string): Promise<void> {
   }
 
   const info = tryParseLockInfo(raw);
-  if (info !== null && info.pid !== process.pid) {
-    // Our hold was declared stale and broken by someone else, who has
-    // since re-acquired it — do not delete it out from under them.
+  if (info === null || info.token !== handle.token) {
+    // Not our current hold — either already released, or our stale hold
+    // was broken and re-acquired (by us or someone else) since. Never
+    // touch it.
+    return;
+  }
+
+  const retiredPath = `${lockPath}.released-${handle.token}`;
+  try {
+    await rename(lockPath, retiredPath);
+  } catch (err) {
+    if (isEnoent(err)) return; // someone else already broke/removed it
+    throw err;
+  }
+
+  let retiredRaw: string;
+  try {
+    retiredRaw = await readFile(retiredPath, "utf8");
+  } catch (err) {
+    // We just created this path via `rename` — see `tryBreakStaleLock`'s
+    // identical defensive comment for why this is "not our win" rather
+    // than a throw.
+    if (isEnoent(err)) return;
+    throw err;
+  }
+
+  if (retiredRaw !== raw) {
+    // We relocated a DIFFERENT (live) lock than the one we just verified —
+    // a stale-break-and-reacquire cycle recreated `lockPath` in the gap
+    // between our read above and the `rename`. Put it back; that fresh
+    // acquisition is not ours to discard.
+    try {
+      await rename(retiredPath, lockPath);
+    } catch (err) {
+      // Best effort, same as `tryBreakStaleLock`: if `lockPath` is
+      // occupied again by the time we try to restore, there's nothing
+      // sane to restore into. The content is preserved at `retiredPath`.
+      if (!isEexist(err)) throw err;
+    }
     return;
   }
 
   try {
-    await rm(lockPath, { force: true });
+    await rm(retiredPath, { force: true });
   } catch (err) {
     if (!isEnoent(err)) throw err;
   }
@@ -337,17 +412,19 @@ export async function releaseLock(lockPath: string): Promise<void> {
  * Run `fn` while holding `lockPath` exclusively; always releases,
  * including when `fn` throws. This is the flatfile driver's write-scope
  * primitive — commands reach it through `StorageBackend.transact`
- * (src/storage/), never directly.
+ * (src/storage/), never directly. `fn` receives the {@link LockHandle} in
+ * case a caller ever needs to prove which acquisition it's running under;
+ * every current caller ignores it.
  */
 export async function withLock<T>(
   lockPath: string,
-  fn: () => Promise<T>,
+  fn: (lock: LockHandle) => Promise<T>,
   options?: AcquireLockOptions,
 ): Promise<T> {
-  await acquireLock(lockPath, options);
+  const lock = await acquireLock(lockPath, options);
   try {
-    return await fn();
+    return await fn(lock);
   } finally {
-    await releaseLock(lockPath);
+    await releaseLock(lockPath, lock);
   }
 }

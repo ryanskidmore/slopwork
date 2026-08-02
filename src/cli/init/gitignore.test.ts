@@ -17,6 +17,10 @@ describe("computeGitignoreLines", () => {
     expect(computeGitignoreLines()).toContain(".slop/db/.lock.stale-*");
   });
 
+  it("always ignores the .lock.released-<token> retirement-path glob (t-cloj2 follow-up: token-safe release)", () => {
+    expect(computeGitignoreLines()).toContain(".slop/db/.lock.released-*");
+  });
+
   it("the .lock.stale-* glob actually matches lock.ts's own sentinel naming (tryBreakStaleLock: `${lockPath}.stale-${token}`)", () => {
     const glob = computeGitignoreLines().find((l) => l === ".slop/db/.lock.stale-*");
     if (glob === undefined) {
@@ -29,6 +33,19 @@ describe("computeGitignoreLines", () => {
     // Must not accidentally also swallow the plain lock file under a
     // different rule's coverage assumption — both entries coexist.
     expect(regex.test(".slop/db/.lock")).toBe(false);
+  });
+
+  it("the .lock.released-* glob matches lock.ts's releaseLock retirement naming (`${lockPath}.released-${token}`) and nothing else", () => {
+    const glob = computeGitignoreLines().find((l) => l === ".slop/db/.lock.released-*");
+    if (glob === undefined) {
+      throw new Error(
+        "expected '.slop/db/.lock.released-*' to be present in the generated gitignore lines",
+      );
+    }
+    const regex = new RegExp(`^${glob.replace(/\*/g, ".*")}$`);
+    expect(regex.test(".slop/db/.lock.released-01ARZ3NDEKTSV4RRFFQ69G5FAV")).toBe(true);
+    expect(regex.test(".slop/db/.lock")).toBe(false);
+    expect(regex.test(".slop/db/.lock.stale-01ARZ3NDEKTSV4RRFFQ69G5FAV")).toBe(false);
   });
 
   it("the generated glob entries actually match a stray .lock and a stray tickets/.tmp-* left by a killed process", () => {
