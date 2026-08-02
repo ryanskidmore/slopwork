@@ -12,7 +12,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "done",
   "priority": 1,
   "labels": [
     "group:g3",
@@ -25,8 +25,8 @@
   "root_id": "ticket_01KYZP89SKDFS5RE7NDE2J8W82",
   "path": [],
   "active_session": null,
-  "last_activity_at": "2026-08-01T22:13:59.781Z",
-  "latest_note": null,
+  "last_activity_at": "2026-08-02T10:33:02.112Z",
+  "latest_note": "PRs #3/#4 merged; content landed on main via the stranded-stack merge (4811002). list/ready filters/bulk ops/graph editing/slug healing + full elicitations live. CI coverage gate tracked in t-mx6bq.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -36,5 +36,5 @@
     }
   },
   "created_at": "2026-08-01T22:13:59.781Z",
-  "updated_at": "2026-08-01T22:13:59.781Z"
+  "updated_at": "2026-08-02T10:33:02.112Z"
 }

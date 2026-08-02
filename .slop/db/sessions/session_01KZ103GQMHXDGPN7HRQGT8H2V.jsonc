@@ -1,0 +1,39 @@
+{
+  "id": "session_01KZ103GQMHXDGPN7HRQGT8H2V",
+  "ticket": "ticket_01KZ1036AQGKG5PN8RN3D0GAEY",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "d4635e1a-1026-4110-a973-7e19232602ca"
+  },
+  "git": {
+    "branch": "main",
+    "commit_at_start": "248f156c2f2cb6f48f1bda7044591bef364a0dad"
+  },
+  "started_at": "2026-08-02T10:25:23.188Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Merge stranded g3 branch (G3+G4) into main",
+          "checked": true
+        },
+        {
+          "text": "Diagnose CI failure (coverage thresholds + missing in-process command tests)",
+          "checked": true
+        },
+        {
+          "text": "Spawn coverage-fix subagent; land tests; CI green",
+          "checked": false
+        }
+      ],
+      "created_at": "2026-08-02T10:31:47.807Z"
+    }
+  ],
+  "end_summary": null
+}

@@ -1,0 +1,20 @@
+{
+  "id": "session_01KZ0NT3XZRM82BJNW7987ZHQ0",
+  "ticket": "ticket_01KYZP986BBWTJAP9E9ZW0ZZSH",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "d4635e1a-1026-4110-a973-7e19232602ca"
+  },
+  "git": {
+    "branch": "main",
+    "commit_at_start": "fbc24e6a4842767bc3693c14ace5ce319fcf9318"
+  },
+  "started_at": "2026-08-02T07:25:29.406Z",
+  "ended_at": "2026-08-02T10:33:01.689Z",
+  "plan": [],
+  "end_summary": "PR #2 merged; content landed on main via the stranded-stack merge (4811002). Storage interface + flatfile driver + remote stub + wire contract + event sharding + lock simplification + unified overlay fold all live. CI coverage gate tracked separately in t-mx6bq."
+}

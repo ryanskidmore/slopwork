@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ10HHB37JB308WGF2QJKX76",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": "session_01KZ0SKJ32NK9R7SNKRQPYNE2T",
+  "verb": "session.ended",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KZ0SKJ32NK9R7SNKRQPYNE2T"
+  },
+  "payload": {
+    "reason": "done",
+    "note": "PRs #3/#4 merged; content landed on main via the stranded-stack merge (4811002). list/ready filters/bulk ops/graph editing/slug healing + full elicitations live. CI coverage gate tracked in t-mx6bq."
+  },
+  "at": "2026-08-02T10:33:02.563Z"
+}

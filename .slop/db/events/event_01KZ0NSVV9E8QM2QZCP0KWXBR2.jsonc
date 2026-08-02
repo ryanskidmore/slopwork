@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ0NSVV9E8QM2QZCP0KWXBR2",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F"
+  },
+  "payload": {
+    "progress": "PR #2 open, restacked onto main after PR #1 merged. Gate green: 1851 tests. StorageBackend interface (src/storage/backend.ts) + flatfile driver + remote stub + wire contract (docs/storage-backends.md) + monthly event sharding + simplified lock + unified overlay fold. Web cache ticket resolved as side effect. Follow-ups reported: init does not prompt for backend/lock_timeout; remote driver has no real HTTP client yet; remote-auth failures map to GENERIC_ERROR; strict listEvents path uncached."
+  },
+  "at": "2026-08-02T07:25:21.129Z"
+}

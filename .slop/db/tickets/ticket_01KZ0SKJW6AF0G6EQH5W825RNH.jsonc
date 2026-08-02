@@ -1,0 +1,41 @@
+{
+  "id": "ticket_01KZ0SKJW6AF0G6EQH5W825RNH",
+  "name": "Post-G3 polish: argv shim for --blocks/--relates-to, edit messages, tutorial examples",
+  "slug": "post-g3-polish-argv-shim",
+  "spec": {
+    "summary": "Small follow-ups from the G3 report: extend the Commander argv shim to --blocks/--relates-to (same leading-dash hazard --label/--discovered-from had); slop edit refusal messages should name the new update flags (--clear-owner/--clear-parent/--discovered-from); refresh docs/getting-started.md examples for list/bulk/ask-era workflows.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "group:g5",
+    "source:product-audit"
+  ],
+  "adhoc": false,
+  "parent": "ticket_01KYZP8A340W5A8X70TYQ6XVT8",
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KYZP8A340W5A8X70TYQ6XVT8",
+  "path": [
+    "ticket_01KYZP8A340W5A8X70TYQ6XVT8"
+  ],
+  "active_session": null,
+  "last_activity_at": "2026-08-02T08:31:49.641Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-02T08:31:49.641Z",
+  "updated_at": "2026-08-02T08:31:49.641Z"
+}

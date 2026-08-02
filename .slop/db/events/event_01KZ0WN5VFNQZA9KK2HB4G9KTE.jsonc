@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ0WN5VFNQZA9KK2HB4G9KTE",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYZP8A340W5A8X70TYQ6XVT8"
+  },
+  "payload": {
+    "progress": "G5 subagent (Sonnet) spawned; branch feat/g5-simplification stacked on origin/feat/g4-elicitations. Covers t-5vj9o, t-ukxun, t-uy8vo, t-drz1d, t-z4ci3 plus small extras from earlier group reports (BOOTSTRAP_DEFAULTS, env-strip leftovers, stale command counts)."
+  },
+  "at": "2026-08-02T09:25:07.567Z"
+}

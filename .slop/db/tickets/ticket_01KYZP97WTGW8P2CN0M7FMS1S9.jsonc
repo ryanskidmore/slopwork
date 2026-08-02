@@ -12,7 +12,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "done",
   "priority": 1,
   "labels": [
     "group:g2",
@@ -28,8 +28,8 @@
     "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F"
   ],
   "active_session": null,
-  "last_activity_at": "2026-08-01T22:14:30.557Z",
-  "latest_note": null,
+  "last_activity_at": "2026-08-02T10:33:01.567Z",
+  "latest_note": "PR #2 merged; content landed on main via the stranded-stack merge (4811002). Storage interface + flatfile driver + remote stub + wire contract + event sharding + lock simplification + unified overlay fold all live. CI coverage gate tracked separately in t-mx6bq.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -39,5 +39,5 @@
     }
   },
   "created_at": "2026-08-01T22:14:30.557Z",
-  "updated_at": "2026-08-01T22:14:30.557Z"
+  "updated_at": "2026-08-02T10:33:01.567Z"
 }

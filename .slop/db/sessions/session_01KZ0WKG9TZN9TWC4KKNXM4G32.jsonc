@@ -1,0 +1,39 @@
+{
+  "id": "session_01KZ0WKG9TZN9TWC4KKNXM4G32",
+  "ticket": "ticket_01KYZP8A340W5A8X70TYQ6XVT8",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "d4635e1a-1026-4110-a973-7e19232602ca"
+  },
+  "git": {
+    "branch": "main",
+    "commit_at_start": "f7159a586f992e14d292253804dd45c2c677df9f"
+  },
+  "started_at": "2026-08-02T09:24:12.730Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Spawn G5 worktree subagent: simplification sweep",
+          "checked": true
+        },
+        {
+          "text": "Review agent report + PR",
+          "checked": false
+        },
+        {
+          "text": "Mark epic + children in review with MR link",
+          "checked": false
+        }
+      ],
+      "created_at": "2026-08-02T09:24:12.874Z"
+    }
+  ],
+  "end_summary": null
+}
