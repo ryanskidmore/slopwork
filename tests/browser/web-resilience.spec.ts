@@ -73,6 +73,88 @@ test("failed review fetch reaches retry and recovers", async ({ page }) => {
   expect(attempts).toBe(2);
 });
 
+test("review panel load-more fetches and appends the next page", async ({ page }) => {
+  const pageOne = {
+    config: {
+      project: "fixture",
+      warning: null,
+      remotes: { repo: null, jira: null },
+      defaults: { stale_after: "60m", review_stale_after: "24h" },
+      integrity: { event_problems: [] },
+    },
+    tickets: [
+      {
+        id: "ticket_01LOADMOREPAGEONE00000001",
+        handle: "t-lm001",
+        name: "Load-more page one ticket",
+        slug: "load-more-page-one-ticket",
+        state: "review",
+        priority: 2,
+        labels: [],
+        owner: null,
+        adhoc: false,
+        last_activity_at: "2026-07-20T10:00:00.000Z",
+        latest_note: null,
+        created_at: "2026-07-20T10:00:00.000Z",
+        updated_at: "2026-07-20T10:00:00.000Z",
+        parent: { kind: "none" },
+        overlay: {
+          blocked: false,
+          blocked_by: [],
+          stale: false,
+          stale_reason: null,
+          awaiting_input: false,
+          awaiting_input_reason: null,
+        },
+        review: {
+          mr: null,
+          requested_at: "2026-07-20T10:00:00.000Z",
+          by: { name: "reviewer", kind: "human" },
+          awaiting_ms: 1_000,
+        },
+      },
+    ],
+    pagination: { page: 1, limit: 1, total: 2, total_pages: 2, previous_page: null, next_page: 2 },
+  };
+  const pageTwo = {
+    ...pageOne,
+    tickets: [
+      {
+        ...pageOne.tickets[0],
+        id: "ticket_01LOADMOREPAGETWO00000002",
+        handle: "t-lm002",
+        name: "Load-more page two ticket",
+        slug: "load-more-page-two-ticket",
+      },
+    ],
+    pagination: { page: 2, limit: 1, total: 2, total_pages: 2, previous_page: 1, next_page: null },
+  };
+
+  await page.route("**/api/review*", async (route) => {
+    const url = new URL(route.request().url());
+    const body = url.searchParams.get("page") === "2" ? pageTwo : pageOne;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(body),
+    });
+  });
+
+  await page.goto("/review");
+  await expect(page.getByRole("link", { name: "Load-more page one ticket" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Load-more page two ticket" })).not.toBeVisible();
+  await expect(page.getByText("Showing 1 of 2 tickets")).toBeVisible();
+
+  const loadMore = page.getByRole("button", { name: "Load more" });
+  await expect(loadMore).toBeVisible();
+  await loadMore.click();
+
+  await expect(page.getByRole("link", { name: "Load-more page two ticket" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Load-more page one ticket" })).toBeVisible();
+  await expect(page.getByText("Showing 2 of 2 tickets")).toBeVisible();
+  await expect(page.getByText("All loaded")).toBeVisible();
+});
+
 test("mobile navigation keeps names, keyboard operation, and coherent layout", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/tree");

@@ -40,13 +40,13 @@ function writeExpanded(expanded: ReadonlySet<string>): void {
 
 function branchIds(nodes: readonly TreeNodeDTO[]): string[] {
   return nodes.flatMap((node) => [
-    ...(node.children.length > 0 ? [node.ticket.id] : []),
+    ...(node.has_children ? [node.ticket.id] : []),
     ...branchIds(node.children),
   ]);
 }
 
 function defaultExpanded(nodes: readonly TreeNodeDTO[]): Set<string> {
-  return new Set(nodes.filter((node) => node.children.length > 0).map((node) => node.ticket.id));
+  return new Set(nodes.filter((node) => node.has_children).map((node) => node.ticket.id));
 }
 
 function TreeNode({
@@ -60,7 +60,7 @@ function TreeNode({
   expanded: ReadonlySet<string>;
   onToggle: (id: string) => void;
 }) {
-  const hasChildren = node.children.length > 0;
+  const hasChildren = node.has_children;
   const isExpanded = hasChildren && expanded.has(node.ticket.id);
   const toggleLabel = `${isExpanded ? "Collapse" : "Expand"} children of ${node.ticket.name}`;
 
@@ -104,6 +104,18 @@ function TreeNode({
           <OverlayBadges overlay={node.ticket.overlay} />
           <LabelChips labels={node.ticket.labels} />
           {node.external_parent && <ExternalParentBadge parent={node.external_parent} />}
+          {node.children_truncated && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="rounded-md border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
+                  +more
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                Not every child of {node.ticket.name} is shown — the tree view is bounded.
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
       </div>
       {isExpanded && (
@@ -210,6 +222,14 @@ export function TreePage() {
       )}
 
       {error && <QueryErrorState title="Ticket tree unavailable" error={error} onRetry={retry} />}
+
+      {data && data.truncated && (
+        <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          Showing {data.returned} of {data.total} tickets — this view is bounded (max{" "}
+          {data.bounds.max_nodes} nodes, {data.bounds.max_depth} levels deep). Narrow your search or
+          use the ticket list for the full set.
+        </p>
+      )}
 
       {data && data.roots.length === 0 && (
         <EmptyState
