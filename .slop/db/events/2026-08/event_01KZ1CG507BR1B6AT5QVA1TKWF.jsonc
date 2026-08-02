@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ1CG507BR1B6AT5QVA1TKWF",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": "session_01KZ103GQMHXDGPN7HRQGT8H2V",
+  "verb": "session.ended",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KZ103GQMHXDGPN7HRQGT8H2V"
+  },
+  "payload": {
+    "reason": "done",
+    "note": "Main CI green (run 30751034628): stranded G3/G4 landed via 4811002, coverage gate closed by PR #8's in-process tests. Both acceptance criteria met."
+  },
+  "at": "2026-08-02T14:02:00.071Z"
+}

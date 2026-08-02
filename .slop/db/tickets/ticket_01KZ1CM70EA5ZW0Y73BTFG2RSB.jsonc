@@ -1,0 +1,36 @@
+{
+  "id": "ticket_01KZ1CM70EA5ZW0Y73BTFG2RSB",
+  "name": "Wrangle orphaned audit-fix program from dead session",
+  "slug": "wrangle-orphaned-audit-fix-program",
+  "spec": {
+    "summary": "A parallel session running an audit-fix program died mid-flight: PRs #5/#6/#7 open, 10 more branches pushed without PRs, 3 dirty /tmp worktrees. Salvaged WIP to wip/salvage-* branches. Now: rebase+gate+verdict the 3 open PRs against post-G2/G5 main; inventory the rest for Ryan's decision.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "in_progress",
+  "priority": 1,
+  "labels": [
+    "source:salvage"
+  ],
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ1CM70EA5ZW0Y73BTFG2RSB",
+  "path": [],
+  "active_session": "session_01KZ1CMG3NR26DWQNXFHVS0601",
+  "last_activity_at": "2026-08-02T14:04:22.586Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-02T14:04:13.289Z",
+  "updated_at": "2026-08-02T14:04:22.586Z"
+}

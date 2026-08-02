@@ -13,20 +13,19 @@
     "meta": {},
     "v": 1
   },
-  "state": "review",
+  "state": "done",
   "priority": 0,
   "labels": [
     "source:ci"
   ],
-  "adhoc": false,
   "blocks": [],
   "relates_to": [],
   "discovered_from": [],
   "root_id": "ticket_01KZ1036AQGKG5PN8RN3D0GAEY",
   "path": [],
-  "active_session": "session_01KZ103GQMHXDGPN7HRQGT8H2V",
-  "last_activity_at": "2026-08-02T11:12:00.258Z",
-  "latest_note": null,
+  "active_session": null,
+  "last_activity_at": "2026-08-02T14:02:00.078Z",
+  "latest_note": "Main CI green (run 30751034628): stranded G3/G4 landed via 4811002, coverage gate closed by PR #8's in-process tests. Both acceptance criteria met.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -36,13 +35,5 @@
     }
   },
   "created_at": "2026-08-02T10:25:12.611Z",
-  "updated_at": "2026-08-02T11:12:00.258Z",
-  "review": {
-    "mr": "https://github.com/ryanskidmore/slopwork/pull/8",
-    "requested_at": "2026-08-02T11:12:00.258Z",
-    "by": {
-      "name": "coordinator",
-      "kind": "agent"
-    }
-  }
+  "updated_at": "2026-08-02T14:02:00.078Z"
 }

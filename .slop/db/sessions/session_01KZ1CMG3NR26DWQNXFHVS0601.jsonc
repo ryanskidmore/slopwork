@@ -1,0 +1,39 @@
+{
+  "id": "session_01KZ1CMG3NR26DWQNXFHVS0601",
+  "ticket": "ticket_01KZ1CM70EA5ZW0Y73BTFG2RSB",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "d4635e1a-1026-4110-a973-7e19232602ca"
+  },
+  "git": {
+    "branch": "main",
+    "commit_at_start": "0633b520894ff95160feba502553bc49f3dd4689"
+  },
+  "started_at": "2026-08-02T14:04:22.517Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Salvage dirty worktree WIP to wip/salvage-* branches",
+          "checked": true
+        },
+        {
+          "text": "Rebase+gate+verdict PRs 5/6/7 via subagent",
+          "checked": false
+        },
+        {
+          "text": "Inventory PR-less branches; Ryan decides their fate",
+          "checked": false
+        }
+      ],
+      "created_at": "2026-08-02T14:04:22.776Z"
+    }
+  ],
+  "end_summary": null
+}
