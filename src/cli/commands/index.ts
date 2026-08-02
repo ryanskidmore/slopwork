@@ -17,6 +17,7 @@ import { registerEditCommand } from "./edit.js";
 import { registerEventsCommand } from "./events.js";
 import { registerInitCommand } from "./init.js";
 import { registerInstructionsCommand } from "./instructions.js";
+import { registerListCommand } from "./list.js";
 import { registerNewCommand } from "./new.js";
 import { registerPlanCommand } from "./plan.js";
 import { registerReadyCommand } from "./ready.js";
@@ -59,6 +60,7 @@ export function registerCommands(program: Command): void {
   program.commandsGroup("Inspecting:");
   registerStatusCommand(program);
   registerShowCommand(program);
+  registerListCommand(program);
   registerSearchCommand(program);
   registerEventsCommand(program);
   registerWebCommand(program);
