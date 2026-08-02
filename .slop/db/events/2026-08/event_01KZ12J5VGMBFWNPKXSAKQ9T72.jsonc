@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ12J5VGMBFWNPKXSAKQ9T72",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ124Q5PHPJC0891677MMBFQ"
+  },
+  "payload": {
+    "progress": "Implemented one check:required gate used verbatim by CI and release, forced workflow_dispatch onto the dry-run publish step while real publish requires a v* tag push, and added a prepack-backed verifier that packs, installs, checks installed source/assets, and executes the installed launcher. Workflow/YAML contract tests, packaging tests, format, lint, typecheck, build, compiled smoke, and package smoke pass."
+  },
+  "at": "2026-08-02T11:08:20.720Z"
+}

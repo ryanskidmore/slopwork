@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ129ZH09AM3YJ6HZXS1DTRT",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ124Q5PHPJC0891677MMBFQ"
+  },
+  "payload": {
+    "progress": "Confirmed release workflow_dispatch defaults to a real publish path, release runs plain tests while CI uses coverage thresholds, and CI only inspects npm pack metadata. Designed one check:required package script for both workflows, dry-run-only manual dispatch, and a self-contained tarball pack/install/execute verifier."
+  },
+  "at": "2026-08-02T11:03:52.096Z"
+}

@@ -1,0 +1,44 @@
+{
+  "id": "ticket_01KZ124Q5PHPJC0891677MMBFQ",
+  "name": "Harden release and package verification",
+  "slug": "harden-release-and-package-verification",
+  "spec": {
+    "summary": "Guard manual releases and verify the installable tarball through one shared CI/release contract.",
+    "details_md": "Manual workflow dispatch can currently publish arbitrary refs, release validation is weaker than CI, and package checks do not install or execute the packed artifact. Make manual dispatch dry-run-only, centralize required validation, and add deterministic installed-tarball verification.",
+    "acceptance": [
+      "Manual workflow_dispatch cannot publish a package from an arbitrary ref.",
+      "CI and release reuse the same required validation commands and deterministic package verifier.",
+      "The verifier packs and installs the tarball, executes slop --version and --help, and checks runtime entry and generated web assets."
+    ],
+    "context": [
+      ".github/workflows/ci.yml",
+      ".github/workflows/release.yml",
+      "package.json",
+      "docs/RELEASE.md"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "in_progress",
+  "priority": 1,
+  "labels": [],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ124Q5PHPJC0891677MMBFQ",
+  "path": [],
+  "active_session": "session_01KZ124ZB5T27QRJYM76EPDEBZ",
+  "last_activity_at": "2026-08-02T11:01:08.072Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-08-02T11:00:59.759Z",
+  "updated_at": "2026-08-02T11:01:08.072Z"
+}

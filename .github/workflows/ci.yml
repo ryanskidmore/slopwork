@@ -13,6 +13,7 @@ concurrency:
 
 jobs:
   ci:
+    # Keep this stable: branch protection may key its required check by name.
     name: install, lint, typecheck, test+coverage, build
     runs-on: ubuntu-latest
     steps:
@@ -38,55 +39,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Lint
-        run: bun run lint
-
-      - name: Format check
-        run: bun run format:check
-
-      - name: Typecheck
-        run: bun run typecheck
-
-      # `test:coverage` runs the exact same suite as `test` (see
-      # vitest.config.ts's `include`) plus coverage + threshold enforcement,
-      # so it subsumes a plain `test` run — running both back to back would
-      # execute the whole suite twice for no benefit.
-      - name: Test (with coverage; enforces the thresholds in vitest.config.ts)
-        run: bun run test:coverage
-
-      - name: Build
-        run: bun run build
-
-      - name: Smoke test the compiled binary
-        run: ./dist/slop --help
-
-      - name: Verify npm package contents
-        run: |
-          set -euo pipefail
-          npm pack --dry-run --json 2>/dev/null | bun -e '
-            const data = JSON.parse(await Bun.stdin.text());
-            const pkg = data[0];
-            const paths = pkg.files.map((f) => f.path);
-
-            if (pkg.name !== "slopwork") {
-              console.error(`unexpected package name: ${pkg.name}`);
-              process.exit(1);
-            }
-
-            const disallowed = paths.filter(
-              (p) => p.startsWith("dist/") || p.includes("node_modules"),
-            );
-            if (disallowed.length > 0) {
-              console.error(`disallowed paths in tarball: ${disallowed.join(", ")}`);
-              process.exit(1);
-            }
-
-            const required = ["package.json", "README.md", "LICENSE", "bin/slop.mjs"];
-            const missing = required.filter((r) => !paths.includes(r));
-            if (missing.length > 0) {
-              console.error(`missing required paths in tarball: ${missing.join(", ")}`);
-              process.exit(1);
-            }
-
-            console.log(`OK: ${pkg.name}@${pkg.version} — ${paths.length} files, ${pkg.size} bytes packed`);
-          '
+      # One repository-owned gate is shared with release.yml, so release
+      # cannot silently use weaker tests or a different package smoke test.
+      - name: Run required gate
+        run: bun run check:required
