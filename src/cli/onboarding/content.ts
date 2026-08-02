@@ -49,7 +49,7 @@ export const WHEN_TO_ACT: readonly WhenToActRow[] = [
   },
   {
     situation: 'Told "pick up the next thing"',
-    action: "`slop ready --json --budget 3000` → `slop start <top item>`",
+    action: "`slop ready --json --budget 3000` (actionable leaves only) → `slop start <top item>`",
   },
   {
     situation: "About to start non-trivial work that has no ticket",

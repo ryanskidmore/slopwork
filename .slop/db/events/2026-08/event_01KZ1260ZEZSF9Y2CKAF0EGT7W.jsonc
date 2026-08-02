@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ1260ZEZSF9Y2CKAF0EGT7W",
+  "actor": {
+    "name": "codex-ready-audit",
+    "kind": "human"
+  },
+  "session": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM",
+  "verb": "review.requested",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ11E6CJYM9EQEJR3VAW9411"
+  },
+  "payload": {
+    "mr": "https://github.com/ryanskidmore/slopwork/pull/6"
+  },
+  "at": "2026-08-02T11:01:42.510Z"
+}

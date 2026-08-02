@@ -22,7 +22,7 @@ Slopwork (`slop`) tracks work as a dependency graph of tickets. You read it to k
 | Situation | Do this |
 |---|---|
 | Told "work on X" (id, slug, or jira ref) | `slop show X --context` → if it has open subtickets, pick/start the right one; else `slop start X` |
-| Told "pick up the next thing" | `slop ready --json --budget 3000` → `slop start <top item>` |
+| Told "pick up the next thing" | `slop ready --json --budget 3000` (actionable leaves only) → `slop start <top item>` |
 | About to start non-trivial work that has no ticket | `slop new "…"` first (ask the human if unsure it's wanted), then `start` it |
 | Discover a bug/follow-up mid-task | `slop new "…" --discovered-from <current>` — never a TODO comment, never "I'll mention it later" |
 | Blocked by missing work | `slop new "<what's missing>" --blocks <current>` to file the blocker (it blocks this ticket), tell the human |

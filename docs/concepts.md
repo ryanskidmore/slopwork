@@ -194,8 +194,12 @@ the current clock.
   decrement-by-one is provably wrong for a diamond dependency: closing one
   of two live blockers must not flip a ticket to unblocked while the other
   is still live).
-- **`ready`** — `state === "open" ∧ no live blockers ∧ active_session === null`.
-  Drafts and in-review tickets never qualify, no matter what.
+- **`ready`** — `state === "open" ∧ no live blockers ∧ active_session === null ∧
+  no nonterminal descendants`. The descendant check is transitive: any
+  `draft`, `open`, `in_progress`, or `review` descendant makes the ticket an
+  umbrella rather than actionable leaf work, even when that descendant is
+  blocked or awaiting input. `done` and `dropped` descendants do not suppress
+  their parent. Drafts and in-review tickets never qualify themselves.
 - **`stale`** — `in_progress` *or* `review` with no activity past a
   configured threshold. This is a **deadline**, not a boolean: the index
   stores `last_activity_at + stale_after` (in_progress) or

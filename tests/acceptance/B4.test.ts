@@ -403,6 +403,58 @@ describe("B4: Derivations", () => {
   // -------------------------------------------------------------------------
 
   describe("ready query surface", () => {
+    it("returns actionable leaves across deep trees, terminal children, unpickable children, and resumable umbrellas", async () => {
+      const root = await makeCliFixture();
+
+      const deepRoot = newTicketCli(root, "deep umbrella");
+      const deepChild = newTicketCli(root, "deep child", ["--parent", deepRoot.id]);
+      const grandchild = newTicketCli(root, "deep grandchild", ["--parent", deepChild.id]);
+
+      const terminalRoot = newTicketCli(root, "terminal umbrella");
+      const doneChild = newTicketCli(root, "done child", ["--parent", terminalRoot.id]);
+      const droppedChild = newTicketCli(root, "dropped child", ["--parent", terminalRoot.id]);
+      const startDone = runSlop(["start", doneChild.id], root);
+      expect(startDone.status, startDone.stderr).toBe(0);
+      const done = runSlop(["done", doneChild.id, "--note", "verified"], root);
+      expect(done.status, done.stderr).toBe(0);
+      const dropped = runSlop(["drop", droppedChild.id, "--reason", "not needed"], root);
+      expect(dropped.status, dropped.stderr).toBe(0);
+
+      const blockedRoot = newTicketCli(root, "blocked-child umbrella");
+      const blockedChild = newTicketCli(root, "blocked child", ["--parent", blockedRoot.id]);
+      const blocker = newTicketCli(root, "child blocker", ["--blocks", blockedChild.id]);
+
+      const awaitingRoot = newTicketCli(root, "awaiting-child umbrella");
+      const awaitingChild = newTicketCli(root, "awaiting child", ["--parent", awaitingRoot.id]);
+      const asked = runSlop(["ask", awaitingChild.id, "Which path?"], root);
+      expect(asked.status, asked.stderr).toBe(0);
+
+      const resumableRoot = newTicketCli(root, "stopped umbrella");
+      const resumableChild = newTicketCli(root, "remaining child", ["--parent", resumableRoot.id]);
+      const started = runSlop(["start", resumableRoot.id], root);
+      expect(started.status, started.stderr).toBe(0);
+      const stopped = runSlop(["stop", resumableRoot.id, "--note", "child remains"], root);
+      expect(stopped.status, stopped.stderr).toBe(0);
+
+      const json = readyJson(root, ["--resumable"]);
+      expect(json.ready.map((row) => row.id)).toEqual([
+        grandchild.id,
+        terminalRoot.id,
+        blocker.id,
+        resumableChild.id,
+      ]);
+      expect(json.ready.every((row) => row.why.includes("no nonterminal descendants"))).toBe(true);
+      expect(json.resumable.map((row) => row.id)).not.toContain(resumableRoot.id);
+      expect(json.ready.map((row) => row.id)).not.toContain(deepRoot.id);
+      expect(json.ready.map((row) => row.id)).not.toContain(deepChild.id);
+      expect(json.ready.map((row) => row.id)).not.toContain(blockedRoot.id);
+      expect(json.ready.map((row) => row.id)).not.toContain(awaitingRoot.id);
+
+      const withAwaiting = readyJson(root, ["--include-awaiting"]);
+      expect(withAwaiting.ready.map((row) => row.id)).toContain(awaitingChild.id);
+      expect(withAwaiting.ready.map((row) => row.id)).not.toContain(awaitingRoot.id);
+    });
+
     it("drafts never appear in ready", async () => {
       const root = await makeCliFixture();
       const draft = newTicketCli(root, "a draft", ["--draft"]);

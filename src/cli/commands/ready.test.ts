@@ -3,10 +3,14 @@ import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cl
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
 import type { TicketId } from "../../core/index.js";
 import { shortTicketCode } from "../../core/index.js";
+import { runAsk } from "./ask.js";
+import { runDone } from "./done.js";
+import { runDrop } from "./drop.js";
 import { runNew } from "./new.js";
 import { runReady } from "./ready.js";
 import { runReview } from "./review.js";
 import { runStart } from "./start.js";
+import { runStop } from "./stop.js";
 
 const originalFakeNow = process.env.SLOP_FAKE_NOW;
 afterEach(() => {
@@ -19,7 +23,7 @@ afterEach(() => {
 async function jsonNewTicket(
   root: string,
   name: string,
-  extra: { blocks?: string[]; label?: string[] } = {},
+  extra: { blocks?: string[]; label?: string[]; parent?: string } = {},
 ): Promise<TicketId> {
   const out = captureOutput();
   try {
@@ -40,6 +44,15 @@ async function jsonNewTicket(
   }
 }
 
+async function runQuietly(root: string, command: () => Promise<void>): Promise<void> {
+  const out = captureOutput();
+  try {
+    await withCwd(root, command);
+  } finally {
+    out.restore();
+  }
+}
+
 describe("runReady (in-process)", () => {
   it("lists open, unblocked tickets", async () => {
     const root = await makeTempRepo("slop-ready-inproc-basic-");
@@ -54,6 +67,100 @@ describe("runReady (in-process)", () => {
     }
     const body = JSON.parse(out.stdout()) as { ready: { id: string }[] };
     expect(body.ready.map((r) => r.id)).toContain(id);
+  });
+
+  it("lists the deepest actionable leaf, not its direct or transitive umbrella ancestors", async () => {
+    const root = await makeTempRepo("slop-ready-inproc-leaf-tree-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const umbrella = await jsonNewTicket(root, "Umbrella");
+    const child = await jsonNewTicket(root, "Child", { parent: umbrella });
+    const grandchild = await jsonNewTicket(root, "Grandchild", { parent: child });
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runReady({ json: true }));
+    } finally {
+      out.restore();
+    }
+    const body = JSON.parse(out.stdout()) as { ready: { id: string; why: string }[] };
+    expect(body.ready.map((row) => row.id)).toEqual([grandchild]);
+    expect(body.ready[0]?.why).toContain("no nonterminal descendants");
+  });
+
+  it("allows an umbrella once all of its descendants are done or dropped", async () => {
+    const root = await makeTempRepo("slop-ready-inproc-terminal-children-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const umbrella = await jsonNewTicket(root, "Terminal children umbrella");
+    const doneChild = await jsonNewTicket(root, "Done child", { parent: umbrella });
+    const droppedChild = await jsonNewTicket(root, "Dropped child", { parent: umbrella });
+
+    await runQuietly(root, () => runStart(doneChild, {}));
+    await runQuietly(root, () => runDone([doneChild], { note: "verified" }));
+    await runQuietly(root, () => runDrop([droppedChild], { reason: "not needed" }));
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runReady({ json: true }));
+    } finally {
+      out.restore();
+    }
+    const body = JSON.parse(out.stdout()) as { ready: { id: string }[] };
+    expect(body.ready.map((row) => row.id)).toEqual([umbrella]);
+  });
+
+  it("does not promote an umbrella when its remaining child is blocked or awaiting input", async () => {
+    const root = await makeTempRepo("slop-ready-inproc-unpickable-children-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const blockedUmbrella = await jsonNewTicket(root, "Blocked child umbrella");
+    const blockedChild = await jsonNewTicket(root, "Blocked child", { parent: blockedUmbrella });
+    const blocker = await jsonNewTicket(root, "Child blocker", { blocks: [blockedChild] });
+    const awaitingUmbrella = await jsonNewTicket(root, "Awaiting child umbrella");
+    const awaitingChild = await jsonNewTicket(root, "Awaiting child", {
+      parent: awaitingUmbrella,
+    });
+    await runQuietly(root, () => runAsk(awaitingChild, "Which path?", { option: [] }));
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runReady({ json: true }));
+    } finally {
+      out.restore();
+    }
+    const body = JSON.parse(out.stdout()) as { ready: { id: string }[] };
+    expect(body.ready.map((row) => row.id)).toEqual([blocker]);
+
+    const included = captureOutput();
+    try {
+      await withCwd(root, () => runReady({ json: true, includeAwaiting: true }));
+    } finally {
+      included.restore();
+    }
+    const includedBody = JSON.parse(included.stdout()) as { ready: { id: string }[] };
+    expect(includedBody.ready.map((row) => row.id)).toEqual([blocker, awaitingChild]);
+    expect(includedBody.ready.map((row) => row.id)).not.toContain(blockedUmbrella);
+    expect(includedBody.ready.map((row) => row.id)).not.toContain(awaitingUmbrella);
+  });
+
+  it("omits a stopped resumable umbrella while its child remains nonterminal", async () => {
+    const root = await makeTempRepo("slop-ready-inproc-resumable-umbrella-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const umbrella = await jsonNewTicket(root, "Stopped umbrella");
+    const child = await jsonNewTicket(root, "Remaining child", { parent: umbrella });
+    await runQuietly(root, () => runStart(umbrella, {}));
+    await runQuietly(root, () => runStop(umbrella, { note: "child remains" }));
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runReady({ json: true, resumable: true }));
+    } finally {
+      out.restore();
+    }
+    const body = JSON.parse(out.stdout()) as {
+      ready: { id: string }[];
+      resumable: { id: string }[];
+    };
+    expect(body.ready.map((row) => row.id)).toEqual([child]);
+    expect(body.resumable.map((row) => row.id)).not.toContain(umbrella);
   });
 
   // handle-t-code-missing-from: `ready --json` rows used to omit the short

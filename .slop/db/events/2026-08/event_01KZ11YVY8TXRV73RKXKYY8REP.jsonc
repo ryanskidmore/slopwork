@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ11YVY8TXRV73RKXKYY8REP",
+  "actor": {
+    "name": "codex-ready-audit",
+    "kind": "human"
+  },
+  "session": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM",
+  "verb": "plan.step_checked",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM"
+  },
+  "payload": {
+    "step": 2,
+    "checked": true
+  },
+  "at": "2026-08-02T10:57:47.977Z"
+}

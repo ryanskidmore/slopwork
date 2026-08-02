@@ -1,9 +1,10 @@
 /**
  * `slop ready` — design.md §2, §4.2; work item B4, staleness wiring C5.
  *
- * `ready` = open ∧ no live blockers ∧ no active session. Drafts and review
- * items never appear (design.md §2). The pure selection/ordering this
- * command wraps lives in `src/tickets/ready.ts` — see that module's doc
+ * `ready` = open ∧ no live blockers ∧ no active session ∧ no nonterminal
+ * descendants. Drafts and review items never appear (design.md §2). The
+ * pure selection/ordering this command wraps lives in `src/tickets/ready.ts` —
+ * see that module's doc
  * for the exact `--resumable` scope (including C5's widened predicate)
  * and the `--budget` eliding strategy.
  *
@@ -251,7 +252,9 @@ export async function runReady(opts: ReadyCommandOptions): Promise<void> {
 export function registerReadyCommand(program: Command): void {
   program
     .command("ready")
-    .description("List ready tickets: open, no live blockers, no active session.")
+    .description(
+      "List actionable leaf tickets: open, no live blockers, no active session, no nonterminal descendants.",
+    )
     .option(
       "--label <label>",
       "filter to tickets carrying this label (repeatable; AND — every given label must be present)",
@@ -262,7 +265,7 @@ export function registerReadyCommand(program: Command): void {
     .option("--priority <0-3>", "filter to tickets at exactly this priority", parsePriority)
     .option(
       "--resumable",
-      "also include stopped or stale in_progress/review tickets worth resuming",
+      "also include stopped or stale in_progress/review leaf tickets worth resuming",
     )
     .option(
       "--include-awaiting",

@@ -54,7 +54,10 @@ draft ⇄ open ──start──▶ in_progress ──review --mr──▶ revie
 
 Derived overlays (D5): `blocked` (live blockers) · `stale` (in_progress *or review*, no activity past threshold — review staleness catches MRs rotting unreviewed).
 
-`ready` = query: `open ∧ no live blockers ∧ no active session`. Drafts and review items never appear.
+`ready` = query: `open ∧ no live blockers ∧ no active session ∧ no nonterminal
+descendants`. The descendant check is transitive, making the pull queue
+leaf-first; `done` and `dropped` descendants do not suppress their parent.
+Drafts and review items never appear themselves.
 
 **Working a ticket:** `start` creates a session (harness kind + harness session id + branch/commit captured), sets `in_progress`, prints the context pack. `plan` registers/revises the session's step checklist. `update --progress` logs + bumps activity. `review --mr <url>` records the MR and flips state — the ticket now points at exactly the thing a human needs to look at. `done` completes (cascades unblocks) and finalizes the session: end summary written to the db, transcript captured per D16 — legal from `review` *or* directly from `in_progress` (review is optional, D15 revised); completing a non-`adhoc` ticket that never went through review prints a soft nag on stderr but still succeeds, mirroring `review --mr`'s own required-with-warning treatment of the MR link (§8.1 item 3); `adhoc` tickets (D13) complete directly with no nag at all. `stop` hands off (transcript also captured — a dead session's transcript is often the most valuable one). Takeover of an active ticket: warn + `--takeover`, logged.
 

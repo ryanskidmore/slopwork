@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ11K5ZE62TRWJYC001RVK7C",
+  "actor": {
+    "name": "codex-ready-audit",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ11E6CJYM9EQEJR3VAW9411"
+  },
+  "payload": {
+    "progress": "Mapped ready selection: IndexTicketRow.path contains full ancestry; current filters ignore descendants, so leaf eligibility can be derived once from all nonterminal rows before existing priority/age sort."
+  },
+  "at": "2026-08-02T10:51:25.038Z"
+}

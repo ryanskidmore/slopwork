@@ -88,11 +88,12 @@ slop ready
 
 ```
 ready (1):
-  [P1] ticket_01KYA7TH26K5AY5ACN4RW1ET94  add-password-reset-flow  "Add password reset flow"  — open, no live blockers, no active session
+  [P1] ticket_01KYA7TH26K5AY5ACN4RW1ET94  add-password-reset-flow  "Add password reset flow"  — open, no live blockers, no active session, no nonterminal descendants
 ```
 
-`ready` = open, no live blockers, no active session. Drafts and
-in-review tickets never show up here.
+`ready` returns actionable leaves: open, no live blockers, no active session,
+and no nonterminal descendants. Drafts and in-review tickets never show up
+here; parents reappear after all of their descendants are done or dropped.
 
 Want to just browse — every ticket, or filtered by state/label/owner,
 regardless of whether it's workable right now? That's `slop list`:
