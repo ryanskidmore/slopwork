@@ -270,25 +270,21 @@ async function runScale(args: Args, tickets: number): Promise<ScaleResult> {
       notes: "cache validation; event-only fingerprint never scans tickets or sessions",
     }),
   );
-  // Serializing an unpaginated million-row response is not a useful routine
-  // benchmark and can consume gigabytes. Cover the handler through 100k rows.
-  if (tickets <= 100_000) {
-    const request = new Request("http://localhost/api/tickets") as BunRequest;
-    timings.push(
-      await timeInProcess(
-        "web: GET /api/tickets summaries",
-        async () => {
-          const response = await handleTicketList(request, dataSource, Date.now());
-          if (!response.ok) throw new Error(`ticket list returned ${response.status}`);
-        },
-        {
-          runs: tickets <= 10_000 ? 3 : 1,
-          n: tickets,
-          notes: "includes cached storage reads, derived overlays, and JSON serialization",
-        },
-      ),
-    );
-  }
+  const request = new Request("http://localhost/api/tickets?limit=100") as BunRequest;
+  timings.push(
+    await timeInProcess(
+      "web: GET /api/tickets (100-row page)",
+      async () => {
+        const response = await handleTicketList(request, dataSource, Date.now());
+        if (!response.ok) throw new Error(`ticket list returned ${response.status}`);
+      },
+      {
+        runs: tickets <= 10_000 ? 3 : 1,
+        n: tickets,
+        notes: "includes cached storage reads, filter/sort/overlay derivation, and bounded JSON",
+      },
+    ),
+  );
 
   // --- Phase 6: end-to-end CLI latency -------------------------------------
   // Includes binary startup, which is a fixed floor invisible above.

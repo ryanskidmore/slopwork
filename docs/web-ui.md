@@ -61,7 +61,8 @@ build/dev-loop details.
   `prefers-color-scheme` by default with an explicit toggle (topbar, top
   right) that persists across visits.
 - **Cmd/Ctrl-K** opens a command palette to jump straight to any ticket
-  by name, slug, or `t-<code>` handle.
+  by name, slug, id, or `t-<code>` handle. Its debounced search runs on the
+  server and returns at most 20 results rather than downloading the database.
 
 ## Pages
 
@@ -70,9 +71,10 @@ build/dev-loop details.
 Every ticket, filterable by **state**, **label**, **priority**, and
 **owner** (as `<select>`s, populated from the real facets in the current
 db), plus a free-text search box — all reflected in the URL's query
-string, so a filtered view is bookmarkable/shareable. Shows state,
-priority, name, slug, labels, owner, and last activity for each row, with
-`blocked`/`stale`/`awaiting_input` badges where they apply.
+string, so a filtered view is bookmarkable/shareable. Pagination and page
+size are URL-backed too; searches are debounced and superseded requests are
+cancelled. Shows state, priority, name, slug, labels, owner, and last activity
+for each row, with `blocked`/`stale`/`awaiting_input` badges where they apply.
 
 ### Tree view (`/tree`)
 
@@ -140,7 +142,7 @@ also call directly (still strictly read-only — GET/HEAD only, same
 | Route | Returns |
 |---|---|
 | `GET /api/config` | project name, remotes, staleness thresholds, and a `warning` when `config.yaml` couldn't be read/parsed/validated |
-| `GET /api/tickets` | ticket list; accepts `state`/`label`/`priority`/`owner`/`q` query params, same semantics as the `/tickets` page's filters |
+| `GET /api/tickets` | bounded ticket list; accepts `state`/`label`/`priority`/`owner`/`q` plus 1-based `page` and `limit` (default 50, maximum 100) |
 | `GET /api/tree` | the parent/child hierarchy, nested, with external-parent badges resolved |
 | `GET /api/tickets/:ref` | one ticket: spec (markdown pre-rendered to sanitized HTML), relationships, overlays, events, sessions |
 | `GET /api/review` | tickets in review, longest-awaiting-first |
@@ -156,6 +158,15 @@ links, which come back as `{ url, safe_url }` so a client never has to
 re-implement scheme-checking): a `javascript:`/`data:` link never reaches
 the wire as a live `href`/`src`. See `src/web/api/types.ts` for the full
 response shapes.
+
+Ticket-list filters are applied before pagination. Ordering is stable:
+effective `last_activity_at` descending, then ticket id ascending. The
+top-level `total` remains the count of every ticket in the repository for
+compatibility with pre-pagination clients; `pagination.filtered_total` is
+the number matching the active filters, with `total_pages`, `previous_page`,
+and `next_page` describing traversal. Omitting `page`/`limit` is supported,
+but `tickets` is now deliberately capped at the first 50 rows rather than
+returning an unbounded array.
 
 ## Staying in sync with the CLI
 

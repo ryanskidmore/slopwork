@@ -1,0 +1,52 @@
+{
+  "id": "ticket_01KZ13WZTWWMRZ5MPYCK3910KT",
+  "name": "Bound web ticket listing and search requests",
+  "slug": "bound-web-ticket-listing-and",
+  "spec": {
+    "summary": "Add a stable bounded pagination contract and responsive, abortable ticket-list and command-palette search UI.",
+    "details_md": "",
+    "acceptance": [
+      "Ticket list filters and stable sort are applied before a server-enforced bounded slice with total and next-page metadata.",
+      "Ticket list pagination is URL-backed and search is debounced, abortable, and visibly pending without stale-row ambiguity.",
+      "Command palette performs bounded server-side search, cancels superseded requests, and distinguishes errors from empty results.",
+      "API and large-list tests prove bounded payloads, stable order, and no duplicates across pages; relevant controls have accessible names."
+    ],
+    "context": [
+      "src/web/api/tickets.ts and src/web/api/types.ts",
+      "src/web/frontend/pages/tickets-page.tsx and command palette components",
+      "Stacked on PR #12 / fix/audit-read-performance"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "review",
+  "priority": 1,
+  "labels": [],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ13WZTWWMRZ5MPYCK3910KT",
+  "path": [],
+  "active_session": "session_01KZ13X6D8T9VNY1S0ZJMH771J",
+  "last_activity_at": "2026-08-02T11:46:05.339Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-08-02T11:31:43.770Z",
+  "updated_at": "2026-08-02T11:46:05.339Z",
+  "review": {
+    "mr": "https://github.com/ryanskidmore/slopwork/pull/15",
+    "requested_at": "2026-08-02T11:46:05.339Z",
+    "by": {
+      "name": "Ryan Skidmore",
+      "kind": "human"
+    }
+  }
+}

@@ -26,8 +26,16 @@ export class ApiError extends Error {
   }
 }
 
-async function getJson<T>(path: string): Promise<T> {
-  const res = await fetch(path, { method: "GET", headers: { accept: "application/json" } });
+export interface ApiRequestOptions {
+  signal?: AbortSignal;
+}
+
+async function getJson<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+  const res = await fetch(path, {
+    method: "GET",
+    headers: { accept: "application/json" },
+    signal: options.signal,
+  });
   if (!res.ok) {
     let message = `${res.status} ${res.statusText}`;
     try {
@@ -51,15 +59,20 @@ export interface TicketListFilters {
   priority?: string;
   owner?: string;
   q?: string;
+  page?: number;
+  limit?: number;
 }
 
-export function fetchTicketList(filters: TicketListFilters = {}): Promise<TicketListResponseDTO> {
+export function fetchTicketList(
+  filters: TicketListFilters = {},
+  options: ApiRequestOptions = {},
+): Promise<TicketListResponseDTO> {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
-    if (value) params.set(key, value);
+    if (value !== undefined && value !== "") params.set(key, String(value));
   }
   const qs = params.toString();
-  return getJson(`/api/tickets${qs ? `?${qs}` : ""}`);
+  return getJson(`/api/tickets${qs ? `?${qs}` : ""}`, options);
 }
 
 export function fetchTree(): Promise<TreeResponseDTO> {

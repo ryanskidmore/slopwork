@@ -226,10 +226,24 @@ export interface ConfigDTO {
   defaults: { stale_after: string; review_stale_after: string };
 }
 
+/** Stable, 1-based page metadata for `GET /api/tickets`. `total` on the
+ * response remains the whole-repository count for compatibility;
+ * `filtered_total` is the number of rows matching the active filters. */
+export interface TicketListPaginationDTO {
+  page: number;
+  limit: number;
+  filtered_total: number;
+  total_pages: number;
+  previous_page: number | null;
+  next_page: number | null;
+}
+
 export interface TicketListResponseDTO {
   config: ConfigDTO;
   tickets: TicketSummaryDTO[];
+  /** Whole-repository ticket count, preserving the pre-pagination contract. */
   total: number;
+  pagination: TicketListPaginationDTO;
   facets: { labels: string[]; owners: string[]; states: TicketState[] };
 }
 
