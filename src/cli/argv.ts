@@ -31,17 +31,24 @@
  * after it are left completely untouched, so Commander's own "missing
  * required argument" error still fires exactly as it does today.
  *
- * Deliberately scoped to the literal token `"--label"`: no other §4.2
- * option is spelled that way (confirmed against every option registered
- * on `new`/`update`, the only two commands with a `--label` flag), so this
- * never touches any other flag's tokens, on those commands or any other —
- * this is not a general argv rewriter.
+ * t-9uvbr: `--discovered-from <±ref>` (update's new `±`-sigil flag) hits the
+ * exact same Commander limitation for the exact same reason — a `±ref`
+ * value is just as `-`-shaped as a `±label` one — so this is now a small,
+ * explicit ALLOWLIST of flag tokens rather than a `--label`-only rewriter:
+ * {@link SIGIL_VALUE_FLAGS}. Every other §4.2 option keeps behaving exactly
+ * as before (this is still not a general argv rewriter) — only a flag
+ * token literally in that set is ever rewritten, and each is rewritten
+ * completely independently of the others (a `--label`/`--discovered-from`
+ * mix in one invocation is handled correctly either way, since the loop
+ * below matches one flag token at a time).
  */
 
-const LABEL_VALUE_PATTERN = /^[+-][^\s-].*$/;
+const SIGIL_VALUE_FLAGS = new Set(["--label", "--discovered-from"]);
 
-function looksLikeLabelValue(token: string | undefined): token is string {
-  return token !== undefined && LABEL_VALUE_PATTERN.test(token);
+const SIGIL_VALUE_PATTERN = /^[+-][^\s-].*$/;
+
+function looksLikeSigilValue(token: string | undefined): token is string {
+  return token !== undefined && SIGIL_VALUE_PATTERN.test(token);
 }
 
 export function rewriteLabelArgv(argv: readonly string[]): string[] {
@@ -50,26 +57,26 @@ export function rewriteLabelArgv(argv: readonly string[]): string[] {
   while (i < argv.length) {
     const token = argv[i];
     i++;
-    if (token !== "--label") {
+    if (token === undefined || !SIGIL_VALUE_FLAGS.has(token)) {
       if (token !== undefined) out.push(token);
       continue;
     }
 
     // Absorb every consecutive value-shaped token that follows this bare
-    // `--label`, each becoming its own unambiguous `--label=<value>`.
+    // flag, each becoming its own unambiguous `<flag>=<value>`.
     const values: string[] = [];
-    while (looksLikeLabelValue(argv[i])) {
+    while (looksLikeSigilValue(argv[i])) {
       values.push(argv[i] as string);
       i++;
     }
 
     if (values.length === 0) {
-      // Nothing value-shaped follows — leave `--label` exactly as-is.
+      // Nothing value-shaped follows — leave the flag exactly as-is.
       out.push(token);
       continue;
     }
     for (const value of values) {
-      out.push(`--label=${value}`);
+      out.push(`${token}=${value}`);
     }
   }
   return out;

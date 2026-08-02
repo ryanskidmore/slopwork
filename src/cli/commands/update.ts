@@ -1,14 +1,30 @@
 import type { Command } from "commander";
-import { fixedClock, shortTicketCode, systemClock } from "../../core/index.js";
+import type { Actor } from "../../core/index.js";
+import { EXIT_CODES, fixedClock, shortTicketCode, systemClock } from "../../core/index.js";
 import type { JsoncPatchEntry, Ticket } from "../../core/index.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
+import type { StorageBackend } from "../../storage/index.js";
 import { openStorage } from "../../storage/index.js";
 import { validateTicketEdges } from "../../tickets/edges.js";
 import { recomputeAncestry, resolveParentRef } from "../../tickets/parent.js";
-import { buildUpdate, parseBlocksOpText, parseRelatesToOpText } from "../../tickets/update.js";
-import type { BlocksOp, RelatesToOp, UpdateInput } from "../../tickets/update.js";
+import {
+  buildUpdate,
+  parseBlocksOpText,
+  parseDiscoveredFromOpText,
+  parseRelatesToOpText,
+} from "../../tickets/update.js";
+import type { BlocksOp, DiscoveredFromOp, RelatesToOp, UpdateInput } from "../../tickets/update.js";
 import { loadConfig, resolveActor } from "../actor.js";
-import { collect, parsePriority, printWarning, readStdin } from "./shared.js";
+import { SlopError } from "../errors.js";
+import {
+  type BulkOutcome,
+  collect,
+  parsePriority,
+  printWarning,
+  readStdin,
+  resolveBulkRefs,
+  runSingleOrBulk,
+} from "./shared.js";
 
 interface UpdateCommandOptions {
   progress?: string;
@@ -23,8 +39,11 @@ interface UpdateCommandOptions {
   context: string[];
   relatesTo: string[];
   blocks: string[];
+  discoveredFrom: string[];
   owner?: string;
+  clearOwner?: boolean;
   parent?: string;
+  clearParent?: boolean;
   json?: boolean;
 }
 
@@ -33,7 +52,10 @@ interface UpdateCommandOptions {
  * else — `undefined` otherwise. ticket_01KY9RWFM80BKNE2CDX85QMKGS: this is
  * the one `update` call shape that goes lock-free below; every other
  * combination (including `--progress` alongside a real field) keeps
- * today's locked read-modify-write path unchanged.
+ * today's locked read-modify-write path unchanged. t-9uvbr extends the
+ * disqualifying list with the new `--discovered-from`/`--clear-owner`/
+ * `--clear-parent` flags — each is a real field change, same as
+ * `--owner`/`--parent` already were.
  */
 function pureProgressNote(opts: UpdateCommandOptions): string | undefined {
   if (
@@ -49,48 +71,73 @@ function pureProgressNote(opts: UpdateCommandOptions): string | undefined {
     opts.context.length > 0 ||
     opts.relatesTo.length > 0 ||
     opts.blocks.length > 0 ||
+    opts.discoveredFrom.length > 0 ||
     opts.owner !== undefined ||
-    opts.parent !== undefined
+    opts.clearOwner === true ||
+    opts.parent !== undefined ||
+    opts.clearParent === true
   ) {
     return undefined;
   }
   return opts.progress;
 }
 
+/** One ref's update outcome — what {@link updateOneRef} returns, shared by
+ * both the single-ref and bulk (t-mmngo) rendering paths below. */
+interface UpdateOneResult {
+  ticket: Ticket;
+  reparentedDescendants: number;
+  /** Non-fatal notices (e.g. a malformed `jira:`-shaped `--parent` ref's
+   * format warning) — printed by the caller AFTER this ref's own
+   * transaction commits, same convention every other soft warning in this
+   * codebase follows. */
+  warnings: string[];
+}
+
 /**
- * closing-loop-commands-lack-json: `--json` result — a small, stable
- * shape naming exactly the fields the human-readable output already
- * prints, with `handle` added for parity with `new --json`'s own result
- * (E1) — every mutator that reads a ticket back should surface the same
- * short, typeable handle, not just the commands that create one. Field
- * names deliberately match `new`'s JSON keys (`id`/`slug`/`handle`/`name`/
- * `state`/`priority`) rather than inventing a parallel vocabulary.
- * `reparented_descendants` (edit-vi-fallback-hangs-agents) is purely
- * additive — 0 on every call that isn't a `--parent` reparent — so it
- * doesn't disturb this already-documented shape (same "additive, existing
- * consumers only read known keys" reasoning `new --json`'s own `handle`
- * used when it was added).
+ * closing-loop-commands-lack-json: the `--json` result shape for ONE ref —
+ * a small, stable shape naming exactly the fields the human-readable
+ * output already prints, with `handle` added for parity with `new
+ * --json`'s own result (E1) — every mutator that reads a ticket back
+ * should surface the same short, typeable handle, not just the commands
+ * that create one. Field names deliberately match `new`'s JSON keys
+ * (`id`/`slug`/`handle`/`name`/`state`/`priority`) rather than inventing a
+ * parallel vocabulary. `reparented_descendants` (edit-vi-fallback-hangs
+ * -agents) is purely additive — 0 on every call that isn't a `--parent`/
+ * `--clear-parent` reparent. Reused verbatim (t-mmngo) as the `result`
+ * field of each successful row in bulk `--json`'s `results[]` — a bulk
+ * caller reading one row's `result` sees exactly what a single-ref
+ * `update --json` would have printed for that ref alone.
  */
-function printUpdated(
+function updateJsonBody(
   ticket: Pick<Ticket, "id" | "slug" | "name" | "state" | "priority">,
-  json: boolean | undefined,
-  reparentedDescendants = 0,
-): void {
+  reparentedDescendants: number,
+): {
+  id: string;
+  slug: string;
+  handle: string;
+  name: string;
+  state: string;
+  priority: number;
+  reparented_descendants: number;
+} {
+  return {
+    id: ticket.id,
+    slug: ticket.slug,
+    handle: shortTicketCode(ticket.id),
+    name: ticket.name,
+    state: ticket.state,
+    priority: ticket.priority,
+    reparented_descendants: reparentedDescendants,
+  };
+}
+
+function printUpdated(result: UpdateOneResult, json: boolean | undefined): void {
+  for (const w of result.warnings) printWarning(w);
+  const { ticket, reparentedDescendants } = result;
   if (json) {
     process.stdout.write(
-      `${JSON.stringify(
-        {
-          id: ticket.id,
-          slug: ticket.slug,
-          handle: shortTicketCode(ticket.id),
-          name: ticket.name,
-          state: ticket.state,
-          priority: ticket.priority,
-          reparented_descendants: reparentedDescendants,
-        },
-        null,
-        2,
-      )}\n`,
+      `${JSON.stringify(updateJsonBody(ticket, reparentedDescendants), null, 2)}\n`,
     );
     return;
   }
@@ -104,13 +151,81 @@ function printUpdated(
   );
 }
 
-export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promise<void> {
-  const root = requireRepoRoot(process.cwd());
-  const paths = repoPaths(root);
-  const config = await loadConfig(paths);
-  const actor = resolveActor({ config, cwd: root });
-  const backend = await openStorage(paths);
+/**
+ * t-mmngo: bulk (`refs.length > 1`) rendering — one line of text per ref
+ * (this ticket's brief, verbatim), or a `results[]` envelope for `--json`.
+ * A failing ref's TEXT line goes to STDERR (never stdout — the "errors
+ * never on stdout" discipline docs/cli-reference.md documents for `--json`
+ * extended here to text mode too, so stdout only ever carries real
+ * results); its `--json` entry still lives in the ONE `results[]` array on
+ * stdout, since that's the whole point of a structured per-ref outcome —
+ * embedding a `{ok: false, error}` row inside an otherwise-valid JSON
+ * document is not the same thing as printing a bare error to stdout.
+ */
+function renderBulkUpdate(
+  outcomes: readonly BulkOutcome<UpdateOneResult>[],
+  json: boolean | undefined,
+): void {
+  for (const outcome of outcomes) {
+    if (outcome.ok && outcome.data) {
+      for (const w of outcome.data.warnings) printWarning(w);
+    }
+  }
 
+  if (json) {
+    const results = outcomes.map((outcome) =>
+      outcome.ok && outcome.data
+        ? {
+            ref: outcome.ref,
+            ok: true,
+            exit_code: outcome.exitCode,
+            result: updateJsonBody(outcome.data.ticket, outcome.data.reparentedDescendants),
+          }
+        : { ref: outcome.ref, ok: false, exit_code: outcome.exitCode, error: outcome.error },
+    );
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          results,
+          ok: outcomes.every((o) => o.ok),
+          succeeded: outcomes.filter((o) => o.ok).length,
+          failed: outcomes.filter((o) => !o.ok).length,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    return;
+  }
+
+  for (const outcome of outcomes) {
+    if (outcome.ok && outcome.data) {
+      const { ticket, reparentedDescendants } = outcome.data;
+      process.stdout.write(
+        `${outcome.ref} -> updated ${ticket.id} (${ticket.slug})  state: ${ticket.state}  ` +
+          `priority: ${ticket.priority}` +
+          (reparentedDescendants > 0
+            ? `  reparented: ${reparentedDescendants} descendant(s)`
+            : "") +
+          "\n",
+      );
+    } else {
+      process.stderr.write(`error: ${outcome.ref}: ${outcome.error} (exit ${outcome.exitCode})\n`);
+    }
+  }
+}
+
+/** Everything one `update` call needs to touch <ref> — resolved once per
+ * ref, sharing the flags/config/actor/backend/stdin-read-once values the
+ * caller (t-mmngo's bulk driver, or the single-ref path) already gathered. */
+async function updateOneRef(
+  backend: StorageBackend,
+  actor: Actor,
+  specRaw: string | undefined,
+  detailsRaw: string | undefined,
+  opts: UpdateCommandOptions,
+  ref: string,
+): Promise<UpdateOneResult> {
   // A read outside the lock is fine for resolving <ref> -> id (and
   // surfacing NOT_FOUND/AMBIGUOUS_REF quickly on a cold ref); the decisive
   // read-modify-write happens fresh, under the lock, below — same
@@ -127,21 +242,8 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
   // contention: each call mints its own ULID event file, and ULID
   // filenames never collide (entity-file.ts's `createEntityFileCanonical`
   // doc) — nothing here needs mutual exclusion at all.
-  // `latest_note`/`last_activity_at` become effective (derived) values,
-  // folding this event on top of the ticket's stored baseline at READ
-  // time (`src/repo/db-index.ts`'s `deriveEffectiveOverlay`) — `show`/
-  // `status`/`ready`/staleness all read the derived value, never the
-  // (possibly now-stale) field on the ticket file itself.
   const note = pureProgressNote(opts);
   if (note !== undefined) {
-    // Deferred-item early return, progress flavor: identical to the note
-    // we already saw for this ticket a moment ago (best-effort — this
-    // read predates the call, same as `initialTicket` above always is) —
-    // genuinely nothing to record, so append nothing. Mirrors buildUpdate's
-    // own same-content no-op rule (tickets/update.ts's UPDATE_CONTENT_FIELDS)
-    // for the single-writer case; under real concurrency this is purely an
-    // optimization; it never has to be right for correctness; another
-    // agent's genuinely different note is unaffected.
     if (note !== initialTicket.latest_note) {
       await backend.appendEvent(
         { actor, session: null },
@@ -149,19 +251,8 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
         { verb: "ticket.updated", payload: { progress: note } },
       );
     }
-
-    printUpdated(initialTicket, opts.json);
-    return;
+    return { ticket: initialTicket, reparentedDescendants: 0, warnings: [] };
   }
-
-  const specRaw =
-    opts.spec === undefined ? undefined : opts.spec === "-" ? await readStdin() : opts.spec;
-  const detailsRaw =
-    opts.details === undefined
-      ? undefined
-      : opts.details === "-"
-        ? await readStdin()
-        : opts.details;
 
   // edit-vi-fallback-hangs-agents: collected here, printed AFTER the lock
   // below resolves — never before validation succeeds (nags-print-before
@@ -184,8 +275,8 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
     // (and thus any write) ever runs.
     const relatesToOps: RelatesToOp[] = [];
     for (const raw of opts.relatesTo) {
-      const { op, ref } = parseRelatesToOpText(raw);
-      const target = await backend.resolveTicketRef(ref);
+      const { op, ref: targetRef } = parseRelatesToOpText(raw);
+      const target = await backend.resolveTicketRef(targetRef);
       relatesToOps.push({ op, id: target.id });
     }
 
@@ -194,19 +285,36 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
     // `BlocksOp` doc for the `blocks`-vs-`relates_to` distinction).
     const blocksOps: BlocksOp[] = [];
     for (const raw of opts.blocks) {
-      const { op, ref } = parseBlocksOpText(raw);
-      const target = await backend.resolveTicketRef(ref);
+      const { op, ref: targetRef } = parseBlocksOpText(raw);
+      const target = await backend.resolveTicketRef(targetRef);
       blocksOps.push({ op, id: target.id });
     }
 
-    // `--parent <ref>` — resolved the exact same way `new --parent` is
-    // (tickets/parent.ts's `resolveParentRef`: a local ref via
-    // `resolveTicketRef`, or an external `jira:`-shaped ref accepted as-is
-    // with a warn-only format check). `undefined` (never even attempted)
-    // when `--parent` was omitted — mirrors `relatesToOps`/`blocksOps`
-    // only ever being resolved from what was actually given.
+    // `--discovered-from <±ref>` (t-9uvbr) — same shape again; see
+    // tickets/update.ts's `DiscoveredFromOp` doc for why this one isn't
+    // cycle-checked (same as `relates-to`).
+    const discoveredFromOps: DiscoveredFromOp[] = [];
+    for (const raw of opts.discoveredFrom) {
+      const { op, ref: targetRef } = parseDiscoveredFromOpText(raw);
+      const target = await backend.resolveTicketRef(targetRef);
+      discoveredFromOps.push({ op, id: target.id });
+    }
+
+    // `--parent <ref>` / `--clear-parent` (t-9uvbr) — resolved the exact
+    // same way `new --parent` is (tickets/parent.ts's `resolveParentRef`: a
+    // local ref via `resolveTicketRef`, or an external `jira:`-shaped ref
+    // accepted as-is with a warn-only format check) when a ref was given;
+    // `--clear-parent` needs no resolution at all — it constructs
+    // `{kind: "none"}` directly, which `buildUpdate`'s
+    // `parentValueFromResolution` already knows means "clear". Mutual
+    // exclusivity between the two flags is enforced by the CLI layer
+    // before this ever runs (see `runUpdate`).
     const parentResolution =
-      opts.parent !== undefined ? await resolveParentRef(backend, opts.parent) : undefined;
+      opts.clearParent === true
+        ? ({ kind: "none" } as const)
+        : opts.parent !== undefined
+          ? await resolveParentRef(backend, opts.parent)
+          : undefined;
     if (parentResolution?.kind === "external" && parentResolution.warning) {
       warnings.push(parentResolution.warning);
     }
@@ -224,7 +332,9 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
       context: opts.context,
       relatesToOps,
       blocksOps,
+      discoveredFromOps,
       ownerRaw: opts.owner,
+      clearOwner: opts.clearOwner,
       parentResolution,
     };
 
@@ -238,42 +348,40 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
     let { ticket, patch } = built;
     const { verb, payload } = built;
 
-    // B3: `relates_to`/`blocks`/`parent` are the edge fields `update` can
-    // touch (ticket_01KYA3Z9FNZ2FDMDRWNKR9EV7J;
-    // edit-vi-fallback-hangs-agents extends this to `blocks`/`parent`) —
-    // whenever the patch actually changes any of them, re-run the exact
-    // same degree-cap/target-existence/cycle validation `new`'s own edge
-    // flags go through (edges.ts's `validateTicketEdges`, the single entry
-    // point its own doc says every edge-mutating write path should call)
-    // before this ticket is ever persisted. Gated on the patch (not merely
-    // "was an edge flag given") so a fully redundant `--relates-to`/
-    // `--blocks` (e.g. `+already-present`) with nothing else given — a
-    // real, already-handled no-op patch — never pays for a `listTickets`
-    // scan it doesn't need. `discovered_from` remains untouched by
-    // `update` (never appears in `UPDATE_TOUCHABLE_FIELDS`), so its own
-    // slice of `validateTicketEdges`'s checks stays a no-op against this
-    // particular write — cheap insurance against an already-inconsistent
-    // (e.g. hand-edited) db, not dead code.
+    // B3: `relates_to`/`blocks`/`discovered_from`/`parent` are the edge
+    // fields `update` can touch (ticket_01KYA3Z9FNZ2FDMDRWNKR9EV7J;
+    // edit-vi-fallback-hangs-agents extends this to `blocks`/`parent`;
+    // t-9uvbr extends it again to `discovered_from`) — whenever the patch
+    // actually changes any of them, re-run the exact same degree-cap/
+    // target-existence/cycle validation `new`'s own edge flags go through
+    // (edges.ts's `validateTicketEdges`, the single entry point its own
+    // doc says every edge-mutating write path should call) before this
+    // ticket is ever persisted. Gated on the patch (not merely "was an
+    // edge flag given") so a fully redundant `--relates-to`/`--blocks`/
+    // `--discovered-from` (e.g. `+already-present`) with nothing else
+    // given — a real, already-handled no-op patch — never pays for a
+    // `listTickets` scan it doesn't need.
     let reparentedDescendants = 0;
     const touchesEdges = patch.some((entry) =>
-      (["blocks", "relates_to", "parent"] as const).includes(
-        entry.path[0] as "blocks" | "relates_to" | "parent",
+      (["blocks", "relates_to", "discovered_from", "parent"] as const).includes(
+        entry.path[0] as "blocks" | "relates_to" | "discovered_from" | "parent",
       ),
     );
     if (touchesEdges) {
       const others = await backend.listTickets();
       validateTicketEdges(ticket, others);
 
-      // `--parent` changed: `buildUpdate` only ever sets `ticket.parent`
-      // itself (it has no `others` to recompute ancestry with — see
-      // tickets/update.ts's top doc) — `root_id`/`path` here are still
-      // `current`'s stale values. `recomputeAncestry` (parent.ts, same
-      // function `edit.ts`'s own reparent path uses) derives the correct
-      // ones from the NOW-validated `parent` chain, plus every EXISTING
-      // descendant's own `root_id`/`path` that must move with it.
-      // `validateTicketEdges` above has already confirmed `parent` is
-      // acyclic and (if local) resolves to a real ticket in `others` —
-      // `recomputeAncestry`'s own documented precondition.
+      // `--parent`/`--clear-parent` changed: `buildUpdate` only ever
+      // sets/clears `ticket.parent` itself (it has no `others` to
+      // recompute ancestry with — see tickets/update.ts's top doc) —
+      // `root_id`/`path` here are still `current`'s stale values.
+      // `recomputeAncestry` (parent.ts, same function `edit.ts`'s own
+      // reparent path uses) derives the correct ones from the
+      // NOW-validated `parent` chain (or its absence, for a clear), plus
+      // every EXISTING descendant's own `root_id`/`path` that must move
+      // with it. `validateTicketEdges` above has already confirmed
+      // `parent` is acyclic and (if local) resolves to a real ticket in
+      // `others` — `recomputeAncestry`'s own documented precondition.
       if (patch.some((entry) => entry.path[0] === "parent")) {
         const { ticket: reparented, descendants, changed } = recomputeAncestry(ticket, others);
         if (changed) {
@@ -351,8 +459,64 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
     return { ticket, reparentedDescendants };
   });
 
-  for (const w of warnings) printWarning(w);
-  printUpdated(ticket, opts.json, reparentedDescendants);
+  return { ticket, reparentedDescendants, warnings };
+}
+
+export async function runUpdate(refs: string[], opts: UpdateCommandOptions): Promise<void> {
+  // t-9uvbr: mutual exclusivity, checked up front — same "reject before
+  // any I/O" discipline every other usage-mistake check in this codebase
+  // follows (e.g. drop.ts's blank-`--reason` guard).
+  if (opts.clearOwner === true && opts.owner !== undefined) {
+    throw new SlopError(
+      "--clear-owner and --owner are mutually exclusive — pass one or the other",
+      EXIT_CODES.USAGE_ERROR,
+    );
+  }
+  if (opts.clearParent === true && opts.parent !== undefined) {
+    throw new SlopError(
+      "--clear-parent and --parent are mutually exclusive — pass one or the other",
+      EXIT_CODES.USAGE_ERROR,
+    );
+  }
+
+  // t-mmngo: refs from stdin ("-") and a stdin-reading option flag both
+  // want the SAME stdin — reject the ambiguous combination up front rather
+  // than letting one silently starve the other of input.
+  if (refs.length === 1 && refs[0] === "-" && (opts.spec === "-" || opts.details === "-")) {
+    throw new SlopError(
+      'cannot combine "-" (read refs from stdin) with --spec -/--details - (which also read ' +
+        "stdin) — give refs literally, or pass --spec/--details a real value",
+      EXIT_CODES.USAGE_ERROR,
+    );
+  }
+
+  const root = requireRepoRoot(process.cwd());
+  const paths = repoPaths(root);
+  const config = await loadConfig(paths);
+  const actor = resolveActor({ config, cwd: root });
+  const backend = await openStorage(paths);
+
+  // t-mmngo: `--spec`/`--details`/etc. are SHARED flags applying to every
+  // ref — but stdin can only be read once, so `-` is resolved here, ONCE,
+  // before resolving which refs to process at all (not inside a per-ref
+  // loop, which would starve every ref after the first).
+  const specRaw =
+    opts.spec === undefined ? undefined : opts.spec === "-" ? await readStdin() : opts.spec;
+  const detailsRaw =
+    opts.details === undefined
+      ? undefined
+      : opts.details === "-"
+        ? await readStdin()
+        : opts.details;
+
+  const resolvedRefs = await resolveBulkRefs(refs);
+
+  await runSingleOrBulk(
+    resolvedRefs,
+    (ref) => updateOneRef(backend, actor, specRaw, detailsRaw, opts, ref),
+    (result) => printUpdated(result, opts.json),
+    (outcomes) => renderBulkUpdate(outcomes, opts.json),
+  );
 }
 
 /** `slop update` — design.md §4.2; work item B1.
@@ -360,19 +524,26 @@ export async function runUpdate(ref: string, opts: UpdateCommandOptions): Promis
  * The general mutator: `new`'s sugar flags and the dedicated verb commands
  * (`draft`/`undraft`/`review`/`stop`/`done`/`drop`/`plan --check`, …) are
  * all expressible in terms of `update`. Also the non-interactive path for
- * post-creation edge/owner repair (`--parent`/`--blocks`/`--owner`
- * /`--relates-to`) that used to require `slop edit` (edit-vi-fallback
- * -hangs-agents) — `edit`'s `$EDITOR` fallback can hang forever on a
- * non-TTY; these flags never do.
+ * post-creation edge/owner repair (`--parent`/`--clear-parent`/`--blocks`/
+ * `--discovered-from`/`--owner`/`--clear-owner`/`--relates-to`) that used
+ * to require `slop edit` (edit-vi-fallback-hangs-agents) — `edit`'s
+ * `$EDITOR` fallback can hang forever on a non-TTY; these flags never do.
+ *
+ * t-mmngo: accepts multiple `<refs...>` (or `-` to read refs from stdin,
+ * one per line) — every shared flag applies to every ref, applied per-ref
+ * (never all-or-nothing); see `runSingleOrBulk`'s doc (shared.ts) for the
+ * exact single-vs-bulk output contract.
  */
 export function registerUpdateCommand(program: Command): void {
   program
     .command("update")
     .description(
       "General ticket mutator (progress notes, state, priority, labels, name, spec, " +
-        "relates-to, blocks, owner, parent); the verb commands are sugar over this.",
+        "relates-to, blocks, discovered-from, owner, parent); the verb commands are sugar " +
+        'over this. Accepts multiple <refs...> (or "-" to read refs from stdin, one per ' +
+        "line), applied per-ref.",
     )
-    .argument("<ref>", "ticket to update")
+    .argument("<refs...>", 'one or more tickets to update (or "-" to read refs from stdin)')
     .option("--progress <note>", "append a progress note and bump last_activity_at")
     .option(
       "--state <state>",
@@ -427,18 +598,31 @@ export function registerUpdateCommand(program: Command): void {
       [] as string[],
     )
     .option(
-      "--owner <actor>",
-      "set/replace the owning actor (no supported way to clear via update — hand-edit via `slop edit` for that)",
+      "--discovered-from <±ref>",
+      "add (+ref) or remove (-ref) a discovered-from edge (repeatable) — not cycle-checked, same as --relates-to",
+      collect,
+      [] as string[],
     )
+    .option(
+      "--owner <actor>",
+      "set/replace the owning actor: a bare name (human, back-compat) or agent:<name>/human:<name>. " +
+        "Mutually exclusive with --clear-owner.",
+    )
+    .option("--clear-owner", "clear the owning actor entirely. Mutually exclusive with --owner.")
     .option(
       "--parent <ref>",
       "reparent <ref> under this ticket, or an external ref (e.g. jira:PROJ-123); recomputes " +
-        "root_id/path for <ref> AND every existing descendant. No supported way to clear a parent " +
-        "via update — hand-edit via `slop edit` for that.",
+        "root_id/path for <ref> AND every existing descendant. Mutually exclusive with --clear-parent.",
+    )
+    .option(
+      "--clear-parent",
+      "clear the parent, becoming a local root; recomputes root_id/path for this ticket and " +
+        "every descendant, same as reparenting. Mutually exclusive with --parent.",
     )
     .option(
       "--json",
-      "machine-readable result (id, slug, handle, name, state, priority, reparented_descendants)",
+      "machine-readable result (id, slug, handle, name, state, priority, reparented_descendants) " +
+        "for a single ref; {results[], ok, succeeded, failed} for multiple",
     )
     .action(runUpdate);
 }

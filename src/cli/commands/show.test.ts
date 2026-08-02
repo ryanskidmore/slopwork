@@ -258,10 +258,11 @@ describe("runShow (in-process)", () => {
     const updateOut = captureOutput();
     try {
       await withCwd(root, () =>
-        runUpdate(id, {
+        runUpdate([id], {
           label: [],
           relatesTo: [],
           blocks: [],
+          discoveredFrom: [],
           acceptance: [],
           context: [],
           progress: "fresh progress note",

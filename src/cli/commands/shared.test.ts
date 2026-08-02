@@ -11,11 +11,14 @@ import { SlopError } from "../errors.js";
 import {
   assertMaxLength,
   collect,
+  mostSevereBulkExitCode,
   parseBudgetOption,
   parseIntegerOption,
   parsePriority,
   printWarning,
   readStdin,
+  resolveBulkRefs,
+  runBulk,
   sessionOwnershipWarning,
 } from "./shared.js";
 
@@ -287,5 +290,120 @@ describe("readStdin", () => {
     } finally {
       Object.defineProperty(process, "stdin", { value: originalStdin, configurable: true });
     }
+  });
+});
+
+// t-mmngo: bulk multi-ref helpers shared by done/drop/update.
+
+function withFakeStdin<T>(lines: string, fn: () => Promise<T>): Promise<T> {
+  const fake = Readable.from([lines]);
+  const originalStdin = process.stdin;
+  Object.defineProperty(process, "stdin", { value: fake, configurable: true });
+  return fn().finally(() => {
+    Object.defineProperty(process, "stdin", { value: originalStdin, configurable: true });
+  });
+}
+
+describe("resolveBulkRefs", () => {
+  it("passes literal refs straight through, unchanged", async () => {
+    await expect(resolveBulkRefs(["a", "b", "c"])).resolves.toEqual(["a", "b", "c"]);
+  });
+
+  it("a single ref is still returned as a one-element array", async () => {
+    await expect(resolveBulkRefs(["a"])).resolves.toEqual(["a"]);
+  });
+
+  it('"-" reads refs from stdin, one per line, dropping blank lines', async () => {
+    await withFakeStdin("a\nb\n\n  \nc\n", async () => {
+      await expect(resolveBulkRefs(["-"])).resolves.toEqual(["a", "b", "c"]);
+    });
+  });
+
+  it('rejects "-" mixed with a literal ref', async () => {
+    await expect(resolveBulkRefs(["a", "-"])).rejects.toMatchObject({
+      exitCode: EXIT_CODES.USAGE_ERROR,
+    });
+    await expect(resolveBulkRefs(["-", "a"])).rejects.toMatchObject({
+      exitCode: EXIT_CODES.USAGE_ERROR,
+    });
+  });
+
+  it('rejects "-" that reads zero non-blank lines from stdin', async () => {
+    await withFakeStdin("\n   \n", async () => {
+      await expect(resolveBulkRefs(["-"])).rejects.toMatchObject({
+        exitCode: EXIT_CODES.USAGE_ERROR,
+      });
+    });
+  });
+});
+
+describe("runBulk", () => {
+  it("applies fn per-ref, in order, collecting each outcome", async () => {
+    const seen: string[] = [];
+    const outcomes = await runBulk(["a", "b", "c"], async (ref) => {
+      seen.push(ref);
+      return `handled:${ref}`;
+    });
+    expect(seen).toEqual(["a", "b", "c"]);
+    expect(outcomes).toEqual([
+      { ref: "a", ok: true, exitCode: EXIT_CODES.SUCCESS, data: "handled:a" },
+      { ref: "b", ok: true, exitCode: EXIT_CODES.SUCCESS, data: "handled:b" },
+      { ref: "c", ok: true, exitCode: EXIT_CODES.SUCCESS, data: "handled:c" },
+    ]);
+  });
+
+  it("a failure on one ref never aborts the rest — per-ref, not all-or-nothing", async () => {
+    const outcomes = await runBulk(["a", "bad", "c"], async (ref) => {
+      if (ref === "bad") throw new SlopError("nope", EXIT_CODES.NOT_FOUND);
+      return `ok:${ref}`;
+    });
+    expect(outcomes).toEqual([
+      { ref: "a", ok: true, exitCode: EXIT_CODES.SUCCESS, data: "ok:a" },
+      { ref: "bad", ok: false, exitCode: EXIT_CODES.NOT_FOUND, error: "nope" },
+      { ref: "c", ok: true, exitCode: EXIT_CODES.SUCCESS, data: "ok:c" },
+    ]);
+  });
+
+  it("a non-SlopError throw is reported as GENERIC_ERROR", async () => {
+    const outcomes = await runBulk(["a"], async () => {
+      throw new Error("boom");
+    });
+    expect(outcomes).toEqual([
+      { ref: "a", ok: false, exitCode: EXIT_CODES.GENERIC_ERROR, error: "boom" },
+    ]);
+  });
+});
+
+describe("mostSevereBulkExitCode", () => {
+  it("is SUCCESS when every outcome succeeded", () => {
+    expect(
+      mostSevereBulkExitCode([
+        { ok: true, exitCode: EXIT_CODES.SUCCESS },
+        { ok: true, exitCode: EXIT_CODES.SUCCESS },
+      ]),
+    ).toBe(EXIT_CODES.SUCCESS);
+  });
+
+  it("is the one failing code when only one ref failed", () => {
+    expect(
+      mostSevereBulkExitCode([
+        { ok: true, exitCode: EXIT_CODES.SUCCESS },
+        { ok: false, exitCode: EXIT_CODES.NOT_FOUND },
+      ]),
+    ).toBe(EXIT_CODES.NOT_FOUND);
+  });
+
+  it("is the numerically greatest failing code across multiple failures (documented judgment call)", () => {
+    expect(
+      mostSevereBulkExitCode([
+        { ok: false, exitCode: EXIT_CODES.NOT_FOUND },
+        { ok: false, exitCode: EXIT_CODES.CONFLICT },
+        { ok: false, exitCode: EXIT_CODES.USAGE_ERROR },
+      ]),
+    ).toBe(EXIT_CODES.CONFLICT);
+  });
+
+  it("an empty outcome list is SUCCESS", () => {
+    expect(mostSevereBulkExitCode([])).toBe(EXIT_CODES.SUCCESS);
   });
 });

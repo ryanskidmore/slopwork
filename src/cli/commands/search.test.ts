@@ -73,10 +73,11 @@ describe("runSearch (in-process)", () => {
     const out1 = captureOutput();
     try {
       await withCwd(root, () =>
-        runUpdate(id, {
+        runUpdate([id], {
           label: [],
           relatesTo: [],
           blocks: [],
+          discoveredFrom: [],
           acceptance: [],
           context: [],
           progress: "mentions gadgetronic",
@@ -88,10 +89,11 @@ describe("runSearch (in-process)", () => {
     const out2 = captureOutput();
     try {
       await withCwd(root, () =>
-        runUpdate(id, {
+        runUpdate([id], {
           label: [],
           relatesTo: [],
           blocks: [],
+          discoveredFrom: [],
           acceptance: [],
           context: [],
           progress: "a later, unrelated note",
