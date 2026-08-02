@@ -663,6 +663,40 @@ describe("writeIndex / loadIndex — fresh read", () => {
   });
 });
 
+describe("event integrity in the derived index", () => {
+  it("persists event problems, keeps good derivations, and retries an in-place repair", async () => {
+    const ticket = makeTicket();
+    await createTicket(paths, ticket, ctx, createdEvent, clock);
+    const repairedEvent = makeEventAt(Date.UTC(2026, 6, 24), {
+      entity: { kind: "ticket", id: ticket.id },
+      verb: "ticket.updated",
+      payload: { progress: "visible after repair" },
+    });
+    await createEvent(paths, repairedEvent);
+    const path = join(
+      paths.eventsDir,
+      eventShardMonth(repairedEvent.id),
+      `${repairedEvent.id}.jsonc`,
+    );
+    await writeFile(path, "{ corrupt {{{", "utf8");
+
+    const damaged = await buildIndex(paths, clock);
+    expect(damaged.event_problems).toMatchObject([
+      { kind: "read_error", id: repairedEvent.id, path },
+    ]);
+    expect(damaged.tickets[0]?.latest_note).not.toBe("visible after repair");
+    await writeIndex(paths, damaged);
+
+    // Event fingerprints are intentionally count/max-id only, so this
+    // proves the persisted problem itself forces a retry.
+    await writeFile(path, writeCanonical(repairedEvent), "utf8");
+    const healed = await loadIndex(paths, clock);
+    expect(healed).toMatchObject({ rebuilt: true, reason: "stale_content" });
+    expect(healed.index.event_problems).toEqual([]);
+    expect(healed.index.tickets[0]?.latest_note).toBe("visible after repair");
+  });
+});
+
 describe("loadIndex — auto-heal (A3 acceptance: 'deleted index self-heals')", () => {
   it("rebuilds transparently when index.jsonc is missing entirely", async () => {
     const t = makeTicket();

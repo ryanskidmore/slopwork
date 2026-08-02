@@ -28,7 +28,7 @@ import type { Command } from "commander";
 import type { Actor } from "../../core/index.js";
 import { EXIT_CODES, shortTicketCode } from "../../core/index.js";
 import { repoPaths, requireRepoRoot, ticketEventContext } from "../../repo/index.js";
-import { openStorage } from "../../storage/index.js";
+import { openStorage, warnAboutEventReadProblems } from "../../storage/index.js";
 import type { Question } from "../../tickets/questions.js";
 import {
   ANSWER_TEXT_MAX_LENGTH,
@@ -83,7 +83,14 @@ export async function runAnswer(
   // write lock, while the authoritative recheck below (scoped to just
   // this question's own ticket) is what actually guards the double
   // -answer race.
-  const allEvents = await backend.listEventsTolerant();
+  const { events: allEvents, problems: eventProblems } = await backend.listEventsTolerant();
+  if (eventProblems.length > 0) {
+    warnAboutEventReadProblems(eventProblems);
+    throw new SlopError(
+      "cannot answer safely while event files are unreadable; repair them and run `slop reindex`",
+      EXIT_CODES.GENERIC_ERROR,
+    );
+  }
   const allQuestions = deriveQuestions(allEvents);
   const candidates = matchQuestionsByRef(allQuestions, questionRef);
   if (candidates.length === 0) {

@@ -1,0 +1,55 @@
+{
+  "id": "ticket_01KZ14E4SZ1QP6Q2XSWB4J1XB6",
+  "name": "Surface and recover corrupt event records",
+  "slug": "surface-and-recover-corrupt-event",
+  "spec": {
+    "summary": "Make every tolerant event consumer preserve actionable integrity diagnostics instead of silently omitting corrupt audit data.",
+    "details_md": "",
+    "acceptance": [
+      "Flat and sharded corrupt or unreadable event files yield structured EventReadProblem records while valid events remain available.",
+      "Per-shard caching never hides an in-place repair of a shard that previously contained a problem.",
+      "Index, CLI/reindex/status, storage backend, remote contract, and web API/UI expose event integrity problems with documented warning and exit behavior.",
+      "Question and awaiting-input overlays continue to derive correctly from valid events."
+    ],
+    "context": [
+      "src/repo/events.ts",
+      "src/storage/flatfile.ts",
+      "src/repo/db-index.ts",
+      "src/web"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "review",
+  "priority": 0,
+  "labels": [],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KZ12QP04YSS8860GKR661F5P"
+  ],
+  "root_id": "ticket_01KZ14E4SZ1QP6Q2XSWB4J1XB6",
+  "path": [],
+  "active_session": "session_01KZ14EAYSAKR2ZK1S505MZH9C",
+  "last_activity_at": "2026-08-02T12:06:47.632Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-08-02T11:41:05.733Z",
+  "updated_at": "2026-08-02T12:06:47.632Z",
+  "review": {
+    "mr": "https://github.com/ryanskidmore/slopwork/pull/18",
+    "requested_at": "2026-08-02T12:06:47.632Z",
+    "by": {
+      "name": "Ryan Skidmore",
+      "kind": "human"
+    }
+  }
+}

@@ -19,7 +19,7 @@ import type { RenderFormat } from "../../core/index.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
 import type { StorageBackend } from "../../storage/index.js";
-import { openStorage } from "../../storage/index.js";
+import { openStorage, warnAboutEventReadProblems } from "../../storage/index.js";
 import type { Question } from "../../tickets/questions.js";
 import {
   deriveQuestions,
@@ -60,10 +60,16 @@ async function gatherQuestions(
   backend: StorageBackend,
   opts: QuestionsCommandOptions,
 ): Promise<Question[]> {
-  const events =
-    opts.ticket !== undefined
-      ? await backend.queryEvents({ ticket: (await backend.resolveTicketRef(opts.ticket)).id })
-      : await backend.listEventsTolerant();
+  let events;
+  if (opts.ticket !== undefined) {
+    events = await backend.queryEvents({
+      ticket: (await backend.resolveTicketRef(opts.ticket)).id,
+    });
+  } else {
+    const result = await backend.listEventsTolerant();
+    events = result.events;
+    warnAboutEventReadProblems(result.problems);
+  }
   const all = deriveQuestions(events);
   return opts.all ? all : unansweredQuestions(all);
 }

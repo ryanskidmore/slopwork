@@ -41,17 +41,17 @@ export async function handleTreeView(
   dataSource: WebDataSource,
   now: number,
 ): Promise<Response> {
-  const [rawTickets, { config, warning }, events] = await Promise.all([
+  const [rawTickets, { config, warning }, eventResult] = await Promise.all([
     dataSource.listTickets(),
     dataSource.getConfig(),
     dataSource.listEvents(),
   ]);
-  const tickets = deriveEffectiveTickets(rawTickets, events);
+  const tickets = deriveEffectiveTickets(rawTickets, eventResult.events);
   const thresholds = staleThresholdsFromConfig(config);
   const childIndex = buildChildIndex(tickets);
   // G4 (t-jggg9): reuses the SAME whole-db event read already fetched
   // above for deriveEffectiveTickets — no second listEvents() call.
-  const awaitingInputByTicket = computeAwaitingInputByTicket(events);
+  const awaitingInputByTicket = computeAwaitingInputByTicket(eventResult.events);
   const summaryContext = createTicketSummaryContext(
     tickets,
     thresholds,
@@ -81,7 +81,7 @@ export async function handleTreeView(
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const body: TreeResponseDTO = {
-    config: configDto(config, warning),
+    config: configDto(config, warning, eventResult.problems),
     roots: roots.map((root) => buildNode(root, new Set())),
     total: tickets.length,
   };

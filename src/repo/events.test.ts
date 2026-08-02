@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -23,6 +23,7 @@ import {
   listEventIds,
   listEventShardDirs,
   listEvents,
+  listEventsTolerant,
   migrateFlatEventsToShards,
   queryEvents,
   readEvent,
@@ -273,6 +274,90 @@ describe("reads merge the flat and sharded layouts transparently", () => {
     const poisoned = makeEvent();
     await writeFile(eventFilePath(paths, poisoned.id), "{ not valid jsonc {{{");
     await expect(readEvent(paths, poisoned.id)).rejects.toMatchObject({ exitCode: 1 });
+  });
+});
+
+describe("listEventsTolerant — loud integrity diagnostics", () => {
+  it("keeps good flat events while reporting syntax, schema, and unreadable files", async () => {
+    const good = makeEvent();
+    await plantFlat(paths, good);
+
+    const syntaxId = newEventId();
+    const schemaId = newEventId();
+    const unreadableId = newEventId();
+    await writeFile(eventFilePath(paths, syntaxId), "{ nope {{{", "utf8");
+    await writeFile(eventFilePath(paths, schemaId), "{}\n", "utf8");
+    await writeFile(
+      eventFilePath(paths, unreadableId),
+      writeCanonical(makeEvent({ id: unreadableId })),
+    );
+    await chmod(eventFilePath(paths, unreadableId), 0o000);
+
+    try {
+      const result = await listEventsTolerant(paths);
+      expect(result.events.map((event) => event.id)).toEqual([good.id]);
+      expect(result.problems).toHaveLength(3);
+      expect(result.problems.every((problem) => problem.kind === "read_error")).toBe(true);
+      expect(result.problems.map((problem) => problem.path)).toEqual(
+        expect.arrayContaining([
+          eventFilePath(paths, syntaxId),
+          eventFilePath(paths, schemaId),
+          eventFilePath(paths, unreadableId),
+        ]),
+      );
+    } finally {
+      await chmod(eventFilePath(paths, unreadableId), 0o600);
+    }
+  });
+
+  it("reports invalid filenames and payload ids without admitting either record", async () => {
+    const payload = makeEvent();
+    const filenameId = newEventId();
+    await writeFile(join(paths.eventsDir, "not-an-event.jsonc"), writeCanonical(payload));
+    await writeFile(eventFilePath(paths, filenameId), writeCanonical(payload));
+
+    const result = await listEventsTolerant(paths);
+    expect(result.events).toEqual([]);
+    expect(result.problems.map((problem) => problem.kind).sort()).toEqual([
+      "id_mismatch",
+      "invalid_filename",
+    ]);
+  });
+
+  it("prefers a sharded copy and reports a duplicate legacy flat copy", async () => {
+    const event = makeEvent();
+    await plantSharded(paths, event);
+    await plantFlat(paths, event);
+
+    const result = await listEventsTolerant(paths);
+    expect(result.events.map((item) => item.id)).toEqual([event.id]);
+    expect(result.problems).toMatchObject([
+      { kind: "duplicate_id", id: event.id, path: eventFilePath(paths, event.id) },
+    ]);
+  });
+
+  it("reports an otherwise-valid event placed in the wrong month shard", async () => {
+    const event = makeEventAt(Date.UTC(2024, 0, 15));
+    const wrongDir = join(paths.eventsDir, "2024-02");
+    await mkdir(wrongDir, { recursive: true });
+    await writeFile(join(wrongDir, `${event.id}.jsonc`), writeCanonical(event));
+
+    const result = await listEventsTolerant(paths);
+    expect(result.events).toEqual([]);
+    expect(result.problems).toMatchObject([{ kind: "wrong_shard", id: event.id }]);
+  });
+
+  it("reports a regex-valid but undecodable event ULID instead of throwing", async () => {
+    const id = "event_ZZZZZZZZZZZZZZZZZZZZZZZZZZ" as EventId;
+    const event = makeEvent({ id });
+    const dir = join(paths.eventsDir, "2024-02");
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, `${id}.jsonc`), writeCanonical(event));
+
+    await expect(listEventsTolerant(paths)).resolves.toMatchObject({
+      events: [],
+      problems: [{ kind: "read_error", id }],
+    });
   });
 });
 

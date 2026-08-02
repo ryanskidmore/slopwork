@@ -1,10 +1,10 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { ulid } from "ulid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Event, EventId, Ticket } from "../core/index.js";
-import { newTicketId, ticketSchema } from "../core/index.js";
+import { newTicketId, ticketSchema, writeCanonical } from "../core/index.js";
 import {
   createEntityFileCanonical,
   ensureDbDirs,
@@ -181,12 +181,12 @@ describe("FlatfileBackend", () => {
       const first = await backend.listEventsTolerant();
       // 3 events total: createTicket's own sharded `ticket.created` event,
       // plus the two hand-placed jan/feb ones.
-      expect(first).toHaveLength(3);
-      expect(first.map((e) => e.id)).toEqual(expect.arrayContaining([jan.id, feb.id]));
+      expect(first.events).toHaveLength(3);
+      expect(first.events.map((e) => e.id)).toEqual(expect.arrayContaining([jan.id, feb.id]));
 
       readFileMock.mockClear();
       const second = await backend.listEventsTolerant();
-      expect(second.map((e) => e.id).sort()).toEqual(first.map((e) => e.id).sort());
+      expect(second.events.map((e) => e.id).sort()).toEqual(first.events.map((e) => e.id).sort());
 
       const eventFileReads = readFileMock.mock.calls.filter(([path]) =>
         String(path).startsWith(paths.eventsDir),
@@ -217,7 +217,7 @@ describe("FlatfileBackend", () => {
       );
       const result = await backend.listEventsTolerant();
 
-      expect(result.map((e) => e.id)).toEqual(expect.arrayContaining([jan2.id, feb.id]));
+      expect(result.events.map((e) => e.id)).toEqual(expect.arrayContaining([jan2.id, feb.id]));
 
       const readsUnderJan = readFileMock.mock.calls.filter(([path]) =>
         String(path).startsWith(join(paths.eventsDir, "2024-01")),
@@ -248,7 +248,7 @@ describe("FlatfileBackend", () => {
       const added = await writeFlatEvent(paths, ticket.id, "2024-01-20T00:00:00.000Z", "flat #2");
       const events = await backend.listEventsTolerant();
 
-      expect(events.map((event) => event.id)).toEqual(
+      expect(events.events.map((event) => event.id)).toEqual(
         expect.arrayContaining([existingShardEvent.id, added.id]),
       );
       const shardReads = readFileMock.mock.calls.filter(([path]) =>
@@ -274,7 +274,30 @@ describe("FlatfileBackend", () => {
       );
 
       const after = await backend.listEventsTolerant();
-      expect(after.length).toBe(before.length + 1);
+      expect(after.events.length).toBe(before.events.length + 1);
+    });
+
+    it("does not cache a damaged shard, so an in-place repair is visible on the same backend", async () => {
+      const ticket = makeTicket();
+      await backend.createTicket(ticket, ctx, createdEvent);
+      const event = await writeEventInMonth(
+        paths,
+        ticket.id,
+        "2024-01",
+        "2024-01-15T00:00:00.000Z",
+        "repair me",
+      );
+      const path = join(paths.eventsDir, "2024-01", `${event.id}.jsonc`);
+      await writeFile(path, "{ corrupt {{{", "utf8");
+
+      const damaged = await backend.listEventsTolerant();
+      expect(damaged.events.some((item) => item.id === event.id)).toBe(false);
+      expect(damaged.problems).toMatchObject([{ kind: "read_error", id: event.id, path }]);
+
+      await writeFile(path, writeCanonical(event), "utf8");
+      const repaired = await backend.listEventsTolerant();
+      expect(repaired.events.some((item) => item.id === event.id)).toBe(true);
+      expect(repaired.problems).toEqual([]);
     });
   });
 });

@@ -2,7 +2,11 @@ import type { Command } from "commander";
 import { EXIT_CODES, nowIso, systemClock, ticketSchema } from "../../core/index.js";
 import type { SessionId } from "../../core/index.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
-import { formatDuplicateSlugProblems, formatIndexProblems } from "../../storage/backend.js";
+import {
+  formatDuplicateSlugProblems,
+  formatEventReadProblems,
+  formatIndexProblems,
+} from "../../storage/backend.js";
 import { openStorage } from "../../storage/index.js";
 import { diffSessionPatch } from "../../sessions/patch.js";
 import { buildHealedSession, findOrphanedActiveSessions } from "../../sessions/repair.js";
@@ -76,6 +80,7 @@ export async function runReindex(options: ReindexOptions): Promise<void> {
     // this up-front gate specifically so `reindex` alone can opt back
     // into the old all-or-nothing behavior.
     await backend.listTickets();
+    await backend.listEvents();
   }
 
   let shardNote = "";
@@ -93,22 +98,31 @@ export async function runReindex(options: ReindexOptions): Promise<void> {
   const swept = await backend.sweepTempFiles();
   const sweptNote = swept.length > 0 ? `; swept ${swept.length} stale temp file(s)` : "";
 
-  if (index.problems.length > 0) {
-    process.stderr.write(`${formatIndexProblems(index.problems)}\n`);
+  if (index.problems.length > 0 || index.event_problems.length > 0) {
+    if (index.problems.length > 0) process.stderr.write(`${formatIndexProblems(index.problems)}\n`);
+    if (index.event_problems.length > 0) {
+      process.stderr.write(`${formatEventReadProblems(index.event_problems)}\n`);
+    }
+    const skipped = index.problems.length + index.event_problems.length;
     process.stdout.write(
-      `reindexed: ${index.tickets.length} ticket(s) rebuilt, ${index.problems.length} skipped due to errors, ${Object.keys(index.slugs).length} slug(s)${sweptNote}${shardNote}\n`,
+      `reindexed: ${index.tickets.length} ticket(s) rebuilt, ${skipped} skipped due to errors ` +
+        `(${index.problems.length} ticket file(s), ${index.event_problems.length} event problem(s)), ` +
+        `${Object.keys(index.slugs).length} slug(s)${sweptNote}${shardNote}\n`,
     );
     // sessions/repair.ts's own doc: an unreadable ticket's own
     // active_session is invisible to the referenced-ids set below, which
     // would misreport a genuinely live session as orphaned — a corrupt
     // ticket read makes the scan itself unsound, not just unavailable.
-    printWarning(
-      "skipped the orphaned-active-session scan: the ticket read above had unreadable file(s), " +
-        "so the scan could misreport a genuinely live session as orphaned. Fix the ticket " +
-        "problem(s) above and re-run `slop reindex` (with --heal, if repair is needed) once clean.",
-    );
+    if (index.problems.length > 0) {
+      printWarning(
+        "skipped the orphaned-active-session scan: the ticket read above had unreadable file(s), " +
+          "so the scan could misreport a genuinely live session as orphaned. Fix the ticket " +
+          "problem(s) above and re-run `slop reindex` (with --heal, if repair is needed) once clean.",
+      );
+    }
     throw new SlopError(
-      `reindex finished with ${index.problems.length} unreadable ticket file(s) (see the errors above); ` +
+      `reindex finished with ${index.problems.length} unreadable ticket file(s) and ` +
+        `${index.event_problems.length} event file problem(s) (see the errors above); ` +
         "fix them and re-run `slop reindex` — everything else was rebuilt and saved successfully",
       EXIT_CODES.GENERIC_ERROR,
     );

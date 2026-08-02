@@ -33,6 +33,7 @@ import type {
   TicketRefDTO,
   TicketSummaryDTO,
 } from "./types.js";
+import type { EventReadProblem } from "../../storage/backend.js";
 import {
   type AwaitingInputOverlay,
   buildReverseEdgeIndex,
@@ -113,7 +114,11 @@ export function apiErrorResponse(message: string, status: number): Response {
   return Response.json({ error: message }, { status });
 }
 
-export function configDto(config: Config, warning: string | null): ConfigDTO {
+export function configDto(
+  config: Config,
+  warning: string | null,
+  eventProblems: readonly EventReadProblem[] = [],
+): ConfigDTO {
   return {
     project: config.project,
     warning,
@@ -125,6 +130,7 @@ export function configDto(config: Config, warning: string | null): ConfigDTO {
       stale_after: config.defaults.stale_after,
       review_stale_after: config.defaults.review_stale_after,
     },
+    integrity: { event_problems: [...eventProblems] },
   };
 }
 

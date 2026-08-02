@@ -63,6 +63,11 @@ build/dev-loop details.
 - **Cmd/Ctrl-K** opens a command palette to jump straight to any ticket
   by name, slug, id, or `t-<code>` handle. Its debounced search runs on the
   server and returns at most 20 results rather than downloading the database.
+- **Audit integrity stays visible.** If an event file cannot be read or
+  violates its filename/shard identity, the remaining data still renders,
+  but a persistent alert warns that activity and awaiting-input overlays
+  may be incomplete. The same structured `event_problems` are returned by
+  `/api/config` and each config-bearing page API.
 
 ## Pages
 

@@ -17,6 +17,7 @@ import {
   createSession,
   createTicket,
   ensureDbDirs,
+  eventShardMonth,
   listEvents,
   readSession,
   ticketFilePath,
@@ -95,6 +96,28 @@ describe("slop reindex — fault tolerance (adversarial-review Finding 3)", () =
     expect(status).toBe(0);
     expect(stdout).toContain("reindexed: 1 ticket(s)");
     expect(stderr).toBe("");
+  });
+
+  it("keeps good events, reports a corrupt event, persists diagnostics, and exits 1", async () => {
+    const first = makeTicket();
+    const second = makeTicket();
+    await createTicket(paths, first, ctx, createdEvent);
+    await createTicket(paths, second, ctx, createdEvent);
+    const events = await listEvents(paths);
+    const damaged = events[0];
+    expect(damaged).toBeDefined();
+    if (!damaged) return;
+    const path = join(paths.eventsDir, eventShardMonth(damaged.id), `${damaged.id}.jsonc`);
+    await writeFile(path, "{ corrupt {{{", "utf8");
+
+    const { status, stdout, stderr } = spawnReindex(scratch);
+    expect(status).toBe(1);
+    expect(stdout).toContain("1 skipped due to errors");
+    expect(stderr).toContain("event file problem");
+    expect(stderr).toContain(path);
+    const persisted = await readFile(paths.indexFile, "utf8");
+    expect(persisted).toContain('"event_problems"');
+    expect(persisted).toContain(second.id);
   });
 
   it("one corrupt ticket among several: rebuilds the good ones, reports the bad one actionably, exits 1", async () => {

@@ -74,11 +74,17 @@ import type { JsoncPatchEntry } from "../core/jsonc.js";
 // here as the interface's own vocabulary. `import type` only — no runtime
 // dependency from the interface onto any driver.
 import type { DbIndex, LoadIndexResult } from "../repo/db-index.js";
-import type { EventContext, EventQuery, MutationEventSpec } from "../repo/events.js";
+import type {
+  EventContext,
+  EventQuery,
+  ListEventsTolerantResult,
+  MutationEventSpec,
+} from "../repo/events.js";
 import type { ListSessionsTolerantResult } from "../repo/sessions.js";
 import type { ListTicketsTolerantResult } from "../repo/tickets.js";
 
 export { formatDuplicateSlugProblems, formatIndexProblems } from "../repo/db-index.js";
+export { formatEventReadProblems, warnAboutEventReadProblems } from "../repo/events.js";
 export type {
   DbIndex,
   DuplicateSlugProblem,
@@ -86,7 +92,13 @@ export type {
   LoadIndexResult,
   TicketReadProblem,
 } from "../repo/db-index.js";
-export type { EventContext, EventQuery, MutationEventSpec } from "../repo/events.js";
+export type {
+  EventContext,
+  EventQuery,
+  EventReadProblem,
+  ListEventsTolerantResult,
+  MutationEventSpec,
+} from "../repo/events.js";
 export type { ListSessionsTolerantResult, SessionReadProblem } from "../repo/sessions.js";
 export type { ListTicketsTolerantResult } from "../repo/tickets.js";
 
@@ -182,8 +194,8 @@ export interface StorageBackend {
   queryEvents(query?: EventQuery): Promise<Event[]>;
   /** Every event, strict, in cursor (ascending id / chronological) order. */
   listEvents(): Promise<Event[]>;
-  /** Every readable event in cursor order; corrupt files silently excluded. */
-  listEventsTolerant(): Promise<Event[]>;
+  /** Every readable event plus structured diagnostics for every skipped file. */
+  listEventsTolerant(): Promise<ListEventsTolerantResult>;
 
   // --- ref resolution --------------------------------------------------
   /**
@@ -199,7 +211,8 @@ export interface StorageBackend {
   // --- derived index ---------------------------------------------------
   /**
    * The derived index (per-ticket summary rows, slug map, reverse edges,
-   * blocked/ready columns, staleness deadlines, `problems[]`),
+   * blocked/ready columns, staleness deadlines, ticket `problems[]`, and
+   * event `event_problems[]`),
    * transparently rebuilt when stale — the flatfile driver's self-healing
    * `index.jsonc`. A remote backend serves the equivalent server-derived
    * data with `rebuilt: false, reason: "fresh"`.

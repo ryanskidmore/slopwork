@@ -191,7 +191,7 @@ slop instructions
 Rebuilds the derived, gitignored `.slop/db/index.jsonc` from the tickets,
 sessions, and events on disk. You rarely need this by hand — every read
 path auto-heals a missing/stale index — but it's the manual escape hatch
-after a bulk hand-edit, or to force-surface every unreadable ticket file
+after a bulk hand-edit, or to force-surface every unreadable ticket or event file
 in one pass. It also scans for **orphaned active sessions** — sessions
 with no `ended_at` that no ticket's `active_session` references, which
 can happen if a `start`/takeover is interrupted (e.g. a crash) between
@@ -205,8 +205,13 @@ slop reindex --shard-events   # migrate flat-layout events/ into events/YYYY-MM/
 ```
 
 `--strict` restores pre-fault-tolerance, all-or-nothing behavior. Without
-it, `reindex` skips unreadable ticket files, still rebuilds everything it
-could read, reports every problem, and exits `1` if any remain.
+it, `reindex` skips unreadable ticket and event files, still rebuilds
+everything it could read, reports every problem, and exits `1` if any
+remain. Event diagnostics also cover invalid filenames, filename/payload
+id mismatches, events in the wrong month shard, and duplicate ids. Because
+event-derived activity and awaiting-input state can be incomplete, these
+problems remain attached to the index and are retried on every read until
+the files are repaired.
 
 `--heal` closes out every orphaned active session it finds: sets
 `ended_at` and a synthesized `end_summary` explaining the auto-heal, and

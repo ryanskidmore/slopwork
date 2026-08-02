@@ -12,6 +12,7 @@ import type { ConfigDTO } from "../../api/types.js";
 import { useApiQuery } from "../hooks/use-api-query.js";
 import { fetchConfig } from "../lib/api.js";
 import { CommandPalette, useCommandPaletteShortcut } from "./command-palette.js";
+import { EventIntegrityBanner } from "./integrity-banner.js";
 import { ThemeToggle } from "./theme-toggle.js";
 import { Button } from "./ui/button.js";
 
@@ -117,6 +118,7 @@ export function AppShell() {
           </button>
         </div>
       )}
+      {config && <EventIntegrityBanner problems={config.integrity.event_problems} />}
       <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
         <Outlet />
       </main>

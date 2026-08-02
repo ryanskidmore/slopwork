@@ -74,12 +74,19 @@ import {
   listEvents,
   listEventShardDirs,
   listEventsInDirTolerant,
+  mergeEventReadResults,
   migrateFlatEventsToShards,
   queryEvents,
   readEvent,
   recoverMutationEvents,
 } from "../repo/events.js";
-import type { EventContext, EventQuery, MutationEventSpec } from "../repo/events.js";
+import type {
+  EventContext,
+  EventDirectoryResult,
+  EventQuery,
+  ListEventsTolerantResult,
+  MutationEventSpec,
+} from "../repo/events.js";
 import { DEFAULT_TIMEOUT_MS, withLock } from "../repo/lock.js";
 import { hasPendingMutationJournals } from "../repo/mutation-journal.js";
 import { sweepStaleTempFiles } from "../repo/atomic-write.js";
@@ -130,7 +137,7 @@ export class FlatfileBackend implements StorageBackend {
   private sessionsCache: CacheEntry<ListSessionsTolerantResult> | null = null;
   /** One entry per event shard key (`"events"`, `"events/YYYY-MM"`) — see
    * the module doc's "Events specifically: cached PER SHARD" section. */
-  private eventShardCache = new Map<string, CacheEntry<Event[]>>();
+  private eventShardCache = new Map<string, CacheEntry<EventDirectoryResult>>();
 
   constructor(
     /** The flatfile layout under this repo's `.slop/` — driver-internal;
@@ -261,9 +268,16 @@ export class FlatfileBackend implements StorageBackend {
    * last call is served from cache untouched; only a changed (or
    * never-seen) shard is actually read + parsed.
    */
-  async listEventsTolerant(): Promise<Event[]> {
+  async listEventsTolerant(): Promise<ListEventsTolerantResult> {
     const fp = await computeEventsFingerprint(this.paths);
-    const shardEntries = Object.entries(fp);
+    const shardEntries = Object.entries(fp)
+      // Preserve readEvent's shard-first precedence when an id exists in
+      // both layouts; the duplicate flat copy becomes the problem.
+      .sort(([a], [b]) => {
+        if (a === "events") return 1;
+        if (b === "events") return -1;
+        return a.localeCompare(b);
+      });
 
     const perShard = await Promise.all(
       shardEntries.map(async ([key, dirFp]) => {
@@ -274,9 +288,19 @@ export class FlatfileBackend implements StorageBackend {
           key === "events"
             ? this.paths.eventsDir
             : join(this.paths.eventsDir, key.slice("events/".length));
-        const events = await listEventsInDirTolerant(dir);
-        this.eventShardCache.set(key, { key: cacheKey, value: events });
-        return events;
+        const result = await listEventsInDirTolerant(
+          dir,
+          key === "events" ? undefined : key.slice("events/".length),
+        );
+        // A damaged shard is deliberately never cached. Its cheap
+        // count/max-id fingerprint can stay unchanged after an in-place
+        // repair, so re-reading is required for repair visibility.
+        if (result.problems.length === 0) {
+          this.eventShardCache.set(key, { key: cacheKey, value: result });
+        } else {
+          this.eventShardCache.delete(key);
+        }
+        return result;
       }),
     );
 
@@ -289,7 +313,7 @@ export class FlatfileBackend implements StorageBackend {
       if (!currentKeys.has(key)) this.eventShardCache.delete(key);
     }
 
-    return perShard.flat().sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    return mergeEventReadResults(perShard);
   }
 
   // --- ref resolution --------------------------------------------------
