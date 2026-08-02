@@ -14,7 +14,7 @@
     "commit_at_start": "eb571b2e765506991040cebc25ece06eb392fbfe"
   },
   "started_at": "2026-08-02T20:41:22.266Z",
-  "ended_at": null,
+  "ended_at": "2026-08-02T22:01:44.816Z",
   "plan": [],
-  "end_summary": null
+  "end_summary": "PRs 20 and 21 merged to main. Merge-safe poll cursors + enforceable dependency boundaries live; the recursive detector caught 3 real violations before merging."
 }

@@ -10,7 +10,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "review",
+  "state": "done",
   "priority": 2,
   "labels": [
     "source:salvage"
@@ -20,9 +20,9 @@
   "discovered_from": [],
   "root_id": "ticket_01KZ1P45S0TBRBRWK1CHB170PP",
   "path": [],
-  "active_session": "session_01KZ23BDS6VADNPD9R5RX3KH4C",
-  "last_activity_at": "2026-08-02T21:47:00.152Z",
-  "latest_note": null,
+  "active_session": null,
+  "last_activity_at": "2026-08-02T22:01:44.932Z",
+  "latest_note": "PRs 20 and 21 merged to main. Merge-safe poll cursors + enforceable dependency boundaries live; the recursive detector caught 3 real violations before merging.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -32,13 +32,5 @@
     }
   },
   "created_at": "2026-08-02T16:50:13.525Z",
-  "updated_at": "2026-08-02T21:47:00.152Z",
-  "review": {
-    "mr": "https://github.com/ryanskidmore/slopwork/pull/21",
-    "requested_at": "2026-08-02T21:47:00.152Z",
-    "by": {
-      "name": "coordinator",
-      "kind": "agent"
-    }
-  }
+  "updated_at": "2026-08-02T22:01:44.932Z"
 }
