@@ -14,7 +14,7 @@
     "commit_at_start": "433e255d0c8283899b8b3cd97d2acff5f1a9e201"
   },
   "started_at": "2026-08-02T21:47:00.519Z",
-  "ended_at": null,
+  "ended_at": "2026-08-02T22:54:59.559Z",
   "plan": [],
-  "end_summary": null
+  "end_summary": "PRs 22 and 23 merged to main. Web collections bounded end to end; concurrent suite runs officially supported (perf-scale knob + ephemeral Playwright port, repro harness committed)."
 }

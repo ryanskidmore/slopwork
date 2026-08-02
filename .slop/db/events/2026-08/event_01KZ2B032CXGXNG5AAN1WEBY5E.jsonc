@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ2B032CXGXNG5AAN1WEBY5E",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": "session_01KZ284E7KQB4MJCW2HQ7C7KV3",
+  "verb": "session.ended",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KZ284E7KQB4MJCW2HQ7C7KV3"
+  },
+  "payload": {
+    "reason": "done",
+    "note": "PRs 22 and 23 merged to main. Web collections bounded end to end; concurrent suite runs officially supported (perf-scale knob + ephemeral Playwright port, repro harness committed)."
+  },
+  "at": "2026-08-02T22:54:59.660Z"
+}
