@@ -7,79 +7,68 @@
  * (re-exported here as {@link CONTEXT_PACK_BUDGET_UNIT} for call-site
  * continuity), the ONE unit every `--budget`-taking command in this CLI
  * documents and enforces: `ready`, `search`, `status`, `events`, `context`,
- * and `show --context`. (History: `slop show --context --budget` used to
- * treat `N` as a *rough* token estimate via `tickets/context.ts`'s own
- * `budgetCharsFromTokens`, ~4 chars/token — a real, user-visible
- * inconsistency with this module's exact character count.
- * budget-flags-units-and-validation reconciled `show --context` onto this
- * module's `renderContextPackWithBudget` and removed the now-dead
- * token-estimate helper entirely, rather than leave two units alive.)
- * Every command's parser also now shares one implementation —
- * `src/cli/commands/shared.ts`'s `parseBudgetOption` — so a negative
- * `--budget` is rejected (`USAGE_ERROR`, exit 2) the same way everywhere,
- * instead of silently degrading to "elide everything" on some commands and
- * erroring on others.
+ * and `show --context`. Every command's parser also shares one
+ * implementation — `src/cli/commands/shared.ts`'s `parseBudgetOption` —
+ * so a negative `--budget` is rejected (`USAGE_ERROR`, exit 2) the same
+ * way everywhere.
  *
- * **Elision order** (least-important content dropped first, per the C1
- * brief: "degrade by truncating the least important sections first ...
- * rather than hard-cutting mid-structure, and say what was elided"):
- *   1. Oldest prior sessions, one at a time (`ContextPackData.sessions` is
- *      already most-recent-first per `tickets/context.ts`'s documented
- *      convention) — a session from three weeks ago is the least useful
- *      thing to keep when space is tight.
- *   2. The ticket's own `spec.details_md` — typically the longest single
- *      block of freeform prose — trimmed to the longest prefix that fits
- *      (found by binary search over the exact rendered length, so the
- *      result is never off-by-a-little the way a fixed-percentage cut
- *      would be).
- *   3. Last resort: a raw slice of our OWN already-elided text (core pack
- *      fields + our own elision notes, details_md already blanked) down to
- *      exactly `budgetChars`. Deliberately NOT `tickets/context.ts`'s own
- *      post-hoc `renderContextPack(data, budgetChars)` (a simpler,
- *      fixed-length-truncation-note primitive this module is built on top
- *      of, not a duplicate of): a raw slice has no minimum floor, so
- *      {@link renderContextPackWithBudget} always genuinely respects the
- *      budget, for every `budgetChars >= 0`, even one too small to fit any
- *      coherent structure at all.
+ * **G5 (t-5vj9o) simplification**: this module used to hand-roll its own
+ * elision ladder (drop oldest sessions one at a time, then binary-search
+ * the longest `spec.details_md` prefix that fits, then a raw slice) —
+ * the exact kind of bespoke, individually-documented degradation strategy
+ * the "simplification sweep" audit flagged for six-plus commands. It now
+ * reduces the context pack to a plain list of droppable pieces and hands
+ * that straight to `core/budget.ts`'s {@link renderEntriesWithBudget} —
+ * the SAME generic cap-and-report helper `ready`/`search`/`status`/
+ * `events`/`list`/`questions` already use. The pieces, most-important
+ * first (so the generic "drop from the tail" strategy removes the least
+ * useful content first):
  *
- * Every step that actually elided something appends a trailing "## Elided
- * for --budget" section naming what happened, so the reader always knows
- * content was dropped rather than silently getting a truncated-looking
- * pack with no explanation.
+ *   1. `spec.details_md` + ancestry + blockers — kept as one atomic
+ *      "extras" tier, dropped as a whole rather than partially truncated
+ *      (the old binary search bought precision the audit judged not worth
+ *      the complexity — a whole-or-nothing drop is simpler and still
+ *      "say what was elided").
+ *   2. Prior sessions, newest first (`ContextPackData.sessions` is already
+ *      most-recent-first) — dropped from the tail, i.e. oldest first, one
+ *      at a time.
  *
- * **Reused across every read command**: E1 generalised `--budget` beyond
- * `context`/`show --context` — `ready`/`search`/`status`/`events` instead
- * build on `core/budget.ts`'s list-shaped `renderEntriesWithBudget` (this
- * module's prose-eliding sibling, same "drop least-important content
- * first, say what was elided" philosophy), while `context`/`show
- * --context` keep using {@link renderContextPackWithBudget} directly — the
- * only per-command work is building a `ContextPackData` (see
- * `context-pack.ts`, also C1)
- * and passing it here.
+ * Both {@link renderContextPackWithBudget} (text) and
+ * {@link renderContextPackJsonWithBudget} (`--json`) share this one
+ * entries list and one elision order — only the final "can't shrink any
+ * further" floor differs, and only because text and JSON differ in what a
+ * safe last resort even IS (module doc on `core/budget.ts`): a raw
+ * character slice is always valid text, but never safely valid JSON, so
+ * the JSON floor is the already-valid zero-entries envelope instead.
+ *
+ * **Reused across every read command**: `ready`/`search`/`status`/
+ * `events`/`list`/`questions` build on `core/budget.ts`'s list-shaped
+ * `renderEntriesWithBudget` directly; `context`/`show --context` do the
+ * same, just with the context pack's own pieces as the "entries" — the
+ * only per-command work left is building a `ContextPackData` (see
+ * `context-pack.ts`, also C1) and describing what its droppable pieces are.
  */
 import type { Session, Ticket } from "../core/index.js";
 import {
   BUDGET_UNIT as CONTEXT_PACK_BUDGET_UNIT,
-  renderJsonBodyWithBudget,
+  renderEntriesWithBudget,
 } from "../core/budget.js";
 import type { ContextPackData } from "../tickets/context.js";
 import { renderContextPack } from "../tickets/context.js";
 import { jiraBrowseUrl } from "../tickets/jira.js";
 
 /** The unit `--budget N` counts in for `slop context`/`slop start` — see
- * this module's doc for why this deliberately differs from `slop show
- * --context --budget`'s rough token estimate. Re-exported under this
- * historical name (rather than making every existing caller switch to
- * importing `BUDGET_UNIT` from `core/budget.ts` directly) purely for
- * call-site continuity — `core/budget.ts` owns the single canonical
- * constant now that E1 generalises `--budget` beyond the context pack. */
+ * this module's doc. Re-exported under this historical name (rather than
+ * making every existing caller switch to importing `BUDGET_UNIT` from
+ * `core/budget.ts` directly) purely for call-site continuity —
+ * `core/budget.ts` owns the single canonical constant. */
 export { CONTEXT_PACK_BUDGET_UNIT };
 
 export interface BudgetedContextPack {
   text: string;
-  /** Human-readable notes on what was dropped/shortened to fit, in the
-   * order applied. Empty iff nothing needed to change (already under
-   * budget, or no budget was given at all). */
+  /** Human-readable notes on what was dropped to fit, in the order
+   * applied. Empty iff nothing needed to change (already under budget, or
+   * no budget was given at all). */
   elisions: string[];
   /** `true` iff `text.length <= budgetChars` — always `true` when
    * `budgetChars` is `undefined`, and (by construction — see module doc)
@@ -92,22 +81,34 @@ function elisionBlock(notes: readonly string[]): string {
   return `\n\n## Elided for --budget (${CONTEXT_PACK_BUDGET_UNIT})\n${notes.map((n) => `  - ${n}`).join("\n")}`;
 }
 
-function sessionElisionNote(dropped: number, total: number): string {
-  const kept = total - dropped;
-  return kept > 0
-    ? `${dropped} older session(s) omitted (kept ${kept} most recent of ${total})`
-    : `all ${total} prior session(s) omitted`;
+/**
+ * The context pack's droppable pieces, most-important first (see module
+ * doc): the "extras" tier (spec prose + ancestry + blockers, dropped as
+ * one whole) always comes first — it survives every session being
+ * dropped — followed by each prior session, already most-recent-first, so
+ * dropping from the tail removes the oldest session first.
+ */
+type ContextEntry = { kind: "extras" } | { kind: "session"; session: Session };
+
+function contextEntries(data: ContextPackData): ContextEntry[] {
+  return [
+    { kind: "extras" },
+    ...data.sessions.map((session): ContextEntry => ({ kind: "session", session })),
+  ];
 }
 
-const DETAILS_ELIDED_NOTE = "ticket spec.details_md truncated";
-const HARD_TRUNCATED_NOTE =
-  "remaining content hard-truncated (budget too small for any full section)";
-
-function withTruncatedDetails(ticket: Ticket, keepChars: number): Ticket {
-  const details = ticket.spec.details_md;
-  if (keepChars >= details.length) return ticket;
-  const truncated = keepChars <= 0 ? "" : `${details.slice(0, keepChars)}…`;
-  return { ...ticket, spec: { ...ticket.spec, details_md: truncated } };
+/** Rebuild `data` restricted to whichever pieces `kept` still names —
+ * dropping the "extras" tier clears `spec.details_md` and empties
+ * `ancestors`/`blockers` together (module doc: one atomic tier, not a
+ * partial truncation). */
+function dataForKeptEntries(data: ContextPackData, kept: readonly ContextEntry[]): ContextPackData {
+  const keepExtras = kept.some((e) => e.kind === "extras");
+  const sessions = kept
+    .filter((e): e is Extract<ContextEntry, { kind: "session" }> => e.kind === "session")
+    .map((e) => e.session);
+  if (keepExtras) return { ...data, sessions };
+  const blankTicket: Ticket = { ...data.ticket, spec: { ...data.ticket.spec, details_md: "" } };
+  return { ...data, ticket: blankTicket, ancestors: [], blockers: [], sessions };
 }
 
 /**
@@ -118,81 +119,23 @@ export function renderContextPackWithBudget(
   data: ContextPackData,
   budgetChars?: number,
 ): BudgetedContextPack {
-  const full = renderContextPack(data);
-  if (budgetChars === undefined || full.length <= budgetChars) {
-    return { text: full, elisions: [], withinBudget: true };
-  }
-
-  const totalSessions = data.sessions.length;
-
-  // Step 1: drop the oldest prior sessions, one at a time, until it fits
-  // or none are left.
-  for (let keep = totalSessions - 1; keep >= 0; keep--) {
-    const dropped = totalSessions - keep;
-    const notes = [sessionElisionNote(dropped, totalSessions)];
-    const candidate =
-      renderContextPack({ ...data, sessions: data.sessions.slice(0, keep) }) + elisionBlock(notes);
-    if (candidate.length <= budgetChars) {
-      return { text: candidate, elisions: notes, withinBudget: true };
-    }
-  }
-  const carriedNotes = totalSessions > 0 ? [sessionElisionNote(totalSessions, totalSessions)] : [];
-  const noSessions: ContextPackData = { ...data, sessions: [] };
-
-  // Step 2: binary-search the longest `spec.details_md` prefix (with every
-  // session already dropped) that still fits.
-  const fullDetailsLen = data.ticket.spec.details_md.length;
-  if (fullDetailsLen > 0) {
-    let lo = 0;
-    let hi = fullDetailsLen;
-    let best: { text: string; elisions: string[] } | null = null;
-    while (lo <= hi) {
-      const mid = Math.floor((lo + hi) / 2);
-      const truncatedTicket = withTruncatedDetails(noSessions.ticket, mid);
-      const notes = mid < fullDetailsLen ? [...carriedNotes, DETAILS_ELIDED_NOTE] : carriedNotes;
-      const candidate =
-        renderContextPack({ ...noSessions, ticket: truncatedTicket }) + elisionBlock(notes);
-      if (candidate.length <= budgetChars) {
-        best = { text: candidate, elisions: notes };
-        lo = mid + 1;
-      } else {
-        hi = mid - 1;
-      }
-    }
-    if (best !== null) {
-      return { text: best.text, elisions: best.elisions, withinBudget: true };
-    }
-  }
-
-  // Step 3: last resort — drop details_md entirely, keep the (now short)
-  // core pack plus our own elision notes.
-  const finalNotes = [...carriedNotes, DETAILS_ELIDED_NOTE, HARD_TRUNCATED_NOTE];
-  const blankDetails = withTruncatedDetails(noSessions.ticket, 0);
-  const withoutHardTruncation =
-    renderContextPack({ ...noSessions, ticket: blankDetails }) + elisionBlock(finalNotes);
-  if (withoutHardTruncation.length <= budgetChars) {
-    return { text: withoutHardTruncation, elisions: finalNotes, withinBudget: true };
-  }
-
-  // Still too big (a genuinely tiny budget). Deliberately NOT delegating to
-  // tickets/context.ts's own `renderContextPack(data, budgetChars)` here:
-  // that function's post-hoc truncation appends a FIXED-length note
-  // ("… [truncated to fit --budget]", ~32 chars) and can't shrink below
-  // that note's own length — for a `budgetChars` smaller than ~32 it would
-  // silently return text LONGER than the requested budget, breaking the
-  // "genuinely respects N, for every N >= 0" contract this function
-  // promises. A raw slice of our own already-elided text never has that
-  // problem: `s.slice(0, n).length` is always `<= n`, unconditionally,
-  // even for `n === 0`. This is also strictly better content-wise: it's a
-  // prefix of the SMART-elided pack (core fields + our own elision notes),
-  // not an arbitrary cut through the original, un-elided pack.
-  const rawSlice = budgetChars <= 0 ? "" : withoutHardTruncation.slice(0, budgetChars);
-  return { text: rawSlice, elisions: finalNotes, withinBudget: rawSlice.length <= budgetChars };
+  const entries = contextEntries(data);
+  const rendered = renderEntriesWithBudget(
+    entries,
+    (kept, elisions) => renderContextPack(dataForKeptEntries(data, kept)) + elisionBlock(elisions),
+    budgetChars,
+    { format: "text", noun: "context section" },
+  );
+  return {
+    text: rendered.text,
+    elisions: [...rendered.elisions],
+    withinBudget: rendered.withinBudget,
+  };
 }
 
 // ---------------------------------------------------------------------------
 // `--json` (E1): a structured form of the same pack, budget-aware without
-// ever corrupting JSON — see core/budget.ts's module doc, "the defect this
+// ever corrupting JSON — see core/budget.ts's module doc, "The defect this
 // module fixes". Used by both `slop context --json` and `slop show
 // --context --json`.
 // ---------------------------------------------------------------------------
@@ -280,108 +223,39 @@ export function buildContextPackJson(
 }
 
 /**
- * The guaranteed-fits-almost-any-real-budget floor for
- * {@link renderContextPackJsonWithBudget}'s final fallback: ticket core
- * fields only (id/slug/name/state/priority), no spec prose, no
- * ancestry/blockers/sessions. Small and FIXED size regardless of how huge
- * the real pack is — genuinely returned as-is (never sliced) even for a
- * pathological budget (0, 1 char) too small for even this to fit (see
- * `core/budget.ts`'s module doc for why that's the correct behavior, not a
- * bug: valid-but-over-budget beats corrupt-but-under-budget).
- */
-function minimalContextPackJson(ticket: Ticket, elisions: readonly string[]): ContextPackJsonBody {
-  return {
-    ticket: {
-      id: ticket.id,
-      slug: ticket.slug,
-      name: ticket.name,
-      state: ticket.state,
-      priority: ticket.priority,
-      spec: { summary: "", details_md: "", acceptance: [], context: [] },
-    },
-    ancestry: [],
-    external_parent_ref: null,
-    jira_url: null,
-    blockers: [],
-    sessions: [],
-    elided: [...elisions],
-  };
-}
-
-function toJsonResult(body: ContextPackJsonBody): { body: ContextPackJsonBody; text: string } {
-  return { body, text: `${JSON.stringify(body, null, 2)}\n` };
-}
-
-/**
  * The `--json` sibling of {@link renderContextPackWithBudget} — same
- * elision order (sessions, then `details_md`, mirrored step-for-step
- * below) and same "never exceed a real budget when a fit exists" guarantee,
- * but the LAST-resort step differs on purpose (core/budget.ts's module
- * doc): text can always be raw-sliced and stay valid; JSON cannot, so this
- * function's floor is {@link minimalContextPackJson} returned AS-IS,
- * never a corrupt slice of it. Also drops `ancestry`/`blockers` at that
- * final step (the prose version doesn't need an equivalent step — a long
- * ancestor/blocker chain is comparatively rare and small next to
- * `details_md`, but unlike prose, JSON field overhead means it's worth
- * being thorough about the guaranteed-minimal floor here).
+ * entries list, same elision order (module doc), same "never exceed a
+ * real budget when a fit exists" guarantee. Delegates entirely to
+ * `core/budget.ts`'s `renderEntriesWithBudget`, `format: "json"`, for the
+ * "never corrupt JSON, floor at the valid zero-entries envelope" contract
+ * every other budget-taking command's `--json` path shares — this is no
+ * longer a bespoke JSON degradation of its own.
+ *
+ * `body` (needed by `slop show --json --context`, which embeds this as a
+ * sub-object of its own larger response rather than re-parsing text) is
+ * captured via the closure below: `renderEntriesWithBudget` calls `render`
+ * exactly once more than it returns from, so the last body built is always
+ * the one whose text was actually returned.
  */
 export function renderContextPackJsonWithBudget(
   data: ContextPackData,
   budgetChars?: number,
 ): { body: ContextPackJsonBody; text: string; withinBudget: boolean } {
-  const full = toJsonResult(buildContextPackJson(data));
-  if (budgetChars === undefined || full.text.length <= budgetChars) {
-    return { ...full, withinBudget: true };
-  }
-
-  const totalSessions = data.sessions.length;
-
-  // Step 1: drop the oldest prior sessions, one at a time.
-  for (let keep = totalSessions - 1; keep >= 0; keep--) {
-    const dropped = totalSessions - keep;
-    const notes = [sessionElisionNote(dropped, totalSessions)];
-    const candidate = toJsonResult(
-      buildContextPackJson({ ...data, sessions: data.sessions.slice(0, keep) }, notes),
-    );
-    if (candidate.text.length <= budgetChars) return { ...candidate, withinBudget: true };
-  }
-  const carriedNotes = totalSessions > 0 ? [sessionElisionNote(totalSessions, totalSessions)] : [];
-  const noSessions: ContextPackData = { ...data, sessions: [] };
-
-  // Step 2: binary-search the longest spec.details_md prefix (zero
-  // sessions) whose JSON serialization still fits.
-  const fullDetailsLen = data.ticket.spec.details_md.length;
-  if (fullDetailsLen > 0) {
-    let lo = 0;
-    let hi = fullDetailsLen;
-    let best: { body: ContextPackJsonBody; text: string } | null = null;
-    while (lo <= hi) {
-      const mid = Math.floor((lo + hi) / 2);
-      const truncatedTicket = withTruncatedDetails(noSessions.ticket, mid);
-      const notes = mid < fullDetailsLen ? [...carriedNotes, DETAILS_ELIDED_NOTE] : carriedNotes;
-      const candidate = toJsonResult(
-        buildContextPackJson({ ...noSessions, ticket: truncatedTicket }, notes),
-      );
-      if (candidate.text.length <= budgetChars) {
-        best = candidate;
-        lo = mid + 1;
-      } else {
-        hi = mid - 1;
-      }
-    }
-    if (best !== null) return { ...best, withinBudget: true };
-  }
-
-  // Step 3 (final fallback, JSON-safe): drop details_md entirely AND drop
-  // ancestry/blockers — the guaranteed-minimal floor. Delegates to
-  // core/budget.ts's `renderJsonBodyWithBudget` for the actual "return it
-  // as-is, valid JSON, even if it still exceeds budgetChars" decision —
-  // the single shared mechanism every command in this codebase uses for
-  // "JSON can't be safely raw-sliced the way text can" (that module's doc).
-  const finalNotes = [...carriedNotes, DETAILS_ELIDED_NOTE, "ancestry/blockers omitted"];
-  const { body, text, withinBudget } = renderJsonBodyWithBudget(
-    [() => minimalContextPackJson(data.ticket, finalNotes)],
+  const entries = contextEntries(data);
+  let lastBody: ContextPackJsonBody | undefined;
+  const rendered = renderEntriesWithBudget(
+    entries,
+    (kept, elisions) => {
+      const body = buildContextPackJson(dataForKeptEntries(data, kept), elisions);
+      lastBody = body;
+      return `${JSON.stringify(body, null, 2)}\n`;
+    },
     budgetChars,
+    { format: "json", noun: "context section" },
   );
-  return { body, text, withinBudget };
+  return {
+    body: lastBody as ContextPackJsonBody,
+    text: rendered.text,
+    withinBudget: rendered.withinBudget,
+  };
 }

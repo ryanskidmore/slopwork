@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderEntriesWithBudget, renderJsonBodyWithBudget } from "./budget.js";
+import { renderEntriesWithBudget } from "./budget.js";
 
 // Format-agnostic renderer used by every test below: JSON-shaped so the
 // "never corrupt JSON" assertions can actually parse it, and so text-mode
@@ -103,50 +103,5 @@ describe("renderEntriesWithBudget", () => {
     const result = renderEntriesWithBudget([], jsonRender, 100);
     expect(JSON.parse(result.text)).toEqual({ ids: [], elided: [] });
     expect(result.elisions).toEqual([]);
-  });
-});
-
-describe("renderJsonBodyWithBudget", () => {
-  it("returns the first (most-complete) candidate when it already fits", () => {
-    const result = renderJsonBodyWithBudget([() => ({ full: true, data: "x".repeat(50) })], 1000);
-    expect(result.withinBudget).toBe(true);
-    expect(JSON.parse(result.text)).toEqual({ full: true, data: "x".repeat(50) });
-  });
-
-  it("falls through the ladder to the first candidate that fits", () => {
-    const candidates = [
-      () => ({ size: "full", data: "x".repeat(200) }),
-      () => ({ size: "medium", data: "x".repeat(50) }),
-      () => ({ size: "minimal" }),
-    ];
-    const full = `${JSON.stringify(candidates[0]?.(), null, 2)}\n`;
-    const medium = `${JSON.stringify(candidates[1]?.(), null, 2)}\n`;
-    const result = renderJsonBodyWithBudget(candidates, medium.length);
-    expect(result.withinBudget).toBe(true);
-    expect(result.text.length).toBeLessThanOrEqual(medium.length);
-    expect(result.text.length).toBeLessThan(full.length);
-  });
-
-  it("never returns a corrupt slice: even when EVERY candidate exceeds budget, the last (minimal) candidate's valid JSON is returned as-is", () => {
-    const candidates: Array<() => Record<string, unknown>> = [
-      () => ({ size: "full", data: "x".repeat(200) }),
-      () => ({ id: "ticket_x" }), // the guaranteed-minimal floor
-    ];
-    for (const budget of [0, 1, 2]) {
-      const result = renderJsonBodyWithBudget(candidates, budget);
-      expect(() => JSON.parse(result.text)).not.toThrow();
-      expect(result.withinBudget).toBe(false);
-      expect(result.body).toEqual({ id: "ticket_x" });
-    }
-  });
-
-  it("with no budget given, returns the first (most-complete) candidate", () => {
-    const candidates: Array<() => Record<string, unknown>> = [
-      () => ({ full: true }),
-      () => ({ minimal: true }),
-    ];
-    const result = renderJsonBodyWithBudget(candidates, undefined);
-    expect(result.body).toEqual({ full: true });
-    expect(result.withinBudget).toBe(true);
   });
 });

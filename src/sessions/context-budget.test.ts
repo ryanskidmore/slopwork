@@ -114,7 +114,7 @@ describe("renderContextPackWithBudget", () => {
     expect(result.text).not.toContain(oldest.id);
   });
 
-  it("a tighter budget forces dropping ALL sessions and truncating spec.details_md, but stays within budget and says what happened", () => {
+  it("a tighter budget forces dropping ALL sessions and the details_md/ancestry/blockers tier, but stays within budget and says what happened", () => {
     const sessions = [makeSession("2026-07-23T09:00:00.000Z", "agent-a")];
     const data = baseData({ sessions });
     const full = renderContextPack(data);
@@ -125,8 +125,8 @@ describe("renderContextPackWithBudget", () => {
     expect(result.text.length).toBeLessThanOrEqual(budget);
     expect(result.withinBudget).toBe(true);
     expect(result.text).toContain("Elided for --budget");
-    expect(result.text).toMatch(/all \d+ prior session\(s\) omitted|older session\(s\) omitted/);
-    expect(result.text).toContain("details_md truncated");
+    expect(result.elisions.length).toBeGreaterThan(0);
+    expect(result.elisions[0]).toMatch(/omitted to fit --budget/);
     // Still coherent: the ticket's own header/summary line survives.
     expect(result.text).toContain(data.ticket.name);
   });

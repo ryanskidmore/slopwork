@@ -4,18 +4,51 @@ Every `slop` command below was verified against `./dist/slop <command>
 --help` and the command's implementation in `src/cli/commands/`. Commands
 are grouped exactly as `slop --help` groups them.
 
-A note on two flags that show up on most read commands: `--json` switches
-to machine-readable output, and `--budget <n>` caps output to roughly `n`
-characters, eliding the least-important entries first (the exact elision
-order — lowest-priority tickets, stale rows before review rows before
-in-progress rows, oldest sessions before long spec prose, etc. — is
-documented per-command below and in each command's own `--help`). With
-`--json`, hitting the budget never produces truncated/invalid JSON — it
-degrades to a smaller, still-valid envelope instead. `--budget` counts in
-characters on every command it appears on — `ready`, `list`, `search`,
-`status`, `events`, `questions`, `context`, and `show --context` — and rejects a
-negative value as a usage error (exit `2`) rather than silently eliding
-everything.
+A note on `--json`, which shows up on most commands below: it switches to
+machine-readable output. `--budget <n>` shows up on most *read* commands —
+see [Budget](#budget) just below for the one shared contract every one of
+them follows.
+
+## Budget
+
+`--budget <n>` caps output to roughly `n` characters on every command that
+takes it — `ready`, `list`, `search`, `status`, `events`, `questions`,
+`context`, and `show --context` — via ONE shared strategy, not a
+per-command bespoke ladder:
+
+- Each command reduces its output to a list of entries already in
+  elision-priority order (least important last), then drops whole entries
+  from the tail, one at a time, until the rendering fits `n`. What counts
+  as an "entry" is the obvious one for that command — a ticket row
+  (`ready`/`list`), a search result (`search`), an event (`events`), a
+  question (`questions`), a status section row (`status`), or a context
+  pack section (`context`/`show --context`: prior sessions oldest-first,
+  then spec prose + ancestry + blockers dropped together as one final
+  tier). Fixed-size summary fields — `counts`/`derived`/`problems` on
+  `status`, `total`/`problems` on `list`, and their equivalents elsewhere —
+  are never elided.
+- Every response that could be shortened carries an explicit elision
+  indicator: `elided`/`elisions` (an array of human-readable notes on what
+  was dropped) in `--json`, and a trailing `(--budget, characters): ...`
+  block in the human view. Both are empty/absent iff nothing needed to be
+  dropped.
+- **`--json` is never truncated mid-structure.** If even the
+  zero-entries envelope doesn't fit `n`, that minimal-but-valid envelope
+  is returned as-is (a budget of 0 or 1 characters can never truly be met
+  by valid JSON) — reported via `withinBudget: false`, never by emitting
+  invalid JSON. The human (text) view has no such syntax to protect, so
+  its own last resort is a raw character slice, which always exactly
+  meets the budget.
+- `events`' `next_cursor`/`has_more` are always recomputed against
+  whatever `--budget` actually kept, not the pre-elision page — a caller
+  paging with `--since <next_cursor>` never loses an event that got
+  elided from a page it already saw.
+- `--budget` counts in characters, always (never tokens), and rejects a
+  negative value as a usage error (exit `2`) rather than silently eliding
+  everything.
+
+See `src/core/budget.ts` for the implementation (`renderEntriesWithBudget`
+— the one function every command above calls into).
 
 ## Ref resolution
 
@@ -96,17 +129,13 @@ so a driving agent can branch on `$?` instead of scraping output:
 | 0 | `SUCCESS` | Command completed successfully. |
 | 1 | `GENERIC_ERROR` | Unexpected runtime error (I/O failure, bug, etc). |
 | 2 | `USAGE_ERROR` | Bad invocation — missing/invalid arguments or flags. |
-| 3 | `NOT_IMPLEMENTED` | **Reserved, currently unreachable** — no command throws it today; see below. |
 | 4 | `NOT_FOUND` | A `<ref>` did not resolve to any entity, or no `.slop/` repo was found. |
 | 5 | `AMBIGUOUS_REF` | A short-prefix or slug `<ref>` matched more than one entity. |
 | 6 | `CONFLICT` | Illegal state transition or other conflicting operation. |
 
-`NOT_IMPLEMENTED` (3) was scaffolding for a command registered but not yet built during early v0
-— by design every §4.2 command shipped a real implementation before v0 was done, so no command
-exits 3 today and no test asserts one does (it would break the moment that command's own work item
-landed, which is exactly what happened to this suite's prior assertion about `status`). The code
-stays reserved (not repurposed for something else) rather than removed, in case a future command
-is scaffolded the same way.
+Code `3` is intentionally absent (it was `NOT_IMPLEMENTED`, reserved-but-unreachable scaffolding
+no command ever threw — G5's simplification sweep removed it entirely); `4`/`5`/`6` keep their
+original numbers, not renumbered down to fill the gap.
 
 `NOT_FOUND` (4) is also what every command throws when it can't find a `.slop/` repo — walking up
 from the cwd the same way `git` looks for `.git/` (`requireRepoRoot`, `src/repo/paths.ts`). This
@@ -485,7 +514,7 @@ in-review tickets never appear.
 | `--resumable` | also list stopped or gone-stale in_progress/review tickets worth resuming |
 | `--include-awaiting` | include tickets with an unanswered question (G4) — excluded by default |
 | `--json` | machine-readable |
-| `--budget <n>` | cap output size, eliding lowest-priority/least-relevant tickets first |
+| `--budget <n>` | cap output size — see [Budget](#budget) |
 
 `--label`/`--owner`/`--priority` all compose with AND — `ready --owner
 priya --label area:auth --label team:infra` returns only tickets owned by
@@ -537,7 +566,7 @@ mid-session, without changing state — useful after context compaction.
 
 | Flag | Meaning |
 |---|---|
-| `--budget <n>` | cap output; elides oldest sessions, then long `spec.details_md`, before ever hard-truncating |
+| `--budget <n>` | cap output size — see [Budget](#budget) |
 | `--json` | structured pack; degrades to a minimal-but-valid envelope under a tight budget rather than corrupting the JSON |
 
 ### `plan`
@@ -615,14 +644,8 @@ slop review <ref> --mr <url>            # also legal AGAIN once <ref> is already
 
 Moves `in_progress → review`. `--mr` is recommended, not required (D15):
 omitting it still moves the ticket, but nags on stderr and leaves
-`review.mr` absent.
-
-Re-running `review <ref> --mr <url>` on a ticket **already** in review is
-also legal — an idempotent attach/replace of the MR link, not a new
-review round (no new session, state stays `review`). This is the exact
-recovery path the no-`--mr` nag advises; a bare `review <ref>` (no `--mr`)
-on an already-review ticket is still rejected (`CONFLICT`, exit `6`) —
-there's nothing to update without a link to attach.
+`review.mr` absent. Re-running on a ticket already in review with `--mr`
+replaces the link; a bare re-run (no `--mr`) is a conflict (exit `6`).
 
 `--json` returns `{id, slug, handle, name, state, review,
 already_in_review}` — `review` is `null`, or `{mr, requested_at, by}`
@@ -727,7 +750,7 @@ tickets awaiting review with their MR links.
 | Flag | Meaning |
 |---|---|
 | `--json` | machine-readable |
-| `--budget <n>` | elides stale rows, then awaiting-input rows, then review rows, then in-progress rows, least-important-first; the counts/derived totals are always kept in full |
+| `--budget <n>` | cap output size — see [Budget](#budget); counts/derived totals are always kept in full |
 
 The "Awaiting input" section (G4, t-jggg9) lists every ticket with `>=1`
 unanswered question — ticket, open-question count, and the oldest question's
@@ -753,7 +776,7 @@ before `spec` (G4, t-jggg9) — see `slop ask`/`slop answer`.
 |---|---|
 | `--context` | include the full context pack |
 | `--tree` | render the ticket's ancestry/descendant tree |
-| `--budget <n>` | caps `--context` output only — a single ticket/tree view is never elided |
+| `--budget <n>` | caps `--context` output only (see [Budget](#budget)) — a single ticket/tree view is never elided |
 | `--json` | machine-readable (ticket, plus `--tree`/`--context` data when given) |
 
 `--json` adds an `awaiting_input: {open: boolean, questions: [{id, text,
@@ -795,7 +818,7 @@ is plain browsing, no query language, deterministic sort.
 | `--limit <n>` | cap the number of tickets returned (after filtering/sorting) |
 | `--offset <n>` | skip this many matching tickets before applying `--limit` |
 | `--json` | machine-readable output |
-| `--budget <n>` | cap output size, eliding lowest-priority/least-relevant tickets first |
+| `--budget <n>` | cap output size — see [Budget](#budget) |
 
 **Sort is deterministic**: state (in `draft → open → in_progress → review
 → done → dropped` order), then priority (0 urgent .. 3 low), then age
@@ -828,7 +851,7 @@ a query language (no field filters) — that's the parked SlopQL feature.
 |---|---|
 | `--json` | machine-readable |
 | `--limit <n>` | cap result count |
-| `--budget <n>` | elides lowest-ranked results first |
+| `--budget <n>` | cap output size — see [Budget](#budget) |
 
 ### `questions`
 
@@ -848,7 +871,7 @@ oldest open question has waited longest sorts first).
 | `--all` | include already-answered questions too |
 | `--ticket <ref>` | scope to one ticket |
 | `--json` | machine-readable |
-| `--budget <n>` | cap output size, eliding the newest/least-urgent questions first |
+| `--budget <n>` | cap output size — see [Budget](#budget) |
 
 `--json` returns `{groups: [{ticket: {id, slug, handle, name, state},
 questions: [{id, text, options, asked_by, asked_at, answer}]}], total_questions,
@@ -872,7 +895,7 @@ sorts chronologically (oldest first).
 | `--ticket <ref>` | scope to one ticket (id, slug, or short prefix) |
 | `--limit <n>` | cap result count |
 | `--json` | events plus a `next_cursor` for paging |
-| `--budget <n>` | elides the newest trailing events first, adjusting `next_cursor`/`has_more` to match what's actually returned |
+| `--budget <n>` | cap output size — see [Budget](#budget); `next_cursor`/`has_more` are recomputed to match what's actually returned |
 
 ### `web`
 

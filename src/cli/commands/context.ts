@@ -71,9 +71,9 @@ export function registerContextCommand(program: Command): void {
     .argument("<ref>", "ticket whose context pack to print")
     .option(
       "--budget <n>",
-      `cap the context pack to N ${CONTEXT_PACK_BUDGET_UNIT}, eliding oldest sessions then long ` +
-        "spec.details_md before ever hard-truncating (see src/sessions/context-budget.ts); with " +
-        "--json, degrades to a minimal-but-always-valid envelope instead of ever corrupting the JSON",
+      `cap the context pack to N ${CONTEXT_PACK_BUDGET_UNIT}, eliding oldest sessions first, then ` +
+        "spec/ancestry/blockers as one tier (see 'Budget' in docs/cli-reference.md); with --json, " +
+        "degrades to a minimal-but-always-valid envelope instead of ever corrupting the JSON",
       parseBudgetFlag,
     )
     .option("--json", "machine-readable, structured context pack")
