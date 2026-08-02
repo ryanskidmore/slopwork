@@ -1,0 +1,43 @@
+{
+  "id": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0",
+  "ticket": "ticket_01KZ11CQSZDEPJRS4V057PVAYN",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "human"
+  },
+  "harness": {
+    "kind": "other",
+    "session_id": null
+  },
+  "git": {
+    "branch": "fix/audit-lock-safety",
+    "commit_at_start": "0c50f3f8541261b22ae1b2c5b66878e8cd9a3e46"
+  },
+  "started_at": "2026-08-02T10:47:59.728Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Define unique lock handles and conservative dead-owner recovery",
+          "checked": true
+        },
+        {
+          "text": "Add deterministic stale-break, release replacement, and same-PID regressions",
+          "checked": true
+        },
+        {
+          "text": "Update documentation and run the focused and repository quality gates",
+          "checked": true
+        },
+        {
+          "text": "Open the pull request and move the ticket to review",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-08-02T10:47:59.905Z"
+    }
+  ],
+  "end_summary": null
+}
