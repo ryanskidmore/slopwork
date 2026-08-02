@@ -1,0 +1,55 @@
+{
+  "id": "session_01KZ14SQVWRFJA20EPM3R10X36",
+  "ticket": "ticket_01KZ14SF4JKZFE59P6D3PYSF2H",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "human"
+  },
+  "harness": {
+    "kind": "other",
+    "session_id": null
+  },
+  "git": {
+    "branch": "fix/audit-command-snapshots",
+    "commit_at_start": "6373ca1e1a865b6dbca190ae49be97927dcad50c"
+  },
+  "started_at": "2026-08-02T11:47:25.692Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Map command read/resolve/transaction call graphs and existing backend test seams",
+          "checked": true
+        },
+        {
+          "text": "Design command-scoped ticket/index resolution snapshot preserving exact semantics",
+          "checked": true
+        },
+        {
+          "text": "Collapse split multi-child scans with deterministic call-count and behavior tests",
+          "checked": true
+        },
+        {
+          "text": "Batch update edge resolution with mixed-ref/duplicate/conflict/freshness tests",
+          "checked": true
+        },
+        {
+          "text": "Reuse new slug/ref validation and context-pack snapshots with operation-count tests",
+          "checked": true
+        },
+        {
+          "text": "Run focused G5/full/static/build gates and benchmark if useful",
+          "checked": true
+        },
+        {
+          "text": "Commit code and tracker, push stacked branch, open PR, and move ticket to review",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-08-02T11:47:25.906Z"
+    }
+  ],
+  "end_summary": null
+}

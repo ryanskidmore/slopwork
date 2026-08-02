@@ -15,6 +15,7 @@ import {
   nextAvailableSlug,
   nowIso,
   parseExplicitSlug,
+  slugify,
   ticketSchema,
 } from "../core/index.js";
 import type { StorageBackend } from "../storage/backend.js";
@@ -22,8 +23,8 @@ import { SlopError } from "../cli/errors.js";
 import { validateTicketEdges } from "./edges.js";
 import { assertLabelHasNoLeadingSigil } from "./labels.js";
 import { parseOwnerRaw } from "./owner.js";
-import { ancestryFor, resolveParentRef } from "./parent.js";
-import { pickSlug, takenSlugs } from "./slug.js";
+import { ancestryFor, parseParentRef } from "./parent.js";
+import type { ParentResolution } from "./parent.js";
 import {
   applySpecFieldOverrides,
   defaultSpec,
@@ -68,7 +69,7 @@ export interface NewTicketInput {
   /**
    * Raw `--slug` value (D12: short, branch-style handles), or `undefined`
    * if omitted — the common case, where the slug is auto-generated from
-   * `name` (see {@link resolveSlug}). When given, it's validated/
+   * `name`. When given, it's validated/
    * normalized by `parseExplicitSlug` (core/slug.ts) rather than derived
    * from `name` at all: an explicit slug like `fix/ui-not-showing` is
    * taken as the caller's chosen handle, not a name to slugify.
@@ -84,7 +85,7 @@ export interface NewTicketResult {
 
 /**
  * D12: the slug a new ticket gets — an explicit `--slug` when given,
- * otherwise auto-generated from `name` (`pickSlug`, unchanged). Either way
+ * otherwise auto-generated from `name` (`slugify`, unchanged). Either way
  * runs through the SAME collision rule (`nextAvailableSlug` against the
  * real on-disk "taken" set): an explicit `--slug` that collides with an
  * existing ticket is disambiguated with a `-2`/`-3`/... suffix exactly
@@ -95,18 +96,15 @@ export interface NewTicketResult {
  * USAGE_ERROR (exit 2) via `parseExplicitSlug` before uniqueness is even
  * considered.
  */
-async function resolveSlug(backend: StorageBackend, input: NewTicketInput): Promise<string> {
+function slugBase(input: NewTicketInput): string {
   if (input.slugRaw === undefined) {
-    return pickSlug(backend, input.name);
+    return slugify(input.name);
   }
-  let base: string;
   try {
-    base = parseExplicitSlug(input.slugRaw);
+    return parseExplicitSlug(input.slugRaw);
   } catch (err) {
     throw new SlopError(err instanceof Error ? err.message : String(err), EXIT_CODES.USAGE_ERROR);
   }
-  const taken = await takenSlugs(backend);
-  return nextAvailableSlug(base, taken);
 }
 
 /**
@@ -125,7 +123,7 @@ async function resolveSlug(backend: StorageBackend, input: NewTicketInput): Prom
  *     for an unresolvable `--parent`/`--blocks`/`--relates-to`/`--discovered-from`
  *     local ref;
  *   - a USAGE_ERROR `SlopError` if `--slug` is given but malformed (see
- *     {@link resolveSlug}), or if the assembled candidate fails
+ *     the slug-base parsing above, or if the assembled candidate fails
  *     `ticketSchema` validation (bad priority, empty name, an over-long
  *     label, ...) — every field-level constraint funnels through one
  *     final validation pass rather than being hand-checked piecemeal;
@@ -166,7 +164,19 @@ export async function buildNewTicket(
       ? parseSpecInput(input.specRaw, input.name)
       : applySpecFieldOverrides(defaultSpec(input.name), specFieldOverrides);
 
-  const parentResolution = await resolveParentRef(backend, input.parentRaw);
+  const parsedParent = parseParentRef(input.parentRaw);
+  const refs = [
+    ...(parsedParent.kind === "local" ? [parsedParent.ref] : []),
+    ...input.blocksRaw,
+    ...input.relatesToRaw,
+    ...(input.discoveredFromRaw === undefined ? [] : [input.discoveredFromRaw]),
+  ];
+  const resolved = refs.length > 0 ? await backend.resolveTicketRefs(refs) : [];
+  let resolvedIndex = 0;
+  const parentResolution: ParentResolution =
+    parsedParent.kind === "local"
+      ? { kind: "local", ticket: resolved[resolvedIndex++]! }
+      : parsedParent;
   if (parentResolution.kind === "external" && parentResolution.warning) {
     warnings.push(parentResolution.warning);
   }
@@ -176,12 +186,13 @@ export async function buildNewTicket(
   // repeated `--blocks` naming the same ticket twice is deduped here
   // rather than surfaced as a creation-time error, which would be a
   // needlessly hostile reaction to a harmless repeated flag/copy-paste.
-  // One index load for the whole batch, not one per ref — see
-  // `repo/refs.ts`'s `resolveTicketRefs` for why the loop form was
-  // O(refs x tickets). Dedup below is unchanged.
+  // One index snapshot for every creation ref, not a separate load per
+  // flag group — see `repo/refs.ts`'s `resolveTicketRefs`. Dedup below is
+  // unchanged.
   const blocks: TicketId[] = [];
   const seenBlocks = new Set<TicketId>();
-  for (const target of await backend.resolveTicketRefs(input.blocksRaw)) {
+  for (let i = 0; i < input.blocksRaw.length; i++) {
+    const target = resolved[resolvedIndex++]!;
     if (!seenBlocks.has(target.id)) {
       seenBlocks.add(target.id);
       blocks.push(target.id);
@@ -193,7 +204,8 @@ export async function buildNewTicket(
   // ticket field the resolved ids land in.
   const relatesTo: TicketId[] = [];
   const seenRelatesTo = new Set<TicketId>();
-  for (const target of await backend.resolveTicketRefs(input.relatesToRaw)) {
+  for (let i = 0; i < input.relatesToRaw.length; i++) {
+    const target = resolved[resolvedIndex++]!;
     if (!seenRelatesTo.has(target.id)) {
       seenRelatesTo.add(target.id);
       relatesTo.push(target.id);
@@ -202,19 +214,21 @@ export async function buildNewTicket(
 
   const discoveredFrom: TicketId[] = [];
   if (input.discoveredFromRaw !== undefined) {
-    const target = await backend.resolveTicketRef(input.discoveredFromRaw);
+    const target = resolved[resolvedIndex++]!;
     discoveredFrom.push(target.id);
   }
 
   const id = newTicketId();
   const ancestry = ancestryFor(parentResolution, id);
-  const slug = await resolveSlug(backend, input);
+  // Parsing the explicit slug stays ahead of the strict storage scan,
+  // preserving the existing USAGE_ERROR behavior for malformed values.
+  const baseSlug = slugBase(input);
   const now = nowIso(clock);
 
-  const candidate = {
+  const baseCandidate = {
     id,
     name: input.name,
-    slug,
+    slug: baseSlug,
     spec,
     state: input.draft ? ("draft" as const) : ("open" as const),
     priority: input.priority,
@@ -249,7 +263,20 @@ export async function buildNewTicket(
     updated_at: now,
   };
 
-  const parsed = ticketSchema.safeParse(candidate);
+  // Keep field-level usage failures ahead of `listTickets()`, as before.
+  // Collision suffixing can lengthen a valid base slug, so the finalized
+  // candidate is parsed once more below after applying the snapshot.
+  const baseParsed = ticketSchema.safeParse(baseCandidate);
+  if (!baseParsed.success) {
+    throw new SlopError(
+      formatZodIssuesForUsage("invalid ticket", baseParsed.error),
+      EXIT_CODES.USAGE_ERROR,
+    );
+  }
+
+  const others = await backend.listTickets();
+  const slug = nextAvailableSlug(baseSlug, new Set(others.map((ticket) => ticket.slug)));
+  const parsed = ticketSchema.safeParse({ ...baseCandidate, slug });
   if (!parsed.success) {
     throw new SlopError(
       formatZodIssuesForUsage("invalid ticket", parsed.error),
@@ -260,7 +287,6 @@ export async function buildNewTicket(
   // B3: degree cap (and, uniformly, the cycle checks — always a no-op
   // here, see this function's doc) before this ticket is ever handed back
   // for persisting.
-  const others = await backend.listTickets();
   validateTicketEdges(parsed.data, others);
 
   return { ticket: parsed.data, warnings };

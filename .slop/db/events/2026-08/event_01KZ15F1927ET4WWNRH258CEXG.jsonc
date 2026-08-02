@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ15F1927ET4WWNRH258CEXG",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ14SF4JKZFE59P6D3PYSF2H"
+  },
+  "payload": {
+    "progress": "Focused snapshot suite green: 109 tests. Regressions prove split uses one listTickets scan across three children with collision suffixing; update resolves mixed/duplicate edge plus local-parent refs in one ordered batch; new uses one ordered batch plus one ticket scan; context pack uses one tolerant ticket scan and no loadIndex."
+  },
+  "at": "2026-08-02T11:59:03.458Z"
+}
