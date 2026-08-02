@@ -74,7 +74,12 @@ export function AppShell() {
             aria-label="Main"
           >
             {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
-              <NavLink key={to} to={to} className={({ isActive }) => navClass(isActive)}>
+              <NavLink
+                key={to}
+                to={to}
+                aria-label={label}
+                className={({ isActive }) => navClass(isActive)}
+              >
                 <Icon className="size-4" aria-hidden="true" />
                 <span className="hidden sm:inline">{label}</span>
               </NavLink>

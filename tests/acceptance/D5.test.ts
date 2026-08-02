@@ -248,6 +248,13 @@ describe("D5: slop web", () => {
       const { status, body } = await getJson<TicketListResponseDTO>("/api/tickets");
       expect(status).toBe(200);
       expect(body.total).toBe(fixtureTickets.length);
+      expect(body.pagination).toMatchObject({
+        page: 1,
+        limit: 50,
+        filtered_total: fixtureTickets.length,
+        previous_page: null,
+        next_page: null,
+      });
       const names = body.tickets.map((t) => t.name);
       const slugs = body.tickets.map((t) => t.slug);
       for (const t of fixtureTickets) {
@@ -327,6 +334,13 @@ describe("D5: slop web", () => {
       expect(body.facets.labels).toContain("billing");
       expect(body.facets.owners).toContain("ryan");
       expect(body.facets.states).toContain("done");
+    });
+
+    it("rejects invalid or over-limit pagination", async () => {
+      for (const path of ["/api/tickets?page=0", "/api/tickets?limit=101"]) {
+        const res = await get(path);
+        expect(res.status).toBe(400);
+      }
     });
   });
 
