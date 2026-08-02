@@ -43,7 +43,7 @@
         },
         {
           "text": "Rebase+gate+verdict PRs 5/6/7 via subagent",
-          "checked": false
+          "checked": true
         },
         {
           "text": "Shard dogfood events on main directly (supersedes chore/audit-dogfood-event-shards)",

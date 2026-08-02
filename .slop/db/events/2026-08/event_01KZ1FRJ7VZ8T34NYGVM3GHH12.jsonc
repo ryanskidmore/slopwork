@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ1FRJ7VZ8T34NYGVM3GHH12",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ1CM70EA5ZW0Y73BTFG2RSB"
+  },
+  "payload": {
+    "progress": "Wave 1 verdicts: PR5 MERGE-READY (YAML parser misparses new backend: key — 4/5 conformance cases red on main); PR6 MERGE-READY (umbrella parents leaked into ready — 9/9 red on main, composes with new filters); PR7 MERGE-READY after substantial rework (kept only the minimal token-safe release fixing a proven releaseLock TOCTOU; dropped the mkdir/owner.json protocol rewrite and restored staleTimeoutMs; a rarer pre-existing three-party restore race documented in DECISIONS.md rather than fixed). All pushed. Launching Batch A (web trio)."
+  },
+  "at": "2026-08-02T14:59:01.499Z"
+}
