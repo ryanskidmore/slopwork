@@ -51,7 +51,7 @@
         },
         {
           "text": "Batch A: web trio rebase+vet+PR",
-          "checked": false
+          "checked": true
         },
         {
           "text": "Batch B: mutation-recovery + event-integrity",
