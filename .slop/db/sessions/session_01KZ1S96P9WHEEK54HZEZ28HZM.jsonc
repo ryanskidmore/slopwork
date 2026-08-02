@@ -14,7 +14,7 @@
     "commit_at_start": "c15f8c02c6b32ce31cd66a266f663f2eb4d15658"
   },
   "started_at": "2026-08-02T17:45:23.913Z",
-  "ended_at": null,
+  "ended_at": "2026-08-02T19:25:33.710Z",
   "plan": [],
-  "end_summary": null
+  "end_summary": "All six PRs rebased and MERGEABLE with CI passing (merge order: 7/13/14/15 any order, 18 after 14, 16 after 15). .slop/db marked linguist-generated + gitlab-generated on main. Two merge-wave regressions hotfixed on main, byte-aligned with branches; main CI green (run 30763143561)."
 }

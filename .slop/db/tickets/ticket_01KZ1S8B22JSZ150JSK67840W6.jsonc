@@ -10,7 +10,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "in_progress",
+  "state": "done",
   "priority": 1,
   "labels": [
     "source:salvage"
@@ -20,9 +20,9 @@
   "discovered_from": [],
   "root_id": "ticket_01KZ1S8B22JSZ150JSK67840W6",
   "path": [],
-  "active_session": "session_01KZ1S96P9WHEEK54HZEZ28HZM",
-  "last_activity_at": "2026-08-02T17:45:23.927Z",
-  "latest_note": null,
+  "active_session": null,
+  "last_activity_at": "2026-08-02T19:25:33.725Z",
+  "latest_note": "All six PRs rebased and MERGEABLE with CI passing (merge order: 7/13/14/15 any order, 18 after 14, 16 after 15). .slop/db marked linguist-generated + gitlab-generated on main. Two merge-wave regressions hotfixed on main, byte-aligned with branches; main CI green (run 30763143561).",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -32,5 +32,5 @@
     }
   },
   "created_at": "2026-08-02T17:44:55.763Z",
-  "updated_at": "2026-08-02T17:45:23.927Z"
+  "updated_at": "2026-08-02T19:25:33.725Z"
 }
