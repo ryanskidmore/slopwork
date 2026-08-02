@@ -1,0 +1,20 @@
+{
+  "id": "event_01KZ1291WQQQFK0GYXCR6KE7K4",
+  "actor": {
+    "name": "codex-source-hygiene",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.created",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ1291TZ9J6FZT0W55X85P57"
+  },
+  "payload": {
+    "method": "new",
+    "state": "open",
+    "adhoc": false,
+    "parent": null
+  },
+  "at": "2026-08-02T11:03:21.751Z"
+}

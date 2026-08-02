@@ -32,11 +32,9 @@ npm-debug.log*
 # Biome
 .biome-cache/
 
-# NOTE: this repo's OWN .slop/ (if this repo dogfoods itself later) is not
-# ignored here. `slop init` (work item D1) writes .slop/db/index.jsonc and
-# .slop/transcripts/ gitignore entries into the *target* repo it runs in,
-# per D14/D16 — that is a runtime concern of the tool, not this repo's own
-# tooling config.
+# NOTE: this repo's OWN .slop/ is dogfood data and remains tracked. `slop init`
+# writes only ephemeral db paths into the target repo's managed section; that
+# runtime behavior is separate from this repo's own tooling configuration.
 
 
 # agent worktrees (temporary, isolated)

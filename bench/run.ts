@@ -157,7 +157,7 @@ async function runScale(args: Args, tickets: number): Promise<ScaleResult> {
   // Config so staleness thresholds resolve exactly as in a real repo.
   await writeFile(
     join(root, ".slop", "config.yaml"),
-    "project: bench\nuser: bench\ndefaults:\n  stale_after: 60m\n  review_stale_after: 24h\ntranscripts: off\n",
+    "project: bench\nuser: bench\ndefaults:\n  stale_after: 60m\n  review_stale_after: 24h\n",
     "utf8",
   );
 
@@ -312,11 +312,7 @@ async function runConcurrency(args: Args): Promise<{
   log(`\n=== concurrency: ${args.workers} workers ===`);
 
   const seeded = await seed({ root, tickets: 2000, events: 0 });
-  await writeFile(
-    join(root, ".slop", "config.yaml"),
-    "project: bench\nuser: bench\ntranscripts: off\n",
-    "utf8",
-  );
+  await writeFile(join(root, ".slop", "config.yaml"), "project: bench\nuser: bench\n", "utf8");
 
   const results: Timing[] = [];
   // `spawnSync` would serialize the workers and measure nothing, so every

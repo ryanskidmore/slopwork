@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ12K6JJNH6Y6THKZ0E3QYGN",
+  "actor": {
+    "name": "codex-source-hygiene",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ1291TZ9J6FZT0W55X85P57"
+  },
+  "payload": {
+    "progress": "Repaired literal source NULs as escaped runtime delimiters, corrected WebDataSource mojibake, removed stale transcript settings only from .gitignore/bench configs, regenerated managed onboarding, and added digest/source-byte/mojibake/active-transcript/managed-drift regressions. Historical and migration compatibility references remain intact; event sharding untouched."
+  },
+  "at": "2026-08-02T11:08:54.227Z"
+}

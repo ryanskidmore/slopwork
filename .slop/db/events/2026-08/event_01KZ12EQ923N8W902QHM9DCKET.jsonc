@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ12EQ923N8W902QHM9DCKET",
+  "actor": {
+    "name": "codex-source-hygiene",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ1291TZ9J6FZT0W55X85P57"
+  },
+  "payload": {
+    "progress": "Verified on current main: two literal NUL bytes are runtime separators in fingerprintEntityDir; one corrupt comment sequence is in WebDataSource event docs; only .gitignore plus two benchmark configs are active stale transcript artifacts; .slop/AGENTS.md is behind canonical onboarding while SKILL.md is current; no drift/source-byte gate exists. Historical changelog/DECISIONS and G1 compatibility tests are intentional and remain."
+  },
+  "at": "2026-08-02T11:06:27.491Z"
+}
