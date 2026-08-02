@@ -64,6 +64,24 @@ export const EVENT_VERBS = [
   // --- Review (D15) --------------------------------------------------------
   // `review --mr <url>` (in_progress -> review).
   "review.requested",
+
+  // --- Elicitations (G4, t-jggg9) -------------------------------------------
+  // `slop ask <ticket-ref> "<question>" [--option <text>]...` — ticket
+  // -scoped (`entity: {kind: "ticket", id}`), payload carries `text` and
+  // `options` (string[], [] when none given). Identified by THIS event's
+  // own id — `slop answer <question-id>` and the `awaiting_input` overlay
+  // (a ticket has it iff it has >=1 question.asked with no later
+  // question.answered referencing it — src/tickets/overlay.ts) both key
+  // off it. Deliberately an event, not a new stored entity: this keeps the
+  // merge-clean, immutable one-file-per-event property (concepts.md) and
+  // puts questions on the same audit spine as everything else, instead of
+  // inventing a `.slop/db/questions/` directory with its own CRUD.
+  "question.asked",
+  // `slop answer <question-id> "<answer>"` — same ticket as the question
+  // it answers (payload.question_id names the question.asked event id);
+  // answering an already-answered question is a CONFLICT (exit 6), never
+  // a second question.answered event for the same question_id.
+  "question.answered",
 ] as const;
 export const eventVerbSchema = z.enum(EVENT_VERBS);
 export type EventVerb = (typeof EVENT_VERBS)[number];

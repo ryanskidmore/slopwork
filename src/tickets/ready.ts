@@ -68,6 +68,16 @@ export interface ReadyQueryOptions {
   owner?: string;
   /** Only rows at exactly this priority (0..3). */
   priority?: number;
+  /**
+   * G4 (t-jggg9): by default, `ready`/`--resumable` EXCLUDE any row with
+   * `awaiting_input === true` — a ticket blocked on a human's answer isn't
+   * genuinely pickable-up work; an agent that started it anyway would
+   * just stall on the same unanswered question. `--include-awaiting`
+   * (`slop ready --include-awaiting`) sets this `true` to opt back into
+   * the pre-G4 behavior for a specific pull. `undefined`/`false` means
+   * the exclusion applies (the new default).
+   */
+  includeAwaiting?: boolean;
 }
 
 /**
@@ -110,11 +120,17 @@ function matchesPriority(row: IndexTicketRow, priority: number | undefined): boo
   return priority === undefined || row.priority === priority;
 }
 
+/** G4: see `ReadyQueryOptions.includeAwaiting`'s doc — excludes `awaiting_input` rows unless opted back in. */
+function matchesAwaitingInput(row: IndexTicketRow, includeAwaiting: boolean | undefined): boolean {
+  return includeAwaiting === true || row.awaiting_input !== true;
+}
+
 function matchesReadyOptions(row: IndexTicketRow, options: ReadyQueryOptions): boolean {
   return (
     matchesLabels(row, options.labels) &&
     matchesOwner(row, options.owner) &&
-    matchesPriority(row, options.priority)
+    matchesPriority(row, options.priority) &&
+    matchesAwaitingInput(row, options.includeAwaiting)
   );
 }
 

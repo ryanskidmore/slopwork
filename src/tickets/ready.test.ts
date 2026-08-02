@@ -36,6 +36,9 @@ function makeRow(overrides: Partial<IndexTicketRow> = {}): IndexTicketRow {
     ready: true,
     stale_at: null,
     review_stale_at: null,
+    awaiting_input: false,
+    open_question_count: 0,
+    oldest_open_question_at: null,
     ...overrides,
   };
 }
