@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { configSchema } from "./config.js";
+import { configSchema, normalizeBackendSelection } from "./config.js";
 
 describe("configSchema", () => {
   it("parses the exact example from design.md §3, defaults included", () => {
@@ -25,7 +25,9 @@ describe("configSchema", () => {
       defaults: {
         stale_after: "60m",
         review_stale_after: "24h",
+        lock_timeout: "5s",
       },
+      backend: "flatfile",
     });
   });
 
@@ -37,7 +39,9 @@ describe("configSchema", () => {
       defaults: {
         stale_after: "60m",
         review_stale_after: "24h",
+        lock_timeout: "5s",
       },
+      backend: "flatfile",
     });
   });
 
@@ -121,5 +125,71 @@ describe("configSchema", () => {
     expect(configSchema.safeParse({ project: "x", remotes: { jira: "not a url" } }).success).toBe(
       false,
     );
+  });
+
+  // G2: `backend:` selects the storage backend — see configBackendSchema's
+  // own doc comment for the accepted forms.
+  describe("backend:", () => {
+    it("defaults to flatfile when the key is absent", () => {
+      const parsed = configSchema.parse({ project: "x" });
+      expect(parsed.backend).toBe("flatfile");
+    });
+
+    it("coerces a bare `backend:` line (real-YAML null) to flatfile", () => {
+      const parsed = configSchema.parse({ project: "x", backend: null });
+      expect(parsed.backend).toBe("flatfile");
+    });
+
+    it("accepts the bare string shorthand 'flatfile'", () => {
+      const parsed = configSchema.parse({ project: "x", backend: "flatfile" });
+      expect(parsed.backend).toBe("flatfile");
+    });
+
+    it("accepts the bare string shorthand 'remote'", () => {
+      const parsed = configSchema.parse({ project: "x", backend: "remote" });
+      expect(parsed.backend).toBe("remote");
+    });
+
+    it("accepts the structured form { kind: remote, url }", () => {
+      const parsed = configSchema.parse({
+        project: "x",
+        backend: { kind: "remote", url: "https://slop.example.workers.dev" },
+      });
+      expect(parsed.backend).toEqual({
+        kind: "remote",
+        url: "https://slop.example.workers.dev",
+      });
+    });
+
+    it("accepts the structured form { kind: remote } with no url", () => {
+      const parsed = configSchema.parse({ project: "x", backend: { kind: "remote" } });
+      expect(parsed.backend).toEqual({ kind: "remote" });
+    });
+
+    it("rejects an unknown backend kind", () => {
+      expect(configSchema.safeParse({ project: "x", backend: { kind: "sqlite" } }).success).toBe(
+        false,
+      );
+    });
+
+    it("rejects a non-URL remote url", () => {
+      expect(
+        configSchema.safeParse({ project: "x", backend: { kind: "remote", url: "not a url" } })
+          .success,
+      ).toBe(false);
+    });
+  });
+
+  describe("normalizeBackendSelection", () => {
+    it("normalizes every accepted shape to {kind: 'flatfile'} or {kind: 'remote', url?}", () => {
+      expect(normalizeBackendSelection("flatfile")).toEqual({ kind: "flatfile" });
+      expect(normalizeBackendSelection("remote")).toEqual({ kind: "remote" });
+      expect(normalizeBackendSelection({ kind: "flatfile" })).toEqual({ kind: "flatfile" });
+      expect(normalizeBackendSelection({ kind: "remote" })).toEqual({ kind: "remote" });
+      expect(normalizeBackendSelection({ kind: "remote", url: "https://x.example" })).toEqual({
+        kind: "remote",
+        url: "https://x.example",
+      });
+    });
   });
 });

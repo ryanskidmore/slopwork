@@ -122,6 +122,7 @@ describe("isTicketStale", () => {
     project: "x",
     remotes: {},
     defaults: { stale_after: "60m", review_stale_after: "24h", lock_timeout: "5s" },
+    backend: "flatfile" as const,
   });
   const now = Date.parse("2026-07-23T12:00:00.000Z");
 
@@ -235,6 +236,7 @@ describe("computeStaleReason", () => {
     project: "x",
     remotes: {},
     defaults: { stale_after: "60m", review_stale_after: "24h", lock_timeout: "5s" },
+    backend: "flatfile" as const,
   });
   const now = Date.parse("2026-07-23T12:00:00.000Z");
 

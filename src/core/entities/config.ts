@@ -56,6 +56,46 @@ export const configDefaultsSchema = z.object({
 });
 export type ConfigDefaults = z.infer<typeof configDefaultsSchema>;
 
+/**
+ * G2: `backend:` selects the storage backend (docs/configuration.md,
+ * docs/storage-backends.md). Accepted forms:
+ *
+ * ```yaml
+ * backend: flatfile          # explicit default (same as the key being absent)
+ * backend: remote            # shorthand for {kind: remote} with no url
+ * backend:                   # structured form
+ *   kind: remote
+ *   url: https://slop.example.workers.dev
+ * ```
+ *
+ * Absent (or a bare `backend:` line, real-YAML `null`) means `flatfile` —
+ * the flatfile db under `.slop/db/` remains the default and needs no
+ * config at all. Auth for a remote backend is NOT configured here: the
+ * bearer token comes from the `SLOP_REMOTE_TOKEN` environment variable
+ * (secrets don't belong in a committed config.yaml) — see
+ * docs/storage-backends.md.
+ */
+export const configBackendSchema = z.preprocess(
+  (val) => (val === null || val === undefined ? "flatfile" : val),
+  z.union([
+    z.literal("flatfile"),
+    z.literal("remote"),
+    z.object({ kind: z.literal("flatfile") }),
+    z.object({ kind: z.literal("remote"), url: nullToUndefined(z.url()) }),
+  ]),
+);
+export type ConfigBackend = z.infer<typeof configBackendSchema>;
+
+/** {@link configBackendSchema}'s accepted forms, normalized to one shape. */
+export type BackendSelection = { kind: "flatfile" } | { kind: "remote"; url?: string };
+
+export function normalizeBackendSelection(backend: ConfigBackend): BackendSelection {
+  if (backend === "flatfile") return { kind: "flatfile" };
+  if (backend === "remote") return { kind: "remote" };
+  if (backend.kind === "flatfile") return { kind: "flatfile" };
+  return { kind: "remote", ...(backend.url !== undefined ? { url: backend.url } : {}) };
+}
+
 export const configSchema = z.object({
   project: z.string().trim().min(1),
   /** Actor fallback (D17) — `user:` in config.yaml, checked after `--as` and `SLOP_ACTOR`. */
@@ -71,5 +111,7 @@ export const configSchema = z.object({
   // present-but-empty.
   remotes: configRemotesSchema.default(() => configRemotesSchema.parse({})),
   defaults: configDefaultsSchema.default(() => configDefaultsSchema.parse({})),
+  /** G2: storage backend selection — see {@link configBackendSchema}. */
+  backend: configBackendSchema.default("flatfile"),
 });
 export type Config = z.infer<typeof configSchema>;

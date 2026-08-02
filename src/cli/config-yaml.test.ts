@@ -22,6 +22,7 @@ defaults:
         jira: "https://yourorg.atlassian.net",
       },
       defaults: { stale_after: "60m", review_stale_after: "24h", lock_timeout: "5s" },
+      backend: "flatfile",
     });
   });
 
@@ -75,6 +76,7 @@ describe("stringifyConfigYaml", () => {
         jira: "https://yourorg.atlassian.net",
       },
       defaults: { stale_after: "60m", review_stale_after: "24h", lock_timeout: "5s" },
+      backend: "flatfile",
     });
   });
 
