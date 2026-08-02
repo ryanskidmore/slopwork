@@ -502,16 +502,23 @@ slop ready --include-awaiting
 slop ready --json --budget 3000
 ```
 
-Lists tickets that are `open`, have no live blockers, and no active
-session — ordered by priority then age (oldest first). Drafts and
-in-review tickets never appear.
+Lists actionable leaf tickets that are `open`, have no live blockers, no
+active session, and no nonterminal descendants — ordered by priority then
+age (oldest first). Drafts and in-review tickets never appear.
+
+The descendant check is transitive and applies to both the plain list and
+`--resumable`: a parent stays out while any child or deeper descendant is
+`draft`, `open`, `in_progress`, or `review`, even when that descendant is
+itself blocked or awaiting input. `done` and `dropped` descendants do not
+suppress their parent. This keeps the default pull queue leaf-first without
+changing the established priority-then-age ordering among eligible tickets.
 
 | Flag | Meaning |
 |---|---|
 | `--label <label>` | filter to tickets carrying this label (repeatable; AND — every given label must be present, t-175oq) |
 | `--owner <name>` | filter to tickets owned by this exact actor name (t-175oq) |
 | `--priority <0-3>` | filter to tickets at exactly this priority (t-175oq) |
-| `--resumable` | also list stopped or gone-stale in_progress/review tickets worth resuming |
+| `--resumable` | also list stopped or gone-stale in_progress/review leaf tickets worth resuming |
 | `--include-awaiting` | include tickets with an unanswered question (G4) — excluded by default |
 | `--json` | machine-readable |
 | `--budget <n>` | cap output size — see [Budget](#budget) |

@@ -107,6 +107,11 @@ describe("D1 onboarding content: one source, three renderings", () => {
     expect(body).not.toMatch(/update <current> --state open.*--blocks/s);
   });
 
+  it("directs next-work pulls to actionable leaves", () => {
+    const body = renderOnboardingBody(ctx);
+    expect(body).toContain("`slop ready --json --budget 3000` (actionable leaves only)");
+  });
+
   it("handle-t-code-missing-from: the ref-resolution rule lists the t-<code> handle and a structurally valid full-id example", () => {
     // content.ts's REF_RESOLUTION used to omit the short `t-<code>` handle
     // (src/repo/refs.ts has always accepted it as a ref form) and used

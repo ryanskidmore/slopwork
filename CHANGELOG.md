@@ -11,6 +11,11 @@ where breaking changes land.
 
 ### Added
 
+- **`slop ready` is leaf-first.** Direct or transitive parents with any
+  nonterminal descendant are omitted from both the strict and `--resumable`
+  queues, so agents pull actionable leaf work instead of umbrella tickets.
+  Terminal (`done`/`dropped`) descendants do not suppress a parent; ordering
+  among eligible tickets remains priority then age.
 - **Elicitations: structured questions, `awaiting_input`, questions inbox**
   (G4, t-jggg9). The only agent→human escalation channel used to be a
   string convention (`update --progress "QUESTION: …"`) with no state, no

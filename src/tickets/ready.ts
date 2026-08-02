@@ -8,8 +8,10 @@
  *
  * ## The two groups this module produces
  *
- *  - **`ready`** — design.md §2's `ready` query, verbatim: "open ∧ no live
- *    blockers ∧ no active session. Drafts and review items never appear."
+ *  - **`ready`** — design.md §2's per-ticket `ready` predicate ("open ∧ no
+ *    live blockers ∧ no active session"), narrowed to actionable leaves:
+ *    a row is omitted while any direct or transitive descendant remains in
+ *    a nonterminal state. Drafts and review items never appear.
  *    Every row's own `ready` column (`db-index.ts`'s `computeReady`,
  *    filled in by `buildIndex`) already carries the per-ticket verdict;
  *    this module's job is filtering to `ready === true` (a `null` — a
@@ -37,7 +39,8 @@
  *    The two cases get distinct `ResumableReason`s (`*_no_session` vs.
  *    `*_stale`) so `resumableReasonText` can say which situation applies —
  *    "stopped, resumable" reads very differently from "active session
- *    gone stale."
+ *    gone stale." Resumable umbrellas follow the same leaf rule as
+ *    strict-ready rows.
  *
  * ## Ordering — this work item's acceptance criterion, verbatim: "ready
  * ordering = priority then age"
@@ -45,7 +48,7 @@
  * See {@link compareReadyOrder} for the exact rule and its documented
  * tiebreak.
  */
-import type { RenderFormat, TicketState } from "../core/index.js";
+import type { RenderFormat, TicketId, TicketState } from "../core/index.js";
 import { renderEntriesWithBudget } from "../core/index.js";
 import type { IndexTicketRow } from "../repo/db-index.js";
 import { isReviewStale, isStale } from "./staleness.js";
@@ -134,14 +137,35 @@ function matchesReadyOptions(row: IndexTicketRow, options: ReadyQueryOptions): b
   );
 }
 
+const TERMINAL_TICKET_STATES: ReadonlySet<TicketState> = new Set(["done", "dropped"]);
+
+/**
+ * Every id that owns at least one nonterminal descendant. `path` is the
+ * ticket's full materialized ancestry, not just its direct parent, so one
+ * pass covers children, grandchildren, and arbitrary depth without a graph
+ * walk per candidate. Terminal descendants deliberately contribute nothing:
+ * completed or dropped decomposition should no longer hide its umbrella.
+ */
+function nonterminalAncestorIds(rows: readonly IndexTicketRow[]): ReadonlySet<TicketId> {
+  const ancestors = new Set<TicketId>();
+  for (const row of rows) {
+    if (TERMINAL_TICKET_STATES.has(row.state)) continue;
+    for (const ancestorId of row.path) ancestors.add(ancestorId);
+  }
+  return ancestors;
+}
+
 /** design.md §2's `ready` query — filter + sort. See module doc for the
  * `null`-is-treated-as-not-ready handling. */
 export function filterReadyRows(
   rows: readonly IndexTicketRow[],
   options: ReadyQueryOptions = {},
 ): IndexTicketRow[] {
+  const umbrellaIds = nonterminalAncestorIds(rows);
   return rows
-    .filter((row) => row.ready === true && matchesReadyOptions(row, options))
+    .filter(
+      (row) => row.ready === true && !umbrellaIds.has(row.id) && matchesReadyOptions(row, options),
+    )
     .slice()
     .sort(compareReadyOrder);
 }
@@ -186,10 +210,12 @@ export function filterResumableRows(
   options: ReadyQueryOptions = {},
 ): ResumableRow[] {
   const matched: ResumableRow[] = [];
+  const umbrellaIds = nonterminalAncestorIds(rows);
   for (const row of rows) {
     if (!isResumableCandidate(row, now)) continue;
     const reason = resumableReasonFor(row.state, row.active_session !== null);
     if (reason === null) continue;
+    if (umbrellaIds.has(row.id)) continue;
     if (!matchesReadyOptions(row, options)) continue;
     matched.push({ row, reason });
   }
@@ -197,20 +223,26 @@ export function filterResumableRows(
 }
 
 export function resumableReasonText(reason: ResumableReason): string {
+  let reasonText: string;
   switch (reason) {
     case "in_progress_no_session":
-      return "in_progress with no active session (stopped; resumable)";
+      reasonText = "in_progress with no active session (stopped; resumable)";
+      break;
     case "review_no_session":
-      return "in review with no active session (resumable)";
+      reasonText = "in review with no active session (resumable)";
+      break;
     case "in_progress_stale":
-      return "in_progress, active session gone stale (resumable)";
+      reasonText = "in_progress, active session gone stale (resumable)";
+      break;
     case "review_stale":
-      return "in review, active session gone stale — MR awaiting review (resumable)";
+      reasonText = "in review, active session gone stale — MR awaiting review (resumable)";
+      break;
   }
+  return `${reasonText}; no nonterminal descendants`;
 }
 
-/** Human/JSON "why" text for a strictly-`ready` row — design.md §2, verbatim intent. */
-export const READY_WHY = "open, no live blockers, no active session";
+/** Human/JSON "why" text for a strictly-ready actionable leaf. */
+export const READY_WHY = "open, no live blockers, no active session, no nonterminal descendants";
 
 export type ReadySection = "ready" | "resumable";
 

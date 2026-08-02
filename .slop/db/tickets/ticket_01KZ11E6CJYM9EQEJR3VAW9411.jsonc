@@ -1,0 +1,48 @@
+{
+  "id": "ticket_01KZ11E6CJYM9EQEJR3VAW9411",
+  "name": "Make ready select actionable leaves before umbrella work",
+  "slug": "fix/ready-actionable-leaves",
+  "spec": {
+    "summary": "Exclude ready or resumable umbrella tickets while they still have nonterminal descendants, so agents start concrete leaf work first.",
+    "details_md": "",
+    "acceptance": [
+      "Strict-ready and resumable tickets with any direct or transitive nonterminal descendant are excluded from slop ready.",
+      "Done and dropped descendants do not suppress an otherwise ready ticket.",
+      "Blocked or awaiting-input descendants still suppress their umbrella ancestor.",
+      "Priority and age ordering remains unchanged among eligible leaves.",
+      "Pure, command, and acceptance tests cover direct and transitive descendants plus resumable umbrellas."
+    ],
+    "context": [
+      "src/tickets/ready.ts",
+      "src/cli/commands/ready.ts",
+      "tests/acceptance/B4.test.ts"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "in_progress",
+  "priority": 1,
+  "labels": [
+    "area:cli",
+    "area:product"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ11E6CJYM9EQEJR3VAW9411",
+  "path": [],
+  "active_session": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM",
+  "last_activity_at": "2026-08-02T10:48:44.906Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "codex-ready-audit",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-08-02T10:48:41.673Z",
+  "updated_at": "2026-08-02T10:48:44.906Z"
+}

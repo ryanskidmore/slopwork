@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ124XJRCV4QWR8YK37EVFBX",
+  "actor": {
+    "name": "codex-ready-audit",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ11E6CJYM9EQEJR3VAW9411"
+  },
+  "payload": {
+    "progress": "Verification green: 143 related tests; full suite 132 files/1,959 tests; typecheck, web typecheck, lint, format check, diff check, and compiled build all pass."
+  },
+  "at": "2026-08-02T11:01:06.264Z"
+}

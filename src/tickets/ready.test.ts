@@ -43,6 +43,21 @@ function makeRow(overrides: Partial<IndexTicketRow> = {}): IndexTicketRow {
   };
 }
 
+function makeDescendantRow(
+  ancestors: readonly TicketId[],
+  overrides: Partial<IndexTicketRow> = {},
+): IndexTicketRow {
+  const id = overrides.id ?? newTicketId();
+  const rootId = ancestors[0] ?? id;
+  return makeRow({
+    id,
+    parent: ancestors[ancestors.length - 1] ?? null,
+    root_id: rootId,
+    path: [...ancestors],
+    ...overrides,
+  });
+}
+
 // Deterministically ordered ids, oldest first — real ULIDs sort
 // chronologically, so this mirrors "create ticket A, then B, then C".
 function idsInOrder(n: number): TicketId[] {
@@ -104,6 +119,50 @@ describe("filterReadyRows", () => {
     const newer = makeRow({ id: newerId, priority: 0, ready: true });
     const result = filterReadyRows([older, newer]);
     expect(result.map((r) => r.id)).toEqual([newer.id, older.id]);
+  });
+
+  it("keeps only the deepest actionable leaf when direct and transitive descendants are nonterminal", () => {
+    const root = makeRow({ name: "Umbrella", priority: 0 });
+    const child = makeDescendantRow([root.id], { name: "Child", priority: 1 });
+    const grandchild = makeDescendantRow([root.id, child.id], {
+      name: "Grandchild",
+      priority: 2,
+    });
+
+    expect(filterReadyRows([root, child, grandchild]).map((row) => row.id)).toEqual([
+      grandchild.id,
+    ]);
+  });
+
+  it("done and dropped descendants do not suppress an otherwise ready ancestor", () => {
+    const root = makeRow({ name: "Finished umbrella" });
+    const doneChild = makeDescendantRow([root.id], { state: "done", ready: false });
+    const droppedChild = makeDescendantRow([root.id], { state: "dropped", ready: false });
+
+    expect(filterReadyRows([root, doneChild, droppedChild]).map((row) => row.id)).toEqual([
+      root.id,
+    ]);
+  });
+
+  it("blocked and awaiting-input descendants still suppress their ancestors", () => {
+    const blockedRoot = makeRow({ name: "Blocked-child umbrella" });
+    const blockedChild = makeDescendantRow([blockedRoot.id], {
+      ready: false,
+      blocked_count: 1,
+    });
+    const awaitingRoot = makeRow({ name: "Awaiting-child umbrella" });
+    const awaitingChild = makeDescendantRow([awaitingRoot.id], {
+      awaiting_input: true,
+      open_question_count: 1,
+      oldest_open_question_at: "2026-07-23T10:00:00.000Z",
+    });
+
+    expect(filterReadyRows([blockedRoot, blockedChild, awaitingRoot, awaitingChild])).toEqual([]);
+    expect(
+      filterReadyRows([blockedRoot, blockedChild, awaitingRoot, awaitingChild], {
+        includeAwaiting: true,
+      }).map((row) => row.id),
+    ).toEqual([awaitingChild.id]);
   });
 
   it("--label filters to rows carrying the exact label", () => {
@@ -215,6 +274,20 @@ describe("filterResumableRows", () => {
     const result = filterResumableRows([older, newer], NOW);
     expect(result.map((r) => r.row.id)).toEqual([newer.id, older.id]);
   });
+
+  it("excludes stopped and stale resumable umbrellas while they have nonterminal descendants", () => {
+    const stopped = makeRow({ state: "in_progress", active_session: null, ready: false });
+    const stoppedChild = makeDescendantRow([stopped.id]);
+    const stale = makeRow({
+      state: "in_progress",
+      active_session: newSessionId(),
+      ready: false,
+      stale_at: "2026-07-23T11:00:00.000Z",
+    });
+    const staleGrandchild = makeDescendantRow([stale.id, newTicketId()]);
+
+    expect(filterResumableRows([stopped, stoppedChild, stale, staleGrandchild], NOW)).toEqual([]);
+  });
 });
 
 describe("resumableReasonText", () => {
@@ -223,6 +296,7 @@ describe("resumableReasonText", () => {
     expect(resumableReasonText("review_no_session")).toMatch(/review/);
     expect(resumableReasonText("in_progress_stale")).toMatch(/stale/);
     expect(resumableReasonText("review_stale")).toMatch(/stale/);
+    expect(resumableReasonText("review_stale")).toMatch(/no nonterminal descendants/);
     const texts = new Set([
       resumableReasonText("in_progress_no_session"),
       resumableReasonText("review_no_session"),
