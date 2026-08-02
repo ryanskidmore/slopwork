@@ -37,7 +37,7 @@
         },
         {
           "text": "Run focused and full gates, review diff, commit, push, open PR, and move ticket to review",
-          "checked": false
+          "checked": true
         }
       ],
       "created_at": "2026-08-02T11:03:29.656Z"
