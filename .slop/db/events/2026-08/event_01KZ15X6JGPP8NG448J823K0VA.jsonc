@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ15X6JGPP8NG448J823K0VA",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "human"
+  },
+  "session": "session_01KZ14EAYSAKR2ZK1S505MZH9C",
+  "verb": "review.requested",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ14E4SZ1QP6Q2XSWB4J1XB6"
+  },
+  "payload": {
+    "mr": "https://github.com/ryanskidmore/slopwork/pull/18"
+  },
+  "at": "2026-08-02T12:06:47.632Z"
+}
