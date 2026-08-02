@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ2AFMDVW4X98ZVVZ0372A8S",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": "session_01KZ284E7KQB4MJCW2HQ7C7KV3",
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ28482RCAKQPKTXJQ82FJW1"
+  },
+  "payload": {
+    "progress": "PR #23 open. Two proven causes fixed: D4's real-wall-clock 800ms budget (3/6 runs failed under 3-way contention; SLOP_TEST_PERF_SCALE added) and Playwright's hardcoded port 4765 (PortInUseError reproduced; free-port at config load). The OOM/fork-storm theory did NOT reproduce even at load 129 with 384 concurrent spawns — honestly reported, no blind fix; maxWorkers noted as the lever if ever seen on smaller hardware. Same-checkout concurrent gates remain unsafe by design (shared dist/slop) — documented."
+  },
+  "at": "2026-08-02T22:46:00.379Z"
+}
