@@ -1,0 +1,38 @@
+{
+  "id": "ticket_01KZ12RWEZXT5MQHEWCVAHN8X1",
+  "name": "show/search pay an unconditional full event-log scan — 20s+ at 100k tickets",
+  "slug": "show-search-pay-an-unconditional",
+  "spec": {
+    "summary": "G5's honest re-benchmark (9:1 event ratio) exposed that slop show and slop search scan the entire event log unconditionally: ~20.5s and ~23.1s at 100k tickets (was ~3.5s/~4.5s under the unrealistically low 2:1 seeding). Needs an event index or per-ticket event partitioning; relates to the remote-backend future where the server would own this query.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 2,
+  "labels": [
+    "backlog",
+    "source:benchmarks"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ12RWEZXT5MQHEWCVAHN8X1",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-08-02T11:12:00.546Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-02T11:12:00.546Z",
+  "updated_at": "2026-08-02T11:12:00.546Z"
+}

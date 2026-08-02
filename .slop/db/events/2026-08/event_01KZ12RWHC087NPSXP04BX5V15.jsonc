@@ -1,0 +1,20 @@
+{
+  "id": "event_01KZ12RWHC087NPSXP04BX5V15",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": null,
+  "verb": "ticket.created",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ12RWEZXT5MQHEWCVAHN8X1"
+  },
+  "payload": {
+    "method": "new",
+    "state": "open",
+    "adhoc": false,
+    "parent": null
+  },
+  "at": "2026-08-02T11:12:00.556Z"
+}

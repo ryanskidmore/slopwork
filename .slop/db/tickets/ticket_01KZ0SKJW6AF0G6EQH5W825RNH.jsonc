@@ -10,7 +10,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "review",
   "priority": 2,
   "labels": [
     "group:g5",
@@ -25,8 +25,8 @@
   "path": [
     "ticket_01KYZP8A340W5A8X70TYQ6XVT8"
   ],
-  "active_session": null,
-  "last_activity_at": "2026-08-02T08:31:49.641Z",
+  "active_session": "session_01KZ12RVQN2QFM3NEDWPHH718S",
+  "last_activity_at": "2026-08-02T11:11:59.895Z",
   "latest_note": null,
   "owner": null,
   "provenance": {
@@ -37,5 +37,13 @@
     }
   },
   "created_at": "2026-08-02T08:31:49.641Z",
-  "updated_at": "2026-08-02T08:31:49.641Z"
+  "updated_at": "2026-08-02T11:11:59.895Z",
+  "review": {
+    "mr": "https://github.com/ryanskidmore/slopwork/pull/8",
+    "requested_at": "2026-08-02T11:11:59.895Z",
+    "by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  }
 }

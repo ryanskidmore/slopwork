@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ12RTH4TP8032HDYTYV88ZX",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": "session_01KZ12RT9T69H7QRC24XSHFC5K",
+  "verb": "review.requested",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KYZP9WBV64X85FXDVR3RMR0A"
+  },
+  "payload": {
+    "mr": "https://github.com/ryanskidmore/slopwork/pull/8"
+  },
+  "at": "2026-08-02T11:11:58.500Z"
+}

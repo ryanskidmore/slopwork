@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ12RV25YY0EM72BZV8S4C3Z",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": "session_01KZ12RV1W1RYGQXYY7PQCATQD",
+  "verb": "session.started",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KZ12RV1W1RYGQXYY7PQCATQD"
+  },
+  "payload": {
+    "harness": "claude-code",
+    "takeover": false
+  },
+  "at": "2026-08-02T11:11:59.045Z"
+}
