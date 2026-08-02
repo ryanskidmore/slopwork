@@ -83,8 +83,8 @@ import {
   slugify,
   ticketSchema,
 } from "../core/index.js";
-import type { StorageBackend } from "../storage/backend.js";
-import { SlopError } from "../cli/errors.js";
+import type { StorageBackend } from "../core/storage-contract.js";
+import { SlopError } from "../core/errors.js";
 import { validateTicketEdges } from "./edges.js";
 import { ancestryFor } from "./parent.js";
 import type { ParentResolution } from "./parent.js";

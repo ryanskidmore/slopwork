@@ -7,7 +7,7 @@
  * assignment.
  */
 import { nextAvailableSlug, slugify } from "../core/index.js";
-import type { StorageBackend } from "../storage/backend.js";
+import type { StorageBackend } from "../core/storage-contract.js";
 
 /** Every slug currently on disk, via the (self-healing) index. */
 export async function takenSlugs(backend: StorageBackend): Promise<Set<string>> {

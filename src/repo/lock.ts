@@ -75,7 +75,7 @@ import { randomUUID } from "node:crypto";
 import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import { EXIT_CODES } from "../core/exit-codes.js";
-import { SlopError } from "../cli/errors.js";
+import { SlopError } from "../core/errors.js";
 import { isEexist, isEnoent } from "./fs-utils.js";
 
 export interface LockInfo {

@@ -15,7 +15,7 @@ import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import type { PlanStep, PlanVersion, Session, Ticket } from "../core/index.js";
 import { EXIT_CODES, nowIso, planVersionSchema, sessionSchema } from "../core/index.js";
-import { SlopError } from "../cli/errors.js";
+import { SlopError } from "../core/errors.js";
 import { formatZodIssuesForUsage } from "../tickets/validate.js";
 
 /**

@@ -18,7 +18,7 @@
  * `new`/`update` can never again drift apart on what a "valid label" is.
  */
 import { EXIT_CODES } from "../core/exit-codes.js";
-import { SlopError } from "../cli/errors.js";
+import { SlopError } from "../core/errors.js";
 
 const LABEL_SIGILS = new Set(["+", "-"]);
 

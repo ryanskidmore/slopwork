@@ -2,7 +2,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type Event, newEventId, newTicketId, ticketSchema } from "../../src/core/index.js";
@@ -137,98 +137,252 @@ async function writeFlatEvent(
 // ---------------------------------------------------------------------------
 
 describe("G2: pluggable storage backend", () => {
-  describe("import boundary: commands + web data source never call flatfile data-access functions directly", () => {
-    // The exact data-access primitives StorageBackend methods now wrap —
-    // if any of these are imported by name from a `repo/*` module in the
-    // scanned files, something bypassed the interface.
-    const FORBIDDEN_NAMES = [
-      "readTicket",
-      "listTickets",
-      "listTicketsTolerant",
-      "createTicket",
-      "updateTicket",
-      "readSession",
-      "listSessions",
-      "listSessionsTolerant",
-      "createSession",
-      "updateSession",
-      "readEvent",
-      "appendEvent",
-      "queryEvents",
-      "listEvents",
-      "listEventsTolerant",
-      "createEvent",
-      "resolveTicketRef",
-      "resolveTicketRefs",
-      "loadIndex",
-      "rebuildIndex",
-      "withLock",
-      "sweepStaleTempFiles",
-      "ticketFilePath",
-      "sessionFilePath",
-    ];
-    // A handful of pure/bootstrap exports legitimately still come from the
-    // repo barrel — path/root discovery (`repoPaths`/`requireRepoRoot`/
-    // `findRepoRoot`/`ensureDbDirs`, which has to run BEFORE a backend can
-    // even be constructed), the low-level `atomicWriteFile` primitive
-    // (`edit.ts`'s own documented exception, for $EDITOR rescue/rollback of
-    // raw file bytes), and pure derived-value helpers with no I/O of their
-    // own (`deriveEffectiveOverlay`, the `RepoPaths` type). None of these
-    // names appear in FORBIDDEN_NAMES above.
+  describe("recursive dependency graph", () => {
+    interface ImportDeclaration {
+      importer: string;
+      imported: string;
+      names: string[];
+      typeOnly: boolean;
+    }
 
-    async function scanFile(path: string): Promise<string[]> {
-      const text = await readFile(path, "utf8");
-      const violations: string[] = [];
-      // Matches `import {A, B} from "...repo/xyz.js"` / `import type {A} from "..."`
-      // across both single- and multi-line brace lists.
-      const importRe = /import\s+(?:type\s+)?\{([^}]*)\}\s*from\s*["']([^"']*\/repo\/[^"']*)["']/g;
-      for (const match of text.matchAll(importRe)) {
-        const names = (match[1] ?? "").split(",").map((n) =>
-          n
-            .trim()
-            .split(/\s+as\s+/)[0]
-            ?.trim(),
-        );
-        for (const name of names) {
-          if (name && FORBIDDEN_NAMES.includes(name)) {
-            violations.push(`${path} imports "${name}" from "${match[2]}"`);
-          }
+    interface SourceGraph {
+      declarations: ImportDeclaration[];
+      edges: Map<string, string[]>;
+    }
+
+    const sourceRoot = join(repoRoot, "src");
+    const CLI_REPO_BOOTSTRAP_IMPORTS = new Set([
+      // Repository discovery/path construction happens before a backend can
+      // be selected, so these are composition-root concerns rather than data access.
+      "RepoPaths",
+      "ensureDbDirs",
+      "findRepoRoot",
+      "repoPaths",
+      "requireRepoRoot",
+      // `init` writes initial files and `edit` restores raw bytes after an
+      // invalid $EDITOR result; neither operation has a backend-level shape.
+      "atomicWriteFile",
+    ]);
+
+    async function productionTypeScriptFiles(dir: string): Promise<string[]> {
+      const entries = (await readdir(dir, { withFileTypes: true })).sort((a, b) =>
+        a.name.localeCompare(b.name),
+      );
+      const files: string[] = [];
+      for (const entry of entries) {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) files.push(...(await productionTypeScriptFiles(path)));
+        else if (
+          entry.isFile() &&
+          (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) &&
+          !entry.name.endsWith(".test.ts") &&
+          !entry.name.endsWith(".test.tsx")
+        ) {
+          files.push(path);
         }
       }
-      return violations;
+      return files;
     }
 
-    async function scanDir(dir: string, exempt: Set<string>): Promise<string[]> {
-      const entries = await readdir(dir, { withFileTypes: true });
-      const violations: string[] = [];
-      for (const entry of entries) {
-        if (!entry.isFile() || !entry.name.endsWith(".ts")) continue;
-        if (entry.name.endsWith(".test.ts")) continue; // tests legitimately reach into repo/ for scaffolding
-        if (exempt.has(entry.name)) continue;
-        violations.push(...(await scanFile(join(dir, entry.name))));
+    function moduleName(path: string): string {
+      return relative(repoRoot, path).replaceAll("\\", "/");
+    }
+
+    function importedNames(clause: string): string[] {
+      const named = /\{([\s\S]*?)\}/.exec(clause)?.[1];
+      if (named === undefined) return ["*"];
+      return named
+        .split(",")
+        .map((name) =>
+          name
+            .trim()
+            .replace(/^type\s+/, "")
+            .split(/\s+as\s+/)[0]
+            ?.trim(),
+        )
+        .filter((name): name is string => Boolean(name));
+    }
+
+    function parseImports(source: string): Array<{
+      specifier: string;
+      names: string[];
+      typeOnly: boolean;
+    }> {
+      const imports: Array<{ specifier: string; names: string[]; typeOnly: boolean }> = [];
+      const fromPattern = /\b(?:import|export)\s+(type\s+)?([^;]*?)\s+from\s+["']([^"']+)["']\s*;/g;
+      for (const match of source.matchAll(fromPattern)) {
+        imports.push({
+          typeOnly: match[1] !== undefined,
+          names: importedNames(match[2] ?? ""),
+          specifier: match[3] ?? "",
+        });
       }
-      return violations;
+      const sideEffectPattern = /^\s*import\s+["']([^"']+)["']\s*;/gm;
+      for (const match of source.matchAll(sideEffectPattern)) {
+        imports.push({ specifier: match[1] ?? "", names: ["*"], typeOnly: false });
+      }
+      return imports;
     }
 
-    it("no src/cli/commands/*.ts imports a flatfile data-access function directly", async () => {
-      const violations = await scanDir(join(repoRoot, "src", "cli", "commands"), new Set());
+    // Non-source asset specifiers (stylesheets, images, fonts, JSON, ...) are
+    // leaves the bundler handles directly — they can never participate in an
+    // import cycle or a layer violation, so they're skipped rather than
+    // resolved. Only a bare specifier or one already ending `.js` (this
+    // codebase's own ESM-relative-import convention, e.g. `./foo.js` naming
+    // `foo.ts`) is expected to resolve to a production TypeScript module;
+    // anything else with a real, non-TS/TSX extension is a non-cyclable leaf.
+    const NON_SOURCE_EXTENSION =
+      /\.(?:css|scss|less|json|svg|png|jpe?g|gif|webp|ico|woff2?|ttf|eot)$/i;
+
+    function resolveLocalImport(
+      importer: string,
+      specifier: string,
+      sourceFiles: ReadonlySet<string>,
+    ): string | null {
+      if (!specifier.startsWith(".")) return null;
+      if (NON_SOURCE_EXTENSION.test(specifier)) return null;
+      const base = resolve(dirname(importer), specifier.replace(/\.js$/, ""));
+      for (const candidate of [
+        `${base}.ts`,
+        `${base}.tsx`,
+        join(base, "index.ts"),
+        join(base, "index.tsx"),
+      ]) {
+        if (sourceFiles.has(candidate)) return candidate;
+      }
+      throw new Error(`${moduleName(importer)} has unresolved local import "${specifier}"`);
+    }
+
+    async function loadSourceGraph(): Promise<SourceGraph> {
+      const files = await productionTypeScriptFiles(sourceRoot);
+      const sourceFiles = new Set(files);
+      const declarations: ImportDeclaration[] = [];
+      const edges = new Map(files.map((file) => [moduleName(file), [] as string[]]));
+
+      for (const importer of files) {
+        const source = await readFile(importer, "utf8");
+        for (const declaration of parseImports(source)) {
+          const imported = resolveLocalImport(importer, declaration.specifier, sourceFiles);
+          if (imported === null) continue;
+          const edge = {
+            importer: moduleName(importer),
+            imported: moduleName(imported),
+            names: declaration.names,
+            typeOnly: declaration.typeOnly,
+          };
+          declarations.push(edge);
+          edges.get(edge.importer)?.push(edge.imported);
+        }
+      }
+
+      for (const targets of edges.values()) targets.sort();
+      declarations.sort((a, b) =>
+        `${a.importer}:${a.imported}:${a.names.join(",")}`.localeCompare(
+          `${b.importer}:${b.imported}:${b.names.join(",")}`,
+        ),
+      );
+      return { declarations, edges };
+    }
+
+    function area(module: string): string {
+      return module.split("/")[1] ?? "";
+    }
+
+    function layerViolations(declarations: readonly ImportDeclaration[]): string[] {
+      const allowedTargets: Record<string, ReadonlySet<string>> = {
+        core: new Set(["core"]),
+        tickets: new Set(["core", "sessions", "tickets"]),
+        sessions: new Set(["core", "sessions", "tickets"]),
+        repo: new Set(["core", "repo", "sessions", "tickets"]),
+        storage: new Set(["core", "repo", "storage"]),
+        web: new Set(["core", "sessions", "storage", "tickets", "web"]),
+      };
+      return declarations.flatMap((declaration) => {
+        const allowed = allowedTargets[area(declaration.importer)];
+        if (!allowed || allowed.has(area(declaration.imported))) return [];
+        const kind = declaration.typeOnly ? "type" : "runtime/mixed";
+        return [
+          `${declaration.importer} -> ${declaration.imported} (${kind}) violates the layer direction`,
+        ];
+      });
+    }
+
+    function stronglyConnectedComponents(
+      edges: ReadonlyMap<string, readonly string[]>,
+    ): string[][] {
+      let nextIndex = 0;
+      const index = new Map<string, number>();
+      const lowLink = new Map<string, number>();
+      const stack: string[] = [];
+      const onStack = new Set<string>();
+      const components: string[][] = [];
+
+      function visit(node: string): void {
+        index.set(node, nextIndex);
+        lowLink.set(node, nextIndex);
+        nextIndex += 1;
+        stack.push(node);
+        onStack.add(node);
+
+        for (const target of edges.get(node) ?? []) {
+          if (!index.has(target)) {
+            visit(target);
+            lowLink.set(node, Math.min(lowLink.get(node) ?? 0, lowLink.get(target) ?? 0));
+          } else if (onStack.has(target)) {
+            lowLink.set(node, Math.min(lowLink.get(node) ?? 0, index.get(target) ?? 0));
+          }
+        }
+
+        if (lowLink.get(node) !== index.get(node)) return;
+        const component: string[] = [];
+        let member: string;
+        do {
+          member = stack.pop() ?? "";
+          onStack.delete(member);
+          component.push(member);
+        } while (member !== node);
+        if (component.length > 1 || (edges.get(node) ?? []).includes(node)) {
+          components.push(component.sort());
+        }
+      }
+
+      for (const node of [...edges.keys()].sort()) {
+        if (!index.has(node)) visit(node);
+      }
+      return components.sort((a, b) => a.join("\n").localeCompare(b.join("\n")));
+    }
+
+    it("recursively enforces inward layer dependencies for type and runtime imports", async () => {
+      const graph = await loadSourceGraph();
+      expect(layerViolations(graph.declarations)).toEqual([]);
+    });
+
+    it("limits CLI-to-repo imports to documented bootstrap and raw-file primitives", async () => {
+      const graph = await loadSourceGraph();
+      const violations = graph.declarations.flatMap((declaration) => {
+        if (area(declaration.importer) !== "cli" || area(declaration.imported) !== "repo") {
+          return [];
+        }
+        const forbidden = declaration.names.filter((name) => !CLI_REPO_BOOTSTRAP_IMPORTS.has(name));
+        return forbidden.map(
+          (name) => `${declaration.importer} imports non-bootstrap repo symbol "${name}"`,
+        );
+      });
       expect(violations).toEqual([]);
     });
 
-    it("no src/web/*.ts imports a flatfile data-access function directly (except the deliberate fixture exception)", async () => {
-      // fixture-data-source.ts is the one documented exception (its own
-      // module doc): a fixture-only WebDataSource that reads plain fs
-      // directly for tests, never wired into the real `slop web` path
-      // (storage-data-source.ts is). It doesn't import repo/ at all today,
-      // but it's exempted by name here so this test's contract is about
-      // the REAL path (storage-data-source.ts, server.ts, api/*, views),
-      // not an accidental side effect of what fixture-data-source.ts
-      // happens not to import right now.
-      const violations = await scanDir(
-        join(repoRoot, "src", "web"),
-        new Set(["fixture-data-source.ts"]),
-      );
-      expect(violations).toEqual([]);
+    it("has no production module cycles", async () => {
+      const graph = await loadSourceGraph();
+      expect(stronglyConnectedComponents(graph.edges)).toEqual([]);
+    });
+
+    it("reports cycle components in deterministic order", () => {
+      const cyclic = new Map<string, string[]>([
+        ["src/z.ts", ["src/z.ts"]],
+        ["src/b.ts", ["src/a.ts"]],
+        ["src/a.ts", ["src/b.ts"]],
+      ]);
+      expect(stronglyConnectedComponents(cyclic)).toEqual([["src/a.ts", "src/b.ts"], ["src/z.ts"]]);
     });
   });
 

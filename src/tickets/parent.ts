@@ -10,8 +10,8 @@ import { systemClock } from "../core/clock.js";
 import type { Ticket, TicketId } from "../core/index.js";
 import { EXIT_CODES, isTicketId, nowIso } from "../core/index.js";
 import { EXTERNAL_REF_PATTERN, checkJiraRefFormat } from "../core/entities/ref.js";
-import type { StorageBackend } from "../storage/backend.js";
-import { SlopError } from "../cli/errors.js";
+import type { StorageBackend } from "../core/storage-contract.js";
+import { SlopError } from "../core/errors.js";
 import { deepEqualJson } from "./patch.js";
 
 export type ParentResolution =

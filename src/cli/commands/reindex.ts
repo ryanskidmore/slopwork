@@ -1,12 +1,9 @@
 import type { Command } from "commander";
 import { EXIT_CODES, nowIso, systemClock, ticketSchema } from "../../core/index.js";
 import type { SessionId } from "../../core/index.js";
+import { formatDuplicateSlugProblems, formatIndexProblems } from "../../core/db-index.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
-import {
-  formatDuplicateSlugProblems,
-  formatEventReadProblems,
-  formatIndexProblems,
-} from "../../storage/backend.js";
+import { formatEventReadProblems } from "../../storage/backend.js";
 import { openStorage } from "../../storage/index.js";
 import { diffSessionPatch } from "../../sessions/patch.js";
 import { buildHealedSession, findOrphanedActiveSessions } from "../../sessions/repair.js";

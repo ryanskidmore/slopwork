@@ -151,14 +151,10 @@ import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import type { Event, Ticket, TicketId } from "../core/index.js";
 import { EXIT_CODES } from "../core/index.js";
-import { SlopError } from "../cli/errors.js";
+import { SlopError } from "../core/errors.js";
+import type { TicketReadProblem } from "../core/db-index.js";
+import type { EventContext, StorageBackend, StorageTxScope } from "../core/storage-contract.js";
 import { computeBlockedCounts, isLiveBlockerState } from "./overlay.js";
-import type {
-  EventContext,
-  StorageBackend,
-  StorageTxScope,
-  TicketReadProblem,
-} from "../storage/backend.js";
 
 export interface CascadeOnCloseResult {
   /** Every ticket that is, per THIS call's fresh read of disk,

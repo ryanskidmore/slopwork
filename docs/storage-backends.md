@@ -1,7 +1,8 @@
 # Storage backends
 
 Slopwork's commands and `slop web` talk to exactly one interface,
-`StorageBackend` (`src/storage/backend.ts`) — never to `.slop/db/` files
+`StorageBackend` (`src/core/storage-contract.ts`; compatibility exports remain
+in `src/storage/backend.ts`) — never to `.slop/db/` files
 directly. `.slop/config.yaml`'s `backend:` key
 ([Configuration → Storage backend](configuration.md#storage-backend))
 selects which implementation (a "driver") a repo uses:
@@ -18,8 +19,7 @@ selects which implementation (a "driver") a repo uses:
   "implement this," not "redesign the interface."
 
 Everything below is written against `StorageBackend`'s own method
-signatures (`src/storage/backend.ts` — read that file first; it's
-heavily doc-commented and this document assumes its vocabulary:
+signatures (`src/core/storage-contract.ts`; this document assumes its vocabulary:
 `StorageTxScope`, the transaction model, tolerant vs. strict reads). Every
 endpoint maps 1:1 to one interface method.
 
@@ -174,7 +174,7 @@ records, but neither can erase the other's progress.
 | `GET /v1/index` | `loadIndex(clock?)` | `{ "index": DbIndex, "rebuilt": boolean, "reason": IndexLoadReason }` — a remote backend has no on-disk staleness to detect (its derived data is server-computed on every read, or kept continuously up to date), so it should always respond `rebuilt: false, reason: "fresh"` per `StorageBackend.loadIndex`'s own doc comment |
 | `POST /v1/index/rebuild` | `rebuildIndex(clock?)` | `DbIndex` — force a full recompute; for a backend that's always fresh this can be a cheap no-op that just returns the current derived state |
 
-`DbIndex`'s shape (`src/repo/db-index.ts`'s `dbIndexSchema`) includes a
+`DbIndex`'s shape (`src/core/db-index.ts`'s `dbIndexSchema`) includes a
 `fingerprint` field that is meaningless off the flatfile layout (it's a
 content hash of on-disk directories) — a remote backend may fill it with
 any stable placeholder value; nothing reads `fingerprint` through the
@@ -198,8 +198,8 @@ interface *method* signature changed, only this response shape):
 
 `StorageBackend.transact(fn)` is a **client-side** call: `fn` runs
 in-process and makes some number of the calls above, one at a time,
-expecting exclusive access for their whole duration (`backend.ts`'s
-module doc, "The transaction model"). A remote backend maps this onto a
+expecting exclusive access for their whole duration (the core storage
+contract's transaction marker). A remote backend maps this onto a
 short-lived server-side **lease**:
 
 | Method & path | Purpose |
@@ -276,5 +276,7 @@ for a single local flatfile repo.
 - [Concurrency & merging](concurrency-and-merging.md) — the flatfile
   lock's exact semantics, which "Transactions" above generalizes to a
   server-side lease.
-- `src/storage/backend.ts` — the source of truth for every method
+- `src/core/storage-contract.ts` — the source of truth for every method
   signature this document maps to an endpoint.
+- [Architecture](architecture.md) — the port/adapter dependency direction
+  and its enforced exceptions.

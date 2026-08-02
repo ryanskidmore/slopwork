@@ -1,10 +1,9 @@
 import type { Command } from "commander";
 import type { Config, Event, Ticket } from "../../core/index.js";
 import { isTicketId, shortTicketCode } from "../../core/index.js";
-import { deriveEffectiveOverlay } from "../../repo/index.js";
+import type { StorageBackend } from "../../core/storage-contract.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { openStorage } from "../../storage/index.js";
-import type { StorageBackend } from "../../storage/index.js";
 import {
   CONTEXT_PACK_BUDGET_UNIT,
   renderContextPackJsonWithBudget,
@@ -13,6 +12,7 @@ import {
 import { buildContextPackData } from "../../sessions/context-pack.js";
 import { formatTicketDetail } from "../../tickets/detail.js";
 import { jiraBrowseUrl } from "../../tickets/jira.js";
+import { deriveEffectiveOverlay } from "../../tickets/overlay.js";
 import type { Question } from "../../tickets/questions.js";
 import { deriveQuestions, unansweredQuestions } from "../../tickets/questions.js";
 import type { TreeNode } from "../../tickets/tree.js";

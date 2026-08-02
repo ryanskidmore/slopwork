@@ -1,9 +1,15 @@
 import type { Command } from "commander";
 import type { Actor } from "../../core/index.js";
-import { EXIT_CODES, fixedClock, shortTicketCode, systemClock } from "../../core/index.js";
+import {
+  EXIT_CODES,
+  fixedClock,
+  shortTicketCode,
+  systemClock,
+  ticketEventContext,
+} from "../../core/index.js";
 import type { JsoncPatchEntry, Ticket } from "../../core/index.js";
-import { repoPaths, requireRepoRoot, ticketEventContext } from "../../repo/index.js";
-import type { StorageBackend } from "../../storage/index.js";
+import type { StorageBackend } from "../../core/storage-contract.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { openStorage } from "../../storage/index.js";
 import { validateTicketEdges } from "../../tickets/edges.js";
 import { parseParentRef, recomputeAncestry } from "../../tickets/parent.js";

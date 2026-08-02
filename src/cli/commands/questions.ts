@@ -16,9 +16,9 @@ import type { Command } from "commander";
 import type { Actor, Ticket, TicketId } from "../../core/index.js";
 import { renderEntriesWithBudget, shortTicketCode } from "../../core/index.js";
 import type { RenderFormat } from "../../core/index.js";
+import type { StorageBackend } from "../../core/storage-contract.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
-import type { StorageBackend } from "../../storage/index.js";
 import { openStorage, warnAboutEventReadProblems } from "../../storage/index.js";
 import type { Question } from "../../tickets/questions.js";
 import {

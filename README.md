@@ -233,25 +233,28 @@ src/
       index.ts            registers all 26 commands, grouped as in design.md §4.2 (plus G3's `list`, G4's `ask`/`answer`/`questions`)
       <command>.ts          one file per command (new.ts, start.ts, review.ts, ...)
       shared.ts             tiny option-parsing helpers (collect, parseIntegerOption)
-  core/                 entity types, schemas, ids, serialization, exit codes
+  core/                 inward-owned entities, schemas, ids, errors, and ports
+    db-index.ts           derived-index schema/DTO contract + pure diagnostics
+    storage-contract.ts   StorageBackend port + shared query/result DTOs
     exit-codes.ts         the exit-code table above
     index.ts               module re-exports; entity types/schemas/ULIDs/JSONC live here
   repo/                 the flatfile DRIVER's internals: atomic writes (tmp+rename),
                         `.slop/db/.lock`, crash-recovery mutation journal, ref resolution, the
-                        derived index, and month-sharded event writer. Not imported outside
-                        src/storage/ — commands and src/web/ go through the interface below.
+                        derived index, and month-sharded event writer. CLI access is limited to
+                        documented repository discovery/raw-file bootstrap primitives (see
+                        docs/architecture.md) — everything else stays behind the interface below.
     index.ts               re-exports the repo layer (atomic-write, db-index, events, refs,
                             sessions, tickets, ...); ticket/session CRUD is built on this
-  storage/              the pluggable storage-backend interface (docs/storage-backends.md):
-                        commands/web construct one via `openStorage(paths)` and never import
-                        repo/ directly
-    backend.ts              the StorageBackend interface + transaction model
+  storage/              adapters for the core-owned StorageBackend port
+                        (docs/storage-backends.md); commands/web construct one via
+                        `openStorage(paths)` and never call repo data access directly
+    backend.ts              compatibility exports for the core-owned contract
     flatfile.ts              the default driver — repo/ wrapped behind the interface, plus an
                             in-process read cache
     remote.ts                 stub remote driver (every call fails with a clear "see
                             docs/storage-backends.md" error) selected via config.yaml's `backend:`
     open.ts                  `openStorage(paths)` — reads config.yaml, picks flatfile/remote
-  tickets/              ticket-domain logic on top of storage/: state machine, done-cascade,
+  tickets/              ticket-domain logic against core ports: state machine, done-cascade,
                         staleness, search, ancestry/tree, jira ref parsing
   sessions/             session lifecycle: harness/git capture, plan versioning + diff,
                         context pack, start/stop/finalize

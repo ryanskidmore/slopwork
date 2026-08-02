@@ -1,0 +1,50 @@
+{
+  "id": "ticket_01KZ15K9Z7QSNR003PSSDJ2M25",
+  "name": "Enforce dependency ownership boundaries",
+  "slug": "enforce-dependency-ownership-boundaries",
+  "spec": {
+    "summary": "Move shared errors and storage contracts above CLI/repo adapters, eliminate the audited dependency loops, and make architectural boundaries recursively enforceable.",
+    "details_md": "",
+    "acceptance": [
+      "SlopError is owned by a neutral core module and CLI compatibility imports do not make repo depend on CLI",
+      "StorageBackend and adapters use neutral contract/query/tolerant-read types and shared pure formatters without changing persisted or wire behavior",
+      "Recursive import-graph tests cover nested TypeScript files and type/runtime imports with deterministic cycle detection and narrow documented exceptions",
+      "Targeted cli-repo and tickets-storage-repo ownership cycles are absent",
+      "Architecture documentation and decisions describe the enforced layer model and residual exceptions",
+      "Focused boundary tests plus full test, typecheck, lint, format, and build gates pass"
+    ],
+    "context": [
+      "src/storage/backend.ts",
+      "src/repo",
+      "tests/acceptance/G2.test.ts",
+      "docs/architecture.md"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "in_progress",
+  "priority": 1,
+  "labels": [
+    "architecture",
+    "boundaries"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ15K9Z7QSNR003PSSDJ2M25",
+  "path": [],
+  "active_session": "session_01KZ15KN503KPSNDBMK51074TF",
+  "last_activity_at": "2026-08-02T12:01:34.883Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "codex-dependency-boundaries",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-08-02T12:01:23.483Z",
+  "updated_at": "2026-08-02T12:01:34.883Z"
+}

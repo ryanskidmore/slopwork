@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Command } from "commander";
 import type { ExitCode, JsoncPatchEntry } from "../../core/index.js";
+import { ticketEventContext } from "../../core/index.js";
 import { EXIT_CODES } from "../../core/exit-codes.js";
 // `atomicWriteFile` is a deliberate, narrow exception to "commands go
 // through StorageBackend only": `slop edit` opens the ticket's RAW bytes
@@ -13,12 +14,7 @@ import { EXIT_CODES } from "../../core/exit-codes.js";
 // (a remote backend has no local file to hand $EDITOR at all). The
 // structured, backend-portable write still goes through
 // `backend.updateTicket` below once the edit is validated.
-import {
-  atomicWriteFile,
-  repoPaths,
-  requireRepoRoot,
-  ticketEventContext,
-} from "../../repo/index.js";
+import { atomicWriteFile, repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { openStorage } from "../../storage/index.js";
 import { validateEditedTicketText } from "../../tickets/edit.js";
 import { validateTicketEdges } from "../../tickets/edges.js";

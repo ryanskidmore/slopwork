@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { Ticket } from "../../core/index.js";
-import { EXIT_CODES, nowIso, systemClock } from "../../core/index.js";
-import { repoPaths, requireRepoRoot, ticketEventContext } from "../../repo/index.js";
+import { EXIT_CODES, nowIso, systemClock, ticketEventContext } from "../../core/index.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { openStorage } from "../../storage/index.js";
 import { TICKET_FIELDS, diffTicketPatch } from "../../tickets/patch.js";
 import { buildSplitChild } from "../../tickets/split.js";

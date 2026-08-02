@@ -107,10 +107,11 @@ import {
   shortTicketCode,
   TICKET_STATES,
 } from "../../core/index.js";
-import type { IndexTicketRow } from "../../repo/index.js";
+import type { IndexTicketRow } from "../../core/db-index.js";
+import type { StorageBackend } from "../../core/storage-contract.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
-import type { EventReadProblem, StorageBackend } from "../../storage/index.js";
+import type { EventReadProblem } from "../../storage/index.js";
 import { openStorage } from "../../storage/index.js";
 import { isReviewStale, isStale } from "../../tickets/staleness.js";
 import type {

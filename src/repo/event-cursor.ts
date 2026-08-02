@@ -8,55 +8,37 @@
  * token is constant-size; its gitignored local/server-side state grows
  * O(events seen), the unavoidable cost of exact no-miss polling across
  * arbitrary legacy ids with no trustworthy origin/sequence metadata.
+ *
+ * The token/state schema and parser are canonically DEFINED in
+ * `core/storage-contract.ts` (the `StorageBackend` port's own vocabulary)
+ * and re-exported here for compatibility; this module owns only the
+ * flatfile I/O built on top of them.
  */
 import { randomUUID } from "node:crypto";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
-import { z } from "zod";
-import { EXIT_CODES, eventIdSchema, type EventId } from "../core/index.js";
-import { SlopError } from "../cli/errors.js";
+import { EXIT_CODES, type EventId } from "../core/index.js";
+import {
+  type EventPollCursor,
+  eventPollCursorSchema,
+  type EventPollCursorState,
+  eventPollCursorStateSchema,
+} from "../core/storage-contract.js";
+import { SlopError } from "../core/errors.js";
 import { writeCanonical } from "../core/jsonc.js";
 import { atomicWriteFile } from "./atomic-write.js";
 import { createEntityFileCanonical, readEntityFile } from "./entity-file.js";
 import { withLock } from "./lock.js";
 import type { RepoPaths } from "./paths.js";
 
-export const EVENT_POLL_CURSOR_VERSION = 1 as const;
-export const eventPollCursorSchema = z
-  .string()
-  .regex(/^cursor_v1_[0-9a-f]{32}$/, "expected cursor_v1_<32 lowercase hex characters>")
-  .brand<"EventPollCursor">();
-export type EventPollCursor = z.infer<typeof eventPollCursorSchema>;
-
-export const eventPollCursorStateSchema = z
-  .object({
-    version: z.literal(EVENT_POLL_CURSOR_VERSION),
-    cursor: eventPollCursorSchema,
-    seen: z.array(eventIdSchema),
-  })
-  .superRefine((state, ctx) => {
-    if (new Set(state.seen).size !== state.seen.length) {
-      ctx.addIssue({ code: "custom", path: ["seen"], message: "event ids must be unique" });
-    }
-    for (let i = 1; i < state.seen.length; i++) {
-      if ((state.seen[i - 1] ?? "") >= (state.seen[i] ?? "")) {
-        ctx.addIssue({ code: "custom", path: ["seen"], message: "event ids must be sorted" });
-        break;
-      }
-    }
-  });
-export type EventPollCursorState = z.infer<typeof eventPollCursorStateSchema>;
-
-export function parseEventPollCursor(raw: string): EventPollCursor {
-  const parsed = eventPollCursorSchema.safeParse(raw);
-  if (!parsed.success) {
-    throw new SlopError(
-      `invalid event polling cursor "${raw}"; expected cursor_v1_<32 lowercase hex characters>`,
-      EXIT_CODES.USAGE_ERROR,
-    );
-  }
-  return parsed.data;
-}
+export {
+  EVENT_POLL_CURSOR_VERSION,
+  type EventPollCursor,
+  eventPollCursorSchema,
+  type EventPollCursorState,
+  eventPollCursorStateSchema,
+  parseEventPollCursor,
+} from "../core/storage-contract.js";
 
 export function eventPollCursorFilePath(paths: RepoPaths, cursor: EventPollCursor): string {
   return join(paths.eventCursorsDir, `${cursor}.jsonc`);

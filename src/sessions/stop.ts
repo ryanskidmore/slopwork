@@ -8,7 +8,7 @@ import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import type { Session, Ticket } from "../core/index.js";
 import { EXIT_CODES, nowIso, sessionSchema, ticketSchema } from "../core/index.js";
-import { SlopError } from "../cli/errors.js";
+import { SlopError } from "../core/errors.js";
 import { formatZodIssuesForUsage } from "../tickets/validate.js";
 
 /** `stop` only makes sense on a ticket with an active session — this is

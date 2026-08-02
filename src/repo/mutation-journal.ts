@@ -17,7 +17,6 @@ import { isDeepStrictEqual } from "node:util";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
-import { SlopError } from "../cli/errors.js";
 import {
   type Event,
   type EventId,
@@ -26,6 +25,7 @@ import {
   sessionIdSchema,
   ticketIdSchema,
 } from "../core/index.js";
+import { SlopError } from "../core/errors.js";
 import { writeCanonical } from "../core/jsonc.js";
 import { EXIT_CODES } from "../core/exit-codes.js";
 import { atomicWriteFile, durableRemoveFile, isTempFileName } from "./atomic-write.js";

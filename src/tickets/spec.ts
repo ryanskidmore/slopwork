@@ -8,7 +8,7 @@
  */
 import type { Spec } from "../core/index.js";
 import { EXIT_CODES, specSchema } from "../core/index.js";
-import { SlopError } from "../cli/errors.js";
+import { SlopError } from "../core/errors.js";
 import { formatZodIssuesForUsage } from "./validate.js";
 
 /** `summary` defaults sensibly from the ticket name (B1 brief) — the name

@@ -22,7 +22,7 @@ import { statSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { EXIT_CODES } from "../core/exit-codes.js";
-import { SlopError } from "../cli/errors.js";
+import { SlopError } from "../core/errors.js";
 
 export interface RepoPaths {
   /** The directory containing `.slop/` — not `.slop/` itself. */

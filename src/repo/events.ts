@@ -59,24 +59,31 @@
 import { mkdir, rename, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { decodeTime } from "ulid";
-import { z } from "zod";
 import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import {
-  type Actor,
   type Event,
   type EventEntity,
   type EventId,
-  type EventVerb,
-  type SessionId,
-  type Ticket,
-  type TicketId,
-  eventIdSchema,
   eventSchema,
   isEventId,
   newEventId,
   parsePrefixedId,
 } from "../core/index.js";
+import type {
+  EventContext,
+  EventQuery,
+  ListEventsTolerantResult,
+  MutationEventSpec,
+} from "../core/storage-contract.js";
+export type {
+  EventContext,
+  EventQuery,
+  ListEventsTolerantResult,
+  MutationEventSpec,
+} from "../core/storage-contract.js";
+import type { EventReadProblem } from "../core/db-index.js";
+export type { EventReadProblem } from "../core/db-index.js";
 import { createEntityFileCanonical, listEntityIds, readEntityFile } from "./entity-file.js";
 import { isEnoent, readDirSafe } from "./fs-utils.js";
 import type { RepoPaths } from "./paths.js";
@@ -315,19 +322,6 @@ export async function listEvents(paths: RepoPaths): Promise<Event[]> {
  * chronological) order — the filtering only ever removes entries, never
  * reorders survivors.
  */
-export const eventReadProblemSchema = z.object({
-  kind: z.enum(["invalid_filename", "read_error", "id_mismatch", "wrong_shard", "duplicate_id"]),
-  id: eventIdSchema.nullable(),
-  path: z.string(),
-  message: z.string(),
-});
-export type EventReadProblem = z.infer<typeof eventReadProblemSchema>;
-
-export interface ListEventsTolerantResult {
-  events: Event[];
-  problems: EventReadProblem[];
-}
-
 export interface EventDirectoryResult extends ListEventsTolerantResult {
   dir: string;
 }
@@ -506,24 +500,10 @@ export function warnAboutEventReadProblems(problems: readonly EventReadProblem[]
  * actor would make it easy to ship a mutation with a meaningless audit
  * trail entry; requiring it makes omitting it a compile error instead.
  */
-export interface EventContext {
-  actor: Actor;
-  /** The session this mutation happens under, or `null` outside any session. */
-  session: SessionId | null;
-}
-
-/**
- * Event context for work performed on a ticket. The caller chooses the
- * ticket snapshot deliberately: lock-free event-only commands use the
- * snapshot they resolved before appending, while read-modify-write commands
- * pass the fresh snapshot read inside their transaction.
- */
-export function ticketEventContext(
-  actor: Actor,
-  ticket: Pick<Ticket, "active_session">,
-): EventContext {
-  return { actor, session: ticket.active_session };
-}
+// Pure — canonically DEFINED in core/storage-contract.ts (see its own doc)
+// so CLI composition can import it without crossing into repo-owned data
+// access; re-exported here for compatibility.
+export { ticketEventContext } from "../core/storage-contract.js";
 
 /**
  * What varies per call site: which of the 15 {@link EventVerb}s applies
@@ -536,11 +516,6 @@ export function ticketEventContext(
  * it here would just be one more way for a payload to accidentally
  * disagree with the write it's describing.
  */
-export interface MutationEventSpec {
-  verb: EventVerb;
-  payload?: Record<string, unknown>;
-}
-
 /**
  * Mint and write exactly one event — no accompanying entity write, no
  * lock. The lock-free counterpart to {@link withMutationEvent} below.
@@ -624,26 +599,6 @@ export function recoverMutationEvents(paths: RepoPaths): Promise<Event[]> {
 }
 
 // --- A4: ULID cursor query -------------------------------------------------
-
-export interface EventQuery {
-  /**
-   * Exclusive cursor: only events with an id strictly greater (later, per
-   * ULID ordering) than this are returned. This is the cursor D3's `slop
-   * events --since <event_…>` passes straight through.
-   */
-  since?: EventId;
-  /**
-   * Only events about this ticket — `entity.kind === "ticket" &&
-   * entity.id === ticket`. Session-lifecycle events are NOT pulled in
-   * even when the session belongs to this ticket; this is A4's minimal,
-   * unambiguous reading of design.md §4.2's `--ticket <ref>` filter — D3
-   * can widen it later if the dogfood week wants ticket-scoped session
-   * events too.
-   */
-  ticket?: TicketId;
-  /** Cap the number of events returned, applied last (after `since`/`ticket` filtering), preserving ULID order. */
-  limit?: number;
-}
 
 /**
  * The cursor query D3's `slop events --since <event_…> [--ticket <ref>]

@@ -21,14 +21,13 @@
  * than a confusing partial success against the wrong store.
  */
 import { EXIT_CODES } from "../core/exit-codes.js";
-import { SlopError } from "../cli/errors.js";
+import { SlopError } from "../core/errors.js";
+import type { DbIndex, LoadIndexResult } from "../core/db-index.js";
 import type {
-  DbIndex,
   EventShardMigrationResult,
-  LoadIndexResult,
   StorageBackend,
   StorageTxScope,
-} from "./backend.js";
+} from "../core/storage-contract.js";
 
 /** {@link RemoteBackend}'s constructor input — the normalized `{kind:
  * "remote", url?}` half of `BackendSelection` (core/entities/config.ts). */

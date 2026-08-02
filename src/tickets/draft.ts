@@ -37,7 +37,7 @@
  */
 import type { Ticket } from "../core/index.js";
 import { EXIT_CODES } from "../core/index.js";
-import { SlopError } from "../cli/errors.js";
+import { SlopError } from "../core/errors.js";
 
 function describeTicketRef(t: Pick<Ticket, "slug" | "name">): string {
   return `${t.slug} ("${t.name}")`;

@@ -18,7 +18,7 @@
  */
 import type { TicketId } from "../core/index.js";
 import { nextAvailableSlug } from "../core/slug.js";
-import type { DuplicateSlugProblem } from "../repo/db-index.js";
+import type { DuplicateSlugProblem } from "../core/db-index.js";
 
 export interface SlugHealPlan {
   id: TicketId;

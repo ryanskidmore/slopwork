@@ -1117,3 +1117,33 @@ retain an omission after a same-path repair whose count and maximum id did
 not change. Once the file is repaired, the next read admits it and the
 diagnostic disappears without requiring a process restart or manual cache
 invalidation.
+
+## Architecture — contracts point inward and recursive graph checks replace informal exceptions (ticket_01KZ15K9Z7QSNR003PSSDJ2M25)
+
+**Supersedes the earlier C5 layering exception and CLI-owned helper precedent.**
+Those entries accurately described the implementation at the time, but the
+same informal crossings later combined into real ownership loops: repo
+imported CLI-owned `SlopError` and ticket derivations, while ticket/session
+domain code imported storage, whose flatfile adapter imports repo. The storage
+port also named repo-owned index/event/tolerant-read types, making even
+type-only consumers depend on the adapter they were meant to abstract.
+
+The stable contracts now live at the inward boundary: `core/errors.ts` owns
+`SlopError`; `core/db-index.ts` owns the existing index schemas/DTOs and pure
+problem formatters; `core/storage-contract.ts` owns `StorageBackend`, its
+transaction marker, event/query DTOs, and tolerant-read results. Repo and
+storage modules retain compatibility exports, but adapters and domain code use
+the core definitions directly. No persisted schema, formatter text, command
+output, exit code, or remote wire shape changed.
+
+The dependency direction is now core → ticket/session domain → repo adapter →
+storage adapter → CLI/web composition (arrows mean "may be depended on by").
+CLI composition still needs repo discovery/path primitives before it can select
+a backend, and `init`/`edit` need the raw atomic writer for pre-backend creation
+and byte restoration. Those exceptions are enforced by exact symbol allowlist.
+
+`tests/acceptance/G2.test.ts` now walks nested production `.ts`/`.tsx` files,
+resolves type and runtime import/re-export edges, enforces the layer matrix, and
+runs deterministic strongly connected component detection. This replaces the
+old immediate-directory blacklist, which could miss nested files, unlisted
+symbols, re-exports, type-only inversions, and multi-area cycles.
