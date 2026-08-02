@@ -14,7 +14,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "review",
+  "state": "done",
   "priority": 1,
   "labels": [
     "group:g4",
@@ -26,9 +26,9 @@
   "discovered_from": [],
   "root_id": "ticket_01KYZP89Y62B7TTAJH2HGJVZ6G",
   "path": [],
-  "active_session": "session_01KZ0SKT6NHR1ZAYXJNE2AHHZC",
-  "last_activity_at": "2026-08-02T09:24:12.377Z",
-  "latest_note": null,
+  "active_session": null,
+  "last_activity_at": "2026-08-02T10:33:02.836Z",
+  "latest_note": "PRs #3/#4 merged; content landed on main via the stranded-stack merge (4811002). list/ready filters/bulk ops/graph editing/slug healing + full elicitations live. CI coverage gate tracked in t-mx6bq.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -38,13 +38,5 @@
     }
   },
   "created_at": "2026-08-01T22:13:59.943Z",
-  "updated_at": "2026-08-02T09:24:12.377Z",
-  "review": {
-    "mr": "https://github.com/ryanskidmore/slopwork/pull/4",
-    "requested_at": "2026-08-02T09:24:12.377Z",
-    "by": {
-      "name": "coordinator",
-      "kind": "agent"
-    }
-  }
+  "updated_at": "2026-08-02T10:33:02.836Z"
 }

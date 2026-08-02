@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ10HG9M6F1E7SX57D8477BX",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": "session_01KZ0NT2XM61WEDNXGB8N2DFH5",
+  "verb": "session.ended",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KZ0NT2XM61WEDNXGB8N2DFH5"
+  },
+  "payload": {
+    "reason": "done",
+    "note": "PR #2 merged; content landed on main via the stranded-stack merge (4811002). Storage interface + flatfile driver + remote stub + wire contract + event sharding + lock simplification + unified overlay fold all live. CI coverage gate tracked separately in t-mx6bq."
+  },
+  "at": "2026-08-02T10:33:01.492Z"
+}

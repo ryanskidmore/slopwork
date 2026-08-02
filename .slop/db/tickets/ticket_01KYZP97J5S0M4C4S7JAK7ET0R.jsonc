@@ -12,7 +12,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "review",
+  "state": "done",
   "priority": 1,
   "labels": [
     "group:g2",
@@ -27,9 +27,9 @@
   "path": [
     "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F"
   ],
-  "active_session": "session_01KZ0NT2HEQ4BP4XMAX34HGN49",
-  "last_activity_at": "2026-08-02T07:25:28.206Z",
-  "latest_note": null,
+  "active_session": null,
+  "last_activity_at": "2026-08-02T10:33:01.426Z",
+  "latest_note": "PR #2 merged; content landed on main via the stranded-stack merge (4811002). Storage interface + flatfile driver + remote stub + wire contract + event sharding + lock simplification + unified overlay fold all live. CI coverage gate tracked separately in t-mx6bq.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -39,13 +39,5 @@
     }
   },
   "created_at": "2026-08-01T22:14:30.224Z",
-  "updated_at": "2026-08-02T07:25:28.206Z",
-  "review": {
-    "mr": "https://github.com/ryanskidmore/slopwork/pull/2",
-    "requested_at": "2026-08-02T07:25:28.206Z",
-    "by": {
-      "name": "coordinator",
-      "kind": "agent"
-    }
-  }
+  "updated_at": "2026-08-02T10:33:01.426Z"
 }

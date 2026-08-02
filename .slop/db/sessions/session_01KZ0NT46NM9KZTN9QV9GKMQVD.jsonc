@@ -14,7 +14,7 @@
     "commit_at_start": "fbc24e6a4842767bc3693c14ace5ce319fcf9318"
   },
   "started_at": "2026-08-02T07:25:29.685Z",
-  "ended_at": null,
+  "ended_at": "2026-08-02T10:33:01.804Z",
   "plan": [],
-  "end_summary": null
+  "end_summary": "PR #2 merged; content landed on main via the stranded-stack merge (4811002). Storage interface + flatfile driver + remote stub + wire contract + event sharding + lock simplification + unified overlay fold all live. CI coverage gate tracked separately in t-mx6bq."
 }
