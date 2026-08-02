@@ -467,7 +467,7 @@ describe("runDone (in-process)", () => {
 
     const out = captureOutput();
     try {
-      await withCwd(root, () => runDone(id, { note: "someone else's completion" }), {
+      await withCwd(root, () => runDone([id], { note: "someone else's completion" }), {
         SLOP_ACTOR: "someone-else",
       });
       expect(out.stderr()).toContain("someone-else");
@@ -497,7 +497,7 @@ describe("runDone (in-process)", () => {
 
     const out = captureOutput();
     try {
-      await withCwd(root, () => runDone(id, { note: "shipped via review" }));
+      await withCwd(root, () => runDone([id], { note: "shipped via review" }));
       expect(out.stderr()).not.toMatch(/review\/MR/i);
       expect(out.stdout()).toContain(dependent);
     } finally {
@@ -531,7 +531,7 @@ describe("runDone (in-process)", () => {
     const out = captureOutput();
     try {
       await withCwd(root, () =>
-        runDone(id, { note: "shipped via json", outcome: "Full writeup.", json: true }),
+        runDone([id], { note: "shipped via json", outcome: "Full writeup.", json: true }),
       );
       const body = JSON.parse(out.stdout()) as {
         ticket: { id: string; slug: string; handle: string; name: string; state: string };
@@ -562,7 +562,7 @@ describe("runDone (in-process)", () => {
 
     const out = captureOutput();
     try {
-      await withCwd(root, () => runDone(id, { note: "shipped, skipped review" }));
+      await withCwd(root, () => runDone([id], { note: "shipped, skipped review" }));
       expect(out.stderr()).toMatch(/done without a review\/MR/i);
     } finally {
       out.restore();
@@ -579,7 +579,7 @@ describe("runDone (in-process)", () => {
 
     const out = captureOutput();
     try {
-      await withCwd(root, () => runDone(id, { note: "adhoc, shipped" }));
+      await withCwd(root, () => runDone([id], { note: "adhoc, shipped" }));
       expect(out.stderr()).not.toMatch(/review\/MR/i);
     } finally {
       out.restore();
@@ -597,7 +597,7 @@ describe("runDone (in-process)", () => {
     const out = captureOutput();
     try {
       await withCwd(root, () =>
-        runDone(id, { note: "done", outcome: "Root cause: X. Fixed by Y." }),
+        runDone([id], { note: "done", outcome: "Root cause: X. Fixed by Y." }),
       );
       expect(out.stdout()).toContain("resolution: (set)");
     } finally {
@@ -614,7 +614,7 @@ describe("runDone (in-process)", () => {
     await startTicket(root, id);
 
     const tooLong = "x".repeat(END_SUMMARY_MAX_LENGTH + 1);
-    await expect(withCwd(root, () => runDone(id, { note: tooLong }))).rejects.toMatchObject({
+    await expect(withCwd(root, () => runDone([id], { note: tooLong }))).rejects.toMatchObject({
       exitCode: EXIT_CODES.USAGE_ERROR,
     });
 
@@ -630,7 +630,7 @@ describe("runDone (in-process)", () => {
 
     const tooLong = "x".repeat(RESOLUTION_MAX_LENGTH + 1);
     await expect(
-      withCwd(root, () => runDone(id, { note: "done", outcome: tooLong })),
+      withCwd(root, () => runDone([id], { note: "done", outcome: tooLong })),
     ).rejects.toMatchObject({ exitCode: EXIT_CODES.USAGE_ERROR });
 
     const paths = repoPaths(root);
@@ -649,7 +649,7 @@ describe("runDone (in-process)", () => {
     const outcomeAtLimit = "y".repeat(RESOLUTION_MAX_LENGTH);
     const out = captureOutput();
     try {
-      await withCwd(root, () => runDone(id, { note: noteAtLimit, outcome: outcomeAtLimit }));
+      await withCwd(root, () => runDone([id], { note: noteAtLimit, outcome: outcomeAtLimit }));
     } finally {
       out.restore();
     }
@@ -665,14 +665,14 @@ describe("runDone (in-process)", () => {
     const id = await jsonNewTicket(root, "Dropped ticket");
     const dropOut = captureOutput();
     try {
-      await withCwd(root, () => runDrop(id, { reason: "wontdo" }));
+      await withCwd(root, () => runDrop([id], { reason: "wontdo" }));
     } finally {
       dropOut.restore();
     }
 
     const out = captureOutput();
     try {
-      await expect(withCwd(root, () => runDone(id, {}))).rejects.toMatchObject({
+      await expect(withCwd(root, () => runDone([id], {}))).rejects.toMatchObject({
         exitCode: EXIT_CODES.CONFLICT,
       });
     } finally {
@@ -685,7 +685,7 @@ describe("runDone (in-process)", () => {
     await bootstrapRepo(root, { project: "p", user: "ryan" });
     const out = captureOutput();
     try {
-      await expect(withCwd(root, () => runDone("no-such-ticket", {}))).rejects.toMatchObject({
+      await expect(withCwd(root, () => runDone(["no-such-ticket"], {}))).rejects.toMatchObject({
         exitCode: EXIT_CODES.NOT_FOUND,
       });
     } finally {
