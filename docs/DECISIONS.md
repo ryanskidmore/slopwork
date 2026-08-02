@@ -11,6 +11,34 @@ Short-form log of implementation decisions made while executing
 implementation. Newest at the bottom. Each entry names the work item that
 forced the call.
 
+## How to read this file (G5, t-drz1d)
+
+**Two different things both use the letters/numbers below — they are NOT
+the same namespace, and a cold reader will misread this file if they
+assume otherwise:**
+
+- **`design.md`'s own decision table** (§1) numbers its entries **D1–D17**
+  — e.g. "D15: review is optional." These are cited throughout this file
+  and the codebase as bare `D<n>` (e.g. "D15, revised").
+- **This file's own `##` headings**, below, are named after
+  `v0-implementation-plan.md`'s work items instead: a **lane letter**
+  (A/B/C/D/E, one per implementation stream) plus that item's number
+  **within its own lane** — e.g. "D5" as a heading here means "lane D's
+  5th work item" (something about `slop web`'s fixture data source),
+  which has nothing to do with `design.md`'s D5 decision ("`blocked`/
+  `stale` derived, never asserted"). Two entries below are even both
+  headed "D5" — lane D's 5th item was revisited twice — a collision
+  entirely within this file's own namespace, unrelated to `design.md`'s.
+
+When code or another doc cites a bare `D<n>` with no further qualification,
+check context: a reference to a *decision* ("D15 says review is
+optional") means `design.md`'s table; a reference to a *heading in this
+file* ("see DECISIONS.md's D5 entry") means the implementation-plan lane
+item. When in doubt, `design.md`'s D-table only ever goes up to D17 and
+has no lane letters in front of it, while every heading below is prefixed
+with its lane letter (A/B/C/D/E) or names a non-lettered follow-up batch
+directly.
+
 ## A2 — Edges are stored embedded on the source ticket, not in their own `edges/` directory
 
 `design.md` §3's flatfile db layout lists only `tickets/`, `sessions/`,
