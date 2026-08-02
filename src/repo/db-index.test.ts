@@ -19,6 +19,7 @@ import {
   computeBlockedCounts,
   computeContentFingerprint,
   computeReady,
+  formatDuplicateSlugProblems,
   formatIndexProblems,
   isLiveBlockerState,
   loadIndex,
@@ -776,6 +777,36 @@ describe("loadIndex — auto-heal (A3 acceptance: 'deleted index self-heals')", 
       stderrSpy.mockRestore();
     }
   });
+
+  // t-trqk9: same "never silent" treatment `formatIndexProblems`'s own
+  // warning gets, but for a duplicate slug (a cross-clone merge collision,
+  // never producible through `createTicket`'s own collision-avoidance —
+  // hand-placed directly, same as `tests/acceptance/G3.test.ts`'s slug
+  // -shadowing test does against the real binary).
+  it("warns on stderr about duplicate slugs, every time, and a 'fresh' (non-rebuilt) read is loud too", async () => {
+    const older = makeTicket({ slug: "shared-slug" });
+    const newer = makeTicket({ slug: "shared-slug" });
+    await createTicket(paths, older, ctx, createdEvent);
+    await createTicket(paths, newer, ctx, createdEvent);
+
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const first = await loadIndex(paths, clock);
+      expect(first.index.slug_problems).toEqual([
+        { slug: "shared-slug", ids: expect.arrayContaining([older.id, newer.id]) },
+      ]);
+      expect(stderrSpy).toHaveBeenCalledTimes(1);
+      expect(String(stderrSpy.mock.calls[0]?.[0])).toContain("shared-slug");
+      expect(String(stderrSpy.mock.calls[0]?.[0])).toContain("slop reindex --heal");
+
+      const second = await loadIndex(paths, clock);
+      expect(second.rebuilt).toBe(false);
+      expect(stderrSpy).toHaveBeenCalledTimes(2);
+      expect(String(stderrSpy.mock.calls[1]?.[0])).toContain("shared-slug");
+    } finally {
+      stderrSpy.mockRestore();
+    }
+  });
 });
 
 describe("formatIndexProblems", () => {
@@ -797,6 +828,19 @@ describe("formatIndexProblems", () => {
     expect(text).toContain("line 3, column 1: bad token");
     expect(text).toContain("/x/ticket_b.jsonc");
     expect(text).toContain("id: expected ticket_<ULID>");
+  });
+});
+
+describe("formatDuplicateSlugProblems", () => {
+  it("renders a count header, each slug's claimant ids, and the --heal remedy", () => {
+    const text = formatDuplicateSlugProblems([
+      { slug: "shared-slug", ids: [newTicketId(), newTicketId()] },
+    ]);
+    expect(text).toContain("1 slug(s) are claimed by more than one ticket");
+    expect(text).toContain("shared-slug");
+    expect(text).toContain("AMBIGUOUS_REF");
+    expect(text).toContain("slop reindex --heal");
+    expect(text).toContain("OLDEST ticket, by id, keeps the slug");
   });
 });
 

@@ -113,7 +113,7 @@ describe("G5: simplification sweep", () => {
         const dir = await makeScratchRepo("slop-g5-budget-");
         await seedRichFixture(dir, 8);
 
-        const full = runSlop([...argsPrefix.slice(0, -1)], dir); // no --budget: full render
+        const full = runSlop(argsPrefix.slice(0, -1), dir); // no --budget: full render
         expect(full.status, full.stderr).toBe(0);
 
         const budgeted = runSlop([...argsPrefix, "40"], dir);
@@ -286,7 +286,7 @@ describe("G5: simplification sweep", () => {
   // -------------------------------------------------------------------------
 
   describe("adhoc folded into provenance.method", () => {
-    it("new --adhoc: provenance.method is \"adhoc\", not a separate stored field", async () => {
+    it('new --adhoc: provenance.method is "adhoc", not a separate stored field', async () => {
       const dir = await makeScratchRepo("slop-g5-adhoc-provenance-");
       const t = newTicket(dir, "Adhoc via provenance", "--adhoc");
       const shown = runSlop(["show", t.slug, "--json"], dir);
@@ -408,10 +408,7 @@ describe("G5: simplification sweep", () => {
       const relatesTo = newTicket(dir, "Relates-to target via argv shim");
       const target = newTicket(dir, "Target for add-edges argv shim test");
 
-      const blocksResult = runSlop(
-        ["update", target.slug, "--blocks", `+${blocker.handle}`],
-        dir,
-      );
+      const blocksResult = runSlop(["update", target.slug, "--blocks", `+${blocker.handle}`], dir);
       expect(blocksResult.status, blocksResult.stderr).toBe(0);
       const relatesResult = runSlop(
         ["update", target.slug, "--relates-to", `+${relatesTo.handle}`],
