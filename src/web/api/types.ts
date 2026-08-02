@@ -215,7 +215,9 @@ export interface TicketDetailDTO {
   /** Pre-rendered markdown, same guarantee as `spec.details_html`. `null` when `resolution` was never set. */
   resolution_html: string | null;
   events: EventDTO[];
+  event_pagination: PaginationDTO;
   sessions: SessionDTO[];
+  session_pagination: PaginationDTO;
   provenance: ProvenanceDTO;
   integrity: IntegrityDTO;
 }
@@ -229,6 +231,21 @@ export interface EventReadProblemDTO {
 
 export interface IntegrityDTO {
   event_problems: EventReadProblemDTO[];
+}
+
+/** Stable, 1-based page metadata for a bounded collection with no separate
+ * filter axis (the review/stale/questions panels; a ticket's events and
+ * sessions timelines) — the same page/limit/total_pages/previous_page/
+ * next_page shape `TicketListPaginationDTO` established for `GET
+ * /api/tickets`, minus the filtered-vs-whole-repo total split that only
+ * endpoint needs. */
+export interface PaginationDTO {
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
+  previous_page: number | null;
+  next_page: number | null;
 }
 
 export interface ConfigDTO {
@@ -263,6 +280,8 @@ export interface TicketListResponseDTO {
 export interface TreeNodeDTO {
   ticket: TicketSummaryDTO;
   children: TreeNodeDTO[];
+  has_children: boolean;
+  children_truncated: boolean;
   external_parent: ExternalParentDTO | null;
 }
 
@@ -270,11 +289,20 @@ export interface TreeResponseDTO {
   config: ConfigDTO;
   roots: TreeNodeDTO[];
   total: number;
+  returned: number;
+  truncated: boolean;
+  bounds: {
+    max_nodes: number;
+    max_depth: number;
+    maximum_nodes: number;
+    maximum_depth: number;
+  };
 }
 
 export interface ReviewResponseDTO {
   config: ConfigDTO;
   tickets: TicketSummaryDTO[];
+  pagination: PaginationDTO;
 }
 
 export interface StaleRowDTO {
@@ -285,6 +313,7 @@ export interface StaleRowDTO {
 export interface StaleResponseDTO {
   config: ConfigDTO;
   rows: StaleRowDTO[];
+  pagination: PaginationDTO;
 }
 
 /** G4 (t-jggg9): one `question.asked` event, folded with its answer (if
@@ -311,6 +340,8 @@ export interface QuestionsResponseDTO {
   config: ConfigDTO;
   groups: QuestionGroupDTO[];
   total_questions: number;
+  total_tickets: number;
+  pagination: PaginationDTO;
 }
 
 export interface ApiErrorDTO {

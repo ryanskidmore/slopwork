@@ -60,7 +60,10 @@ export class StorageDataSource implements WebDataSource {
     const { sessions } = await this.backend.listSessionsTolerant();
     return sessions
       .filter((s) => s.ticket === ticketId)
-      .sort((a, b) => a.started_at.localeCompare(b.started_at));
+      .sort((a, b) => {
+        const started = a.started_at.localeCompare(b.started_at);
+        return started !== 0 ? started : a.id.localeCompare(b.id);
+      });
   }
 
   async listEventsForTicket(ticketId: TicketId, knownSessions?: readonly Session[]) {

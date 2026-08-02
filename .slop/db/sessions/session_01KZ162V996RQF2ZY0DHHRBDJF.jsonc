@@ -1,0 +1,55 @@
+{
+  "id": "session_01KZ162V996RQF2ZY0DHHRBDJF",
+  "ticket": "ticket_01KZ162MF26WK43R9SDRZGZJFP",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "human"
+  },
+  "harness": {
+    "kind": "other",
+    "session_id": null
+  },
+  "git": {
+    "branch": "fix/audit-web-collection-bounds",
+    "commit_at_start": "76ddc73c438ab79dc39911aa54fa09ef57e7304f"
+  },
+  "started_at": "2026-08-02T12:09:52.681Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Map remaining unbounded API, storage, hooks, views, and tree collapse contracts",
+          "checked": true
+        },
+        {
+          "text": "Define shared validated cursor/page metadata and bounded data-source adapters",
+          "checked": false
+        },
+        {
+          "text": "Implement review, stale, questions, and ticket-detail pagination end to end",
+          "checked": false
+        },
+        {
+          "text": "Bound tree payload with explicit truncation while preserving collapse persistence",
+          "checked": false
+        },
+        {
+          "text": "Add large-collection API, frontend, and browser regressions",
+          "checked": false
+        },
+        {
+          "text": "Run focused, frontend, Playwright, full, static, and build gates",
+          "checked": false
+        },
+        {
+          "text": "Commit code and tracker, push stacked branch, open PR, and move ticket to review",
+          "checked": false
+        }
+      ],
+      "created_at": "2026-08-02T12:09:52.857Z"
+    }
+  ],
+  "end_summary": null
+}

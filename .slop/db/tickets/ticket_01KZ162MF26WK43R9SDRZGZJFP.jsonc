@@ -1,0 +1,43 @@
+{
+  "id": "ticket_01KZ162MF26WK43R9SDRZGZJFP",
+  "name": "Bound remaining web collections",
+  "slug": "bound-remaining-web-collections",
+  "spec": {
+    "summary": "Add server-side pagination and explicit truncation for remaining unbounded web API collections while preserving stable ordering and resilient UI state.",
+    "details_md": "",
+    "acceptance": [
+      "Review, stale, questions, and ticket-detail timelines expose validated bounds, stable cursors/page metadata, and no duplicate rows across pages.",
+      "Frontend views provide accessible incremental loading or pagination with pending/error states and useful URL state.",
+      "Tree responses are bounded or explicitly truncated without breaking collapse persistence semantics.",
+      "Large-collection API and browser tests prove caps, ordering, pagination continuity, and truncation disclosure."
+    ],
+    "context": [
+      "Stacked on origin/fix/audit-web-resilience (#16), which includes #15/#12.",
+      "Event-integrity PR #18 independently changes event result shapes; keep adapters modular for rebase."
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "in_progress",
+  "priority": 1,
+  "labels": [],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ162MF26WK43R9SDRZGZJFP",
+  "path": [],
+  "active_session": "session_01KZ162V996RQF2ZY0DHHRBDJF",
+  "last_activity_at": "2026-08-02T12:09:52.684Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-08-02T12:09:45.814Z",
+  "updated_at": "2026-08-02T12:09:52.684Z"
+}

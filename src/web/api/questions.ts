@@ -7,6 +7,12 @@
  * derivation (`src/tickets/questions.ts`'s `deriveQuestions`/
  * `groupQuestionsByTicket`) — same one-implementation discipline as every
  * other overlay/derivation shared between the CLI and this web package.
+ *
+ * Bounded the same `page`/`limit` way `GET /api/tickets` is (paginating
+ * the flat, already oldest-first `Question` list BEFORE grouping — see
+ * `pagination.ts`'s doc) — `total_questions`/`total_tickets` stay
+ * whole-inbox counts, same "total vs. this page" split `GET /api/tickets`
+ * makes with `total`/`pagination.filtered_total`.
  */
 import type { BunRequest } from "bun";
 import type { Ticket, TicketId } from "../../core/index.js";
@@ -18,11 +24,14 @@ import {
 import type { WebDataSource } from "../data-source.js";
 import { configDto, jsonResponse, questionGroupDto } from "./shared.js";
 import type { QuestionsResponseDTO } from "./types.js";
+import { paginate, parsePage } from "./pagination.js";
 
 export async function handleQuestionsPanel(
-  _req: BunRequest,
+  req: BunRequest,
   dataSource: WebDataSource,
 ): Promise<Response> {
+  const pageInput = parsePage(new URL(req.url));
+  if (pageInput instanceof Response) return pageInput;
   const [tickets, { config, warning }, eventResult] = await Promise.all([
     dataSource.listTickets(),
     dataSource.getConfig(),
@@ -30,8 +39,12 @@ export async function handleQuestionsPanel(
   ]);
   const byId = new Map<TicketId, Ticket>(tickets.map((t) => [t.id, t]));
 
+  // deriveQuestions already sorts oldest-asked-first by (unique) event id —
+  // no additional tiebreak needed before paginating.
   const open = unansweredQuestions(deriveQuestions(eventResult.events));
-  const groups = groupQuestionsByTicket(open);
+  const totalTickets = new Set(open.map((question) => question.ticketId)).size;
+  const page = paginate(open, pageInput);
+  const groups = groupQuestionsByTicket(page.items);
 
   const body: QuestionsResponseDTO = {
     config: configDto(config, warning, eventResult.problems),
@@ -45,6 +58,8 @@ export async function handleQuestionsPanel(
       return ticket ? [questionGroupDto(ticket, g.questions)] : [];
     }),
     total_questions: open.length,
+    total_tickets: totalTickets,
+    pagination: page.pagination,
   };
   return jsonResponse(body);
 }
