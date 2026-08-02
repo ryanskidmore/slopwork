@@ -172,6 +172,27 @@ where breaking changes land.
   ..., git-style). See
   [Concepts → slug uniqueness](docs/concepts.md#slug-uniqueness).
 
+### Fixed
+
+- **Test suite safe for concurrent runs** (t-ebgqb). Root-caused via a new
+  reproduction harness (`bench/concurrent-repro.ts`, which races `bun run
+  <cmd>` across N throwaway git worktrees) rather than guessing: two real
+  concurrency hazards, both now fixed. (1) `tests/acceptance/D4.test.ts`'s
+  real-wall-clock `< 800ms` budget for a spawned `slop status` call
+  reliably flaked under concurrent full-suite runs (860ms-1.6s observed);
+  `tests/support/perf-scale.ts` adds an opt-in `SLOP_TEST_PERF_SCALE`
+  multiplier (default `1`, i.e. unchanged) a caller can set when it knows
+  it's racing other full-suite runs. (2) `playwright.config.ts`'s
+  hardcoded fixture-server port (`4765`) meant two concurrent `bun run
+  test:browser` runs raced for the same port, one failing outright —
+  fixed by picking a free port at config-load time, same ephemeral-port
+  idea every acceptance test's `--port 0` already used. Deliberately
+  *not* changed: vitest's worker/fork count — the originally-suspected
+  `spawnSync`-returns-`status:null` OOM-killer fork-storm was not
+  reproduced even under deliberately escalated concurrent load (see
+  `bench/evidence/` and README.md's Testing section for the full
+  writeup and numbers).
+
 ### Changed
 
 - **Enforceable dependency boundaries** (t-y3fg1, docs/architecture.md).

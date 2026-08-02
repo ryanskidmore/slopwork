@@ -1,0 +1,1383 @@
+{
+  "generatedAt": "2026-08-02T22:21:22.106Z",
+  "runId": "mscd1oej-9jdpla",
+  "args": {
+    "n": 3,
+    "cmd": "test",
+    "ref": "fix/concurrent-test-safety",
+    "repeat": 2,
+    "baseDir": "/home/ryan/.cache/slop-concurrency-bench",
+    "keep": false,
+    "out": "bench-out/before-baseline.json"
+  },
+  "machine": {
+    "platform": "linux 6.18.33.2-microsoft-standard-WSL2",
+    "cpus": "32x AMD Ryzen 9 9950X3D 16-Core Processor",
+    "memoryGb": 30,
+    "bunVersion": "1.3.11",
+    "baseDirFs": "ext4"
+  },
+  "prep": [
+    {
+      "index": 0,
+      "ok": true,
+      "installMs": 589.1657730000002,
+      "buildMs": 514.90354
+    },
+    {
+      "index": 1,
+      "ok": true,
+      "installMs": 550.2725889999999,
+      "buildMs": 504.79952699999967
+    },
+    {
+      "index": 2,
+      "ok": true,
+      "installMs": 564.9871540000004,
+      "buildMs": 614.9009449999999
+    }
+  ],
+  "rounds": [
+    {
+      "round": 1,
+      "wallMs": 128288,
+      "perWorktree": [
+        {
+          "index": 0,
+          "path": "/home/ryan/.cache/slop-concurrency-bench/wt-mscd1oej-9jdpla-0",
+          "exitCode": 0,
+          "signal": null,
+          "durationMs": 128287,
+          "testFilesLine": "Test Files  150 passed (150)",
+          "failureSignatures": [],
+          "logPath": "/home/ryan/.cache/slop-concurrency-bench/logs-mscd1oej-9jdpla/wt-0-round-1.log"
+        },
+        {
+          "index": 1,
+          "path": "/home/ryan/.cache/slop-concurrency-bench/wt-mscd1oej-9jdpla-1",
+          "exitCode": 0,
+          "signal": null,
+          "durationMs": 124085,
+          "testFilesLine": "Test Files  150 passed (150)",
+          "failureSignatures": [],
+          "logPath": "/home/ryan/.cache/slop-concurrency-bench/logs-mscd1oej-9jdpla/wt-1-round-1.log"
+        },
+        {
+          "index": 2,
+          "path": "/home/ryan/.cache/slop-concurrency-bench/wt-mscd1oej-9jdpla-2",
+          "exitCode": 1,
+          "signal": null,
+          "durationMs": 124403,
+          "testFilesLine": "Test Files  1 failed | 149 passed (150)",
+          "failureSignatures": [],
+          "logPath": "/home/ryan/.cache/slop-concurrency-bench/logs-mscd1oej-9jdpla/wt-2-round-1.log"
+        }
+      ],
+      "allGreen": false,
+      "systemSamples": [
+        {
+          "tMs": 1001,
+          "loadavg": [10.46, 7.79, 4.82],
+          "freeMemMB": 13350
+        },
+        {
+          "tMs": 2002,
+          "loadavg": [10.46, 7.79, 4.82],
+          "freeMemMB": 11478
+        },
+        {
+          "tMs": 3046,
+          "loadavg": [10.46, 7.79, 4.82],
+          "freeMemMB": 9603
+        },
+        {
+          "tMs": 4049,
+          "loadavg": [10.46, 7.79, 4.82],
+          "freeMemMB": 8150
+        },
+        {
+          "tMs": 5074,
+          "loadavg": [23.79, 10.6, 5.75],
+          "freeMemMB": 7048
+        },
+        {
+          "tMs": 6074,
+          "loadavg": [23.79, 10.6, 5.75],
+          "freeMemMB": 6812
+        },
+        {
+          "tMs": 7079,
+          "loadavg": [23.79, 10.6, 5.75],
+          "freeMemMB": 6592
+        },
+        {
+          "tMs": 8080,
+          "loadavg": [23.79, 10.6, 5.75],
+          "freeMemMB": 6370
+        },
+        {
+          "tMs": 9086,
+          "loadavg": [23.79, 10.6, 5.75],
+          "freeMemMB": 6236
+        },
+        {
+          "tMs": 10098,
+          "loadavg": [37.58, 13.67, 6.77],
+          "freeMemMB": 6158
+        },
+        {
+          "tMs": 11140,
+          "loadavg": [37.58, 13.67, 6.77],
+          "freeMemMB": 6437
+        },
+        {
+          "tMs": 12142,
+          "loadavg": [37.58, 13.67, 6.77],
+          "freeMemMB": 6241
+        },
+        {
+          "tMs": 13158,
+          "loadavg": [37.58, 13.67, 6.77],
+          "freeMemMB": 6314
+        },
+        {
+          "tMs": 14169,
+          "loadavg": [37.58, 13.67, 6.77],
+          "freeMemMB": 6645
+        },
+        {
+          "tMs": 15185,
+          "loadavg": [52.27, 17.12, 7.92],
+          "freeMemMB": 6249
+        },
+        {
+          "tMs": 16190,
+          "loadavg": [52.27, 17.12, 7.92],
+          "freeMemMB": 6243
+        },
+        {
+          "tMs": 17198,
+          "loadavg": [52.27, 17.12, 7.92],
+          "freeMemMB": 6204
+        },
+        {
+          "tMs": 18198,
+          "loadavg": [52.27, 17.12, 7.92],
+          "freeMemMB": 6038
+        },
+        {
+          "tMs": 19206,
+          "loadavg": [52.27, 17.12, 7.92],
+          "freeMemMB": 7356
+        },
+        {
+          "tMs": 20207,
+          "loadavg": [63.62, 20.05, 8.92],
+          "freeMemMB": 7209
+        },
+        {
+          "tMs": 21243,
+          "loadavg": [63.62, 20.05, 8.92],
+          "freeMemMB": 7588
+        },
+        {
+          "tMs": 22249,
+          "loadavg": [63.62, 20.05, 8.92],
+          "freeMemMB": 7167
+        },
+        {
+          "tMs": 23275,
+          "loadavg": [63.62, 20.05, 8.92],
+          "freeMemMB": 7161
+        },
+        {
+          "tMs": 24276,
+          "loadavg": [63.62, 20.05, 8.92],
+          "freeMemMB": 6795
+        },
+        {
+          "tMs": 25277,
+          "loadavg": [77.35, 23.62, 10.13],
+          "freeMemMB": 6865
+        },
+        {
+          "tMs": 26277,
+          "loadavg": [77.35, 23.62, 10.13],
+          "freeMemMB": 6853
+        },
+        {
+          "tMs": 27293,
+          "loadavg": [77.35, 23.62, 10.13],
+          "freeMemMB": 6994
+        },
+        {
+          "tMs": 28303,
+          "loadavg": [77.35, 23.62, 10.13],
+          "freeMemMB": 7067
+        },
+        {
+          "tMs": 29304,
+          "loadavg": [77.35, 23.62, 10.13],
+          "freeMemMB": 7084
+        },
+        {
+          "tMs": 30305,
+          "loadavg": [88.93, 26.92, 11.27],
+          "freeMemMB": 7041
+        },
+        {
+          "tMs": 31329,
+          "loadavg": [88.93, 26.92, 11.27],
+          "freeMemMB": 7241
+        },
+        {
+          "tMs": 32330,
+          "loadavg": [88.93, 26.92, 11.27],
+          "freeMemMB": 7653
+        },
+        {
+          "tMs": 33348,
+          "loadavg": [88.93, 26.92, 11.27],
+          "freeMemMB": 7418
+        },
+        {
+          "tMs": 34352,
+          "loadavg": [88.93, 26.92, 11.27],
+          "freeMemMB": 7962
+        },
+        {
+          "tMs": 35363,
+          "loadavg": [94.78, 29.16, 12.08],
+          "freeMemMB": 8020
+        },
+        {
+          "tMs": 36383,
+          "loadavg": [94.78, 29.16, 12.08],
+          "freeMemMB": 8178
+        },
+        {
+          "tMs": 37384,
+          "loadavg": [94.78, 29.16, 12.08],
+          "freeMemMB": 8127
+        },
+        {
+          "tMs": 38390,
+          "loadavg": [94.78, 29.16, 12.08],
+          "freeMemMB": 8732
+        },
+        {
+          "tMs": 39391,
+          "loadavg": [94.78, 29.16, 12.08],
+          "freeMemMB": 9547
+        },
+        {
+          "tMs": 40392,
+          "loadavg": [95.6, 30.42, 12.58],
+          "freeMemMB": 9887
+        },
+        {
+          "tMs": 41410,
+          "loadavg": [95.6, 30.42, 12.58],
+          "freeMemMB": 10066
+        },
+        {
+          "tMs": 42418,
+          "loadavg": [95.6, 30.42, 12.58],
+          "freeMemMB": 10282
+        },
+        {
+          "tMs": 43419,
+          "loadavg": [95.6, 30.42, 12.58],
+          "freeMemMB": 10674
+        },
+        {
+          "tMs": 44421,
+          "loadavg": [95.6, 30.42, 12.58],
+          "freeMemMB": 10745
+        },
+        {
+          "tMs": 45430,
+          "loadavg": [93.71, 31.11, 12.9],
+          "freeMemMB": 11034
+        },
+        {
+          "tMs": 46439,
+          "loadavg": [93.71, 31.11, 12.9],
+          "freeMemMB": 11311
+        },
+        {
+          "tMs": 47443,
+          "loadavg": [93.71, 31.11, 12.9],
+          "freeMemMB": 11346
+        },
+        {
+          "tMs": 48444,
+          "loadavg": [93.71, 31.11, 12.9],
+          "freeMemMB": 11447
+        },
+        {
+          "tMs": 49446,
+          "loadavg": [93.71, 31.11, 12.9],
+          "freeMemMB": 11662
+        },
+        {
+          "tMs": 50448,
+          "loadavg": [87.65, 30.89, 12.93],
+          "freeMemMB": 11733
+        },
+        {
+          "tMs": 51451,
+          "loadavg": [87.65, 30.89, 12.93],
+          "freeMemMB": 11811
+        },
+        {
+          "tMs": 52452,
+          "loadavg": [87.65, 30.89, 12.93],
+          "freeMemMB": 11868
+        },
+        {
+          "tMs": 53455,
+          "loadavg": [87.65, 30.89, 12.93],
+          "freeMemMB": 11937
+        },
+        {
+          "tMs": 54469,
+          "loadavg": [87.65, 30.89, 12.93],
+          "freeMemMB": 12031
+        },
+        {
+          "tMs": 55471,
+          "loadavg": [81.91, 30.64, 12.94],
+          "freeMemMB": 12201
+        },
+        {
+          "tMs": 56472,
+          "loadavg": [81.91, 30.64, 12.94],
+          "freeMemMB": 12321
+        },
+        {
+          "tMs": 57474,
+          "loadavg": [81.91, 30.64, 12.94],
+          "freeMemMB": 12405
+        },
+        {
+          "tMs": 58476,
+          "loadavg": [81.91, 30.64, 12.94],
+          "freeMemMB": 12345
+        },
+        {
+          "tMs": 59490,
+          "loadavg": [81.91, 30.64, 12.94],
+          "freeMemMB": 12327
+        },
+        {
+          "tMs": 60491,
+          "loadavg": [77.6, 30.6, 13.03],
+          "freeMemMB": 12338
+        },
+        {
+          "tMs": 61492,
+          "loadavg": [77.6, 30.6, 13.03],
+          "freeMemMB": 12381
+        },
+        {
+          "tMs": 62494,
+          "loadavg": [77.6, 30.6, 13.03],
+          "freeMemMB": 12457
+        },
+        {
+          "tMs": 63497,
+          "loadavg": [77.6, 30.6, 13.03],
+          "freeMemMB": 12468
+        },
+        {
+          "tMs": 64499,
+          "loadavg": [77.6, 30.6, 13.03],
+          "freeMemMB": 12605
+        },
+        {
+          "tMs": 65500,
+          "loadavg": [71.86, 30.19, 12.99],
+          "freeMemMB": 12655
+        },
+        {
+          "tMs": 66502,
+          "loadavg": [71.86, 30.19, 12.99],
+          "freeMemMB": 12607
+        },
+        {
+          "tMs": 67504,
+          "loadavg": [71.86, 30.19, 12.99],
+          "freeMemMB": 12720
+        },
+        {
+          "tMs": 68506,
+          "loadavg": [71.86, 30.19, 12.99],
+          "freeMemMB": 12715
+        },
+        {
+          "tMs": 69508,
+          "loadavg": [71.86, 30.19, 12.99],
+          "freeMemMB": 12682
+        },
+        {
+          "tMs": 70510,
+          "loadavg": [66.43, 29.76, 12.94],
+          "freeMemMB": 12608
+        },
+        {
+          "tMs": 71512,
+          "loadavg": [66.43, 29.76, 12.94],
+          "freeMemMB": 12783
+        },
+        {
+          "tMs": 72514,
+          "loadavg": [66.43, 29.76, 12.94],
+          "freeMemMB": 12698
+        },
+        {
+          "tMs": 73516,
+          "loadavg": [66.43, 29.76, 12.94],
+          "freeMemMB": 12721
+        },
+        {
+          "tMs": 74518,
+          "loadavg": [66.43, 29.76, 12.94],
+          "freeMemMB": 12696
+        },
+        {
+          "tMs": 75520,
+          "loadavg": [61.51, 29.34, 12.9],
+          "freeMemMB": 12630
+        },
+        {
+          "tMs": 76523,
+          "loadavg": [61.51, 29.34, 12.9],
+          "freeMemMB": 12771
+        },
+        {
+          "tMs": 77524,
+          "loadavg": [61.51, 29.34, 12.9],
+          "freeMemMB": 12756
+        },
+        {
+          "tMs": 78557,
+          "loadavg": [61.51, 29.34, 12.9],
+          "freeMemMB": 12666
+        },
+        {
+          "tMs": 79559,
+          "loadavg": [61.51, 29.34, 12.9],
+          "freeMemMB": 12701
+        },
+        {
+          "tMs": 80561,
+          "loadavg": [56.98, 28.94, 12.85],
+          "freeMemMB": 12706
+        },
+        {
+          "tMs": 81564,
+          "loadavg": [56.98, 28.94, 12.85],
+          "freeMemMB": 12683
+        },
+        {
+          "tMs": 82565,
+          "loadavg": [56.98, 28.94, 12.85],
+          "freeMemMB": 12754
+        },
+        {
+          "tMs": 83587,
+          "loadavg": [56.98, 28.94, 12.85],
+          "freeMemMB": 12657
+        },
+        {
+          "tMs": 84590,
+          "loadavg": [56.98, 28.94, 12.85],
+          "freeMemMB": 12591
+        },
+        {
+          "tMs": 85591,
+          "loadavg": [52.82, 28.54, 12.81],
+          "freeMemMB": 12763
+        },
+        {
+          "tMs": 86592,
+          "loadavg": [52.82, 28.54, 12.81],
+          "freeMemMB": 12688
+        },
+        {
+          "tMs": 87593,
+          "loadavg": [52.82, 28.54, 12.81],
+          "freeMemMB": 12564
+        },
+        {
+          "tMs": 88594,
+          "loadavg": [52.82, 28.54, 12.81],
+          "freeMemMB": 12773
+        },
+        {
+          "tMs": 89595,
+          "loadavg": [52.82, 28.54, 12.81],
+          "freeMemMB": 12766
+        },
+        {
+          "tMs": 90596,
+          "loadavg": [49.07, 28.17, 12.77],
+          "freeMemMB": 12807
+        },
+        {
+          "tMs": 91597,
+          "loadavg": [49.07, 28.17, 12.77],
+          "freeMemMB": 12813
+        },
+        {
+          "tMs": 92598,
+          "loadavg": [49.07, 28.17, 12.77],
+          "freeMemMB": 12759
+        },
+        {
+          "tMs": 93599,
+          "loadavg": [49.07, 28.17, 12.77],
+          "freeMemMB": 12732
+        },
+        {
+          "tMs": 94600,
+          "loadavg": [49.07, 28.17, 12.77],
+          "freeMemMB": 12851
+        },
+        {
+          "tMs": 95601,
+          "loadavg": [46.74, 28.03, 12.81],
+          "freeMemMB": 12768
+        },
+        {
+          "tMs": 96602,
+          "loadavg": [46.74, 28.03, 12.81],
+          "freeMemMB": 12777
+        },
+        {
+          "tMs": 97603,
+          "loadavg": [46.74, 28.03, 12.81],
+          "freeMemMB": 12879
+        },
+        {
+          "tMs": 98604,
+          "loadavg": [46.74, 28.03, 12.81],
+          "freeMemMB": 12738
+        },
+        {
+          "tMs": 99612,
+          "loadavg": [46.74, 28.03, 12.81],
+          "freeMemMB": 12856
+        },
+        {
+          "tMs": 100613,
+          "loadavg": [43.24, 27.62, 12.76],
+          "freeMemMB": 12889
+        },
+        {
+          "tMs": 101614,
+          "loadavg": [43.24, 27.62, 12.76],
+          "freeMemMB": 12844
+        },
+        {
+          "tMs": 102615,
+          "loadavg": [43.24, 27.62, 12.76],
+          "freeMemMB": 12890
+        },
+        {
+          "tMs": 103616,
+          "loadavg": [43.24, 27.62, 12.76],
+          "freeMemMB": 12901
+        },
+        {
+          "tMs": 104617,
+          "loadavg": [43.24, 27.62, 12.76],
+          "freeMemMB": 12861
+        },
+        {
+          "tMs": 105618,
+          "loadavg": [40.1, 27.23, 12.71],
+          "freeMemMB": 12822
+        },
+        {
+          "tMs": 106619,
+          "loadavg": [40.1, 27.23, 12.71],
+          "freeMemMB": 12867
+        },
+        {
+          "tMs": 107620,
+          "loadavg": [40.1, 27.23, 12.71],
+          "freeMemMB": 12930
+        },
+        {
+          "tMs": 108621,
+          "loadavg": [40.1, 27.23, 12.71],
+          "freeMemMB": 12867
+        },
+        {
+          "tMs": 109622,
+          "loadavg": [40.1, 27.23, 12.71],
+          "freeMemMB": 13002
+        },
+        {
+          "tMs": 110623,
+          "loadavg": [37.13, 26.82, 12.66],
+          "freeMemMB": 13058
+        },
+        {
+          "tMs": 111625,
+          "loadavg": [37.13, 26.82, 12.66],
+          "freeMemMB": 13057
+        },
+        {
+          "tMs": 112623,
+          "loadavg": [37.13, 26.82, 12.66],
+          "freeMemMB": 12935
+        },
+        {
+          "tMs": 113625,
+          "loadavg": [37.13, 26.82, 12.66],
+          "freeMemMB": 12926
+        },
+        {
+          "tMs": 114627,
+          "loadavg": [37.13, 26.82, 12.66],
+          "freeMemMB": 12799
+        },
+        {
+          "tMs": 115638,
+          "loadavg": [34.8, 26.51, 12.64],
+          "freeMemMB": 12785
+        },
+        {
+          "tMs": 116638,
+          "loadavg": [34.8, 26.51, 12.64],
+          "freeMemMB": 13023
+        },
+        {
+          "tMs": 117641,
+          "loadavg": [34.8, 26.51, 12.64],
+          "freeMemMB": 12999
+        },
+        {
+          "tMs": 118643,
+          "loadavg": [34.8, 26.51, 12.64],
+          "freeMemMB": 12860
+        },
+        {
+          "tMs": 119644,
+          "loadavg": [34.8, 26.51, 12.64],
+          "freeMemMB": 12995
+        },
+        {
+          "tMs": 120646,
+          "loadavg": [32.33, 26.14, 12.59],
+          "freeMemMB": 13029
+        },
+        {
+          "tMs": 121647,
+          "loadavg": [32.33, 26.14, 12.59],
+          "freeMemMB": 12909
+        },
+        {
+          "tMs": 122649,
+          "loadavg": [32.33, 26.14, 12.59],
+          "freeMemMB": 12930
+        },
+        {
+          "tMs": 123651,
+          "loadavg": [32.33, 26.14, 12.59],
+          "freeMemMB": 12803
+        },
+        {
+          "tMs": 124653,
+          "loadavg": [32.33, 26.14, 12.59],
+          "freeMemMB": 13285
+        },
+        {
+          "tMs": 125655,
+          "loadavg": [30.22, 25.8, 12.55],
+          "freeMemMB": 12672
+        },
+        {
+          "tMs": 126657,
+          "loadavg": [30.22, 25.8, 12.55],
+          "freeMemMB": 12828
+        },
+        {
+          "tMs": 127658,
+          "loadavg": [30.22, 25.8, 12.55],
+          "freeMemMB": 12813
+        }
+      ],
+      "dmesgNewLines": []
+    },
+    {
+      "round": 2,
+      "wallMs": 126610,
+      "perWorktree": [
+        {
+          "index": 0,
+          "path": "/home/ryan/.cache/slop-concurrency-bench/wt-mscd1oej-9jdpla-0",
+          "exitCode": 0,
+          "signal": null,
+          "durationMs": 126609,
+          "testFilesLine": "Test Files  150 passed (150)",
+          "failureSignatures": [],
+          "logPath": "/home/ryan/.cache/slop-concurrency-bench/logs-mscd1oej-9jdpla/wt-0-round-2.log"
+        },
+        {
+          "index": 1,
+          "path": "/home/ryan/.cache/slop-concurrency-bench/wt-mscd1oej-9jdpla-1",
+          "exitCode": 1,
+          "signal": null,
+          "durationMs": 126370,
+          "testFilesLine": "Test Files  1 failed | 149 passed (150)",
+          "failureSignatures": [],
+          "logPath": "/home/ryan/.cache/slop-concurrency-bench/logs-mscd1oej-9jdpla/wt-1-round-2.log"
+        },
+        {
+          "index": 2,
+          "path": "/home/ryan/.cache/slop-concurrency-bench/wt-mscd1oej-9jdpla-2",
+          "exitCode": 1,
+          "signal": null,
+          "durationMs": 124997,
+          "testFilesLine": "Test Files  1 failed | 149 passed (150)",
+          "failureSignatures": [],
+          "logPath": "/home/ryan/.cache/slop-concurrency-bench/logs-mscd1oej-9jdpla/wt-2-round-2.log"
+        }
+      ],
+      "allGreen": false,
+      "systemSamples": [
+        {
+          "tMs": 1000,
+          "loadavg": [30.22, 25.8, 12.55],
+          "freeMemMB": 13244
+        },
+        {
+          "tMs": 2007,
+          "loadavg": [40.78, 28.06, 13.36],
+          "freeMemMB": 10883
+        },
+        {
+          "tMs": 3008,
+          "loadavg": [40.78, 28.06, 13.36],
+          "freeMemMB": 8704
+        },
+        {
+          "tMs": 4015,
+          "loadavg": [40.78, 28.06, 13.36],
+          "freeMemMB": 7177
+        },
+        {
+          "tMs": 5025,
+          "loadavg": [40.78, 28.06, 13.36],
+          "freeMemMB": 6406
+        },
+        {
+          "tMs": 6027,
+          "loadavg": [40.78, 28.06, 13.36],
+          "freeMemMB": 5731
+        },
+        {
+          "tMs": 7030,
+          "loadavg": [57.05, 31.65, 14.6],
+          "freeMemMB": 5340
+        },
+        {
+          "tMs": 8031,
+          "loadavg": [57.05, 31.65, 14.6],
+          "freeMemMB": 5138
+        },
+        {
+          "tMs": 9034,
+          "loadavg": [57.05, 31.65, 14.6],
+          "freeMemMB": 5047
+        },
+        {
+          "tMs": 10037,
+          "loadavg": [57.05, 31.65, 14.6],
+          "freeMemMB": 4877
+        },
+        {
+          "tMs": 11039,
+          "loadavg": [57.05, 31.65, 14.6],
+          "freeMemMB": 5668
+        },
+        {
+          "tMs": 12050,
+          "loadavg": [69.06, 34.56, 15.63],
+          "freeMemMB": 5704
+        },
+        {
+          "tMs": 13054,
+          "loadavg": [69.06, 34.56, 15.63],
+          "freeMemMB": 6218
+        },
+        {
+          "tMs": 14067,
+          "loadavg": [69.06, 34.56, 15.63],
+          "freeMemMB": 6659
+        },
+        {
+          "tMs": 15072,
+          "loadavg": [69.06, 34.56, 15.63],
+          "freeMemMB": 6601
+        },
+        {
+          "tMs": 16082,
+          "loadavg": [69.06, 34.56, 15.63],
+          "freeMemMB": 5886
+        },
+        {
+          "tMs": 17111,
+          "loadavg": [83.87, 38.2, 16.91],
+          "freeMemMB": 6141
+        },
+        {
+          "tMs": 18111,
+          "loadavg": [83.87, 38.2, 16.91],
+          "freeMemMB": 6795
+        },
+        {
+          "tMs": 19128,
+          "loadavg": [83.87, 38.2, 16.91],
+          "freeMemMB": 6474
+        },
+        {
+          "tMs": 20154,
+          "loadavg": [83.87, 38.2, 16.91],
+          "freeMemMB": 6557
+        },
+        {
+          "tMs": 21162,
+          "loadavg": [83.87, 38.2, 16.91],
+          "freeMemMB": 6753
+        },
+        {
+          "tMs": 22167,
+          "loadavg": [90.61, 40.36, 17.72],
+          "freeMemMB": 6874
+        },
+        {
+          "tMs": 23172,
+          "loadavg": [90.61, 40.36, 17.72],
+          "freeMemMB": 7013
+        },
+        {
+          "tMs": 24172,
+          "loadavg": [90.61, 40.36, 17.72],
+          "freeMemMB": 7144
+        },
+        {
+          "tMs": 25174,
+          "loadavg": [90.61, 40.36, 17.72],
+          "freeMemMB": 6913
+        },
+        {
+          "tMs": 26174,
+          "loadavg": [90.61, 40.36, 17.72],
+          "freeMemMB": 7184
+        },
+        {
+          "tMs": 27189,
+          "loadavg": [97.85, 42.69, 18.6],
+          "freeMemMB": 7620
+        },
+        {
+          "tMs": 28190,
+          "loadavg": [97.85, 42.69, 18.6],
+          "freeMemMB": 7388
+        },
+        {
+          "tMs": 29191,
+          "loadavg": [97.85, 42.69, 18.6],
+          "freeMemMB": 7433
+        },
+        {
+          "tMs": 30203,
+          "loadavg": [97.85, 42.69, 18.6],
+          "freeMemMB": 7396
+        },
+        {
+          "tMs": 31216,
+          "loadavg": [97.85, 42.69, 18.6],
+          "freeMemMB": 7069
+        },
+        {
+          "tMs": 32231,
+          "loadavg": [104.83, 45.06, 19.49],
+          "freeMemMB": 7287
+        },
+        {
+          "tMs": 33250,
+          "loadavg": [104.83, 45.06, 19.49],
+          "freeMemMB": 7434
+        },
+        {
+          "tMs": 34257,
+          "loadavg": [104.83, 45.06, 19.49],
+          "freeMemMB": 7755
+        },
+        {
+          "tMs": 35258,
+          "loadavg": [104.83, 45.06, 19.49],
+          "freeMemMB": 7980
+        },
+        {
+          "tMs": 36286,
+          "loadavg": [104.83, 45.06, 19.49],
+          "freeMemMB": 8053
+        },
+        {
+          "tMs": 37287,
+          "loadavg": [109.81, 47.08, 20.29],
+          "freeMemMB": 8166
+        },
+        {
+          "tMs": 38288,
+          "loadavg": [109.81, 47.08, 20.29],
+          "freeMemMB": 8604
+        },
+        {
+          "tMs": 39290,
+          "loadavg": [109.81, 47.08, 20.29],
+          "freeMemMB": 8506
+        },
+        {
+          "tMs": 40301,
+          "loadavg": [109.81, 47.08, 20.29],
+          "freeMemMB": 8496
+        },
+        {
+          "tMs": 41313,
+          "loadavg": [109.81, 47.08, 20.29],
+          "freeMemMB": 9063
+        },
+        {
+          "tMs": 42330,
+          "loadavg": [110.46, 48.26, 20.81],
+          "freeMemMB": 10386
+        },
+        {
+          "tMs": 43333,
+          "loadavg": [110.46, 48.26, 20.81],
+          "freeMemMB": 10656
+        },
+        {
+          "tMs": 44352,
+          "loadavg": [110.46, 48.26, 20.81],
+          "freeMemMB": 10619
+        },
+        {
+          "tMs": 45355,
+          "loadavg": [110.46, 48.26, 20.81],
+          "freeMemMB": 10641
+        },
+        {
+          "tMs": 46359,
+          "loadavg": [110.46, 48.26, 20.81],
+          "freeMemMB": 10628
+        },
+        {
+          "tMs": 47361,
+          "loadavg": [104.82, 48.12, 20.91],
+          "freeMemMB": 10751
+        },
+        {
+          "tMs": 48362,
+          "loadavg": [104.82, 48.12, 20.91],
+          "freeMemMB": 10839
+        },
+        {
+          "tMs": 49362,
+          "loadavg": [104.82, 48.12, 20.91],
+          "freeMemMB": 11299
+        },
+        {
+          "tMs": 50364,
+          "loadavg": [104.82, 48.12, 20.91],
+          "freeMemMB": 11704
+        },
+        {
+          "tMs": 51365,
+          "loadavg": [104.82, 48.12, 20.91],
+          "freeMemMB": 11697
+        },
+        {
+          "tMs": 52367,
+          "loadavg": [97.79, 47.61, 20.89],
+          "freeMemMB": 11417
+        },
+        {
+          "tMs": 53368,
+          "loadavg": [97.79, 47.61, 20.89],
+          "freeMemMB": 11522
+        },
+        {
+          "tMs": 54370,
+          "loadavg": [97.79, 47.61, 20.89],
+          "freeMemMB": 11787
+        },
+        {
+          "tMs": 55371,
+          "loadavg": [97.79, 47.61, 20.89],
+          "freeMemMB": 11995
+        },
+        {
+          "tMs": 56373,
+          "loadavg": [97.79, 47.61, 20.89],
+          "freeMemMB": 12130
+        },
+        {
+          "tMs": 57390,
+          "loadavg": [91.32, 47.1, 20.87],
+          "freeMemMB": 12154
+        },
+        {
+          "tMs": 58391,
+          "loadavg": [91.32, 47.1, 20.87],
+          "freeMemMB": 12119
+        },
+        {
+          "tMs": 59393,
+          "loadavg": [91.32, 47.1, 20.87],
+          "freeMemMB": 12018
+        },
+        {
+          "tMs": 60396,
+          "loadavg": [91.32, 47.1, 20.87],
+          "freeMemMB": 12200
+        },
+        {
+          "tMs": 61398,
+          "loadavg": [91.32, 47.1, 20.87],
+          "freeMemMB": 12143
+        },
+        {
+          "tMs": 62401,
+          "loadavg": [84.57, 46.43, 20.8],
+          "freeMemMB": 12153
+        },
+        {
+          "tMs": 63402,
+          "loadavg": [84.57, 46.43, 20.8],
+          "freeMemMB": 12233
+        },
+        {
+          "tMs": 64403,
+          "loadavg": [84.57, 46.43, 20.8],
+          "freeMemMB": 12390
+        },
+        {
+          "tMs": 65405,
+          "loadavg": [84.57, 46.43, 20.8],
+          "freeMemMB": 12441
+        },
+        {
+          "tMs": 66406,
+          "loadavg": [84.57, 46.43, 20.8],
+          "freeMemMB": 12491
+        },
+        {
+          "tMs": 67408,
+          "loadavg": [78.11, 45.73, 20.71],
+          "freeMemMB": 12489
+        },
+        {
+          "tMs": 68410,
+          "loadavg": [78.11, 45.73, 20.71],
+          "freeMemMB": 12470
+        },
+        {
+          "tMs": 69411,
+          "loadavg": [78.11, 45.73, 20.71],
+          "freeMemMB": 12539
+        },
+        {
+          "tMs": 70413,
+          "loadavg": [78.11, 45.73, 20.71],
+          "freeMemMB": 12445
+        },
+        {
+          "tMs": 71415,
+          "loadavg": [78.11, 45.73, 20.71],
+          "freeMemMB": 12541
+        },
+        {
+          "tMs": 72417,
+          "loadavg": [72.74, 45.15, 20.65],
+          "freeMemMB": 12520
+        },
+        {
+          "tMs": 73432,
+          "loadavg": [72.74, 45.15, 20.65],
+          "freeMemMB": 12504
+        },
+        {
+          "tMs": 74434,
+          "loadavg": [72.74, 45.15, 20.65],
+          "freeMemMB": 12624
+        },
+        {
+          "tMs": 75435,
+          "loadavg": [72.74, 45.15, 20.65],
+          "freeMemMB": 12542
+        },
+        {
+          "tMs": 76437,
+          "loadavg": [72.74, 45.15, 20.65],
+          "freeMemMB": 12475
+        },
+        {
+          "tMs": 77438,
+          "loadavg": [67.32, 44.48, 20.57],
+          "freeMemMB": 12568
+        },
+        {
+          "tMs": 78440,
+          "loadavg": [67.32, 44.48, 20.57],
+          "freeMemMB": 12492
+        },
+        {
+          "tMs": 79441,
+          "loadavg": [67.32, 44.48, 20.57],
+          "freeMemMB": 12493
+        },
+        {
+          "tMs": 80443,
+          "loadavg": [67.32, 44.48, 20.57],
+          "freeMemMB": 12455
+        },
+        {
+          "tMs": 81446,
+          "loadavg": [67.32, 44.48, 20.57],
+          "freeMemMB": 12507
+        },
+        {
+          "tMs": 82447,
+          "loadavg": [62.17, 43.79, 20.48],
+          "freeMemMB": 12383
+        },
+        {
+          "tMs": 83447,
+          "loadavg": [62.17, 43.79, 20.48],
+          "freeMemMB": 12500
+        },
+        {
+          "tMs": 84448,
+          "loadavg": [62.17, 43.79, 20.48],
+          "freeMemMB": 12501
+        },
+        {
+          "tMs": 85449,
+          "loadavg": [62.17, 43.79, 20.48],
+          "freeMemMB": 12421
+        },
+        {
+          "tMs": 86450,
+          "loadavg": [62.17, 43.79, 20.48],
+          "freeMemMB": 12453
+        },
+        {
+          "tMs": 87451,
+          "loadavg": [57.67, 43.17, 20.4],
+          "freeMemMB": 12477
+        },
+        {
+          "tMs": 88452,
+          "loadavg": [57.67, 43.17, 20.4],
+          "freeMemMB": 12473
+        },
+        {
+          "tMs": 89490,
+          "loadavg": [57.67, 43.17, 20.4],
+          "freeMemMB": 12557
+        },
+        {
+          "tMs": 90491,
+          "loadavg": [57.67, 43.17, 20.4],
+          "freeMemMB": 12634
+        },
+        {
+          "tMs": 91492,
+          "loadavg": [57.67, 43.17, 20.4],
+          "freeMemMB": 12552
+        },
+        {
+          "tMs": 92493,
+          "loadavg": [53.69, 42.58, 20.33],
+          "freeMemMB": 12449
+        },
+        {
+          "tMs": 93494,
+          "loadavg": [53.69, 42.58, 20.33],
+          "freeMemMB": 12536
+        },
+        {
+          "tMs": 94495,
+          "loadavg": [53.69, 42.58, 20.33],
+          "freeMemMB": 12475
+        },
+        {
+          "tMs": 95496,
+          "loadavg": [53.69, 42.58, 20.33],
+          "freeMemMB": 12487
+        },
+        {
+          "tMs": 96497,
+          "loadavg": [53.69, 42.58, 20.33],
+          "freeMemMB": 12582
+        },
+        {
+          "tMs": 97498,
+          "loadavg": [49.63, 41.93, 20.24],
+          "freeMemMB": 12590
+        },
+        {
+          "tMs": 98499,
+          "loadavg": [49.63, 41.93, 20.24],
+          "freeMemMB": 12534
+        },
+        {
+          "tMs": 99500,
+          "loadavg": [49.63, 41.93, 20.24],
+          "freeMemMB": 12346
+        },
+        {
+          "tMs": 100501,
+          "loadavg": [49.63, 41.93, 20.24],
+          "freeMemMB": 12418
+        },
+        {
+          "tMs": 101502,
+          "loadavg": [49.63, 41.93, 20.24],
+          "freeMemMB": 12412
+        },
+        {
+          "tMs": 102541,
+          "loadavg": [46.14, 41.33, 20.16],
+          "freeMemMB": 12527
+        },
+        {
+          "tMs": 103542,
+          "loadavg": [46.14, 41.33, 20.16],
+          "freeMemMB": 12441
+        },
+        {
+          "tMs": 104543,
+          "loadavg": [46.14, 41.33, 20.16],
+          "freeMemMB": 12568
+        },
+        {
+          "tMs": 105543,
+          "loadavg": [46.14, 41.33, 20.16],
+          "freeMemMB": 12562
+        },
+        {
+          "tMs": 106544,
+          "loadavg": [46.14, 41.33, 20.16],
+          "freeMemMB": 12586
+        },
+        {
+          "tMs": 107545,
+          "loadavg": [42.84, 40.73, 20.08],
+          "freeMemMB": 12552
+        },
+        {
+          "tMs": 108546,
+          "loadavg": [42.84, 40.73, 20.08],
+          "freeMemMB": 12488
+        },
+        {
+          "tMs": 109547,
+          "loadavg": [42.84, 40.73, 20.08],
+          "freeMemMB": 12306
+        },
+        {
+          "tMs": 110548,
+          "loadavg": [42.84, 40.73, 20.08],
+          "freeMemMB": 12452
+        },
+        {
+          "tMs": 111552,
+          "loadavg": [42.84, 40.73, 20.08],
+          "freeMemMB": 12521
+        },
+        {
+          "tMs": 112554,
+          "loadavg": [39.73, 40.12, 19.99],
+          "freeMemMB": 12512
+        },
+        {
+          "tMs": 113552,
+          "loadavg": [39.73, 40.12, 19.99],
+          "freeMemMB": 12445
+        },
+        {
+          "tMs": 114554,
+          "loadavg": [39.73, 40.12, 19.99],
+          "freeMemMB": 12499
+        },
+        {
+          "tMs": 115627,
+          "loadavg": [39.73, 40.12, 19.99],
+          "freeMemMB": 12460
+        },
+        {
+          "tMs": 116628,
+          "loadavg": [39.73, 40.12, 19.99],
+          "freeMemMB": 12516
+        },
+        {
+          "tMs": 117631,
+          "loadavg": [36.87, 39.52, 19.91],
+          "freeMemMB": 12644
+        },
+        {
+          "tMs": 118643,
+          "loadavg": [36.87, 39.52, 19.91],
+          "freeMemMB": 12613
+        },
+        {
+          "tMs": 119645,
+          "loadavg": [36.87, 39.52, 19.91],
+          "freeMemMB": 12537
+        },
+        {
+          "tMs": 120646,
+          "loadavg": [36.87, 39.52, 19.91],
+          "freeMemMB": 12469
+        },
+        {
+          "tMs": 121648,
+          "loadavg": [36.87, 39.52, 19.91],
+          "freeMemMB": 12485
+        },
+        {
+          "tMs": 122650,
+          "loadavg": [34.16, 38.91, 19.82],
+          "freeMemMB": 12458
+        },
+        {
+          "tMs": 123651,
+          "loadavg": [34.16, 38.91, 19.82],
+          "freeMemMB": 12387
+        },
+        {
+          "tMs": 124652,
+          "loadavg": [34.16, 38.91, 19.82],
+          "freeMemMB": 12429
+        },
+        {
+          "tMs": 125665,
+          "loadavg": [34.16, 38.91, 19.82],
+          "freeMemMB": 12612
+        }
+      ],
+      "dmesgNewLines": []
+    }
+  ],
+  "allRoundsGreen": false
+}

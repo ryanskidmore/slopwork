@@ -121,7 +121,10 @@ async function createWorktrees(args: Args, runId: string): Promise<Worktree[]> {
 async function removeWorktrees(worktrees: Worktree[]): Promise<void> {
   for (const wt of worktrees) {
     log(`removing worktree ${wt.index}: ${wt.path}`);
-    spawnSync("git", ["worktree", "remove", "--force", wt.path], { cwd: REPO_ROOT, encoding: "utf8" });
+    spawnSync("git", ["worktree", "remove", "--force", wt.path], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+    });
     spawnSync("git", ["branch", "-D", wt.branch], { cwd: REPO_ROOT, encoding: "utf8" });
   }
   // `git worktree remove` can leave the administrative record behind if the
@@ -145,13 +148,25 @@ async function prepWorktree(wt: Worktree): Promise<PrepResult> {
   const install = spawnSync("bun", ["install"], { cwd: wt.path, encoding: "utf8" });
   const installMs = performance.now() - t0;
   if (install.status !== 0) {
-    return { index: wt.index, ok: false, installMs, buildMs: 0, error: `bun install failed:\n${install.stderr}` };
+    return {
+      index: wt.index,
+      ok: false,
+      installMs,
+      buildMs: 0,
+      error: `bun install failed:\n${install.stderr}`,
+    };
   }
   const t1 = performance.now();
   const build = spawnSync("bun", ["run", "build"], { cwd: wt.path, encoding: "utf8" });
   const buildMs = performance.now() - t1;
   if (build.status !== 0) {
-    return { index: wt.index, ok: false, installMs, buildMs, error: `bun run build failed:\n${build.stderr}` };
+    return {
+      index: wt.index,
+      ok: false,
+      installMs,
+      buildMs,
+      error: `bun run build failed:\n${build.stderr}`,
+    };
   }
   return { index: wt.index, ok: true, installMs, buildMs };
 }
@@ -174,7 +189,7 @@ interface WorktreeRunResult {
 }
 
 const ANOMALY_PATTERNS: [string, RegExp][] = [
-  ["EADDRINUSE (port collision)", /EADDRINUSE/],
+  ["EADDRINUSE / port collision", /EADDRINUSE|already in use|PortInUseError/],
   ["ENOMEM (out of memory, fork/alloc)", /ENOMEM/],
   ["EAGAIN (resource temporarily unavailable, usually fork under pressure)", /EAGAIN/],
   ["spawnSync status:null", /status:\s*null|"status":\s*null/],
@@ -183,6 +198,10 @@ const ANOMALY_PATTERNS: [string, RegExp][] = [
   ["ECONNREFUSED (server not up in time)", /ECONNREFUSED/],
   ["sandbox guard violation (.slop/ touched)", /SANDBOX VIOLATION/],
   ["test timeout", /Test timed out|hook timed out/i],
+  [
+    "real-wall-clock perf-budget assertion (consider SLOP_TEST_PERF_SCALE, see --perf-scale)",
+    /AssertionError: expected [\d.]+ to be less than \d/,
+  ],
 ];
 
 function classifyFailures(output: string): string[] {
@@ -202,22 +221,26 @@ async function runOneWorktree(
   const logPath = join(logDir, `wt-${wt.index}-round-${round}.log`);
   let buffer = "";
   const t0 = performance.now();
-  const result = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
-    const env = args.perfScale ? { ...process.env, SLOP_TEST_PERF_SCALE: args.perfScale } : process.env;
-    const child = spawn("bun", ["run", args.cmd], {
-      cwd: wt.path,
-      stdio: ["ignore", "pipe", "pipe"],
-      env,
-    });
-    child.stdout.on("data", (d) => {
-      buffer += d.toString();
-    });
-    child.stderr.on("data", (d) => {
-      buffer += d.toString();
-    });
-    child.on("error", reject);
-    child.on("close", (code, signal) => resolve({ code, signal }));
-  });
+  const result = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
+    (resolve, reject) => {
+      const env = args.perfScale
+        ? { ...process.env, SLOP_TEST_PERF_SCALE: args.perfScale }
+        : process.env;
+      const child = spawn("bun", ["run", args.cmd], {
+        cwd: wt.path,
+        stdio: ["ignore", "pipe", "pipe"],
+        env,
+      });
+      child.stdout.on("data", (d) => {
+        buffer += d.toString();
+      });
+      child.stderr.on("data", (d) => {
+        buffer += d.toString();
+      });
+      child.on("error", reject);
+      child.on("close", (code, signal) => resolve({ code, signal }));
+    },
+  );
   const durationMs = performance.now() - t0;
   await appendFile(logPath, buffer);
   const testFilesLine = buffer.match(/Test Files\s+.*$/m)?.[0] ?? null;
@@ -259,7 +282,9 @@ async function runRound(
     });
   }, 1000);
 
-  const perWorktree = await Promise.all(worktrees.map((wt) => runOneWorktree(wt, args, logDir, round)));
+  const perWorktree = await Promise.all(
+    worktrees.map((wt) => runOneWorktree(wt, args, logDir, round)),
+  );
 
   clearInterval(sampler);
   const wallMs = Math.round(performance.now() - t0);
@@ -292,13 +317,19 @@ async function main(): Promise<void> {
     `ref: ${args.ref}, n=${args.n}, cmd="bun run ${args.cmd}", repeat=${args.repeat}` +
       (args.perfScale ? `, SLOP_TEST_PERF_SCALE=${args.perfScale}` : ""),
   );
-  log(`loadavg before: ${loadavg().map((n) => n.toFixed(2)).join(", ")}, freemem: ${Math.round(freemem() / 1024 ** 2)}MB`);
+  log(
+    `loadavg before: ${loadavg()
+      .map((n) => n.toFixed(2))
+      .join(", ")}, freemem: ${Math.round(freemem() / 1024 ** 2)}MB`,
+  );
 
   const worktrees = await createWorktrees(args, runId);
   const logDir = join(args.baseDir, `logs-${runId}`);
   await mkdir(logDir, { recursive: true });
 
-  log(`preparing ${worktrees.length} worktrees (bun install + bun run build, sequential, NOT measured)...`);
+  log(
+    `preparing ${worktrees.length} worktrees (bun install + bun run build, sequential, NOT measured)...`,
+  );
   const prep: PrepResult[] = [];
   for (const wt of worktrees) {
     const r = await prepWorktree(wt);
@@ -309,7 +340,9 @@ async function main(): Promise<void> {
     if (!r.ok) log(`    ${r.error}`);
   }
   if (prep.some((p) => !p.ok)) {
-    log("aborting: at least one worktree failed to prepare — cannot measure test-run concurrency without it");
+    log(
+      "aborting: at least one worktree failed to prepare — cannot measure test-run concurrency without it",
+    );
     if (!args.keep) await removeWorktrees(worktrees);
     process.exitCode = 1;
     return;
@@ -317,7 +350,9 @@ async function main(): Promise<void> {
 
   const rounds: RoundResult[] = [];
   for (let round = 1; round <= args.repeat; round++) {
-    log(`\n=== round ${round}/${args.repeat}: launching ${args.n} concurrent "bun run ${args.cmd}" ===`);
+    log(
+      `\n=== round ${round}/${args.repeat}: launching ${args.n} concurrent "bun run ${args.cmd}" ===`,
+    );
     const r = await runRound(worktrees, args, logDir, round);
     rounds.push(r);
     log(`round ${round}: wall=${r.wallMs}ms, allGreen=${r.allGreen}`);

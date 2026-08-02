@@ -108,10 +108,7 @@ async function runWorkerIterations(args: Args): Promise<CallResult[]> {
   return results;
 }
 
-function toCallResult(
-  r: ReturnType<typeof spawnSync>,
-  durationMs: number,
-): CallResult {
+function toCallResult(r: ReturnType<typeof spawnSync>, durationMs: number): CallResult {
   const err = r.error as NodeJS.ErrnoException | undefined;
   return {
     ok: r.status === 0 && !err,
@@ -140,7 +137,10 @@ async function main(): Promise<void> {
       `spawnSync("${args.cmd}") calls each against ${args.binary}\n`,
   );
 
-  const before = { loadavg: (await import("node:os")).loadavg(), freeMem: (await import("node:os")).freemem() };
+  const before = {
+    loadavg: (await import("node:os")).loadavg(),
+    freeMem: (await import("node:os")).freemem(),
+  };
 
   const children = Array.from({ length: args.workers }, () => {
     return new Promise<CallResult[]>((resolve, reject) => {
@@ -177,13 +177,22 @@ async function main(): Promise<void> {
   const t0 = performance.now();
   const perWorker = await Promise.all(children);
   const wallMs = performance.now() - t0;
-  const after = { loadavg: (await import("node:os")).loadavg(), freeMem: (await import("node:os")).freemem() };
+  const after = {
+    loadavg: (await import("node:os")).loadavg(),
+    freeMem: (await import("node:os")).freemem(),
+  };
 
   const all = perWorker.flat();
   const anomalies = all.filter((r) => !r.ok);
   const byErrorCode = new Map<string, number>();
   for (const a of anomalies) {
-    const key = a.errorCode ?? (a.signal ? `signal:${a.signal}` : a.status === null ? "status:null (no error/signal set)" : `exit:${a.status}`);
+    const key =
+      a.errorCode ??
+      (a.signal
+        ? `signal:${a.signal}`
+        : a.status === null
+          ? "status:null (no error/signal set)"
+          : `exit:${a.status}`);
     byErrorCode.set(key, (byErrorCode.get(key) ?? 0) + 1);
   }
   const durations = all.map((r) => r.durationMs).sort((a, b) => a - b);

@@ -1,0 +1,23 @@
+{
+  "workers": 48,
+  "iterations": 8,
+  "cmd": "init",
+  "binary": "/home/ryan/go/src/github.com/ryanskidmore/slopwork/.claude/worktrees/agent-ab61500488b300f82/dist/slop",
+  "totalCalls": 384,
+  "okCalls": 384,
+  "anomalyCalls": 0,
+  "anomalyBreakdown": {},
+  "wallMs": 5161,
+  "durationMsP50": 468,
+  "durationMsP95": 1144,
+  "durationMsMax": 1619,
+  "systemBefore": {
+    "loadavg": [10.32, 22.16, 16.81],
+    "freeMem": 13493792768
+  },
+  "systemAfter": {
+    "loadavg": [27.59, 25.48, 17.95],
+    "freeMem": 6400258048
+  },
+  "anomalies": []
+}

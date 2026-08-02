@@ -1,0 +1,886 @@
+{
+  "generatedAt": "2026-08-02T22:27:31.239Z",
+  "runId": "mscdblun-rarg4f",
+  "args": {
+    "n": 4,
+    "cmd": "test:coverage",
+    "ref": "fix/concurrent-test-safety",
+    "repeat": 1,
+    "baseDir": "/home/ryan/.cache/slop-concurrency-bench",
+    "keep": false,
+    "out": "bench-out/stress-coverage.json"
+  },
+  "machine": {
+    "platform": "linux 6.18.33.2-microsoft-standard-WSL2",
+    "cpus": "32x AMD Ryzen 9 9950X3D 16-Core Processor",
+    "memoryGb": 30,
+    "bunVersion": "1.3.11",
+    "baseDirFs": "ext4"
+  },
+  "prep": [
+    {
+      "index": 0,
+      "ok": true,
+      "installMs": 579.0986489999999,
+      "buildMs": 569.2467819999999
+    },
+    {
+      "index": 1,
+      "ok": true,
+      "installMs": 592.3010570000001,
+      "buildMs": 530.825578
+    },
+    {
+      "index": 2,
+      "ok": true,
+      "installMs": 597.3878969999996,
+      "buildMs": 576.0239929999998
+    },
+    {
+      "index": 3,
+      "ok": true,
+      "installMs": 593.5229279999994,
+      "buildMs": 529.731135
+    }
+  ],
+  "rounds": [
+    {
+      "round": 1,
+      "wallMs": 159118,
+      "perWorktree": [
+        {
+          "index": 0,
+          "path": "/home/ryan/.cache/slop-concurrency-bench/wt-mscdblun-rarg4f-0",
+          "exitCode": 1,
+          "signal": null,
+          "durationMs": 159118,
+          "testFilesLine": "Test Files  1 failed | 149 passed (150)",
+          "failureSignatures": [],
+          "logPath": "/home/ryan/.cache/slop-concurrency-bench/logs-mscdblun-rarg4f/wt-0-round-1.log"
+        },
+        {
+          "index": 1,
+          "path": "/home/ryan/.cache/slop-concurrency-bench/wt-mscdblun-rarg4f-1",
+          "exitCode": 1,
+          "signal": null,
+          "durationMs": 158216,
+          "testFilesLine": "Test Files  1 failed | 149 passed (150)",
+          "failureSignatures": [],
+          "logPath": "/home/ryan/.cache/slop-concurrency-bench/logs-mscdblun-rarg4f/wt-1-round-1.log"
+        },
+        {
+          "index": 2,
+          "path": "/home/ryan/.cache/slop-concurrency-bench/wt-mscdblun-rarg4f-2",
+          "exitCode": 1,
+          "signal": null,
+          "durationMs": 157051,
+          "testFilesLine": "Test Files  1 failed | 149 passed (150)",
+          "failureSignatures": [],
+          "logPath": "/home/ryan/.cache/slop-concurrency-bench/logs-mscdblun-rarg4f/wt-2-round-1.log"
+        },
+        {
+          "index": 3,
+          "path": "/home/ryan/.cache/slop-concurrency-bench/wt-mscdblun-rarg4f-3",
+          "exitCode": 1,
+          "signal": null,
+          "durationMs": 156683,
+          "testFilesLine": "Test Files  1 failed | 149 passed (150)",
+          "failureSignatures": [],
+          "logPath": "/home/ryan/.cache/slop-concurrency-bench/logs-mscdblun-rarg4f/wt-3-round-1.log"
+        }
+      ],
+      "allGreen": false,
+      "systemSamples": [
+        {
+          "tMs": 1020,
+          "loadavg": [19.98, 23.97, 17.42],
+          "freeMemMB": 10644
+        },
+        {
+          "tMs": 2101,
+          "loadavg": [19.98, 23.97, 17.42],
+          "freeMemMB": 9332
+        },
+        {
+          "tMs": 3101,
+          "loadavg": [19.98, 23.97, 17.42],
+          "freeMemMB": 7886
+        },
+        {
+          "tMs": 4103,
+          "loadavg": [19.98, 23.97, 17.42],
+          "freeMemMB": 6595
+        },
+        {
+          "tMs": 5189,
+          "loadavg": [19.98, 23.97, 17.42],
+          "freeMemMB": 6281
+        },
+        {
+          "tMs": 6190,
+          "loadavg": [27.59, 25.48, 17.95],
+          "freeMemMB": 5643
+        },
+        {
+          "tMs": 7196,
+          "loadavg": [27.59, 25.48, 17.95],
+          "freeMemMB": 4827
+        },
+        {
+          "tMs": 8198,
+          "loadavg": [27.59, 25.48, 17.95],
+          "freeMemMB": 3922
+        },
+        {
+          "tMs": 9203,
+          "loadavg": [27.59, 25.48, 17.95],
+          "freeMemMB": 3274
+        },
+        {
+          "tMs": 10203,
+          "loadavg": [27.59, 25.48, 17.95],
+          "freeMemMB": 3798
+        },
+        {
+          "tMs": 11203,
+          "loadavg": [41.56, 28.41, 18.94],
+          "freeMemMB": 3244
+        },
+        {
+          "tMs": 12208,
+          "loadavg": [41.56, 28.41, 18.94],
+          "freeMemMB": 3678
+        },
+        {
+          "tMs": 13237,
+          "loadavg": [41.56, 28.41, 18.94],
+          "freeMemMB": 3768
+        },
+        {
+          "tMs": 14246,
+          "loadavg": [41.56, 28.41, 18.94],
+          "freeMemMB": 3409
+        },
+        {
+          "tMs": 15251,
+          "loadavg": [41.56, 28.41, 18.94],
+          "freeMemMB": 3493
+        },
+        {
+          "tMs": 16253,
+          "loadavg": [60.65, 32.59, 20.34],
+          "freeMemMB": 3394
+        },
+        {
+          "tMs": 17258,
+          "loadavg": [60.65, 32.59, 20.34],
+          "freeMemMB": 3525
+        },
+        {
+          "tMs": 18260,
+          "loadavg": [60.65, 32.59, 20.34],
+          "freeMemMB": 3466
+        },
+        {
+          "tMs": 19276,
+          "loadavg": [60.65, 32.59, 20.34],
+          "freeMemMB": 3461
+        },
+        {
+          "tMs": 20285,
+          "loadavg": [60.65, 32.59, 20.34],
+          "freeMemMB": 3638
+        },
+        {
+          "tMs": 21286,
+          "loadavg": [73.49, 35.72, 21.42],
+          "freeMemMB": 3959
+        },
+        {
+          "tMs": 22292,
+          "loadavg": [73.49, 35.72, 21.42],
+          "freeMemMB": 3462
+        },
+        {
+          "tMs": 23301,
+          "loadavg": [73.49, 35.72, 21.42],
+          "freeMemMB": 3440
+        },
+        {
+          "tMs": 24303,
+          "loadavg": [73.49, 35.72, 21.42],
+          "freeMemMB": 3227
+        },
+        {
+          "tMs": 25306,
+          "loadavg": [73.49, 35.72, 21.42],
+          "freeMemMB": 3223
+        },
+        {
+          "tMs": 26309,
+          "loadavg": [86.83, 39.11, 22.59],
+          "freeMemMB": 3467
+        },
+        {
+          "tMs": 27314,
+          "loadavg": [86.83, 39.11, 22.59],
+          "freeMemMB": 3442
+        },
+        {
+          "tMs": 28319,
+          "loadavg": [86.83, 39.11, 22.59],
+          "freeMemMB": 3578
+        },
+        {
+          "tMs": 29335,
+          "loadavg": [86.83, 39.11, 22.59],
+          "freeMemMB": 3402
+        },
+        {
+          "tMs": 30345,
+          "loadavg": [86.83, 39.11, 22.59],
+          "freeMemMB": 3588
+        },
+        {
+          "tMs": 31354,
+          "loadavg": [101.98, 43.04, 23.95],
+          "freeMemMB": 3549
+        },
+        {
+          "tMs": 32358,
+          "loadavg": [101.98, 43.04, 23.95],
+          "freeMemMB": 4462
+        },
+        {
+          "tMs": 33368,
+          "loadavg": [101.98, 43.04, 23.95],
+          "freeMemMB": 4667
+        },
+        {
+          "tMs": 34382,
+          "loadavg": [101.98, 43.04, 23.95],
+          "freeMemMB": 4473
+        },
+        {
+          "tMs": 35399,
+          "loadavg": [101.98, 43.04, 23.95],
+          "freeMemMB": 4572
+        },
+        {
+          "tMs": 36409,
+          "loadavg": [110.15, 45.71, 24.92],
+          "freeMemMB": 4486
+        },
+        {
+          "tMs": 37450,
+          "loadavg": [110.15, 45.71, 24.92],
+          "freeMemMB": 4438
+        },
+        {
+          "tMs": 38459,
+          "loadavg": [110.15, 45.71, 24.92],
+          "freeMemMB": 4007
+        },
+        {
+          "tMs": 39474,
+          "loadavg": [110.15, 45.71, 24.92],
+          "freeMemMB": 4456
+        },
+        {
+          "tMs": 40481,
+          "loadavg": [110.15, 45.71, 24.92],
+          "freeMemMB": 4745
+        },
+        {
+          "tMs": 41487,
+          "loadavg": [115.66, 47.93, 25.75],
+          "freeMemMB": 4388
+        },
+        {
+          "tMs": 42489,
+          "loadavg": [115.66, 47.93, 25.75],
+          "freeMemMB": 4991
+        },
+        {
+          "tMs": 43583,
+          "loadavg": [115.66, 47.93, 25.75],
+          "freeMemMB": 4585
+        },
+        {
+          "tMs": 44584,
+          "loadavg": [115.66, 47.93, 25.75],
+          "freeMemMB": 4097
+        },
+        {
+          "tMs": 45594,
+          "loadavg": [129.14, 51.85, 27.14],
+          "freeMemMB": 4300
+        },
+        {
+          "tMs": 46601,
+          "loadavg": [129.14, 51.85, 27.14],
+          "freeMemMB": 4400
+        },
+        {
+          "tMs": 47606,
+          "loadavg": [129.14, 51.85, 27.14],
+          "freeMemMB": 4838
+        },
+        {
+          "tMs": 48618,
+          "loadavg": [129.14, 51.85, 27.14],
+          "freeMemMB": 4808
+        },
+        {
+          "tMs": 49625,
+          "loadavg": [129.14, 51.85, 27.14],
+          "freeMemMB": 4916
+        },
+        {
+          "tMs": 50640,
+          "loadavg": [139.06, 55.19, 28.35],
+          "freeMemMB": 5257
+        },
+        {
+          "tMs": 51642,
+          "loadavg": [139.06, 55.19, 28.35],
+          "freeMemMB": 5328
+        },
+        {
+          "tMs": 52655,
+          "loadavg": [139.06, 55.19, 28.35],
+          "freeMemMB": 5704
+        },
+        {
+          "tMs": 53667,
+          "loadavg": [139.06, 55.19, 28.35],
+          "freeMemMB": 5688
+        },
+        {
+          "tMs": 54677,
+          "loadavg": [139.06, 55.19, 28.35],
+          "freeMemMB": 5683
+        },
+        {
+          "tMs": 55681,
+          "loadavg": [144.1, 57.62, 29.28],
+          "freeMemMB": 5811
+        },
+        {
+          "tMs": 56682,
+          "loadavg": [144.1, 57.62, 29.28],
+          "freeMemMB": 5926
+        },
+        {
+          "tMs": 57687,
+          "loadavg": [144.1, 57.62, 29.28],
+          "freeMemMB": 6261
+        },
+        {
+          "tMs": 58690,
+          "loadavg": [144.1, 57.62, 29.28],
+          "freeMemMB": 7138
+        },
+        {
+          "tMs": 59691,
+          "loadavg": [144.1, 57.62, 29.28],
+          "freeMemMB": 8125
+        },
+        {
+          "tMs": 60719,
+          "loadavg": [144.25, 59.09, 29.91],
+          "freeMemMB": 8089
+        },
+        {
+          "tMs": 61720,
+          "loadavg": [144.25, 59.09, 29.91],
+          "freeMemMB": 8409
+        },
+        {
+          "tMs": 62725,
+          "loadavg": [144.25, 59.09, 29.91],
+          "freeMemMB": 8698
+        },
+        {
+          "tMs": 63727,
+          "loadavg": [144.25, 59.09, 29.91],
+          "freeMemMB": 9212
+        },
+        {
+          "tMs": 64738,
+          "loadavg": [144.25, 59.09, 29.91],
+          "freeMemMB": 9490
+        },
+        {
+          "tMs": 65738,
+          "loadavg": [138.31, 59.27, 30.13],
+          "freeMemMB": 9569
+        },
+        {
+          "tMs": 66742,
+          "loadavg": [138.31, 59.27, 30.13],
+          "freeMemMB": 9589
+        },
+        {
+          "tMs": 67742,
+          "loadavg": [138.31, 59.27, 30.13],
+          "freeMemMB": 9606
+        },
+        {
+          "tMs": 68744,
+          "loadavg": [138.31, 59.27, 30.13],
+          "freeMemMB": 9894
+        },
+        {
+          "tMs": 69746,
+          "loadavg": [138.31, 59.27, 30.13],
+          "freeMemMB": 9780
+        },
+        {
+          "tMs": 70749,
+          "loadavg": [131.8, 59.23, 30.27],
+          "freeMemMB": 10119
+        },
+        {
+          "tMs": 71751,
+          "loadavg": [131.8, 59.23, 30.27],
+          "freeMemMB": 10082
+        },
+        {
+          "tMs": 72753,
+          "loadavg": [131.8, 59.23, 30.27],
+          "freeMemMB": 10207
+        },
+        {
+          "tMs": 73755,
+          "loadavg": [131.8, 59.23, 30.27],
+          "freeMemMB": 10599
+        },
+        {
+          "tMs": 74756,
+          "loadavg": [131.8, 59.23, 30.27],
+          "freeMemMB": 10857
+        },
+        {
+          "tMs": 75757,
+          "loadavg": [123.65, 58.75, 30.27],
+          "freeMemMB": 10670
+        },
+        {
+          "tMs": 76758,
+          "loadavg": [123.65, 58.75, 30.27],
+          "freeMemMB": 11071
+        },
+        {
+          "tMs": 77761,
+          "loadavg": [123.65, 58.75, 30.27],
+          "freeMemMB": 11323
+        },
+        {
+          "tMs": 78762,
+          "loadavg": [123.65, 58.75, 30.27],
+          "freeMemMB": 11136
+        },
+        {
+          "tMs": 79764,
+          "loadavg": [123.65, 58.75, 30.27],
+          "freeMemMB": 11288
+        },
+        {
+          "tMs": 80796,
+          "loadavg": [115.59, 58.15, 30.23],
+          "freeMemMB": 11301
+        },
+        {
+          "tMs": 81798,
+          "loadavg": [115.59, 58.15, 30.23],
+          "freeMemMB": 11417
+        },
+        {
+          "tMs": 82799,
+          "loadavg": [115.59, 58.15, 30.23],
+          "freeMemMB": 11339
+        },
+        {
+          "tMs": 83844,
+          "loadavg": [115.59, 58.15, 30.23],
+          "freeMemMB": 11393
+        },
+        {
+          "tMs": 84847,
+          "loadavg": [115.59, 58.15, 30.23],
+          "freeMemMB": 11331
+        },
+        {
+          "tMs": 85849,
+          "loadavg": [107.85, 57.5, 30.17],
+          "freeMemMB": 11371
+        },
+        {
+          "tMs": 86881,
+          "loadavg": [107.85, 57.5, 30.17],
+          "freeMemMB": 11533
+        },
+        {
+          "tMs": 87902,
+          "loadavg": [107.85, 57.5, 30.17],
+          "freeMemMB": 11760
+        },
+        {
+          "tMs": 88904,
+          "loadavg": [107.85, 57.5, 30.17],
+          "freeMemMB": 11731
+        },
+        {
+          "tMs": 89906,
+          "loadavg": [107.85, 57.5, 30.17],
+          "freeMemMB": 11902
+        },
+        {
+          "tMs": 90908,
+          "loadavg": [99.7, 56.65, 30.04],
+          "freeMemMB": 11859
+        },
+        {
+          "tMs": 91910,
+          "loadavg": [99.7, 56.65, 30.04],
+          "freeMemMB": 11753
+        },
+        {
+          "tMs": 92910,
+          "loadavg": [99.7, 56.65, 30.04],
+          "freeMemMB": 11692
+        },
+        {
+          "tMs": 93912,
+          "loadavg": [99.7, 56.65, 30.04],
+          "freeMemMB": 11648
+        },
+        {
+          "tMs": 94913,
+          "loadavg": [99.7, 56.65, 30.04],
+          "freeMemMB": 11758
+        },
+        {
+          "tMs": 95914,
+          "loadavg": [92.27, 55.82, 29.92],
+          "freeMemMB": 11754
+        },
+        {
+          "tMs": 96914,
+          "loadavg": [92.27, 55.82, 29.92],
+          "freeMemMB": 11634
+        },
+        {
+          "tMs": 97916,
+          "loadavg": [92.27, 55.82, 29.92],
+          "freeMemMB": 11697
+        },
+        {
+          "tMs": 98917,
+          "loadavg": [92.27, 55.82, 29.92],
+          "freeMemMB": 11837
+        },
+        {
+          "tMs": 99918,
+          "loadavg": [92.27, 55.82, 29.92],
+          "freeMemMB": 11788
+        },
+        {
+          "tMs": 100918,
+          "loadavg": [85.85, 55.1, 29.82],
+          "freeMemMB": 11708
+        },
+        {
+          "tMs": 101920,
+          "loadavg": [85.85, 55.1, 29.82],
+          "freeMemMB": 11669
+        },
+        {
+          "tMs": 102921,
+          "loadavg": [85.85, 55.1, 29.82],
+          "freeMemMB": 11704
+        },
+        {
+          "tMs": 103930,
+          "loadavg": [85.85, 55.1, 29.82],
+          "freeMemMB": 11688
+        },
+        {
+          "tMs": 104931,
+          "loadavg": [85.85, 55.1, 29.82],
+          "freeMemMB": 11634
+        },
+        {
+          "tMs": 105932,
+          "loadavg": [79.29, 54.25, 29.68],
+          "freeMemMB": 11624
+        },
+        {
+          "tMs": 106933,
+          "loadavg": [79.29, 54.25, 29.68],
+          "freeMemMB": 11748
+        },
+        {
+          "tMs": 107934,
+          "loadavg": [79.29, 54.25, 29.68],
+          "freeMemMB": 11758
+        },
+        {
+          "tMs": 108934,
+          "loadavg": [79.29, 54.25, 29.68],
+          "freeMemMB": 11763
+        },
+        {
+          "tMs": 109936,
+          "loadavg": [79.29, 54.25, 29.68],
+          "freeMemMB": 11840
+        },
+        {
+          "tMs": 110937,
+          "loadavg": [73.9, 53.55, 29.58],
+          "freeMemMB": 11746
+        },
+        {
+          "tMs": 111938,
+          "loadavg": [73.9, 53.55, 29.58],
+          "freeMemMB": 11926
+        },
+        {
+          "tMs": 112939,
+          "loadavg": [73.9, 53.55, 29.58],
+          "freeMemMB": 11951
+        },
+        {
+          "tMs": 113942,
+          "loadavg": [73.9, 53.55, 29.58],
+          "freeMemMB": 11985
+        },
+        {
+          "tMs": 114943,
+          "loadavg": [73.9, 53.55, 29.58],
+          "freeMemMB": 11831
+        },
+        {
+          "tMs": 115944,
+          "loadavg": [68.47, 52.76, 29.46],
+          "freeMemMB": 11974
+        },
+        {
+          "tMs": 116946,
+          "loadavg": [68.47, 52.76, 29.46],
+          "freeMemMB": 11846
+        },
+        {
+          "tMs": 117949,
+          "loadavg": [68.47, 52.76, 29.46],
+          "freeMemMB": 11786
+        },
+        {
+          "tMs": 118951,
+          "loadavg": [68.47, 52.76, 29.46],
+          "freeMemMB": 12027
+        },
+        {
+          "tMs": 120005,
+          "loadavg": [68.47, 52.76, 29.46],
+          "freeMemMB": 11971
+        },
+        {
+          "tMs": 121006,
+          "loadavg": [63.3, 51.95, 29.32],
+          "freeMemMB": 11950
+        },
+        {
+          "tMs": 122007,
+          "loadavg": [63.3, 51.95, 29.32],
+          "freeMemMB": 11852
+        },
+        {
+          "tMs": 123011,
+          "loadavg": [63.3, 51.95, 29.32],
+          "freeMemMB": 11761
+        },
+        {
+          "tMs": 124021,
+          "loadavg": [63.3, 51.95, 29.32],
+          "freeMemMB": 10156
+        },
+        {
+          "tMs": 125050,
+          "loadavg": [63.3, 51.95, 29.32],
+          "freeMemMB": 9094
+        },
+        {
+          "tMs": 126055,
+          "loadavg": [65.36, 52.56, 29.64],
+          "freeMemMB": 9206
+        },
+        {
+          "tMs": 127060,
+          "loadavg": [65.36, 52.56, 29.64],
+          "freeMemMB": 9149
+        },
+        {
+          "tMs": 128063,
+          "loadavg": [65.36, 52.56, 29.64],
+          "freeMemMB": 9099
+        },
+        {
+          "tMs": 129067,
+          "loadavg": [65.36, 52.56, 29.64],
+          "freeMemMB": 9141
+        },
+        {
+          "tMs": 130069,
+          "loadavg": [65.36, 52.56, 29.64],
+          "freeMemMB": 9451
+        },
+        {
+          "tMs": 131072,
+          "loadavg": [69.1, 53.55, 30.08],
+          "freeMemMB": 9475
+        },
+        {
+          "tMs": 132076,
+          "loadavg": [69.1, 53.55, 30.08],
+          "freeMemMB": 9719
+        },
+        {
+          "tMs": 133079,
+          "loadavg": [69.1, 53.55, 30.08],
+          "freeMemMB": 9528
+        },
+        {
+          "tMs": 134080,
+          "loadavg": [69.1, 53.55, 30.08],
+          "freeMemMB": 9635
+        },
+        {
+          "tMs": 135091,
+          "loadavg": [69.1, 53.55, 30.08],
+          "freeMemMB": 9973
+        },
+        {
+          "tMs": 136093,
+          "loadavg": [68.77, 53.74, 30.27],
+          "freeMemMB": 10094
+        },
+        {
+          "tMs": 137098,
+          "loadavg": [68.77, 53.74, 30.27],
+          "freeMemMB": 10381
+        },
+        {
+          "tMs": 138100,
+          "loadavg": [68.77, 53.74, 30.27],
+          "freeMemMB": 10955
+        },
+        {
+          "tMs": 139161,
+          "loadavg": [68.77, 53.74, 30.27],
+          "freeMemMB": 11012
+        },
+        {
+          "tMs": 140164,
+          "loadavg": [68.77, 53.74, 30.27],
+          "freeMemMB": 11133
+        },
+        {
+          "tMs": 141165,
+          "loadavg": [64.22, 53.05, 30.17],
+          "freeMemMB": 11092
+        },
+        {
+          "tMs": 142168,
+          "loadavg": [64.22, 53.05, 30.17],
+          "freeMemMB": 11005
+        },
+        {
+          "tMs": 143169,
+          "loadavg": [64.22, 53.05, 30.17],
+          "freeMemMB": 11185
+        },
+        {
+          "tMs": 144170,
+          "loadavg": [64.22, 53.05, 30.17],
+          "freeMemMB": 11072
+        },
+        {
+          "tMs": 145170,
+          "loadavg": [64.22, 53.05, 30.17],
+          "freeMemMB": 11171
+        },
+        {
+          "tMs": 146172,
+          "loadavg": [60.28, 52.42, 30.09],
+          "freeMemMB": 11212
+        },
+        {
+          "tMs": 147173,
+          "loadavg": [60.28, 52.42, 30.09],
+          "freeMemMB": 11407
+        },
+        {
+          "tMs": 148174,
+          "loadavg": [60.28, 52.42, 30.09],
+          "freeMemMB": 11460
+        },
+        {
+          "tMs": 149174,
+          "loadavg": [60.28, 52.42, 30.09],
+          "freeMemMB": 11446
+        },
+        {
+          "tMs": 150176,
+          "loadavg": [60.28, 52.42, 30.09],
+          "freeMemMB": 11442
+        },
+        {
+          "tMs": 151177,
+          "loadavg": [55.86, 51.63, 29.96],
+          "freeMemMB": 11619
+        },
+        {
+          "tMs": 152178,
+          "loadavg": [55.86, 51.63, 29.96],
+          "freeMemMB": 11592
+        },
+        {
+          "tMs": 153178,
+          "loadavg": [55.86, 51.63, 29.96],
+          "freeMemMB": 11706
+        },
+        {
+          "tMs": 154180,
+          "loadavg": [55.86, 51.63, 29.96],
+          "freeMemMB": 11531
+        },
+        {
+          "tMs": 155181,
+          "loadavg": [55.86, 51.63, 29.96],
+          "freeMemMB": 11576
+        },
+        {
+          "tMs": 156192,
+          "loadavg": [52.1, 50.92, 29.84],
+          "freeMemMB": 11616
+        },
+        {
+          "tMs": 157192,
+          "loadavg": [52.1, 50.92, 29.84],
+          "freeMemMB": 12155
+        },
+        {
+          "tMs": 158193,
+          "loadavg": [52.1, 50.92, 29.84],
+          "freeMemMB": 12079
+        }
+      ],
+      "dmesgNewLines": [
+        "[Sun Aug  2 17:18:50 2026] WSL (310) ERROR: No buffer space available @telemetry.cpp:190 (StartTelemetryAgent)"
+      ]
+    }
+  ],
+  "allRoundsGreen": false
+}
