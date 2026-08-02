@@ -79,21 +79,78 @@ export function fetchTree(options: ApiRequestOptions = {}): Promise<TreeResponse
   return getJson("/api/tree", options);
 }
 
+export interface TreeBounds {
+  limit?: number;
+  depth?: number;
+}
+
+export function fetchBoundedTree(
+  bounds: TreeBounds = {},
+  options: ApiRequestOptions = {},
+): Promise<TreeResponseDTO> {
+  const params = new URLSearchParams();
+  if (bounds.limit !== undefined) params.set("limit", String(bounds.limit));
+  if (bounds.depth !== undefined) params.set("depth", String(bounds.depth));
+  const query = params.toString();
+  return getJson(`/api/tree${query ? `?${query}` : ""}`, options);
+}
+
+/** `page`/`limit` request params shared by every bounded collection fetch
+ * below — the SPA-side counterpart of `pagination.ts`'s server-side
+ * `parsePage`. */
+export interface PageRequest {
+  page?: number;
+  limit?: number;
+}
+
+function pageParams(page: PageRequest, pageParam = "page", limitParam = "limit"): string {
+  const params = new URLSearchParams();
+  if (page.page !== undefined) params.set(pageParam, String(page.page));
+  if (page.limit !== undefined) params.set(limitParam, String(page.limit));
+  const value = params.toString();
+  return value ? `?${value}` : "";
+}
+
 export function fetchTicketDetail(
   ref: string,
+  timelinePages: {
+    eventsPage?: number;
+    eventsLimit?: number;
+    sessionsPage?: number;
+    sessionsLimit?: number;
+  } = {},
   options: ApiRequestOptions = {},
 ): Promise<TicketDetailDTO> {
-  return getJson(`/api/tickets/${encodeURIComponent(ref)}`, options);
+  const params = new URLSearchParams();
+  if (timelinePages.eventsPage !== undefined)
+    params.set("events_page", String(timelinePages.eventsPage));
+  if (timelinePages.eventsLimit !== undefined)
+    params.set("events_limit", String(timelinePages.eventsLimit));
+  if (timelinePages.sessionsPage !== undefined)
+    params.set("sessions_page", String(timelinePages.sessionsPage));
+  if (timelinePages.sessionsLimit !== undefined)
+    params.set("sessions_limit", String(timelinePages.sessionsLimit));
+  const query = params.toString();
+  return getJson(`/api/tickets/${encodeURIComponent(ref)}${query ? `?${query}` : ""}`, options);
 }
 
-export function fetchReview(options: ApiRequestOptions = {}): Promise<ReviewResponseDTO> {
-  return getJson("/api/review", options);
+export function fetchReview(
+  page: PageRequest = {},
+  options: ApiRequestOptions = {},
+): Promise<ReviewResponseDTO> {
+  return getJson(`/api/review${pageParams(page)}`, options);
 }
 
-export function fetchStale(options: ApiRequestOptions = {}): Promise<StaleResponseDTO> {
-  return getJson("/api/stale", options);
+export function fetchStale(
+  page: PageRequest = {},
+  options: ApiRequestOptions = {},
+): Promise<StaleResponseDTO> {
+  return getJson(`/api/stale${pageParams(page)}`, options);
 }
 
-export function fetchQuestions(options: ApiRequestOptions = {}): Promise<QuestionsResponseDTO> {
-  return getJson("/api/questions", options);
+export function fetchQuestions(
+  page: PageRequest = {},
+  options: ApiRequestOptions = {},
+): Promise<QuestionsResponseDTO> {
+  return getJson(`/api/questions${pageParams(page)}`, options);
 }

@@ -1,53 +1,72 @@
-import { ChevronRight, FileWarning } from "lucide-react";
-import { Fragment, type ReactNode, useEffect, useState } from "react";
+import { ChevronRight } from "lucide-react";
+import { Fragment, type ReactNode, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { PlanVersionDTO, SessionDTO, TicketDetailDTO } from "../../api/types.js";
 import { ActorKindLegend, AuditSpine } from "../components/audit-spine.js";
+import { CollectionLoadMore } from "../components/collection-load-more.js";
 import { CopyableId } from "../components/copyable-id.js";
 import { Markdown } from "../components/markdown.js";
+import { QueryErrorState } from "../components/query-error-state.js";
 import { RefList } from "../components/ref-list.js";
 import { LabelChips, OverlayBadges, PriorityBadge, StateBadge } from "../components/state-badge.js";
 import { DanglingRefText, TicketLink } from "../components/ticket-link.js";
 import { Card, CardContent } from "../components/ui/card.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs.js";
+import { useApiQuery } from "../hooks/use-api-query.js";
+import { useLoadMoreCollection } from "../hooks/use-load-more-collection.js";
 import { useNow } from "../hooks/use-now.js";
 import { fetchTicketDetail } from "../lib/api.js";
 import { formatAbsolute, formatDurationShort, formatRelative } from "../lib/format.js";
 
 export function TicketDetailPage() {
   const { ref = "" } = useParams();
-  const [data, setData] = useState<TicketDetailDTO | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const loadDetail = useCallback(
+    (signal: AbortSignal) => fetchTicketDetail(ref, {}, { signal }),
+    [ref],
+  );
+  const { data, error, loading, retry } = useApiQuery<TicketDetailDTO>(loadDetail);
+  // Events/sessions are each bounded server-side (ticket-detail.ts); "load
+  // more" re-fetches the whole ticket-detail response with the next
+  // `events_page`/`sessions_page` — there is no separate events/sessions
+  // sub-resource endpoint, so this is a full re-fetch rather than a
+  // lighter dedicated one, traded for one fewer API surface to keep in
+  // sync with the rest of the ticket.
+  const loadMoreEvents = useCallback(
+    (page: number, signal: AbortSignal) =>
+      fetchTicketDetail(ref, { eventsPage: page }, { signal }).then((response) => ({
+        items: response.events,
+        pagination: response.event_pagination,
+      })),
+    [ref],
+  );
+  const eventCollection = useLoadMoreCollection(
+    data?.events ?? [],
+    data?.event_pagination ?? null,
+    loadMoreEvents,
+    `events:${ref}`,
+  );
+  const loadMoreSessions = useCallback(
+    (page: number, signal: AbortSignal) =>
+      fetchTicketDetail(ref, { sessionsPage: page }, { signal }).then((response) => ({
+        items: response.sessions,
+        pagination: response.session_pagination,
+      })),
+    [ref],
+  );
+  const sessionCollection = useLoadMoreCollection(
+    data?.sessions ?? [],
+    data?.session_pagination ?? null,
+    loadMoreSessions,
+    `sessions:${ref}`,
+  );
   const now = useNow();
 
-  useEffect(() => {
-    let cancelled = false;
-    setData(null);
-    setError(null);
-    fetchTicketDetail(ref)
-      .then((res) => {
-        if (!cancelled) setData(res);
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [ref]);
-
   if (error) {
-    return (
-      <Card className="border-destructive/40">
-        <CardContent className="flex items-center gap-2 py-6 text-destructive">
-          <FileWarning className="size-5" /> {error}
-        </CardContent>
-      </Card>
-    );
+    return <QueryErrorState title="Ticket unavailable" error={error} onRetry={retry} />;
   }
 
-  if (!data) {
+  if (loading || !data) {
     return (
       <div className="flex flex-col gap-3">
         <Skeleton className="h-8 w-2/3" />
@@ -112,7 +131,7 @@ export function TicketDetailPage() {
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="overview">Spec</TabsTrigger>
           <TabsTrigger value="sessions">
-            Sessions {data.sessions.length > 0 && `(${data.sessions.length})`}
+            Sessions {data.session_pagination.total > 0 && `(${data.session_pagination.total})`}
           </TabsTrigger>
           <TabsTrigger value="relationships">Relationships</TabsTrigger>
         </TabsList>
@@ -120,11 +139,21 @@ export function TicketDetailPage() {
         <TabsContent value="timeline" className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              Every event on this ticket and its sessions, oldest first — the full audit trail.
+              Events on this ticket and its sessions, oldest first.
             </p>
             <ActorKindLegend />
           </div>
-          <AuditSpine events={data.events} now={now} />
+          <div aria-busy={eventCollection.pending}>
+            <AuditSpine events={eventCollection.items} now={now} />
+          </div>
+          <CollectionLoadMore
+            pagination={eventCollection.pagination}
+            loaded={eventCollection.items.length}
+            pending={eventCollection.pending}
+            error={eventCollection.error}
+            onLoadMore={eventCollection.loadMore}
+            noun="events"
+          />
         </TabsContent>
 
         <TabsContent value="overview" className="flex flex-col gap-4">
@@ -174,11 +203,21 @@ export function TicketDetailPage() {
         </TabsContent>
 
         <TabsContent value="sessions" className="flex flex-col gap-3">
-          {data.sessions.length === 0 ? (
+          {data.session_pagination.total === 0 ? (
             <p className="text-sm text-muted-foreground">No sessions yet.</p>
           ) : (
-            data.sessions.map((session) => <SessionCard key={session.id} session={session} />)
+            sessionCollection.items.map((session) => (
+              <SessionCard key={session.id} session={session} />
+            ))
           )}
+          <CollectionLoadMore
+            pagination={sessionCollection.pagination}
+            loaded={sessionCollection.items.length}
+            pending={sessionCollection.pending}
+            error={sessionCollection.error}
+            onLoadMore={sessionCollection.loadMore}
+            noun="sessions"
+          />
         </TabsContent>
 
         <TabsContent value="relationships" className="flex flex-col gap-3">

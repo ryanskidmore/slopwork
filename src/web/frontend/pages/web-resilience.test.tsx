@@ -78,7 +78,18 @@ describe("abortable page queries", () => {
         awaiting_ms: 10_000,
       },
     } satisfies TicketSummaryDTO;
-    const success: ReviewResponseDTO = { config, tickets: [reviewTicket] };
+    const success: ReviewResponseDTO = {
+      config,
+      tickets: [reviewTicket],
+      pagination: {
+        page: 1,
+        limit: 50,
+        total: 1,
+        total_pages: 1,
+        previous_page: null,
+        next_page: null,
+      },
+    };
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
@@ -120,17 +131,32 @@ describe("tree expansion", () => {
   const grandchild: TreeNodeDTO = {
     ticket: ticket("grandchild", "Grandchild"),
     children: [],
+    has_children: false,
+    children_truncated: false,
     external_parent: null,
   };
   const child: TreeNodeDTO = {
     ticket: ticket("child", "Child branch"),
     children: [grandchild],
+    has_children: true,
+    children_truncated: false,
     external_parent: null,
   };
   const tree: TreeResponseDTO = {
     config,
     total: 3,
-    roots: [{ ticket: ticket("root", "Root ticket"), children: [child], external_parent: null }],
+    returned: 3,
+    truncated: false,
+    bounds: { max_nodes: 500, max_depth: 6, maximum_nodes: 1_000, maximum_depth: 12 },
+    roots: [
+      {
+        ticket: ticket("root", "Root ticket"),
+        children: [child],
+        has_children: true,
+        children_truncated: false,
+        external_parent: null,
+      },
+    ],
   };
 
   it("keeps roots visible, limits default depth, and persists keyboard-driven expansion", async () => {

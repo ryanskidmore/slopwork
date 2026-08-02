@@ -8,6 +8,15 @@
  * this handler's only ordering opinion is `events`/`sessions` staying
  * oldest-first (the same order `WebDataSource` hands them back in), which
  * matches a provenance timeline's natural reading order.
+ *
+ * `events`/`sessions` are each bounded with their own `page`/`limit`
+ * (namespaced `events_page`/`events_limit`, `sessions_page`/
+ * `sessions_limit` so one request can page either independently) — the
+ * same envelope `pagination.ts` gives `GET /api/review`/`/api/stale`/
+ * `/api/questions`. Session plan versions are left unbounded: `Session`
+ * carries far fewer plan revisions than a ticket accumulates events or
+ * sessions, and this handler already bounds the two collections that can
+ * actually grow large.
  */
 import type { BunRequest } from "bun";
 import type { Session } from "../../core/index.js";
@@ -32,6 +41,12 @@ import {
   ticketSummaryDto,
 } from "./shared.js";
 import type { RelationshipsDTO, SessionDTO, TicketDetailDTO } from "./types.js";
+import { paginate, parsePage } from "./pagination.js";
+
+export const DEFAULT_DETAIL_EVENT_LIMIT = 50;
+export const DEFAULT_DETAIL_SESSION_LIMIT = 20;
+export const MAX_DETAIL_EVENT_LIMIT = 100;
+export const MAX_DETAIL_SESSION_LIMIT = 50;
 
 function sessionDto(session: Session, activeSessionId: string | null): SessionDTO {
   const latestVersion =
@@ -62,6 +77,21 @@ export async function handleTicketDetail(
   now: number,
 ): Promise<Response> {
   const ref = req.params.ref;
+  const url = new URL(req.url);
+  const eventPageInput = parsePage(url, {
+    pageParam: "events_page",
+    limitParam: "events_limit",
+    defaultLimit: DEFAULT_DETAIL_EVENT_LIMIT,
+    maxLimit: MAX_DETAIL_EVENT_LIMIT,
+  });
+  if (eventPageInput instanceof Response) return eventPageInput;
+  const sessionPageInput = parsePage(url, {
+    pageParam: "sessions_page",
+    limitParam: "sessions_limit",
+    defaultLimit: DEFAULT_DETAIL_SESSION_LIMIT,
+    maxLimit: MAX_DETAIL_SESSION_LIMIT,
+  });
+  if (sessionPageInput instanceof Response) return sessionPageInput;
   // Unlike every other route, ticket detail doesn't embed its own `config`
   // — the SPA's AppShell fetches `/api/config` once, globally, and renders
   // the fault-tolerance warning banner there (src/web/frontend/components/
@@ -79,6 +109,8 @@ export async function handleTicketDetail(
   const sessions = await dataSource.listSessionsForTicket(ticket.id);
   const eventResult = await dataSource.listEventsForTicket(ticket.id, sessions);
   const events = eventResult.events;
+  const eventPage = paginate(events, eventPageInput);
+  const sessionPage = paginate(sessions, sessionPageInput);
 
   const effectiveTicket = deriveEffectiveTickets([ticket], events)[0] ?? ticket;
   const thresholds = staleThresholdsFromConfig(config);
@@ -129,8 +161,10 @@ export async function handleTicketDetail(
       meta: ticket.spec.meta,
     },
     resolution_html: resolutionHtml,
-    events: events.map(eventDto),
-    sessions: sessions.map((s) => sessionDto(s, ticket.active_session)),
+    events: eventPage.items.map(eventDto),
+    event_pagination: eventPage.pagination,
+    sessions: sessionPage.items.map((session) => sessionDto(session, ticket.active_session)),
+    session_pagination: sessionPage.pagination,
     provenance: provenanceDto(ticket, byId),
     integrity: { event_problems: eventResult.problems },
   };

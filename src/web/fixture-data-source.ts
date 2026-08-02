@@ -227,7 +227,10 @@ export class FixtureDataSource implements WebDataSource {
     );
     return all
       .filter((s) => s.ticket === ticketId)
-      .sort((a, b) => a.started_at.localeCompare(b.started_at));
+      .sort((a, b) => {
+        const started = a.started_at.localeCompare(b.started_at);
+        return started !== 0 ? started : a.id.localeCompare(b.id);
+      });
   }
 
   /** The full `db/events/` directory, fault-tolerantly read — shared by
