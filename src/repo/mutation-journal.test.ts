@@ -11,8 +11,18 @@ import {
   ticketSchema,
 } from "../core/index.js";
 import { parseJsonc, writeCanonical } from "../core/jsonc.js";
-import { createEvent, listEvents, recoverMutationEvents, withMutationEvent } from "./events.js";
-import { type MutationJournal, mutationJournalFilePath } from "./mutation-journal.js";
+import {
+  createEvent,
+  listEvents,
+  readEvent,
+  recoverMutationEvents,
+  withMutationEvent,
+} from "./events.js";
+import {
+  commitMutationWithEvent,
+  type MutationJournal,
+  mutationJournalFilePath,
+} from "./mutation-journal.js";
 import { ensureDbDirs } from "./paths.js";
 import type { RepoPaths } from "./paths.js";
 import { createTicket, readTicket, ticketFilePath, updateTicket } from "./tickets.js";
@@ -323,5 +333,97 @@ describe("durable mutation journal recovery", () => {
     await expectMissing(ticketFilePath(paths, ticket.id));
     await expect(listEvents(paths)).resolves.toEqual([]);
     await expect(readFile(validPath, "utf8")).resolves.toBe(writeCanonical(valid));
+  });
+
+  it("rejects a journal whose event doesn't name the same entity it mutates", async () => {
+    const ticket = makeTicket();
+    const other = makeTicket();
+    const event = eventSchema.parse({
+      ...makeEvent(ticket),
+      entity: { kind: "ticket", id: other.id },
+    });
+    const journal: MutationJournal = {
+      schema_version: 1,
+      entity: { kind: "ticket", id: ticket.id },
+      mutation: { operation: "create", before_text: null, after_text: writeCanonical(ticket) },
+      event,
+    };
+    await writeFile(mutationJournalFilePath(paths, event.id), writeCanonical(journal));
+
+    await expect(recoverMutationEvents(paths)).rejects.toMatchObject({
+      exitCode: 1,
+      message: expect.stringContaining("must match the journal entity"),
+    });
+  });
+
+  it("skips .gitkeep placeholders in the journal directory instead of treating them as intents", async () => {
+    await writeFile(join(paths.mutationJournalDir, ".gitkeep"), "");
+
+    await expect(recoverMutationEvents(paths)).resolves.toEqual([]);
+    await expect(access(join(paths.mutationJournalDir, ".gitkeep"))).resolves.toBeUndefined();
+  });
+
+  it("fails loudly on a journal entry that isn't a .jsonc file", async () => {
+    await writeFile(join(paths.mutationJournalDir, "not-a-journal.txt"), "whatever");
+
+    await expect(recoverMutationEvents(paths)).rejects.toMatchObject({
+      exitCode: 1,
+      message: expect.stringContaining("expected <event-id>.jsonc"),
+    });
+  });
+
+  it("fails loudly on a journal filename that isn't a valid event id", async () => {
+    await writeFile(join(paths.mutationJournalDir, "not-an-event-id.jsonc"), "{}");
+
+    await expect(recoverMutationEvents(paths)).rejects.toMatchObject({
+      exitCode: 1,
+      message: expect.stringContaining("expected event_<ULID>.jsonc"),
+    });
+  });
+
+  it("fails loudly when a journal's filename id disagrees with its own event.id", async () => {
+    const ticket = makeTicket();
+    const event = makeEvent(ticket);
+    const journal: MutationJournal = {
+      schema_version: 1,
+      entity: { kind: "ticket", id: ticket.id },
+      mutation: { operation: "create", before_text: null, after_text: writeCanonical(ticket) },
+      event,
+    };
+    // Written under a DIFFERENT event id's filename than the journal's own event.id.
+    const mismatchedId = newEventId();
+    await writeFile(mutationJournalFilePath(paths, mismatchedId), writeCanonical(journal));
+
+    await expect(recoverMutationEvents(paths)).rejects.toMatchObject({
+      exitCode: 1,
+      message: expect.stringContaining("does not match event.id"),
+    });
+  });
+
+  it("refuses to commit a new intent whose journal path is occupied when it goes to write", async () => {
+    // recoverMutationJournals runs before this function ever writes its own
+    // journal, so an ordinary pre-existing file at the same path would
+    // already be drained by the time the "already exists" check runs. A
+    // `preparation` callback (invoked between recovery and the write) can
+    // still land a file in that exact window, which is what this simulates.
+    const ticket = makeTicket();
+    const event = makeEvent(ticket);
+    const path = mutationJournalFilePath(paths, event.id);
+
+    await expect(
+      commitMutationWithEvent(
+        paths,
+        event,
+        { kind: "ticket", id: ticket.id },
+        async () => {
+          await writeFile(path, "{}");
+          return { operation: "create", before_text: null, after_text: writeCanonical(ticket) };
+        },
+        { readEvent, createEvent },
+      ),
+    ).rejects.toMatchObject({
+      exitCode: 6,
+      message: expect.stringContaining("an intent with this event id already exists"),
+    });
   });
 });

@@ -86,6 +86,19 @@ describe("readEntityFile", () => {
     expect((threw as SlopError).message).toContain("count");
   });
 
+  it("renders a root-level schema issue as (root), not a blank field name", async () => {
+    const path = join(scratch, "not-an-object.jsonc");
+    await writeFile(path, "42\n");
+    let threw: unknown;
+    try {
+      await readEntityFile(path, widgetSchema);
+    } catch (err) {
+      threw = err;
+    }
+    expect(threw).toBeInstanceOf(SlopError);
+    expect((threw as SlopError).message).toContain("(root)");
+  });
+
   it("succeeds and returns the validated value for a clean file", async () => {
     const path = join(scratch, "ok.jsonc");
     await writeFile(path, '{ "id": "a", "count": 3 }\n');
