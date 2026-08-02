@@ -1,15 +1,8 @@
 import type { Command } from "commander";
 import { EXIT_CODES } from "../../core/index.js";
 import type { SessionId } from "../../core/index.js";
-import {
-  readSession,
-  readTicket,
-  repoPaths,
-  requireRepoRoot,
-  resolveTicketRef,
-  updateSession,
-  withLock,
-} from "../../repo/index.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
+import { openStorage } from "../../storage/index.js";
 import {
   diffPlanVersions,
   renderPlanDiffLines,
@@ -70,14 +63,15 @@ export async function runPlan(
   const paths = repoPaths(root);
   const config = await loadConfig(paths);
   const actor = resolveActor({ config, cwd: root });
+  const backend = await openStorage(paths);
 
-  const initialTicket = await resolveTicketRef(paths, ref);
+  const initialTicket = await backend.resolveTicketRef(ref);
 
-  const result = await withLock(paths.lockFile, async () => {
-    const current = await readTicket(paths, initialTicket.id);
+  const result = await backend.transact(async () => {
+    const current = await backend.readTicket(initialTicket.id);
     assertHasActiveSession(current);
     const sessionId = current.active_session as SessionId;
-    const session = await readSession(paths, sessionId);
+    const session = await backend.readSession(sessionId);
     // ticket_01KYAPN9NXY6RPSV6WGR42CJHJ: session ownership is a warning,
     // not an enforced gate — see sessionOwnershipWarning's own doc.
     // Computed against the PRE-mutation session (same as every other
@@ -88,8 +82,7 @@ export async function runPlan(
 
     if (steps.length > 0) {
       const { session: updated, isFirstVersion, version } = buildPlanVersion(session, steps);
-      await updateSession(
-        paths,
+      await backend.updateSession(
         session.id,
         diffSessionPatch(session, updated, ["plan"]),
         updated,
@@ -106,8 +99,7 @@ export async function runPlan(
     // assertValidInvocation already guarantees exactly one of these is set.
     const stepNumber = (opts.check ?? opts.uncheck) as number;
     const updated = buildPlanStepToggle(session, stepNumber, checked);
-    await updateSession(
-      paths,
+    await backend.updateSession(
       session.id,
       diffSessionPatch(session, updated, ["plan"]),
       updated,

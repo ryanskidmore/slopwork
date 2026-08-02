@@ -10,8 +10,7 @@ import { systemClock } from "../core/clock.js";
 import type { Ticket, TicketId } from "../core/index.js";
 import { EXIT_CODES, isTicketId, nowIso } from "../core/index.js";
 import { EXTERNAL_REF_PATTERN, checkJiraRefFormat } from "../core/entities/ref.js";
-import type { RepoPaths } from "../repo/paths.js";
-import { resolveTicketRef } from "../repo/refs.js";
+import type { StorageBackend } from "../storage/backend.js";
 import { SlopError } from "../cli/errors.js";
 import { deepEqualJson } from "./patch.js";
 
@@ -33,7 +32,7 @@ export type ParentResolution =
  * USAGE_ERROR exactly as any other local-ref lookup would.
  */
 export async function resolveParentRef(
-  paths: RepoPaths,
+  backend: StorageBackend,
   raw: string | undefined,
 ): Promise<ParentResolution> {
   if (raw === undefined) return { kind: "none" };
@@ -41,7 +40,7 @@ export async function resolveParentRef(
     const check = checkJiraRefFormat(raw);
     return { kind: "external", ref: raw, warning: check.warning };
   }
-  const ticket = await resolveTicketRef(paths, raw);
+  const ticket = await backend.resolveTicketRef(raw);
   return { kind: "local", ticket };
 }
 

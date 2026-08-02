@@ -219,7 +219,7 @@
  */
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { z } from "zod";
 import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
@@ -227,14 +227,13 @@ import {
   isEventId,
   isTicketId,
   labelSchema,
-  outgoingEdges,
   parentRefSchema,
   prioritySchema,
   sessionIdSchema,
   ticketIdSchema,
   ticketStateSchema,
 } from "../core/index.js";
-import type { Event, SessionId, Ticket, TicketId, TicketState } from "../core/index.js";
+import type { Ticket, TicketId } from "../core/index.js";
 import { isoTimestampSchema } from "../core/timestamp.js";
 import { slugSchema } from "../core/slug.js";
 import { parseJsonc, writeCanonical } from "../core/jsonc.js";
@@ -249,9 +248,23 @@ import { isRepresentableDurationMs, parseDurationMs } from "../core/duration.js"
 // (tickets/ready.ts, tickets/status.ts, tickets/cascade.ts) rather than
 // being duplicated or relocated into core/. See DECISIONS.md's C5 entry.
 import { computeReviewStaleAt, computeStaleAt } from "../tickets/staleness.js";
+// G2 (unify-effective-overlay): every pure derivation this index build
+// used to define locally — the effective latest_note/last_activity_at
+// fold, live blocked-counts, the ready verdict, reverse edges — now lives
+// in the ONE shared overlay module `src/tickets/overlay.ts`, consumed by
+// this driver AND the web explorer (src/web/overlays.ts) so the two can
+// never drift again. Same deliberate repo->tickets pure-module crossing
+// staleness.ts already established (see the C5 comment above).
+import {
+  buildReverseEdgeIndex,
+  computeBlockedCounts,
+  computeReady,
+  deriveEffectiveOverlay,
+  groupEventsByTicket,
+} from "../tickets/overlay.js";
 import { atomicWriteFile } from "./atomic-write.js";
 import { loadConfigDefaultsTolerant } from "./config.js";
-import { listEventsTolerant } from "./events.js";
+import { listEventShardDirs, listEventsTolerant } from "./events.js";
 import { isEnoent, readDirSafe } from "./fs-utils.js";
 import type { RepoPaths } from "./paths.js";
 import { listTicketsTolerant } from "./tickets.js";
@@ -362,142 +375,17 @@ export const dbIndexSchema = z.object({
 });
 export type DbIndex = z.infer<typeof dbIndexSchema>;
 
-/**
- * B4: ticket states that no longer block anything (D5's "blocked" derived
- * overlay). A blocker that has reached one of these states is CLOSED and
- * stops counting as a "live" blocker for whatever it names in its own
- * `blocks` array — this is the exact "live" in "live blocker" throughout
- * design.md §2 and this work item's brief. Matches `src/tickets/state.ts`'s
- * own treatment of `done`/`dropped` as terminal (`RAW_STATE_TRANSITIONS`)
- * and `sessions/context-pack.ts`'s pre-existing ad hoc live-blocker filter
- * (`t.state !== "done" && t.state !== "dropped"`) — this is now the one
- * place that rule lives, reused by both `buildIndex` below and B4's
- * done-cascade (`src/tickets/cascade.ts`), which recomputes
- * {@link computeBlockedCounts} fresh against a freshly re-read ticket list
- * rather than trusting any persisted counter (see that module's doc for
- * why recompute-from-truth, not a mutated counter, is this work item's
- * chosen design).
- */
-const CLOSED_TICKET_STATES: ReadonlySet<TicketState> = new Set(["done", "dropped"]);
-
-/** Is a ticket in `state` still capable of blocking something? See {@link CLOSED_TICKET_STATES}. */
-export function isLiveBlockerState(state: TicketState): boolean {
-  return !CLOSED_TICKET_STATES.has(state);
-}
-
-/**
- * B4: live blocked-by count for every ticket in `tickets` — for each
- * ticket, how many OTHER tickets currently in a non-`done`/`dropped` state
- * name it in their own `blocks` array. Pure, synchronous, no I/O. Always
- * has an entry (possibly `0`) for every id in `tickets`, so a caller may
- * `.get(id) ?? 0` purely defensively — every real id IS present.
- *
- * This is the ONE place `blocked_count` is computed: `buildIndex` calls it
- * over the full ticket set below, and B4's done-cascade
- * (`src/tickets/cascade.ts`) calls it again over a freshly re-read ticket
- * set after a closure, instead of decrementing a number stored anywhere
- * (D5: `blocked` is a derived overlay, never asserted — there is nowhere
- * on a `Ticket` to hold a running counter even if this wanted to).
- */
-export function computeBlockedCounts(tickets: readonly Ticket[]): Map<TicketId, number> {
-  const counts = new Map<TicketId, number>();
-  for (const ticket of tickets) counts.set(ticket.id, 0);
-  for (const blocker of tickets) {
-    if (!isLiveBlockerState(blocker.state)) continue;
-    for (const edge of outgoingEdges(blocker)) {
-      if (edge.kind !== "blocks") continue;
-      if (!isTicketId(edge.to)) continue; // "blocks" edges are always local (edge.ts) — defensive only
-      if (!counts.has(edge.to)) continue; // target absent from this ticket set — shouldn't happen for a consistent db
-      counts.set(edge.to, (counts.get(edge.to) ?? 0) + 1);
-    }
-  }
-  return counts;
-}
-
-/**
- * B4: design.md §2's `ready` verdict for a single ticket, verbatim —
- * `open ∧ no live blockers ∧ no active session`. Pure; the one place this
- * predicate is implemented, so `buildIndex`'s `ready` column and any other
- * caller that needs to ask "would this ticket be ready" (e.g. B4's
- * done-cascade, deciding whether a newly-unblocked ticket deserves a
- * `ticket.ready` event) always agree.
- */
-export function computeReady(
-  state: TicketState,
-  liveBlockedCount: number,
-  activeSession: SessionId | null,
-): boolean {
-  return state === "open" && liveBlockedCount === 0 && activeSession === null;
-}
-
-/** {@link deriveEffectiveOverlay}'s result — the two fields
- * ticket_01KY9RWFM80BKNE2CDX85QMKGS makes derived, not stored-verbatim. */
-export interface EffectiveOverlay {
-  latest_note: string | null;
-  last_activity_at: string;
-}
-
-/** The minimal ticket-shaped input {@link deriveEffectiveOverlay} needs. */
-export interface EffectiveOverlaySource {
-  latest_note: string | null;
-  last_activity_at: string;
-}
-
-/**
- * ticket_01KY9RWFM80BKNE2CDX85QMKGS: fold a ticket's stored baseline
- * together with every `payload.progress`-carrying event for that same
- * ticket, keeping whichever note is most recent — this is the ONE place
- * that combination happens; `buildIndex` below calls it per ticket, over
- * every event already grouped by `entity.id`.
- *
- * `events` MUST already be scoped to this one ticket (`buildIndex` groups
- * every event by `entity.id` once, up front, rather than filtering per
- * row) — a non-`"ticket"`-kind entry is skipped defensively, but this
- * function never checks `entity.id` itself. Order MUST be cursor
- * (ascending id / chronological), exactly what {@link listEventsTolerant}/
- * {@link listEvents} already return: since two events can (rarely, under
- * real concurrency) share the same millisecond-resolution `at`, iterating
- * in id order and using `>=` (not `>`) to decide "this event is newer"
- * means ties resolve toward whichever event has the greater id — full
- * determinism, without needing the id itself as a second sort key.
- *
- * A LOCKED `update --progress` (progress alongside a real field change)
- * mints its accompanying event from the exact same clock reading used to
- * build the ticket it writes (`src/cli/commands/update.ts`), so that
- * event's `at` is never strictly greater than the ticket's own
- * `last_activity_at` — the `>=` comparison below can re-select it, but
- * only ever with content identical to the stored baseline it's tied
- * with, so the effective result is byte-for-byte the same either way.
- * Only a genuinely lock-free progress event (whose `at` is strictly
- * later, having never touched the ticket file's own baseline at all) can
- * actually move the result.
- */
-export function deriveEffectiveOverlay(
-  ticket: EffectiveOverlaySource,
-  events: readonly Event[],
-): EffectiveOverlay {
-  let latestNote = ticket.latest_note;
-  let lastActivityAt = ticket.last_activity_at;
-  for (const event of events) {
-    if (event.entity.kind !== "ticket") continue;
-    const progress = event.payload.progress;
-    if (typeof progress !== "string") continue;
-    if (event.at >= lastActivityAt) {
-      lastActivityAt = event.at;
-      latestNote = progress;
-    }
-  }
-  return { latest_note: latestNote, last_activity_at: lastActivityAt };
-}
-
-function pushInto<K>(map: Map<K, TicketId[]>, key: K, value: TicketId): void {
-  const existing = map.get(key);
-  if (existing) {
-    existing.push(value);
-  } else {
-    map.set(key, [value]);
-  }
-}
+// G2 (unify-effective-overlay): re-exported from the shared overlay
+// module so existing repo-layer consumers/tests keep one stable import
+// path; the DEFINITIONS live in src/tickets/overlay.ts now — see this
+// module's import comment above.
+export {
+  computeBlockedCounts,
+  computeReady,
+  deriveEffectiveOverlay,
+  isLiveBlockerState,
+} from "../tickets/overlay.js";
+export type { EffectiveOverlay, EffectiveOverlaySource } from "../tickets/overlay.js";
 
 interface StatTuple {
   name: string;
@@ -505,11 +393,22 @@ interface StatTuple {
   size: number;
 }
 
-async function fingerprintTicketsDir(dir: string): Promise<DirFingerprint> {
+/**
+ * Generalized entity-directory fingerprint — a `{count, digest}` over
+ * every entity file's `(filename, mtimeMs, size)` tuple, computed from
+ * `readdir`/`stat` alone (never file content). Exported (G2) so the
+ * flatfile driver's cross-call read cache (src/storage/flatfile.ts) can
+ * key cached ticket/session listings on the exact same staleness signal
+ * the index auto-heal already trusts.
+ */
+export async function fingerprintEntityDir(
+  dir: string,
+  isId: (value: string) => boolean,
+): Promise<DirFingerprint> {
   const names = await readDirSafe(dir);
   const entityNames = names.filter((name) => {
     if (!name.endsWith(".jsonc")) return false;
-    return isTicketId(name.slice(0, -".jsonc".length));
+    return isId(name.slice(0, -".jsonc".length));
   });
 
   const stats = await Promise.all(
@@ -546,7 +445,7 @@ async function fingerprintTicketsDir(dir: string): Promise<DirFingerprint> {
 
 /**
  * C5: `config.yaml`'s own `(mtimeMs, size)` fingerprint — the single-file
- * analogue of {@link fingerprintTicketsDir}, shaped the same
+ * analogue of {@link fingerprintEntityDir}, shaped the same
  * (`DirFingerprint`) so it fits `ContentFingerprint`'s existing
  * `Record<string, DirFingerprint>` shape with no schema change. `count` is
  * `0`/`1` for absent/present, so a config.yaml being created or deleted
@@ -567,18 +466,33 @@ async function fingerprintConfigFile(configPath: string): Promise<DirFingerprint
 }
 
 /**
- * ticket_01KY9RWFM80BKNE2CDX85QMKGS: `events/`'s own fingerprint — cheaper
- * than {@link fingerprintTicketsDir}'s (zero `stat` calls, `readdir` only)
- * because it can be: events are immutable and strictly append-only
+ * ticket_01KY9RWFM80BKNE2CDX85QMKGS: ONE event directory's own fingerprint
+ * — cheaper than {@link fingerprintEntityDir}'s (zero per-file `stat`
+ * calls) because it can be: events are immutable and strictly append-only
  * (events.ts's module doc — no `updateEvent`, no `deleteEvent`), so
  * `{count, digest: <max event id>}` is already a complete signature of
- * "every event id currently on disk" — ids are ULIDs, so the lexically
+ * "every event id currently in `dir`" — ids are ULIDs, so the lexically
  * greatest one is also the most recently appended, and any append at all
- * changes both `count` and `digest`. This is what lets `loadIndex()`
- * notice a lock-free `update --progress` event even though appending one
+ * changes both `count` and `digest`.
+ *
+ * G2 (shard-event-storage): `dir` is deliberately just "one directory
+ * containing `event_<ulid>.jsonc` files directly" rather than "the whole
+ * events tree" — events.ts's sharded layout (t-6tqw9) splits events
+ * across the flat `events/` directory (old events, never migrated) and
+ * any number of `events/YYYY-MM/` shards, and this function fingerprints
+ * exactly one of those at a time; {@link computeContentFingerprint} below
+ * calls it once per directory (the flat one, always, plus once per shard
+ * `events.ts`'s `listEventShardDirs` reports currently exists) and
+ * assembles the results into one key per directory. Reused as-is for
+ * both cases with no change needed: a shard directory contains nothing
+ * but `event_<ulid>.jsonc` files, so `readDirSafe` + the same
+ * `.jsonc`-suffix/`isEventId` filter already used for the flat directory
+ * is exactly the right listing for a shard too. This is what lets
+ * `loadIndex()` notice a lock-free `update --progress` event — in
+ * whichever directory it actually landed in — even though appending one
  * never touches `tickets/` or `config.yaml`.
  */
-async function fingerprintEventsDir(dir: string): Promise<DirFingerprint> {
+export async function fingerprintEventsDir(dir: string): Promise<DirFingerprint> {
   const names = await readDirSafe(dir);
   const ids = names
     .filter((name) => name.endsWith(".jsonc"))
@@ -597,18 +511,58 @@ async function fingerprintEventsDir(dir: string): Promise<DirFingerprint> {
  * itself (key `"config"`) — `stale_at`/`review_stale_at` are computed
  * from its `defaults.*` thresholds, so a hand-edit to config.yaml must
  * invalidate the index exactly like a ticket-file edit does.
- * ticket_01KY9RWFM80BKNE2CDX85QMKGS: also fingerprints `events/` (key
- * `"events"`, {@link fingerprintEventsDir}) — see this module's doc
- * section above.
+ * ticket_01KY9RWFM80BKNE2CDX85QMKGS: also fingerprints events, via
+ * {@link fingerprintEventsDir}.
+ *
+ * G2 (shard-event-storage, t-6tqw9): events are now fingerprinted
+ * per-directory, not as one combined blob, since a lock-free progress
+ * event or a fresh `ticket.created` event can land in any one of several
+ * directories (the flat `events/` dir, or whichever `events/YYYY-MM/`
+ * shard its own id's month names) and the auto-heal check needs to
+ * notice a change in ANY of them:
+ *   - key `"events"` — the flat `events/` directory's OWN fingerprint,
+ *     scoped to files sitting directly in it (never shard contents).
+ *     ALWAYS present, even when zero flat files remain (`{count: 0,
+ *     digest: "empty"}`) — including after every flat event has been
+ *     migrated into shards — so this key's presence/shape never depends
+ *     on whether migration has ever run, only its CONTENT does.
+ *   - one additional key `` `events/${month}` `` (e.g. `"events/2026-08"`)
+ *     per shard directory {@link listEventShardDirs} (events.ts) reports
+ *     currently exists on disk, each holding that ONE shard's own
+ *     `{count, digest}` — computed the same cheap, zero-file-read way,
+ *     scoped to just that directory's own contents.
+ * `listEventShardDirs` (not a second, parallel "what shards exist"
+ * implementation of its own) is reused here deliberately — single source
+ * of truth for shard discovery between the write path (events.ts) and
+ * this fingerprint.
+ *
+ * No schema change was needed to add these dynamically-named keys:
+ * {@link ContentFingerprint} was already `z.record(z.string(),
+ * dirFingerprintSchema)` — open-ended, not a fixed `{tickets, config,
+ * events}` shape — specifically so a later work item could do exactly
+ * this. {@link fingerprintsEqual} (below) is likewise already fully
+ * generic over arbitrary key sets: a shard key present in one snapshot
+ * and absent in the other (a shard appearing via a new write, or
+ * disappearing — there is no delete path today, but nothing here assumes
+ * one) already correctly counts as "not equal" with no changes needed
+ * there either.
  */
 export async function computeContentFingerprint(paths: RepoPaths): Promise<ContentFingerprint> {
   const configPath = join(paths.slopDir, "config.yaml");
-  const [tickets, config, events] = await Promise.all([
-    fingerprintTicketsDir(paths.ticketsDir),
+  const shardDirs = await listEventShardDirs(paths);
+  const [tickets, config, events, shardEntries] = await Promise.all([
+    fingerprintEntityDir(paths.ticketsDir, isTicketId),
     fingerprintConfigFile(configPath),
     fingerprintEventsDir(paths.eventsDir),
+    Promise.all(
+      shardDirs.map(async (dir): Promise<readonly [string, DirFingerprint]> => {
+        const month = basename(dir);
+        const fingerprint = await fingerprintEventsDir(dir);
+        return [`events/${month}`, fingerprint] as const;
+      }),
+    ),
   ]);
-  return { tickets, config, events };
+  return { tickets, config, events, ...Object.fromEntries(shardEntries) };
 }
 
 function fingerprintsEqual(a: ContentFingerprint, b: ContentFingerprint): boolean {
@@ -707,26 +661,11 @@ export async function buildIndex(paths: RepoPaths, clock: Clock = systemClock): 
 
   // ticket_01KY9RWFM80BKNE2CDX85QMKGS: group once, up front — O(events),
   // not O(tickets × events) — then {@link deriveEffectiveOverlay} looks up
-  // each ticket's own (already cursor-ordered) slice in O(1).
-  const eventsByTicket = new Map<TicketId, Event[]>();
-  for (const event of events) {
-    if (event.entity.kind !== "ticket" || !isTicketId(event.entity.id)) continue;
-    const list = eventsByTicket.get(event.entity.id);
-    if (list) list.push(event);
-    else eventsByTicket.set(event.entity.id, [event]);
-  }
+  // each ticket's own (already cursor-ordered) slice in O(1). Shared with
+  // the web explorer via src/tickets/overlay.ts (G2).
+  const eventsByTicket = groupEventsByTicket(events);
 
-  const blockedBy = new Map<TicketId, TicketId[]>();
-  const relatedFrom = new Map<TicketId, TicketId[]>();
-  const discovered = new Map<TicketId, TicketId[]>();
-  for (const ticket of tickets) {
-    for (const edge of outgoingEdges(ticket)) {
-      if (!isTicketId(edge.to)) continue; // only `parent` edges may be external (edge.ts); irrelevant here
-      if (edge.kind === "blocks") pushInto(blockedBy, edge.to, edge.from);
-      else if (edge.kind === "relates-to") pushInto(relatedFrom, edge.to, edge.from);
-      else if (edge.kind === "discovered-from") pushInto(discovered, edge.to, edge.from);
-    }
-  }
+  const { blockedBy, relatedFrom, discovered } = buildReverseEdgeIndex(tickets);
 
   // B4: computed once over the full ticket set, then read per-row below —
   // see computeBlockedCounts's doc for why this (not a stored/decremented

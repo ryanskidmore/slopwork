@@ -13,11 +13,15 @@
  *    persisted `index.jsonc` — all fine for a read-only viewer at v0
  *    scale, and exactly why this work item does not need to wait on A3.
  *
- *  - A later work item's real-repo-layer adapter. See the class doc on
- *    FixtureDataSource for exactly what that adapter should and should not
- *    reuse from the repo layer.
+ *  - {@link ../storage-data-source.js!StorageDataSource} (G2): the real
+ *    adapter, backed by a {@link ../../storage/backend.js!StorageBackend}
+ *    (`slop web`'s actual data source since G2 — see that class's doc for
+ *    exactly what it reuses from `FixtureDataSource` vs. the storage
+ *    layer).
  */
+import { join } from "node:path";
 import type { Config, Event, Session, Ticket, TicketId } from "../core/index.js";
+import { configSchema } from "../core/index.js";
 
 /**
  * {@link WebDataSource.getConfig}'s return shape — web-corrupt-or-missing-config:
@@ -38,6 +42,50 @@ export interface ConfigResult {
   config: Config;
   /** Human-readable explanation of what went wrong reading config.yaml, or `null` when it loaded cleanly. */
   warning: string | null;
+}
+
+/**
+ * `project` has no schema default (design.md §3: it's required, prompted at
+ * `init`) — so a synthesized fallback {@link Config} needs an explicit
+ * stand-in. Deliberately visible/unusual rather than something that could
+ * pass for a real project name, since {@link readSlopConfigTolerant} only
+ * ever returns this alongside a non-null `warning` the caller is expected
+ * to surface too.
+ */
+const FALLBACK_PROJECT_LABEL = "(unknown — config.yaml unavailable)";
+
+/**
+ * web-corrupt-or-missing-config: the ONE tolerant `.slop/config.yaml`
+ * reader every {@link WebDataSource} implementation's `getConfig()` uses —
+ * `FixtureDataSource` and {@link ../storage-data-source.js!StorageDataSource}
+ * both call this rather than each re-implementing the same "never throws"
+ * contract. Config.yaml is deliberately NOT read through
+ * {@link ../storage/backend.js!StorageBackend}: it's what SELECTS a
+ * backend in the first place (a repo needs `backend:` read locally before
+ * it can even construct a remote client), and it's a single small local
+ * file regardless of which backend is configured — there is nothing about
+ * reading it that a remote backend would do any differently.
+ *
+ * Never throws: `config.yaml` missing (ENOENT), unreadable, invalid YAML,
+ * or schema-invalid all degrade to the same outcome — a synthesized
+ * default {@link Config} plus a non-null `warning` — instead of taking
+ * every §4.4 view down with a 500 (they all call `getConfig()`). Logged to
+ * stderr too (matches `fixture-data-source.ts`'s `warnSkippedFiles`
+ * convention for the tickets/sessions/events listings) so a real `slop
+ * web` operator sees it even if they don't have the browser open.
+ */
+export async function readSlopConfigTolerant(slopRoot: string): Promise<ConfigResult> {
+  const path = join(slopRoot, "config.yaml");
+  try {
+    const text = await Bun.file(path).text();
+    const parsed: unknown = Bun.YAML.parse(text);
+    return { config: configSchema.parse(parsed), warning: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const warning = `config.yaml could not be read — showing defaults (${message})`;
+    process.stderr.write(`slop web: ${path}: ${message}\n`);
+    return { config: configSchema.parse({ project: FALLBACK_PROJECT_LABEL }), warning };
+  }
 }
 
 /**

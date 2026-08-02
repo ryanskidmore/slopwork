@@ -5,16 +5,16 @@ import { join } from "node:path";
 import type { Command } from "commander";
 import type { ExitCode, JsoncPatchEntry } from "../../core/index.js";
 import { EXIT_CODES } from "../../core/exit-codes.js";
-import {
-  atomicWriteFile,
-  listTickets,
-  repoPaths,
-  requireRepoRoot,
-  resolveTicketRef,
-  ticketFilePath,
-  updateTicket,
-  withLock,
-} from "../../repo/index.js";
+// `atomicWriteFile` is a deliberate, narrow exception to "commands go
+// through StorageBackend only": `slop edit` opens the ticket's RAW bytes
+// in $EDITOR and must write those raw bytes straight back (rollback on a
+// bad/aborted edit, before any structured validation runs) — there is no
+// "give me the raw file" primitive on StorageBackend, nor should there be
+// (a remote backend has no local file to hand $EDITOR at all). The
+// structured, backend-portable write still goes through
+// `backend.updateTicket` below once the edit is validated.
+import { atomicWriteFile, repoPaths, requireRepoRoot } from "../../repo/index.js";
+import { openStorage } from "../../storage/index.js";
 import { validateEditedTicketText } from "../../tickets/edit.js";
 import { validateTicketEdges } from "../../tickets/edges.js";
 import { fullFieldPatch } from "../../tickets/patch.js";
@@ -90,9 +90,28 @@ export async function runEdit(ref: string): Promise<void> {
   const paths = repoPaths(root);
   const config = await loadConfig(paths);
   const actor = resolveActor({ config, cwd: root });
+  const backend = await openStorage(paths);
 
-  const ticket = await resolveTicketRef(paths, ref);
-  const filePath = ticketFilePath(paths, ticket.id);
+  // `localTicketFilePath` is StorageBackend's optional local-file
+  // capability (its own doc: "`slop edit` requires this capability; a
+  // backend without it cannot support $EDITOR-based editing") — a remote
+  // backend has no local file to hand $EDITOR at all. Checked BEFORE ref
+  // resolution deliberately: a backend lacking this capability can't
+  // support `edit` at all regardless of whether `ref` would even resolve
+  // (and today's remote stub fails EVERY call including
+  // `resolveTicketRef`, which would otherwise mask this clearer,
+  // more-specific refusal behind its own generic "not implemented" error).
+  if (!backend.localTicketFilePath) {
+    throw new SlopError(
+      `slop edit requires local file access, which the configured "${backend.kind}" backend does ` +
+        "not provide — use `slop update <ref> --parent/--blocks/--owner/--relates-to/...` instead " +
+        "(see `slop update --help`).",
+      EXIT_CODES.USAGE_ERROR,
+    );
+  }
+
+  const ticket = await backend.resolveTicketRef(ref);
+  const filePath = backend.localTicketFilePath(ticket.id);
   const before = await readFile(filePath, "utf8");
 
   const editorCmd = pickEditorCommand();
@@ -230,8 +249,8 @@ export async function runEdit(ref: string): Promise<void> {
   let wroteAnything = false;
   let descendantCount = 0;
   try {
-    await withLock(paths.lockFile, async (lock) => {
-      const all = await listTickets(paths);
+    await backend.transact(async () => {
+      const all = await backend.listTickets();
       const others = all.filter((t) => t.id !== candidate.id);
 
       validateTicketEdges(candidate, others);
@@ -243,8 +262,7 @@ export async function runEdit(ref: string): Promise<void> {
       // S3 spike decision) rather than trusting the editor's raw on-disk
       // bytes as final.
       const patch = fullFieldPatch(reparented);
-      await updateTicket(
-        paths,
+      await backend.updateTicket(
         reparented.id,
         patch,
         reparented,
@@ -259,14 +277,12 @@ export async function runEdit(ref: string): Promise<void> {
       for (const descendant of descendants) {
         // Fencing contract (lock.ts): re-check between each entity write
         // once more than one write is happening under this acquisition.
-        await lock.assertHeld();
         const descendantPatch: JsoncPatchEntry[] = [
           { path: ["root_id"], value: descendant.root_id },
           { path: ["path"], value: descendant.path },
           { path: ["updated_at"], value: descendant.updated_at },
         ];
-        await updateTicket(
-          paths,
+        await backend.updateTicket(
           descendant.id,
           descendantPatch,
           descendant,

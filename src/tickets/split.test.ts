@@ -9,6 +9,7 @@ import type { EventContext, MutationEventSpec } from "../repo/events.js";
 import { ensureDbDirs } from "../repo/paths.js";
 import type { RepoPaths } from "../repo/paths.js";
 import { createTicket } from "../repo/tickets.js";
+import { FlatfileBackend } from "../storage/flatfile.js";
 import { buildSplitChild } from "./split.js";
 
 const ctx: EventContext = { actor: { name: "ryan", kind: "human" }, session: null };
@@ -37,10 +38,12 @@ function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
 
 let scratch: string;
 let paths: RepoPaths;
+let backend: FlatfileBackend;
 
 beforeEach(async () => {
   scratch = await mkdtemp(join(tmpdir(), "slop-split-test-"));
   paths = await ensureDbDirs(scratch);
+  backend = new FlatfileBackend(paths);
 });
 
 afterEach(async () => {
@@ -53,7 +56,7 @@ describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
     await createTicket(paths, target, ctx, createdEvent);
 
     const { ticket: child } = await buildSplitChild(
-      paths,
+      backend,
       { name: "Sub 1", parent: target, actor },
       clock,
     );
@@ -67,7 +70,7 @@ describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
     await createTicket(paths, target, ctx, createdEvent);
 
     const { ticket: child } = await buildSplitChild(
-      paths,
+      backend,
       { name: "Sub", parent: target, actor },
       clock,
     );
@@ -81,7 +84,7 @@ describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
     await createTicket(paths, target, ctx, createdEvent);
 
     const { ticket: child } = await buildSplitChild(
-      paths,
+      backend,
       { name: "Sub", parent: target, actor },
       clock,
     );
@@ -100,7 +103,7 @@ describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
     await createTicket(paths, mid, ctx, createdEvent);
 
     const { ticket: leaf } = await buildSplitChild(
-      paths,
+      backend,
       { name: "Leaf", parent: mid, actor },
       clock,
     );
@@ -118,7 +121,7 @@ describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
     await createTicket(paths, jiraParented, ctx, createdEvent);
 
     const { ticket: child } = await buildSplitChild(
-      paths,
+      backend,
       { name: "Child of jira-parented", parent: jiraParented, actor },
       clock,
     );
@@ -138,7 +141,7 @@ describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
     await createTicket(paths, target, ctx, createdEvent);
 
     const { ticket: child } = await buildSplitChild(
-      paths,
+      backend,
       { name: "Sub", parent: target, actor },
       clock,
     );
@@ -165,7 +168,7 @@ describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
     await createTicket(paths, target, ctx, createdEvent);
 
     const { ticket: child } = await buildSplitChild(
-      paths,
+      backend,
       { name: "Fresh child", parent: target, actor },
       clock,
     );
@@ -182,13 +185,13 @@ describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
     await createTicket(paths, target, ctx, createdEvent);
 
     const { ticket: first } = await buildSplitChild(
-      paths,
+      backend,
       { name: "Same name", parent: target, actor },
       clock,
     );
     await createTicket(paths, first, ctx, createdEvent);
     const { ticket: second } = await buildSplitChild(
-      paths,
+      backend,
       { name: "Same name", parent: target, actor },
       clock,
     );
@@ -202,7 +205,7 @@ describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
     await createTicket(paths, target, ctx, createdEvent);
 
     await expect(
-      buildSplitChild(paths, { name: "   ", parent: target, actor }, clock),
+      buildSplitChild(backend, { name: "   ", parent: target, actor }, clock),
     ).rejects.toMatchObject({ exitCode: 2 });
   });
 
@@ -211,7 +214,7 @@ describe("buildSplitChild — provenance, edges, ancestry, inheritance", () => {
     await createTicket(paths, target, ctx, createdEvent);
 
     const { ticket: child } = await buildSplitChild(
-      paths,
+      backend,
       { name: "Sub", parent: target, actor },
       clock,
     );

@@ -9,6 +9,7 @@ import type { EventContext, MutationEventSpec } from "../repo/events.js";
 import { ensureDbDirs } from "../repo/paths.js";
 import type { RepoPaths } from "../repo/paths.js";
 import { createTicket } from "../repo/tickets.js";
+import { FlatfileBackend } from "../storage/flatfile.js";
 import { ancestryFor, recomputeAncestry, resolveParentRef } from "./parent.js";
 
 const ctx: EventContext = { actor: { name: "ryan", kind: "human" }, session: null };
@@ -33,10 +34,12 @@ function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
 
 let scratch: string;
 let paths: RepoPaths;
+let backend: FlatfileBackend;
 
 beforeEach(async () => {
   scratch = await mkdtemp(join(tmpdir(), "slop-parent-test-"));
   paths = await ensureDbDirs(scratch);
+  backend = new FlatfileBackend(paths);
 });
 
 afterEach(async () => {
@@ -45,38 +48,38 @@ afterEach(async () => {
 
 describe("resolveParentRef", () => {
   it("returns kind 'none' when no --parent was given", async () => {
-    expect(await resolveParentRef(paths, undefined)).toEqual({ kind: "none" });
+    expect(await resolveParentRef(backend, undefined)).toEqual({ kind: "none" });
   });
 
   it("resolves a local parent by full id / slug / short prefix (D12/D6)", async () => {
     const parent = makeTicket({ name: "Parent ticket", slug: "parent-ticket" });
     await createTicket(paths, parent, ctx, createdEvent);
 
-    await expect(resolveParentRef(paths, parent.id)).resolves.toEqual({
+    await expect(resolveParentRef(backend, parent.id)).resolves.toEqual({
       kind: "local",
       ticket: parent,
     });
-    await expect(resolveParentRef(paths, "parent-ticket")).resolves.toEqual({
+    await expect(resolveParentRef(backend, "parent-ticket")).resolves.toEqual({
       kind: "local",
       ticket: parent,
     });
-    await expect(resolveParentRef(paths, parent.id.slice(0, 14))).resolves.toEqual({
+    await expect(resolveParentRef(backend, parent.id.slice(0, 14))).resolves.toEqual({
       kind: "local",
       ticket: parent,
     });
   });
 
   it("throws NOT_FOUND for a local ref that doesn't resolve", async () => {
-    await expect(resolveParentRef(paths, "no-such-slug")).rejects.toMatchObject({ exitCode: 4 });
+    await expect(resolveParentRef(backend, "no-such-slug")).rejects.toMatchObject({ exitCode: 4 });
   });
 
   it("accepts a well-formed jira: ref as external, with no warning (§8.2 item 5)", async () => {
-    const result = await resolveParentRef(paths, "jira:PROJ-123");
+    const result = await resolveParentRef(backend, "jira:PROJ-123");
     expect(result).toEqual({ kind: "external", ref: "jira:PROJ-123", warning: undefined });
   });
 
   it("accepts a malformed jira: ref as external too, WARNING but never blocking (§8.2 item 5)", async () => {
-    const result = await resolveParentRef(paths, "jira:not-a-key");
+    const result = await resolveParentRef(backend, "jira:not-a-key");
     expect(result.kind).toBe("external");
     if (result.kind === "external") {
       expect(result.warning).toBeDefined();
@@ -85,7 +88,7 @@ describe("resolveParentRef", () => {
   });
 
   it("accepts a non-jira external ref with no warning at all", async () => {
-    const result = await resolveParentRef(paths, "gh:123");
+    const result = await resolveParentRef(backend, "gh:123");
     expect(result).toEqual({ kind: "external", ref: "gh:123", warning: undefined });
   });
 });

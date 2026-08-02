@@ -1,15 +1,8 @@
 import type { Command } from "commander";
 import type { Ticket } from "../../core/index.js";
 import { EXIT_CODES, nowIso, systemClock } from "../../core/index.js";
-import {
-  createTicket,
-  readTicket,
-  repoPaths,
-  requireRepoRoot,
-  resolveTicketRef,
-  updateTicket,
-  withLock,
-} from "../../repo/index.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
+import { openStorage } from "../../storage/index.js";
 import { TICKET_FIELDS, diffTicketPatch } from "../../tickets/patch.js";
 import { buildSplitChild } from "../../tickets/split.js";
 import { loadConfig, resolveActor } from "../actor.js";
@@ -103,15 +96,16 @@ export async function runSplit(
   const paths = repoPaths(root);
   const config = await loadConfig(paths);
   const actor = resolveActor({ config, cwd: root });
+  const backend = await openStorage(paths);
 
   // A read outside the lock is fine for surfacing NOT_FOUND/AMBIGUOUS_REF
   // quickly on a cold ref (same rationale as `start.ts`'s own comment) —
   // the decisive read every child/patch is built from happens fresh,
   // under the lock, immediately below.
-  const initialTarget = await resolveTicketRef(paths, ref);
+  const initialTarget = await backend.resolveTicketRef(ref);
 
-  const children: Ticket[] = await withLock(paths.lockFile, async (lock) => {
-    const target = await readTicket(paths, initialTarget.id);
+  const children: Ticket[] = await backend.transact(async () => {
+    const target = await backend.readTicket(initialTarget.id);
     const created: Ticket[] = [];
 
     for (let i = 0; i < names.length; i++) {
@@ -121,11 +115,9 @@ export async function runSplit(
         // Fencing contract (lock.ts): re-check between each entity write
         // once more than one write happens under this acquisition. The
         // very first write is covered by the acquisition itself.
-        await lock.assertHeld();
       }
-      const { ticket } = await buildSplitChild(paths, { name, parent: target, actor });
-      await createTicket(
-        paths,
+      const { ticket } = await buildSplitChild(backend, { name, parent: target, actor });
+      await backend.createTicket(
         ticket,
         { actor, session: null },
         {
@@ -141,11 +133,9 @@ export async function runSplit(
       created.push(ticket);
     }
 
-    await lock.assertHeld();
     const now = nowIso(systemClock);
     const updatedTarget: Ticket = { ...target, last_activity_at: now, updated_at: now };
-    await updateTicket(
-      paths,
+    await backend.updateTicket(
       target.id,
       diffTicketPatch(target, updatedTarget, TICKET_FIELDS),
       updatedTarget,

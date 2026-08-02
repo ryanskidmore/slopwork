@@ -2,9 +2,12 @@ import { mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ulid } from "ulid";
 import { fixedClock } from "../core/clock.js";
 import {
+  type Event,
   type Ticket,
+  eventSchema,
   newSessionId,
   newTicketId,
   ticketSchema,
@@ -21,7 +24,7 @@ import {
   loadIndex,
   writeIndex,
 } from "./db-index.js";
-import { appendEvent } from "./events.js";
+import { appendEvent, createEvent, eventShardMonth } from "./events.js";
 import type { EventContext, MutationEventSpec } from "./events.js";
 import { ensureDbDirs } from "./paths.js";
 import type { RepoPaths } from "./paths.js";
@@ -50,6 +53,31 @@ function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
     last_activity_at: "2026-07-23T10:00:00.000Z",
     created_at: "2026-07-23T10:00:00.000Z",
     updated_at: "2026-07-23T10:00:00.000Z",
+    ...overrides,
+  });
+}
+
+/**
+ * G2 (shard-event-storage): a full, valid `Event` whose id's OWN embedded
+ * ULID timestamp is `atMs` — NOT "now". `core/ids.ts`'s `newEventId`
+ * always mints against the real wall clock (it has no seed-time
+ * parameter), so it's useless for deliberately landing an event in an
+ * arbitrary/old shard month; this instead mints the raw ULID body
+ * directly via the `ulid` package's own seed-time overload (`ulid(atMs)`,
+ * distinct from `core/ids.ts`'s shared monotonic factory) and assembles
+ * a schema-valid `Event` around it, so tests can exercise
+ * {@link computeContentFingerprint}'s per-shard behavior against two
+ * (or more) deliberately-different months without depending on which
+ * month the test happens to actually run in.
+ */
+function makeEventAt(atMs: number, overrides: Partial<Event> = {}): Event {
+  return eventSchema.parse({
+    id: `event_${ulid(atMs)}`,
+    actor: { name: "ryan", kind: "human" },
+    session: null,
+    verb: "ticket.created",
+    entity: { kind: "ticket", id: newTicketId() },
+    at: new Date(atMs).toISOString(),
     ...overrides,
   });
 }
@@ -815,16 +843,20 @@ describe("computeContentFingerprint", () => {
 
   it("is readdir+stat only — never reads or parses file content (spot check: garbage content doesn't throw)", async () => {
     const t = makeTicket();
-    await createTicket(paths, t, ctx, createdEvent);
+    const created = await createTicket(paths, t, ctx, createdEvent);
     await writeFile(ticketFilePath(paths, t.id), "{ not even valid jsonc {{{");
+    // G2 (shard-event-storage): createTicket's accompanying `ticket.created`
+    // event lands in ITS OWN id's shard, never flat — so the flat `events`
+    // key stays {count: 0, digest: "empty"} and a NEW `events/<month>` key
+    // (the month derived from the created event's own id, never a
+    // hardcoded/wall-clock-dependent string, so this test doesn't depend on
+    // what month it happens to run in) carries the {count: 1, digest}.
+    const month = eventShardMonth(created.id);
     await expect(computeContentFingerprint(paths)).resolves.toEqual({
       tickets: { count: 1, digest: expect.any(String) },
       config: { count: 0, digest: "absent" },
-      // ticket_01KY9RWFM80BKNE2CDX85QMKGS: events/ joins the fingerprint
-      // too — createTicket above already appended one `ticket.created`
-      // event (A4), so this is {count: 1, digest: <that event's own id>},
-      // never a readdir/stat-only listing.
-      events: { count: 1, digest: expect.any(String) },
+      events: { count: 0, digest: "empty" },
+      [`events/${month}`]: { count: 1, digest: expect.any(String) },
     });
   });
 
@@ -834,20 +866,86 @@ describe("computeContentFingerprint", () => {
   // config.yaml. Cheap by construction (events are immutable/append-only,
   // events.ts's module doc): {count, digest: <max event id>}, zero `stat`
   // calls, unlike fingerprintTicketsDir's per-file stat.
+  //
+  // G2 (shard-event-storage): a NEW event never lands in the flat `events/`
+  // directory anymore (events.ts's module doc) — it lands in
+  // `events/<eventShardMonth(id)>/`. The flat `events` key therefore stays
+  // put (still meaning "the flat directory's own fingerprint", still
+  // `{count: 0, digest: "empty"}` with nothing flat ever written), and a
+  // per-shard `events/<month>` key is what actually changes on append —
+  // see the tests below.
   describe("events/ is part of the fingerprint", () => {
     it("is {count:0, digest:'empty'} for an empty events dir", async () => {
       const fp = await computeContentFingerprint(paths);
       expect(fp.events).toEqual({ count: 0, digest: "empty" });
     });
 
-    it("changes (count and digest, the max event id) on every event appended, regardless of which ticket file it describes", async () => {
+    it("changes (count and digest, the max event id) on every event appended, regardless of which ticket file it describes — via a NEW `events/<month>` shard key, since the flat `events` key never receives a new write", async () => {
       const before = await computeContentFingerprint(paths);
       const t = makeTicket();
       const created = await createTicket(paths, t, ctx, createdEvent);
       const after = await computeContentFingerprint(paths);
-      expect(after.events?.count).toBe((before.events?.count ?? 0) + 1);
-      expect(after.events?.digest).toBe(created.id);
-      expect(after.events?.digest).not.toBe(before.events?.digest);
+
+      // The flat key is untouched: no new event has ever been written
+      // flat, in `before` or `after`.
+      expect(after.events).toEqual({ count: 0, digest: "empty" });
+      expect(before.events).toEqual({ count: 0, digest: "empty" });
+
+      const month = eventShardMonth(created.id);
+      const key = `events/${month}`;
+      expect(before[key]).toBeUndefined();
+      expect(after[key]?.count).toBe(1);
+      expect(after[key]?.digest).toBe(created.id);
+    });
+
+    it("two events landing in two different months produce two independent shard keys, each reflecting only that one shard's own content", async () => {
+      // A deliberately old-dated event — synthesized via `makeEventAt`
+      // rather than `createTicket`/`appendEvent`, since `newEventId()`
+      // always mints against the real wall clock (core/ids.ts has no
+      // seed-time parameter) and this test needs two events guaranteed to
+      // land in two DIFFERENT shard months regardless of when it's run.
+      const oldEvent = makeEventAt(new Date("2020-01-15T00:00:00.000Z").getTime());
+      await createEvent(paths, oldEvent);
+
+      // A "current" (real-clock) event via the normal mutation path.
+      const currentEvent = await appendEvent(
+        paths,
+        ctx,
+        { kind: "ticket", id: newTicketId() },
+        { verb: "ticket.created" },
+      );
+
+      const oldMonth = eventShardMonth(oldEvent.id);
+      const currentMonth = eventShardMonth(currentEvent.id);
+      // Sanity: this test only proves what it claims to if these really
+      // are two different shards.
+      expect(oldMonth).not.toBe(currentMonth);
+
+      const fp = await computeContentFingerprint(paths);
+      expect(fp.events).toEqual({ count: 0, digest: "empty" }); // flat: untouched
+      expect(fp[`events/${oldMonth}`]).toEqual({ count: 1, digest: oldEvent.id });
+      expect(fp[`events/${currentMonth}`]).toEqual({ count: 1, digest: currentEvent.id });
+    });
+
+    it("a shard key appearing between two snapshots is a real difference — the property fingerprintsEqual's generic (not fixed-3-key) comparison depends on", async () => {
+      const before = await computeContentFingerprint(paths);
+      const event = await appendEvent(
+        paths,
+        ctx,
+        { kind: "ticket", id: newTicketId() },
+        { verb: "ticket.created" },
+      );
+      const key = `events/${eventShardMonth(event.id)}`;
+
+      // The key didn't exist at all in the earlier snapshot...
+      expect(before[key]).toBeUndefined();
+      // ...and does in the later one — a fingerprint comparison that only
+      // ever checked a fixed set of keys (rather than the full key union,
+      // which is what `fingerprintsEqual` actually does) could miss this
+      // exact shape of change.
+      const after = await computeContentFingerprint(paths);
+      expect(after[key]).toEqual({ count: 1, digest: event.id });
+      expect(after).not.toEqual(before);
     });
   });
 

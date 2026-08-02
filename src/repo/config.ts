@@ -26,12 +26,37 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseConfigYamlText } from "../cli/config-yaml.js";
-import type { ConfigDefaults } from "../core/index.js";
-import { configDefaultsSchema, configSchema } from "../core/index.js";
+import type { BackendSelection, Config, ConfigDefaults } from "../core/index.js";
+import { configDefaultsSchema, configSchema, normalizeBackendSelection } from "../core/index.js";
+import { DEFAULT_LOCK_TIMEOUT } from "../core/entities/config.js";
+import { parseDurationMs } from "../core/duration.js";
 import type { RepoPaths } from "./paths.js";
 
 /** `configDefaultsSchema.parse({})` — `DEFAULT_STALE_AFTER`/`DEFAULT_REVIEW_STALE_AFTER`, computed once. */
 const SCHEMA_DEFAULTS: ConfigDefaults = configDefaultsSchema.parse({});
+
+/**
+ * Shared tolerant read: `.slop/config.yaml`, parsed and schema-validated,
+ * or `null` on ANY failure (missing file, unreadable, unparseable YAML
+ * text, schema mismatch). Both {@link loadConfigDefaultsTolerant} and
+ * {@link loadBackendSelectionTolerant} are thin projections of this one
+ * read, so there is exactly one "how do we tolerantly read config.yaml"
+ * implementation rather than two independently-drifting copies.
+ */
+async function tryReadConfigTolerant(paths: RepoPaths): Promise<Config | null> {
+  const configPath = join(paths.slopDir, "config.yaml");
+  try {
+    const text = await readFile(configPath, "utf8");
+    const raw = parseConfigYamlText(text);
+    const parsed = configSchema.safeParse(raw);
+    if (parsed.success) return parsed.data;
+  } catch {
+    // Missing file, unreadable, or unparseable text — fall back below.
+    // Deliberately swallowed: this function's whole contract is "never
+    // throws," see module doc.
+  }
+  return null;
+}
 
 /**
  * `.slop/config.yaml`'s `defaults.stale_after`/`defaults.review_stale_after`
@@ -41,16 +66,42 @@ const SCHEMA_DEFAULTS: ConfigDefaults = configDefaultsSchema.parse({});
  * thresholds to compute `stale_at`/`review_stale_at` against.
  */
 export async function loadConfigDefaultsTolerant(paths: RepoPaths): Promise<ConfigDefaults> {
-  const configPath = join(paths.slopDir, "config.yaml");
-  try {
-    const text = await readFile(configPath, "utf8");
-    const raw = parseConfigYamlText(text);
-    const parsed = configSchema.safeParse(raw);
-    if (parsed.success) return parsed.data.defaults;
-  } catch {
-    // Missing file, unreadable, or unparseable text — fall back below.
-    // Deliberately swallowed: this function's whole contract is "never
-    // throws," see module doc.
+  const config = await tryReadConfigTolerant(paths);
+  return config?.defaults ?? SCHEMA_DEFAULTS;
+}
+
+/** {@link loadBackendSelectionTolerant}'s return shape. */
+export interface BackendConfigTolerant {
+  /** Normalized `backend:` selection (docs/configuration.md) — `{kind: "flatfile"}` on any read failure. */
+  backend: BackendSelection;
+  /** `defaults.lock_timeout`, already parsed to milliseconds — {@link DEFAULT_LOCK_TIMEOUT}'s ms value on any read failure. */
+  lockTimeoutMs: number;
+}
+
+const SCHEMA_DEFAULT_LOCK_TIMEOUT_MS = parseDurationMs(DEFAULT_LOCK_TIMEOUT);
+
+/**
+ * G2 (storage backend selection): `.slop/config.yaml`'s `backend:` and
+ * `defaults.lock_timeout` — read tolerantly, same policy as
+ * {@link loadConfigDefaultsTolerant} and for the same reason: backend
+ * selection has to work for every command, including the read-only ones
+ * that have never required a valid config.yaml to run (e.g. `slop status`
+ * against a repo with no config.yaml at all is a long-standing, deliberate
+ * behavior — see `cli/actor.ts`'s `loadConfig`, which DOES throw, being
+ * reserved for commands that need a resolved actor). Never throws: any
+ * failure falls back to the flatfile default with the hardcoded lock
+ * timeout, exactly as if `backend:` and `defaults.lock_timeout` were both
+ * absent.
+ */
+export async function loadBackendSelectionTolerant(
+  paths: RepoPaths,
+): Promise<BackendConfigTolerant> {
+  const config = await tryReadConfigTolerant(paths);
+  if (config === null) {
+    return { backend: { kind: "flatfile" }, lockTimeoutMs: SCHEMA_DEFAULT_LOCK_TIMEOUT_MS };
   }
-  return SCHEMA_DEFAULTS;
+  return {
+    backend: normalizeBackendSelection(config.backend),
+    lockTimeoutMs: parseDurationMs(config.defaults.lock_timeout),
+  };
 }

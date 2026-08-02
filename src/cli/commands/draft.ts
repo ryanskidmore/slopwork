@@ -1,13 +1,7 @@
 import type { Command } from "commander";
 import { shortTicketCode } from "../../core/index.js";
-import {
-  readTicket,
-  repoPaths,
-  requireRepoRoot,
-  resolveTicketRef,
-  updateTicket,
-  withLock,
-} from "../../repo/index.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
+import { openStorage } from "../../storage/index.js";
 import { assertDraftable } from "../../tickets/draft.js";
 import { buildUpdate } from "../../tickets/update.js";
 import { loadConfig, resolveActor } from "../actor.js";
@@ -21,6 +15,7 @@ export async function runDraft(ref: string, opts: DraftCommandOptions = {}): Pro
   const paths = repoPaths(root);
   const config = await loadConfig(paths);
   const actor = resolveActor({ config, cwd: root });
+  const backend = await openStorage(paths);
 
   // A read outside the lock is fine for resolving <ref> -> id; the
   // decisive read-modify-write happens fresh, under the lock, below — same
@@ -28,10 +23,10 @@ export async function runDraft(ref: string, opts: DraftCommandOptions = {}): Pro
   // `initialTicket`) — otherwise a concurrent `start`/`stop`/`done` landing
   // between this read and the write below would be silently reverted by
   // `updateTicket`'s `writeCanonical(expectedAfter)` fallback.
-  const initialTicket = await resolveTicketRef(paths, ref);
+  const initialTicket = await backend.resolveTicketRef(ref);
 
-  const result = await withLock(paths.lockFile, async () => {
-    const current = await readTicket(paths, initialTicket.id);
+  const result = await backend.transact(async () => {
+    const current = await backend.readTicket(initialTicket.id);
     // The one guard `update.ts`'s generic transition table can't express on
     // its own — see `tickets/draft.ts`'s module doc.
     assertDraftable(current);
@@ -54,8 +49,7 @@ export async function runDraft(ref: string, opts: DraftCommandOptions = {}): Pro
       context: [],
     });
 
-    await updateTicket(
-      paths,
+    await backend.updateTicket(
       current.id,
       patch,
       ticket,

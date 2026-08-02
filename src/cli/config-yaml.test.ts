@@ -21,7 +21,8 @@ defaults:
         repo: "https://github.com/ryan/slopwork",
         jira: "https://yourorg.atlassian.net",
       },
-      defaults: { stale_after: "60m", review_stale_after: "24h" },
+      defaults: { stale_after: "60m", review_stale_after: "24h", lock_timeout: "5s" },
+      backend: "flatfile",
     });
   });
 
@@ -74,7 +75,8 @@ describe("stringifyConfigYaml", () => {
         repo: "https://github.com/ryan/slopwork",
         jira: "https://yourorg.atlassian.net",
       },
-      defaults: { stale_after: "60m", review_stale_after: "24h" },
+      defaults: { stale_after: "60m", review_stale_after: "24h", lock_timeout: "5s" },
+      backend: "flatfile",
     });
   });
 

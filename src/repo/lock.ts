@@ -1,148 +1,95 @@
 /**
- * `.slop/db/.lock` for multi-file transactions (design.md §3: "`.slop/db/
- * .lock` for multi-file transactions (done-cascade, reparent)").
+ * `.slop/db/.lock` — the flatfile db's single write lock.
  *
- * Single-file entity writes never need this — {@link "./atomic-write.js"}
- * already makes any one file's write atomic on its own. This lock exists
- * purely for operations that must touch more than one file as one logical
- * unit (B4's done-cascade, a future reparent) so a reader never observes
- * half of a multi-file change.
+ * Despite its original "multi-file transactions only" billing, this lock
+ * serializes the WHOLE write path: every mutating command (13 of them —
+ * `new`, `update` with any real field, `edit`, `draft`, `undraft`,
+ * `start`, `stop`, `review`, `done`, `drop`, `plan`, `split`, and
+ * `reindex --heal`) takes it around its read-modify-write, both for
+ * multi-file units (the done-cascade, a reparent) AND to keep a plain
+ * single-ticket read-modify-write from clobbering a concurrent writer's
+ * change. The only mutating operation that skips it is the lock-free pure
+ * `update --progress` event append (see docs/concurrency-and-merging.md).
  *
- * Algorithm:
- *   - Acquire by creating the lock file with `O_EXCL` (`open(path, "wx")`)
- *     — exclusive creation is atomic at the OS level, so this is never a
- *     check-then-create race between two processes.
- *   - The lock file's content records the holder's pid, an ISO timestamp,
- *     and a unique **fencing token** (a ULID) — so a stuck lock is
- *     diagnosable by reading it, and so a dispossessed holder can tell it
- *     no longer legitimately holds the lock (see "Fencing" below).
- *   - **Stale-lock recovery**: if creation fails with `EEXIST`, read the
- *     existing lock. It is breakable (relocated, then creation retried) if
- *     either: its recorded pid is no longer alive (`process.kill(pid, 0)`
- *     raises `ESRCH`), or it is older than `staleTimeoutMs`. A lock file
- *     that can't even be parsed is treated as breakable once it's older
- *     than `staleTimeoutMs` by mtime. This is what stops one `kill -9`
- *     from bricking the repo permanently — a dead holder's lock is always
- *     eventually recoverable, either instantly (dead pid) or after the
- *     generous timeout (hung-but-alive holder).
+ * G2 (simplify-db-lock) deliberately reduced this module from a ~518-line
+ * fencing protocol (per-acquisition tokens, `assertHeld()` renewal,
+ * dispossession detection) to the plain mechanism below. The fencing
+ * machinery guarded exactly one scenario — a live holder running past the
+ * stale timeout getting silently dispossessed mid-transaction — and its
+ * own decision log conceded no real call site runs anywhere near the
+ * 5-minute stale timeout (every real transaction is a handful of
+ * millisecond-scale file writes). What remains is the part with real call
+ * sites:
  *
- *     Breaking is done by **atomic rename-away**, not a blind `rm` — see
- *     {@link tryBreakStaleLock} for why a plain `rm` is a TOCTOU race
- *     between two contenders that both judge the same stale lock breakable
- *     (lock-stale-break-toctou).
- *   - Acquisition is bounded: retries with capped exponential backoff
- *     until `timeoutMs` elapses, then throws a {@link SlopError} with the
- *     CONFLICT exit code (6) naming what's blocking it.
+ *   - **Acquisition** is exclusive file creation (`O_EXCL`) — atomic at
+ *     the OS level, never a check-then-create race. The lock file records
+ *     `{pid, acquired_at}` so a stuck lock is diagnosable by reading it.
+ *   - **Bounded waiting**: retries with capped exponential backoff until
+ *     `timeoutMs` elapses (default {@link DEFAULT_TIMEOUT_MS}, 5s —
+ *     configurable via `.slop/config.yaml`'s `defaults.lock_timeout`, see
+ *     docs/configuration.md; the storage layer threads it through), then
+ *     throws a {@link SlopError} with the CONFLICT exit code (6) naming
+ *     the holder.
+ *   - **Stale-lock recovery**: a lock is breakable if its recorded pid is
+ *     no longer alive (`process.kill(pid, 0)` raises `ESRCH`) — the
+ *     `kill -9` case, recovered instantly — or if it is older than
+ *     `staleTimeoutMs` (default 5 minutes; also covers pid reuse, where a
+ *     crashed holder's pid now names some unrelated long-lived process).
+ *     An unparseable lock file is breakable once it's older than
+ *     `staleTimeoutMs` by mtime. KEPT from the old design (and proven by
+ *     its own test): breaking relocates the lock via an atomic `rename`
+ *     to a breaker-unique sentinel and verifies, by content match, that
+ *     what was relocated is the same stale lock this breaker inspected —
+ *     a plain `rm` is a TOCTOU race in which contender B can delete the
+ *     fresh, live lock contender A just legitimately created after
+ *     breaking the same stale lock B read. That race is real and cheap to
+ *     prevent; the fencing protocol was neither.
+ *   - **Release** always runs in a `finally` and is a compare-and-delete
+ *     on the recorded pid, so a process never deletes a lock that is no
+ *     longer its own (e.g. its stale lock was broken and re-acquired by
+ *     someone else while it slept).
  *
- * ## Fencing (adversarial-review Finding 1)
- *
- * Staleness alone can't distinguish a **hung** holder from a **slow but
- * alive** one — a legitimate holder that runs past `staleTimeoutMs`
- * (contended, I/O-stalled, GC-paused, cgroup-throttled) looks identical,
- * from the outside, to a genuinely dead one. Without fencing, a slow
- * holder's lock could be silently stolen while it keeps writing, giving
- * two processes the "exclusive" section at once with no error at all —
- * reproduced by the reviewer as a lost update to a shared counter, with
- * neither writer ever seeing an error.
- *
- * The fix has two halves:
- *   1. Every acquisition mints a unique **fencing token** (a ULID),
- *      recorded in the lock file alongside pid/`acquired_at`.
- *      {@link acquireLock} (and therefore {@link withLock}) returns a
- *      {@link LockHandle} exposing `assertHeld()`, which re-reads the
- *      lock file and throws a {@link SlopError} (CONFLICT, exit 6) if the
- *      recorded token no longer matches this handle's — i.e. this
- *      process has been dispossessed (its lock was declared stale and
- *      broken by someone else). **A dispossessed holder must fail loudly
- *      rather than continue writing** — that's what `assertHeld()` is
- *      for.
- *   2. `assertHeld()` also **renews** the lock: on success (token still
- *      matches), it refreshes the recorded `acquired_at` to "now". A
- *      holder that calls `assertHeld()` regularly as it works is
- *      therefore never reclaimed merely for running long — this turns
- *      the staleness timeout into "no progress for `staleTimeoutMs`", not
- *      "started more than `staleTimeoutMs` ago", which is what it should
- *      have meant all along.
- *
- * **Every call site that performs more than one write inside a single
- * {@link withLock} block MUST call the handle's `assertHeld()` between
- * writes** (not just once at the top) — B4's done-cascade and any future
- * reparent are the intended callers. Skipping it defeats the whole
- * mechanism: a transaction that never checks back in can still be
- * dispossessed partway through and keep writing under someone else's
- * nose, exactly the silent-two-holders failure this exists to prevent.
- * Calling `assertHeld()` liberally is cheap (one `readFile` + one
- * `atomicWriteFile`) relative to any real entity write, so there's no
- * reason to economize on it.
- *
- *   - {@link withLock} always releases in a `finally`, so a thrown error
- *     from the wrapped function still releases the lock.
- *   - Release is a compare-and-delete: it re-reads the lock file first and
- *     only removes it if it's still this acquisition's lock — by fencing
- *     token when the caller has one (every {@link withLock}/{@link
- *     acquireLock} caller does, via {@link LockHandle.token}), falling
- *     back to pid-comparison for a caller that only ever had a bare
- *     `lockPath`. This matters for the (rare, but real) case where this
- *     process held the lock, stalled long enough to be declared stale and
- *     broken by someone else, and then woke back up — without this check
- *     its release would delete the *new* rightful holder's lock instead
- *     of its own (already-gone) one.
+ * The accepted trade (documented, deliberate): a holder that genuinely
+ * runs longer than `staleTimeoutMs` can have its lock broken while still
+ * alive, and — with `assertHeld()` gone — nothing detects the overlap.
+ * No real transaction in this codebase runs for minutes (they run for
+ * milliseconds); if one ever does, that transaction needs redesigning,
+ * not this lock re-complicating.
  */
 import { open, readFile, rename, rm, stat } from "node:fs/promises";
-import { ulid } from "ulid";
+import { randomUUID } from "node:crypto";
 import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import { EXIT_CODES } from "../core/exit-codes.js";
 import { SlopError } from "../cli/errors.js";
-import { atomicWriteFile } from "./atomic-write.js";
 import { isEexist, isEnoent } from "./fs-utils.js";
 
 export interface LockInfo {
   pid: number;
   acquired_at: string;
-  /** Unique per-acquisition fencing token (adversarial-review Finding 1) — see the module doc's "Fencing" section. */
-  token: string;
-}
-
-/**
- * Returned by {@link acquireLock} and handed to {@link withLock}'s
- * callback. See the module doc's "Fencing" section for the full contract.
- */
-export interface LockHandle {
-  /** This acquisition's fencing token — the same value recorded in the lock file at acquire time. */
-  readonly token: string;
-  /**
-   * Re-reads the lock file and confirms this handle's token still
-   * matches what's on disk. Throws a {@link SlopError} (CONFLICT, exit 6)
-   * if not — this process has been dispossessed and MUST stop writing.
-   * On success, also renews the lock by refreshing its recorded
-   * `acquired_at`, so a genuinely-alive holder that calls this regularly
-   * is never reclaimed merely for running past `staleTimeoutMs`.
-   */
-  assertHeld(): Promise<void>;
 }
 
 export interface AcquireLockOptions {
-  /** Total bounded time to wait for the lock before giving up. Default 5s
-   * — generous enough for a real multi-file transaction elsewhere to
-   * finish, short enough that a CLI invocation doesn't hang indefinitely. */
+  /** Total bounded time to wait for the lock before giving up with
+   * CONFLICT (exit 6). Default {@link DEFAULT_TIMEOUT_MS} (5s) — generous
+   * enough for a real transaction elsewhere to finish, short enough that
+   * a CLI invocation doesn't hang indefinitely. Configurable per repo via
+   * `.slop/config.yaml`'s `defaults.lock_timeout` (the storage layer
+   * threads the configured value through to every `withLock` call). */
   timeoutMs?: number;
   /** Base retry backoff; doubles (capped) on each failed attempt. */
   retryDelayMs?: number;
-  /** How old (by recorded `acquired_at`, or by file mtime if the lock file
-   * is unparseable) a lock must be before it's considered stale even if
-   * its holder pid is still alive — covers a genuinely hung/looping
-   * holder, not just a dead one. Default 5 minutes: generous relative to
-   * any real v0 transaction, short enough to still self-heal a repo
-   * within one coffee break. A holder that calls its acquired {@link
-   * LockHandle}'s `assertHeld()` regularly renews `acquired_at`, so this
-   * is really "no progress for this long", not "acquired this long ago"
-   * — see the module doc's "Fencing" section. */
+  /** How old (by recorded `acquired_at`, or by file mtime if the lock
+   * file is unparseable) a lock must be before it's considered stale even
+   * if its holder pid is still alive — covers a genuinely hung holder and
+   * pid reuse after a crash, not just a confirmed-dead pid. Default 5
+   * minutes: generous relative to any real transaction (milliseconds),
+   * short enough to self-heal a wedged repo within one coffee break. */
   staleTimeoutMs?: number;
   clock?: Clock;
 }
 
-const DEFAULT_TIMEOUT_MS = 5_000;
+export const DEFAULT_TIMEOUT_MS = 5_000;
 const DEFAULT_RETRY_DELAY_MS = 25;
 const MAX_RETRY_DELAY_MS = 400;
 const DEFAULT_STALE_TIMEOUT_MS = 5 * 60_000;
@@ -180,10 +127,9 @@ function tryParseLockInfo(raw: string): LockInfo | null {
       parsed !== null &&
       typeof parsed === "object" &&
       typeof (parsed as { pid?: unknown }).pid === "number" &&
-      typeof (parsed as { acquired_at?: unknown }).acquired_at === "string" &&
-      typeof (parsed as { token?: unknown }).token === "string"
+      typeof (parsed as { acquired_at?: unknown }).acquired_at === "string"
     ) {
-      return parsed as LockInfo;
+      return { pid: (parsed as LockInfo).pid, acquired_at: (parsed as LockInfo).acquired_at };
     }
     return null;
   } catch {
@@ -196,55 +142,23 @@ function lockInfoText(info: LockInfo): string {
 }
 
 /**
- * If the lock at `lockPath` is stale (dead holder, or older than
- * `staleTimeoutMs`), break it and return `true` so the caller retries
- * acquisition immediately. Returns `false` if the lock is live and not
- * stale (including: it turned out to be live after all — see below).
- * Returns `true` (nothing to break) if the lock already disappeared
- * between the failed `open` and this check — a normal race with whoever
- * held it finishing up, not an error.
+ * If the lock at `lockPath` is stale (dead holder pid, older than
+ * `staleTimeoutMs`, or unparseable and old by mtime), break it and return
+ * `true` so the caller retries acquisition immediately. Returns `false`
+ * if the lock is live and not stale. Returns `true` (nothing to break) if
+ * the lock already disappeared between the failed `open` and this check —
+ * a normal race with whoever held it finishing up, not an error.
  *
- * **Why breaking is an atomic rename-away, not a plain `rm`**
- * (lock-stale-break-toctou): two contenders can both read the exact same
- * stale lock and both judge it breakable. A plain `rm(lockPath)` doesn't
- * check *what* it's deleting — if contender A breaks the lock and
- * recreates it (now legitimately holding a fresh, live lock) before
- * contender B's own `rm` call runs, B's `rm` silently deletes A's live
- * lock (not the stale one B actually inspected), and B then recreates its
- * own lock in the newly-empty slot. Both A and B now believe they hold
- * the lock — A was silently dispossessed without ever being told, which
- * is exactly the two-holders failure the fencing mechanism exists to
- * prevent, except here it happens *before* A ever gets a chance to call
- * `assertHeld()`.
- *
- * The fix: relocate the lock file via `rename` to a sentinel path unique
- * to this breaker (`${lockPath}.stale-${breakerToken}`) instead of
- * deleting it outright, then verify — by exact content match — that what
- * landed at the sentinel is the *same* stale lock this call inspected a
- * moment ago:
- *   - If `rename` itself fails with `ENOENT`, `lockPath` was already
- *     relocated (or released) by someone else between our read and this
- *     rename — we broke nothing; the caller just retries `open(wx)` and
- *     contends normally against whatever's there now.
- *   - If `rename` succeeds but the relocated content doesn't match what
- *     we read (some other contender's winning `open(wx)` recreated
- *     `lockPath` in the gap between our read and this rename — the exact
- *     race described above, just with `rename` in place of `rm`), we put
- *     it back immediately (`rename` it back to `lockPath`) rather than
- *     delete it, and report "not broken" — we never destroy a lock we
- *     can't prove is the stale one we inspected.
- *   - Only when the content matches do we clean up the sentinel and
- *     report success. This is what makes the operation safe against an
- *     arbitrary number of concurrent breakers: at most one of them can
- *     ever end up owning a sentinel whose content matches its own read,
- *     because a fresh acquisition always writes a fresh (different)
- *     token/timestamp.
+ * Breaking is an atomic rename-away to a breaker-unique sentinel, then a
+ * verify-by-content-match, NOT a plain `rm` — see the module doc's
+ * "Stale-lock recovery" for the TOCTOU race this closes (two contenders
+ * both judging the same stale lock breakable; the loser's blind `rm`
+ * would otherwise delete the winner's fresh, live lock).
  */
 async function tryBreakStaleLock(
   lockPath: string,
   staleTimeoutMs: number,
   now: number,
-  breakerToken: string,
 ): Promise<boolean> {
   let raw: string;
   try {
@@ -257,12 +171,9 @@ async function tryBreakStaleLock(
   const info = tryParseLockInfo(raw);
   let stale: boolean;
   if (info === null) {
-    // Corrupt/unreadable lock content — fall back to mtime so a hand
-    // -mangled lock file doesn't wedge the repo forever either. A lock
-    // file written before fencing tokens existed (no `token` field) also
-    // lands here — harmless: it's just treated by mtime instead of by
-    // its (otherwise well-formed) acquired_at/pid, and still self-heals
-    // once it's old enough.
+    // Corrupt/unreadable lock content — fall back to mtime so a
+    // hand-mangled or half-written lock file doesn't wedge the repo
+    // forever either.
     try {
       const st = await stat(lockPath);
       stale = now - st.mtimeMs >= staleTimeoutMs;
@@ -278,7 +189,7 @@ async function tryBreakStaleLock(
 
   if (!stale) return false;
 
-  const sentinelPath = `${lockPath}.stale-${breakerToken}`;
+  const sentinelPath = `${lockPath}.stale-${randomUUID()}`;
   try {
     await rename(lockPath, sentinelPath);
   } catch (err) {
@@ -302,15 +213,15 @@ async function tryBreakStaleLock(
     // We relocated a DIFFERENT (live) lock than the one we inspected —
     // someone else's winning `open(wx)` recreated `lockPath` in the gap
     // between our read above and the `rename`. Put it back and report
-    // "not broken"; the caller will recontend fairly via normal EEXIST
+    // "not broken"; the caller recontends fairly via normal EEXIST
     // retry/backoff, exactly as if our rename had never happened.
     try {
       await rename(sentinelPath, lockPath);
     } catch (err) {
       // Best effort: if `lockPath` is occupied again by the time we try
-      // to restore (yet another acquisition landed), there's nothing
-      // sane to restore into. The rightful holder's content is still
-      // preserved verbatim at `sentinelPath` either way.
+      // to restore (yet another acquisition landed), there's nothing sane
+      // to restore into. The rightful holder's content is still preserved
+      // verbatim at `sentinelPath` either way.
       if (!isEexist(err)) throw err;
     }
     return false;
@@ -325,59 +236,15 @@ async function tryBreakStaleLock(
 }
 
 /**
- * {@link LockHandle.assertHeld}'s implementation — see the module doc's
- * "Fencing" section for the full contract. Treats a lock file that is
- * simply gone (ENOENT) the same as one now naming a different
- * token/holder: both mean this process no longer holds it.
- */
-async function assertLockHeld(lockPath: string, token: string, clock: Clock): Promise<void> {
-  let raw: string | null;
-  try {
-    raw = await readFile(lockPath, "utf8");
-  } catch (err) {
-    if (isEnoent(err)) {
-      raw = null;
-    } else {
-      throw err;
-    }
-  }
-
-  const info = raw === null ? null : tryParseLockInfo(raw);
-  if (info === null || info.token !== token) {
-    const holderDescription =
-      info !== null
-        ? `pid ${info.pid}, held since ${info.acquired_at}`
-        : "another process (the lock file is gone or unreadable)";
-    throw new SlopError(
-      `lost the db lock at ${lockPath} — it is now held by ${holderDescription}, not this process. ` +
-        "This process was dispossessed (its stale timeout elapsed and another process reclaimed the " +
-        "lock) and must stop writing immediately rather than continue a multi-file transaction under " +
-        "the assumption of exclusivity.",
-      EXIT_CODES.CONFLICT,
-    );
-  }
-
-  // Still genuinely held — renew so a slow-but-alive holder that calls
-  // this regularly is never reclaimed merely for running past
-  // staleTimeoutMs (module doc's "Fencing", half 2).
-  await atomicWriteFile(
-    lockPath,
-    lockInfoText({ pid: info.pid, acquired_at: clock.now().toISOString(), token: info.token }),
-  );
-}
-
-/**
  * Acquire `lockPath` exclusively, breaking a stale lock and retrying with
  * capped backoff until `timeoutMs` elapses. Throws a {@link SlopError}
- * (CONFLICT, exit 6) naming the holder if the lock is genuinely
- * contended and the timeout is reached. Returns a {@link LockHandle} —
- * see the module doc's "Fencing" section for why every multi-write
- * caller needs it.
+ * (CONFLICT, exit 6) naming the holder if the lock is genuinely contended
+ * and the timeout is reached.
  */
 export async function acquireLock(
   lockPath: string,
   options: AcquireLockOptions = {},
-): Promise<LockHandle> {
+): Promise<void> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
   const staleTimeoutMs = options.staleTimeoutMs ?? DEFAULT_STALE_TIMEOUT_MS;
@@ -385,12 +252,10 @@ export async function acquireLock(
 
   const deadline = clock.now().getTime() + timeoutMs;
   let attempt = 0;
-  let lastHolderDescription = "another process";
 
   for (;;) {
     try {
-      const token = ulid();
-      const info: LockInfo = { pid: process.pid, acquired_at: clock.now().toISOString(), token };
+      const info: LockInfo = { pid: process.pid, acquired_at: clock.now().toISOString() };
       const handle = await open(lockPath, "wx");
       try {
         await handle.writeFile(lockInfoText(info), "utf8");
@@ -398,23 +263,11 @@ export async function acquireLock(
       } finally {
         await handle.close();
       }
-      return {
-        token,
-        assertHeld: () => assertLockHeld(lockPath, token, clock),
-      };
+      return;
     } catch (err) {
       if (!isEexist(err)) throw err;
 
-      // Just an identifier for this attempt's break-sentinel filename
-      // (see tryBreakStaleLock) — unrelated to the token this iteration
-      // would use if its own `open(wx)` above had succeeded.
-      const breakerToken = ulid();
-      const broke = await tryBreakStaleLock(
-        lockPath,
-        staleTimeoutMs,
-        clock.now().getTime(),
-        breakerToken,
-      );
+      const broke = await tryBreakStaleLock(lockPath, staleTimeoutMs, clock.now().getTime());
       if (broke) {
         // Retry acquisition immediately, no backoff needed — but still
         // respect the deadline, so a pathological case (something else
@@ -429,15 +282,14 @@ export async function acquireLock(
         continue;
       }
 
-      const raw = await readFile(lockPath, "utf8").catch(() => null);
-      const info = raw !== null ? tryParseLockInfo(raw) : null;
-      lastHolderDescription = info
-        ? `pid ${info.pid}, held since ${info.acquired_at}`
-        : "another process (lock file unreadable)";
-
       if (clock.now().getTime() >= deadline) {
+        const raw = await readFile(lockPath, "utf8").catch(() => null);
+        const info = raw !== null ? tryParseLockInfo(raw) : null;
+        const holderDescription = info
+          ? `pid ${info.pid}, held since ${info.acquired_at}`
+          : "another process (lock file unreadable)";
         throw new SlopError(
-          `timed out waiting for the db lock at ${lockPath} (held by ${lastHolderDescription})`,
+          `timed out waiting for the db lock at ${lockPath} (held by ${holderDescription})`,
           EXIT_CODES.CONFLICT,
         );
       }
@@ -451,16 +303,14 @@ export async function acquireLock(
 
 /**
  * Release `lockPath`, but only if it's still recorded as held by this
- * acquisition — see the module doc's "compare-and-delete" note. Never
- * throws if the lock is already gone.
- *
- * Pass `expectedToken` (every {@link withLock}/{@link acquireLock} caller
- * has one, via {@link LockHandle.token}) for an exact, fencing-token
- * compare-and-delete. Omitting it falls back to the older, coarser
- * pid-based comparison — kept only for a caller that released a bare
- * `lockPath` without ever holding onto its handle.
+ * process — a compare-and-delete on the recorded pid, never a blind
+ * delete. This matters for the (rare, but real) case where this process
+ * held the lock, stalled long enough to be declared stale and broken by
+ * someone else, and then woke back up — a blind delete here would remove
+ * the *new* rightful holder's lock instead of this process's own
+ * (already-gone) one. Never throws if the lock is already gone.
  */
-export async function releaseLock(lockPath: string, expectedToken?: string): Promise<void> {
+export async function releaseLock(lockPath: string): Promise<void> {
   let raw: string;
   try {
     raw = await readFile(lockPath, "utf8");
@@ -470,14 +320,10 @@ export async function releaseLock(lockPath: string, expectedToken?: string): Pro
   }
 
   const info = tryParseLockInfo(raw);
-  if (info !== null) {
-    const stillOurs =
-      expectedToken !== undefined ? info.token === expectedToken : info.pid === process.pid;
-    if (!stillOurs) {
-      // Our hold was declared stale and broken by someone else, who has
-      // since re-acquired it — do not delete it out from under them.
-      return;
-    }
+  if (info !== null && info.pid !== process.pid) {
+    // Our hold was declared stale and broken by someone else, who has
+    // since re-acquired it — do not delete it out from under them.
+    return;
   }
 
   try {
@@ -489,30 +335,19 @@ export async function releaseLock(lockPath: string, expectedToken?: string): Pro
 
 /**
  * Run `fn` while holding `lockPath` exclusively; always releases,
- * including when `fn` throws. This is the only sanctioned way to perform
- * a multi-file transaction (done-cascade, reparent) — single-file writes
- * must not call this, they're already atomic on their own.
- *
- * `fn` receives the {@link LockHandle} this acquisition produced.
- * **Every `fn` that performs more than one entity write MUST call
- * `lock.assertHeld()` between writes** — see the module doc's "Fencing"
- * section for why: without it, a transaction that runs long enough to be
- * declared stale can be silently dispossessed partway through and keep
- * writing as if nothing happened, which is exactly the two-concurrent-
- * holders failure this whole mechanism exists to prevent. A single-write
- * `fn` doesn't strictly need to call it (the `acquireLock` that already
- * ran inside `withLock` established exclusivity for that one write), but
- * doing so anyway is always safe and cheap.
+ * including when `fn` throws. This is the flatfile driver's write-scope
+ * primitive — commands reach it through `StorageBackend.transact`
+ * (src/storage/), never directly.
  */
 export async function withLock<T>(
   lockPath: string,
-  fn: (lock: LockHandle) => Promise<T>,
+  fn: () => Promise<T>,
   options?: AcquireLockOptions,
 ): Promise<T> {
-  const lock = await acquireLock(lockPath, options);
+  await acquireLock(lockPath, options);
   try {
-    return await fn(lock);
+    return await fn();
   } finally {
-    await releaseLock(lockPath, lock.token);
+    await releaseLock(lockPath);
   }
 }

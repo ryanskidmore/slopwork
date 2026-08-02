@@ -8,6 +8,7 @@ import type { EventContext, MutationEventSpec } from "../repo/events.js";
 import { ensureDbDirs } from "../repo/paths.js";
 import type { RepoPaths } from "../repo/paths.js";
 import { createTicket } from "../repo/tickets.js";
+import { FlatfileBackend } from "../storage/flatfile.js";
 import { pickSlug, takenSlugs } from "./slug.js";
 
 const ctx: EventContext = { actor: { name: "ryan", kind: "human" }, session: null };
@@ -32,10 +33,12 @@ function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
 
 let scratch: string;
 let paths: RepoPaths;
+let backend: FlatfileBackend;
 
 beforeEach(async () => {
   scratch = await mkdtemp(join(tmpdir(), "slop-slug-test-"));
   paths = await ensureDbDirs(scratch);
+  backend = new FlatfileBackend(paths);
 });
 
 afterEach(async () => {
@@ -44,21 +47,21 @@ afterEach(async () => {
 
 describe("pickSlug (D12: collision suffix)", () => {
   it("returns the plain slugified name when it's free", async () => {
-    expect(await pickSlug(paths, "Add auth provider")).toBe("add-auth-provider");
+    expect(await pickSlug(backend, "Add auth provider")).toBe("add-auth-provider");
   });
 
   it("appends -2, -3, ... on collision, against real on-disk slugs", async () => {
     await createTicket(paths, makeTicket({ slug: "add-auth-provider" }), ctx, createdEvent);
-    expect(await pickSlug(paths, "Add auth provider")).toBe("add-auth-provider-2");
+    expect(await pickSlug(backend, "Add auth provider")).toBe("add-auth-provider-2");
 
     await createTicket(paths, makeTicket({ slug: "add-auth-provider-2" }), ctx, createdEvent);
-    expect(await pickSlug(paths, "Add auth provider")).toBe("add-auth-provider-3");
+    expect(await pickSlug(backend, "Add auth provider")).toBe("add-auth-provider-3");
   });
 
   it("sees slugs created in a prior call (index self-heals across calls)", async () => {
-    const first = await pickSlug(paths, "Same name");
+    const first = await pickSlug(backend, "Same name");
     await createTicket(paths, makeTicket({ slug: first }), ctx, createdEvent);
-    const second = await pickSlug(paths, "Same name");
+    const second = await pickSlug(backend, "Same name");
     expect(second).not.toBe(first);
     expect(second).toBe("same-name-2");
   });
@@ -66,12 +69,12 @@ describe("pickSlug (D12: collision suffix)", () => {
 
 describe("takenSlugs", () => {
   it("is empty against a fresh db", async () => {
-    await expect(takenSlugs(paths)).resolves.toEqual(new Set());
+    await expect(takenSlugs(backend)).resolves.toEqual(new Set());
   });
 
   it("reflects every slug on disk", async () => {
     await createTicket(paths, makeTicket({ slug: "one" }), ctx, createdEvent);
     await createTicket(paths, makeTicket({ slug: "two" }), ctx, createdEvent);
-    await expect(takenSlugs(paths)).resolves.toEqual(new Set(["one", "two"]));
+    await expect(takenSlugs(backend)).resolves.toEqual(new Set(["one", "two"]));
   });
 });

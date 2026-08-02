@@ -19,7 +19,11 @@
 import { join } from "node:path";
 import { vi } from "vitest";
 import type { Config } from "../../src/core/index.js";
-import { DEFAULT_REVIEW_STALE_AFTER, DEFAULT_STALE_AFTER } from "../../src/core/index.js";
+import {
+  DEFAULT_LOCK_TIMEOUT,
+  DEFAULT_REVIEW_STALE_AFTER,
+  DEFAULT_STALE_AFTER,
+} from "../../src/core/index.js";
 import { type ConfigYamlInput, stringifyConfigYaml } from "../../src/cli/config-yaml.js";
 import { atomicWriteFile, ensureDbDirs, type RepoPaths } from "../../src/repo/index.js";
 
@@ -151,6 +155,7 @@ export const BOOTSTRAP_DEFAULTS: Pick<Config, "defaults"> = {
   defaults: {
     stale_after: DEFAULT_STALE_AFTER,
     review_stale_after: DEFAULT_REVIEW_STALE_AFTER,
+    lock_timeout: DEFAULT_LOCK_TIMEOUT,
   },
 };
 

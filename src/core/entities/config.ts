@@ -8,6 +8,10 @@ import { durationStringSchema } from "../duration.js";
 
 export const DEFAULT_STALE_AFTER = "60m";
 export const DEFAULT_REVIEW_STALE_AFTER = "24h";
+/** G2 (simplify-db-lock): how long a mutating command waits for the db
+ * write lock before giving up with CONFLICT (exit 6). Matches the lock's
+ * long-standing hardcoded 5s. */
+export const DEFAULT_LOCK_TIMEOUT = "5s";
 
 /**
  * `null` -> `undefined` for a single field. A real YAML parser (e.g.
@@ -46,8 +50,51 @@ export type ConfigRemotes = z.infer<typeof configRemotesSchema>;
 export const configDefaultsSchema = z.object({
   stale_after: durationStringSchema.default(DEFAULT_STALE_AFTER),
   review_stale_after: durationStringSchema.default(DEFAULT_REVIEW_STALE_AFTER),
+  /** G2: db write-lock acquisition timeout (flatfile backend). Absent =
+   * {@link DEFAULT_LOCK_TIMEOUT}. See docs/configuration.md. */
+  lock_timeout: durationStringSchema.default(DEFAULT_LOCK_TIMEOUT),
 });
 export type ConfigDefaults = z.infer<typeof configDefaultsSchema>;
+
+/**
+ * G2: `backend:` selects the storage backend (docs/configuration.md,
+ * docs/storage-backends.md). Accepted forms:
+ *
+ * ```yaml
+ * backend: flatfile          # explicit default (same as the key being absent)
+ * backend: remote            # shorthand for {kind: remote} with no url
+ * backend:                   # structured form
+ *   kind: remote
+ *   url: https://slop.example.workers.dev
+ * ```
+ *
+ * Absent (or a bare `backend:` line, real-YAML `null`) means `flatfile` —
+ * the flatfile db under `.slop/db/` remains the default and needs no
+ * config at all. Auth for a remote backend is NOT configured here: the
+ * bearer token comes from the `SLOP_REMOTE_TOKEN` environment variable
+ * (secrets don't belong in a committed config.yaml) — see
+ * docs/storage-backends.md.
+ */
+export const configBackendSchema = z.preprocess(
+  (val) => (val === null || val === undefined ? "flatfile" : val),
+  z.union([
+    z.literal("flatfile"),
+    z.literal("remote"),
+    z.object({ kind: z.literal("flatfile") }),
+    z.object({ kind: z.literal("remote"), url: nullToUndefined(z.url()) }),
+  ]),
+);
+export type ConfigBackend = z.infer<typeof configBackendSchema>;
+
+/** {@link configBackendSchema}'s accepted forms, normalized to one shape. */
+export type BackendSelection = { kind: "flatfile" } | { kind: "remote"; url?: string };
+
+export function normalizeBackendSelection(backend: ConfigBackend): BackendSelection {
+  if (backend === "flatfile") return { kind: "flatfile" };
+  if (backend === "remote") return { kind: "remote" };
+  if (backend.kind === "flatfile") return { kind: "flatfile" };
+  return { kind: "remote", ...(backend.url !== undefined ? { url: backend.url } : {}) };
+}
 
 export const configSchema = z.object({
   project: z.string().trim().min(1),
@@ -64,5 +111,7 @@ export const configSchema = z.object({
   // present-but-empty.
   remotes: configRemotesSchema.default(() => configRemotesSchema.parse({})),
   defaults: configDefaultsSchema.default(() => configDefaultsSchema.parse({})),
+  /** G2: storage backend selection — see {@link configBackendSchema}. */
+  backend: configBackendSchema.default("flatfile"),
 });
 export type Config = z.infer<typeof configSchema>;

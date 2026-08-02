@@ -11,12 +11,14 @@
  * compiled SPA bundle and the API from one `Bun.serve` instance.
  *
  * `src/cli/commands/web.ts` is the only consumer of this module from the
- * CLI side; it discovers the `.slop` directory to serve and drives
- * {@link startWebServer}. See src/web/fixture-data-source.ts's doc comment
- * for the data-source seam this is built on.
+ * CLI side; it discovers the `.slop` directory to serve, opens a
+ * {@link StorageBackend} for it (G2), and drives {@link startWebServer}
+ * with a {@link StorageDataSource}. See src/web/data-source.ts's doc
+ * comment for the data-source seam this is built on.
  */
 export type { WebDataSource } from "./data-source.js";
 export { FixtureDataSource } from "./fixture-data-source.js";
+export { StorageDataSource } from "./storage-data-source.js";
 export {
   createWebServer,
   PortInUseError,

@@ -1,15 +1,10 @@
 import type { Command } from "commander";
 import type { Config, Ticket } from "../../core/index.js";
 import { isTicketId, shortTicketCode } from "../../core/index.js";
-import {
-  deriveEffectiveOverlay,
-  listTickets,
-  queryEvents,
-  repoPaths,
-  requireRepoRoot,
-  resolveTicketRef,
-} from "../../repo/index.js";
-import type { RepoPaths } from "../../repo/index.js";
+import { deriveEffectiveOverlay } from "../../repo/index.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
+import { openStorage } from "../../storage/index.js";
+import type { StorageBackend } from "../../storage/index.js";
 import {
   CONTEXT_PACK_BUDGET_UNIT,
   renderContextPackJsonWithBudget,
@@ -34,10 +29,10 @@ interface ShowCommandOptions {
  * if the root itself has one — shared by both the text and `--json`
  * `--tree` renderings below. */
 async function loadTreeFor(
-  paths: RepoPaths,
+  backend: StorageBackend,
   ticket: Ticket,
 ): Promise<{ tree: TreeNode; externalParentRef: string | undefined }> {
-  const all = await listTickets(paths);
+  const all = await backend.listTickets();
   const rootTicket = all.find((t) => t.id === ticket.root_id) ?? ticket;
   const tree = buildTree(rootTicket.id, all);
   const externalParentRef =
@@ -47,8 +42,8 @@ async function loadTreeFor(
   return { tree, externalParentRef };
 }
 
-async function printTree(paths: RepoPaths, config: Config, ticket: Ticket): Promise<void> {
-  const { tree, externalParentRef } = await loadTreeFor(paths, ticket);
+async function printTree(backend: StorageBackend, config: Config, ticket: Ticket): Promise<void> {
+  const { tree, externalParentRef } = await loadTreeFor(backend, ticket);
   const jiraUrl = externalParentRef !== undefined ? jiraBrowseUrl(config, externalParentRef) : null;
   const lines = renderTreeLines(tree, ticket.id, externalParentRef, jiraUrl);
   process.stdout.write(`${lines.join("\n")}\n`);
@@ -80,8 +75,8 @@ interface TreeNodeJson {
  * `deriveEffectiveOverlay` is a no-op whenever no event is newer than the
  * ticket's own stored `last_activity_at`.
  */
-async function effectiveTicket(paths: RepoPaths, ticket: Ticket): Promise<Ticket> {
-  const events = await queryEvents(paths, { ticket: ticket.id });
+async function effectiveTicket(backend: StorageBackend, ticket: Ticket): Promise<Ticket> {
+  const events = await backend.queryEvents({ ticket: ticket.id });
   const overlay = deriveEffectiveOverlay(ticket, events);
   return { ...ticket, ...overlay };
 }
@@ -121,7 +116,7 @@ function treeNodeJson(node: TreeNode, targetId: string): TreeNodeJson {
  * `--json`'s ticket/tree fields.
  */
 async function runShowJson(
-  paths: RepoPaths,
+  backend: StorageBackend,
   config: Config,
   ticket: Ticket,
   opts: ShowCommandOptions,
@@ -139,13 +134,13 @@ async function runShowJson(
   const body: Record<string, unknown> = {
     // ticket_01KY9RWFM80BKNE2CDX85QMKGS: effective, not stored-verbatim —
     // see effectiveTicket's doc.
-    ticket: await effectiveTicket(paths, ticket),
+    ticket: await effectiveTicket(backend, ticket),
     handle: shortTicketCode(ticket.id),
     jira_url: jiraUrl,
   };
 
   if (opts.tree) {
-    const { tree, externalParentRef } = await loadTreeFor(paths, ticket);
+    const { tree, externalParentRef } = await loadTreeFor(backend, ticket);
     const treeJiraUrl =
       externalParentRef !== undefined ? jiraBrowseUrl(config, externalParentRef) : null;
     body.tree = {
@@ -156,7 +151,7 @@ async function runShowJson(
   }
 
   if (opts.context) {
-    const data = await buildContextPackData(paths, ticket, config);
+    const data = await buildContextPackData(backend, ticket, config);
     // Never corrupts JSON at any budget — see core/budget.ts's module doc
     // and context-budget.ts's renderContextPackJsonWithBudget.
     const { body: contextBody } = renderContextPackJsonWithBudget(data, opts.budget);
@@ -170,23 +165,24 @@ export async function runShow(ref: string, opts: ShowCommandOptions): Promise<vo
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
   const config = await loadConfig(paths);
+  const backend = await openStorage(paths);
 
-  const ticket = await resolveTicketRef(paths, ref);
+  const ticket = await backend.resolveTicketRef(ref);
 
   if (opts.json) {
-    await runShowJson(paths, config, ticket, opts);
+    await runShowJson(backend, config, ticket, opts);
     return;
   }
 
   let printedSomething = false;
 
   if (opts.tree) {
-    await printTree(paths, config, ticket);
+    await printTree(backend, config, ticket);
     printedSomething = true;
   }
 
   if (opts.context) {
-    const data = await buildContextPackData(paths, ticket, config);
+    const data = await buildContextPackData(backend, ticket, config);
     // E1: reconciled onto the same character-counted, smart-eliding
     // budget helper `slop context --budget` uses (previously this used a
     // separate, rougher ~4-chars/token estimate — see
@@ -211,7 +207,7 @@ export async function runShow(ref: string, opts: ShowCommandOptions): Promise<vo
     // Ticket it's handed) — the effective `latest_note`/`last_activity_at`
     // are folded in here, before the call, instead.
     process.stdout.write(
-      `handle: ${shortTicketCode(ticket.id)}\n${formatTicketDetail(await effectiveTicket(paths, ticket), config)}\n`,
+      `handle: ${shortTicketCode(ticket.id)}\n${formatTicketDetail(await effectiveTicket(backend, ticket), config)}\n`,
     );
   }
 }

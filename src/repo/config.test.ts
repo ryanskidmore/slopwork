@@ -21,7 +21,11 @@ afterEach(async () => {
 describe("loadConfigDefaultsTolerant", () => {
   it("falls back to schema defaults (60m/24h) when config.yaml is entirely absent", async () => {
     const defaults = await loadConfigDefaultsTolerant(paths);
-    expect(defaults).toEqual({ stale_after: "60m", review_stale_after: "24h" });
+    expect(defaults).toEqual({
+      stale_after: "60m",
+      review_stale_after: "24h",
+      lock_timeout: "5s",
+    });
   });
 
   it("reads the real configured thresholds when config.yaml exists", async () => {
@@ -31,19 +35,31 @@ describe("loadConfigDefaultsTolerant", () => {
       "utf8",
     );
     const defaults = await loadConfigDefaultsTolerant(paths);
-    expect(defaults).toEqual({ stale_after: "30m", review_stale_after: "12h" });
+    expect(defaults).toEqual({
+      stale_after: "30m",
+      review_stale_after: "12h",
+      lock_timeout: "5s",
+    });
   });
 
   it("falls back to schema defaults when config.yaml is unparseable", async () => {
     await writeFile(join(paths.slopDir, "config.yaml"), "not: valid: yaml: at: all: :::", "utf8");
     const defaults = await loadConfigDefaultsTolerant(paths);
-    expect(defaults).toEqual({ stale_after: "60m", review_stale_after: "24h" });
+    expect(defaults).toEqual({
+      stale_after: "60m",
+      review_stale_after: "24h",
+      lock_timeout: "5s",
+    });
   });
 
   it("falls back to schema defaults when config.yaml fails schema validation", async () => {
     // Missing required `project` field.
     await writeFile(join(paths.slopDir, "config.yaml"), "defaults:\n  stale_after: 5m\n", "utf8");
     const defaults = await loadConfigDefaultsTolerant(paths);
-    expect(defaults).toEqual({ stale_after: "60m", review_stale_after: "24h" });
+    expect(defaults).toEqual({
+      stale_after: "60m",
+      review_stale_after: "24h",
+      lock_timeout: "5s",
+    });
   });
 });

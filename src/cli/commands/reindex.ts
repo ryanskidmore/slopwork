@@ -1,16 +1,9 @@
 import type { Command } from "commander";
 import { EXIT_CODES } from "../../core/exit-codes.js";
 import type { SessionId } from "../../core/index.js";
-import {
-  formatIndexProblems,
-  listTickets,
-  rebuildIndex,
-  repoPaths,
-  requireRepoRoot,
-  sweepStaleTempFiles,
-  updateSession,
-  withLock,
-} from "../../repo/index.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
+import { formatIndexProblems } from "../../storage/backend.js";
+import { openStorage } from "../../storage/index.js";
 import { diffSessionPatch } from "../../sessions/patch.js";
 import { buildHealedSession, findOrphanedActiveSessions } from "../../sessions/repair.js";
 import { loadConfig, resolveActor } from "../actor.js";
@@ -20,6 +13,7 @@ import { printWarning } from "./shared.js";
 interface ReindexOptions {
   strict?: boolean;
   heal?: boolean;
+  shardEvents?: boolean;
 }
 
 /**
@@ -46,10 +40,19 @@ interface ReindexOptions {
  * `end_summary`, one `session.ended` event per orphan, same audit trail
  * every other session-ending command leaves). The scan is only trustworthy
  * against a CLEAN ticket read — see below.
+ *
+ * G2 (shard-event-storage): `--shard-events` explicitly migrates any
+ * flat-layout `events/event_*.jsonc` files into `events/YYYY-MM/` shards
+ * (`StorageBackend.migrateEventShards`, month from each event's own ULID
+ * timestamp). This NEVER runs implicitly — event files are git-tracked, so
+ * the rename should land as a visible, deliberate commit, not something a
+ * routine `reindex` does on every repo's behalf. Idempotent: a repeat run
+ * (or a repo that's already fully sharded) reports zero files moved.
  */
 export async function runReindex(options: ReindexOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
   const paths = repoPaths(root);
+  const backend = await openStorage(paths);
 
   if (options.strict) {
     // Fail fast, exactly like any other direct-by-id read: the first
@@ -58,17 +61,22 @@ export async function runReindex(options: ReindexOptions): Promise<void> {
     // itself is always fault-tolerant now; --strict is implemented as
     // this up-front gate specifically so `reindex` alone can opt back
     // into the old all-or-nothing behavior.
-    await listTickets(paths);
+    await backend.listTickets();
   }
 
-  const index = await rebuildIndex(paths);
+  let shardNote = "";
+  if (options.shardEvents) {
+    const migration = await backend.migrateEventShards();
+    shardNote =
+      migration.moved > 0
+        ? `; migrated ${migration.moved} event(s) into ${migration.shards.length} shard(s) ` +
+          `(${migration.shards.join(", ")})`
+        : "; no flat-layout events to shard (already fully sharded)";
+  }
 
-  const swept = await sweepStaleTempFiles([
-    paths.dbDir,
-    paths.ticketsDir,
-    paths.sessionsDir,
-    paths.eventsDir,
-  ]);
+  const index = await backend.rebuildIndex();
+
+  const swept = await backend.sweepTempFiles();
 
   const slugCount = Object.keys(index.slugs).length;
   const sweptNote = swept.length > 0 ? `; swept ${swept.length} stale temp file(s)` : "";
@@ -76,7 +84,7 @@ export async function runReindex(options: ReindexOptions): Promise<void> {
   if (index.problems.length > 0) {
     process.stderr.write(`${formatIndexProblems(index.problems)}\n`);
     process.stdout.write(
-      `reindexed: ${index.tickets.length} ticket(s) rebuilt, ${index.problems.length} skipped due to errors, ${slugCount} slug(s)${sweptNote}\n`,
+      `reindexed: ${index.tickets.length} ticket(s) rebuilt, ${index.problems.length} skipped due to errors, ${slugCount} slug(s)${sweptNote}${shardNote}\n`,
     );
     // sessions/repair.ts's own doc: an unreadable ticket's own
     // active_session is invisible to the referenced-ids set below, which
@@ -97,7 +105,7 @@ export async function runReindex(options: ReindexOptions): Promise<void> {
   const referencedActiveSessionIds = new Set<SessionId>(
     index.tickets.flatMap((row) => (row.active_session !== null ? [row.active_session] : [])),
   );
-  const sessionScan = await findOrphanedActiveSessions(paths, referencedActiveSessionIds);
+  const sessionScan = await findOrphanedActiveSessions(backend, referencedActiveSessionIds);
 
   if (sessionScan.problems.length > 0) {
     printWarning(
@@ -111,17 +119,14 @@ export async function runReindex(options: ReindexOptions): Promise<void> {
   if (options.heal && sessionScan.orphans.length > 0) {
     const config = await loadConfig(paths);
     const actor = resolveActor({ config, cwd: root });
-    await withLock(paths.lockFile, async (lock) => {
-      // A3's fencing contract (lock.ts's own doc): "every call site that
-      // performs more than one write inside a single withLock block MUST
-      // call the handle's assertHeld() between writes" — this loop can
-      // write one session per orphan, so every iteration checks back in
-      // FIRST, mirroring cascade.ts's identical pattern.
+    await backend.transact(async () => {
+      // Every write inside a multi-write transaction re-checks the lock is
+      // still held between writes (lock.ts's own doc) — this loop can
+      // write one session per orphan, mirroring cascade.ts's identical
+      // pattern.
       for (const session of sessionScan.orphans) {
-        await lock.assertHeld();
         const healed = buildHealedSession(session);
-        await updateSession(
-          paths,
+        await backend.updateSession(
           session.id,
           diffSessionPatch(session, healed),
           healed,
@@ -145,7 +150,7 @@ export async function runReindex(options: ReindexOptions): Promise<void> {
   }
 
   process.stdout.write(
-    `reindexed: ${index.tickets.length} ticket(s), ${slugCount} slug(s)${sweptNote}${orphanNote}\n`,
+    `reindexed: ${index.tickets.length} ticket(s), ${slugCount} slug(s)${sweptNote}${orphanNote}${shardNote}\n`,
   );
 }
 
@@ -164,6 +169,11 @@ export function registerReindexCommand(program: Command): void {
     .option(
       "--heal",
       "also close out any orphaned active sessions found during the scan (sets ended_at + a synthesized end_summary, one session.ended event per orphan)",
+    )
+    .option(
+      "--shard-events",
+      "migrate flat-layout events/event_*.jsonc files into events/YYYY-MM/ shards (idempotent; " +
+        "never runs implicitly — see docs/concepts.md)",
     )
     .action(runReindex);
 }

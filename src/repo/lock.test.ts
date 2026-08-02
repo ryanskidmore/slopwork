@@ -87,19 +87,15 @@ afterEach(async () => {
 });
 
 describe("acquireLock / releaseLock — happy path", () => {
-  it("creates a lock file recording holder pid, ISO timestamp, and a fencing token", async () => {
-    const handle = await acquireLock(lockPath);
+  it("creates a lock file recording holder pid and an ISO timestamp", async () => {
+    await acquireLock(lockPath);
     const raw = JSON.parse(await readFile(lockPath, "utf8")) as {
       pid: number;
       acquired_at: string;
-      token: string;
     };
     expect(raw.pid).toBe(process.pid);
     expect(() => new Date(raw.acquired_at).toISOString()).not.toThrow();
-    expect(raw.token).toBe(handle.token);
-    expect(typeof handle.token).toBe("string");
-    expect(handle.token.length).toBeGreaterThan(0);
-    await releaseLock(lockPath, handle.token);
+    await releaseLock(lockPath);
   });
 
   it("releaseLock removes the lock file", async () => {
@@ -115,16 +111,15 @@ describe("acquireLock / releaseLock — happy path", () => {
   it("a second acquireLock succeeds immediately after the first releases", async () => {
     await acquireLock(lockPath);
     await releaseLock(lockPath);
-    await expect(acquireLock(lockPath)).resolves.toMatchObject({ token: expect.any(String) });
+    await expect(acquireLock(lockPath)).resolves.toBeUndefined();
     await releaseLock(lockPath);
   });
 });
 
 describe("withLock", () => {
-  it("runs fn while holding the lock, hands fn the lock handle, releases on success, and returns fn's result", async () => {
-    const result = await withLock(lockPath, async (lock) => {
+  it("runs fn while holding the lock, releases on success, and returns fn's result", async () => {
+    const result = await withLock(lockPath, async () => {
       await expect(readFile(lockPath, "utf8")).resolves.toBeTruthy();
-      expect(typeof lock.token).toBe("string");
       return 42;
     });
     expect(result).toBe(42);
@@ -140,9 +135,7 @@ describe("withLock", () => {
     // Lock must be gone, not leaked.
     await expect(readFile(lockPath, "utf8")).rejects.toThrow();
     // And therefore immediately re-acquirable.
-    await expect(acquireLock(lockPath, { timeoutMs: 100 })).resolves.toMatchObject({
-      token: expect.any(String),
-    });
+    await expect(acquireLock(lockPath, { timeoutMs: 100 })).resolves.toBeUndefined();
     await releaseLock(lockPath);
   });
 });
@@ -170,6 +163,19 @@ describe("contention: second acquirer waits, then times out with CONFLICT (exit 
     await releaseLock(lockPath);
   });
 
+  it("the configured timeoutMs bounds the wait — a longer timeout waits longer", async () => {
+    await acquireLock(lockPath);
+
+    const start = Date.now();
+    await expect(
+      acquireLock(lockPath, { timeoutMs: 300, retryDelayMs: 10, staleTimeoutMs: 10_000 }),
+    ).rejects.toBeInstanceOf(SlopError);
+    const elapsed = Date.now() - start;
+    expect(elapsed).toBeGreaterThanOrEqual(250);
+
+    await releaseLock(lockPath);
+  });
+
   it("a second acquirer succeeds once the first releases mid-wait", async () => {
     await acquireLock(lockPath);
     setTimeout(() => {
@@ -178,7 +184,7 @@ describe("contention: second acquirer waits, then times out with CONFLICT (exit 
 
     await expect(
       acquireLock(lockPath, { timeoutMs: 2_000, retryDelayMs: 10 }),
-    ).resolves.toMatchObject({ token: expect.any(String) });
+    ).resolves.toBeUndefined();
     await releaseLock(lockPath);
   });
 });
@@ -189,7 +195,7 @@ describe("stale-lock recovery", () => {
     const deadPid = 999_999_999;
     await writeFile(
       lockPath,
-      `${JSON.stringify({ pid: deadPid, acquired_at: new Date().toISOString(), token: "dead-pid-token" }, null, 2)}\n`,
+      `${JSON.stringify({ pid: deadPid, acquired_at: new Date().toISOString() }, null, 2)}\n`,
     );
 
     const start = Date.now();
@@ -208,12 +214,12 @@ describe("stale-lock recovery", () => {
   it("breaks a lock whose holder is alive but old, by acquired_at rather than pid liveness", async () => {
     // Held "by us" (so the pid-liveness check alone would say "alive"),
     // but the recorded acquired_at is manually backdated well past
-    // staleTimeoutMs — isolates the age-based half of staleness from the
-    // dead-pid half tested above.
+    // staleTimeoutMs — isolates the age-based half of staleness (which
+    // also covers pid reuse after a crash) from the dead-pid half above.
     const oldAcquiredAt = new Date(Date.now() - 5_000).toISOString();
     await writeFile(
       lockPath,
-      `${JSON.stringify({ pid: process.pid, acquired_at: oldAcquiredAt, token: "old-token" }, null, 2)}\n`,
+      `${JSON.stringify({ pid: process.pid, acquired_at: oldAcquiredAt }, null, 2)}\n`,
     );
 
     const start = Date.now();
@@ -231,7 +237,7 @@ describe("stale-lock recovery", () => {
     const freshAcquiredAt = new Date().toISOString();
     await writeFile(
       lockPath,
-      `${JSON.stringify({ pid: process.pid, acquired_at: freshAcquiredAt, token: "fresh-token" }, null, 2)}\n`,
+      `${JSON.stringify({ pid: process.pid, acquired_at: freshAcquiredAt }, null, 2)}\n`,
     );
     await expect(
       acquireLock(lockPath, { timeoutMs: 100, retryDelayMs: 10, staleTimeoutMs: 60_000 }),
@@ -251,7 +257,7 @@ describe("stale-lock recovery", () => {
     await writeFile(lockPath, "not json at all {{{");
     await expect(
       acquireLock(lockPath, { timeoutMs: 2_000, retryDelayMs: 10, staleTimeoutMs: 0 }),
-    ).resolves.toMatchObject({ token: expect.any(String) });
+    ).resolves.toBeUndefined();
     await releaseLock(lockPath);
   });
 
@@ -271,24 +277,17 @@ describe("stale-break TOCTOU: concurrent breakers never produce two holders (loc
   it("with a pre-existing stale lock, two concurrent acquireLock calls never both come away believing they hold it", async () => {
     // Plant an already-stale lock — backdated well past staleTimeoutMs —
     // that both contenders will independently read and judge breakable.
+    const staleAcquiredAt = new Date(Date.now() - 5_000).toISOString();
     await writeFile(
       lockPath,
-      `${JSON.stringify(
-        {
-          pid: process.pid,
-          acquired_at: new Date(Date.now() - 5_000).toISOString(),
-          token: "stale-token",
-        },
-        null,
-        2,
-      )}\n`,
+      `${JSON.stringify({ pid: process.pid, acquired_at: staleAcquiredAt }, null, 2)}\n`,
     );
 
     gate.arm(lockPath);
 
     const attempt = (label: "first" | "second") =>
       acquireLock(lockPath, { timeoutMs: 300, retryDelayMs: 10, staleTimeoutMs: 2_000 }).then(
-        (handle) => ({ label, ok: true as const, handle }),
+        () => ({ label, ok: true as const }),
         (error: unknown) => ({ label, ok: false as const, error }),
       );
 
@@ -304,10 +303,15 @@ describe("stale-break TOCTOU: concurrent breakers never produce two holders (loc
       throw new Error(`expected the unheld contender to win cleanly, got: ${String(winner.error)}`);
     }
 
-    // Before releasing the held contender: the winner's handle really is
-    // what's on disk right now.
-    const midRaw = JSON.parse(await readFile(lockPath, "utf8")) as { token: string };
-    expect(midRaw.token).toBe(winner.handle.token);
+    // Before releasing the held contender: the winner's fresh lock really
+    // is what's on disk right now (not the stale content both read).
+    const midRaw = JSON.parse(await readFile(lockPath, "utf8")) as {
+      pid: number;
+      acquired_at: string;
+    };
+    expect(midRaw.pid).toBe(process.pid);
+    expect(midRaw.acquired_at).not.toBe(staleAcquiredAt);
+    const winnerAcquiredAt = midRaw.acquired_at;
 
     gate.release();
     const loser = winner.label === "first" ? await pSecond : await pFirst;
@@ -322,173 +326,25 @@ describe("stale-break TOCTOU: concurrent breakers never produce two holders (loc
 
     // And the winner's lock is still genuinely, un-clobbered held — the
     // loser's break attempt never got to delete or steal it.
-    await expect(winner.handle.assertHeld()).resolves.toBeUndefined();
-    const finalRaw = JSON.parse(await readFile(lockPath, "utf8")) as { token: string };
-    expect(finalRaw.token).toBe(winner.handle.token);
+    const finalRaw = JSON.parse(await readFile(lockPath, "utf8")) as { acquired_at: string };
+    expect(finalRaw.acquired_at).toBe(winnerAcquiredAt);
 
-    await releaseLock(lockPath, winner.handle.token);
+    await releaseLock(lockPath);
   });
 });
 
-describe("release-on-throw compare-and-delete", () => {
-  it("releaseLock (no token, legacy pid-based fallback) refuses to delete a lock now held by a different pid (stolen-back scenario)", async () => {
+describe("release compare-and-delete", () => {
+  it("releaseLock refuses to delete a lock now held by a different pid (stolen-back scenario)", async () => {
     // Simulate: we held the lock, it was declared stale and broken, and
     // someone else (a different pid) has since re-acquired it.
     await acquireLock(lockPath);
     await writeFile(
       lockPath,
-      `${JSON.stringify(
-        {
-          pid: process.pid + 1,
-          acquired_at: new Date().toISOString(),
-          token: "someone-elses-token",
-        },
-        null,
-        2,
-      )}\n`,
+      `${JSON.stringify({ pid: process.pid + 1, acquired_at: new Date().toISOString() }, null, 2)}\n`,
     );
-    await releaseLock(lockPath); // no expectedToken — exercises the pid-fallback path specifically
+    await releaseLock(lockPath);
     // Still there — releaseLock must not have deleted the other holder's lock.
     await expect(readFile(lockPath, "utf8")).resolves.toBeTruthy();
-    await rm(lockPath, { force: true });
-  });
-
-  it("releaseLock(lockPath, token) refuses to delete a lock now held by a different token, even with the SAME pid (a re-acquire by this same process)", async () => {
-    // A stronger version of the scenario above: fencing tokens catch a
-    // steal-back even when pid alone couldn't (e.g. this process's own
-    // lock was reclaimed and then re-acquired again, by this same pid,
-    // producing a fresh token) — token-based compare-and-delete is what
-    // withLock actually uses.
-    const handle = await acquireLock(lockPath);
-    await writeFile(
-      lockPath,
-      `${JSON.stringify(
-        { pid: process.pid, acquired_at: new Date().toISOString(), token: "a-different-token" },
-        null,
-        2,
-      )}\n`,
-    );
-    await releaseLock(lockPath, handle.token);
-    await expect(readFile(lockPath, "utf8")).resolves.toBeTruthy();
-    await rm(lockPath, { force: true });
-  });
-});
-
-describe("fencing token / assertHeld (adversarial-review Finding 1)", () => {
-  it("assertHeld() succeeds and renews acquired_at while genuinely still held", async () => {
-    const clock = fixedClock(new Date("2026-07-23T10:00:00.000Z"));
-    const handle = await acquireLock(lockPath, { clock });
-    clock.advance(1_000);
-    await expect(handle.assertHeld()).resolves.toBeUndefined();
-    const raw = JSON.parse(await readFile(lockPath, "utf8")) as {
-      acquired_at: string;
-      token: string;
-    };
-    expect(raw.acquired_at).toBe("2026-07-23T10:00:01.000Z");
-    expect(raw.token).toBe(handle.token); // the token itself never changes across a renewal
-    await releaseLock(lockPath, handle.token);
-  });
-
-  it("assertHeld() throws SlopError CONFLICT (exit 6) once this holder has been dispossessed", async () => {
-    const handle = await acquireLock(lockPath);
-    // Simulate exactly what a real contender's tryBreakStaleLock + re
-    // -acquire produces: the lock file now names a different holder/token.
-    await writeFile(
-      lockPath,
-      `${JSON.stringify(
-        {
-          pid: process.pid + 1,
-          acquired_at: new Date().toISOString(),
-          token: "someone-elses-token",
-        },
-        null,
-        2,
-      )}\n`,
-    );
-    let threw: unknown;
-    try {
-      await handle.assertHeld();
-    } catch (err) {
-      threw = err;
-    }
-    expect(threw).toBeInstanceOf(SlopError);
-    expect((threw as SlopError).exitCode).toBe(EXIT_CODES.CONFLICT);
-    expect((threw as SlopError).message).toMatch(/dispossessed/i);
-    await rm(lockPath, { force: true });
-  });
-
-  it("assertHeld() throws CONFLICT if the lock file is gone entirely (broken and not yet re-acquired by anyone)", async () => {
-    const handle = await acquireLock(lockPath);
-    await rm(lockPath, { force: true });
-    await expect(handle.assertHeld()).rejects.toMatchObject({ exitCode: EXIT_CODES.CONFLICT });
-  });
-
-  it("renewal prevents a live, slow holder from being reclaimed merely for running past staleTimeoutMs", async () => {
-    // 15ms renewal vs. 200ms staleTimeout is a wide (~13x) real-time
-    // margin, chosen specifically to not flake under load — the previous
-    // 20ms-vs-80ms pairing (~4x) left too little slack for a slow CI
-    // scheduler to occasionally miss a renewal window and make this test
-    // spuriously pass OR spuriously fail depending on which side of the
-    // race lost. Real wall-clock timing (not the injectable fixed clock
-    // used elsewhere in this file) is unavoidable here: what's under
-    // test is genuinely the *live* retry/renewal race between two
-    // independent async loops, not a value `acquireLock` merely records.
-    const handle = await acquireLock(lockPath, { staleTimeoutMs: 200 });
-    const renewals = setInterval(() => {
-      handle.assertHeld().catch(() => {});
-    }, 15);
-    try {
-      // Without renewal this would be clearly stale well before 250ms —
-      // the holder has been renewing the whole time via assertHeld(), so
-      // a contender must still time out rather than steal it.
-      await expect(
-        acquireLock(lockPath, { timeoutMs: 250, retryDelayMs: 10, staleTimeoutMs: 200 }),
-      ).rejects.toBeInstanceOf(SlopError);
-    } finally {
-      clearInterval(renewals);
-      await releaseLock(lockPath, handle.token);
-    }
-  });
-
-  it("withLock hands fn a handle whose assertHeld() a multi-write transaction can call between writes", async () => {
-    const order: string[] = [];
-    const result = await withLock(lockPath, async (lock) => {
-      order.push("write1");
-      await lock.assertHeld();
-      order.push("write2");
-      return "done";
-    });
-    expect(order).toEqual(["write1", "write2"]);
-    expect(result).toBe("done");
-  });
-
-  it("a multi-write withLock transaction aborts loudly (CONFLICT) via assertHeld() if dispossessed between writes, and the second write never runs", async () => {
-    let secondWriteRan = false;
-    await expect(
-      withLock(lockPath, async (lock) => {
-        // Same simulated steal as above, mid-transaction.
-        await writeFile(
-          lockPath,
-          `${JSON.stringify(
-            {
-              pid: process.pid + 1,
-              acquired_at: new Date().toISOString(),
-              token: "someone-elses-token",
-            },
-            null,
-            2,
-          )}\n`,
-        );
-        await lock.assertHeld();
-        secondWriteRan = true;
-      }),
-    ).rejects.toMatchObject({ exitCode: EXIT_CODES.CONFLICT });
-    expect(secondWriteRan).toBe(false);
-
-    // And release (in withLock's finally) correctly refused to clobber
-    // the "new holder's" lock — token-based compare-and-delete held.
-    const remaining = JSON.parse(await readFile(lockPath, "utf8")) as { token: string };
-    expect(remaining.token).toBe("someone-elses-token");
     await rm(lockPath, { force: true });
   });
 });

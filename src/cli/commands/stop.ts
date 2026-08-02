@@ -1,15 +1,7 @@
 import type { Command } from "commander";
 import { END_SUMMARY_MAX_LENGTH } from "../../core/index.js";
-import {
-  readSession,
-  readTicket,
-  repoPaths,
-  requireRepoRoot,
-  resolveTicketRef,
-  updateSession,
-  updateTicket,
-  withLock,
-} from "../../repo/index.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
+import { openStorage } from "../../storage/index.js";
 import { diffSessionPatch, SESSION_END_FIELDS } from "../../sessions/patch.js";
 import { assertStoppable, buildStoppedSession, buildStoppedTicket } from "../../sessions/stop.js";
 import { diffTicketPatch, TICKET_FIELDS } from "../../tickets/patch.js";
@@ -26,6 +18,7 @@ export async function runStop(ref: string, opts: StopCommandOptions): Promise<vo
   const paths = repoPaths(root);
   const config = await loadConfig(paths);
   const actor = resolveActor({ config, cwd: root });
+  const backend = await openStorage(paths);
 
   // D1's installed skill makes a handoff note mandatory practice (§5: a
   // note is what makes the *next* session fast to resume without having
@@ -40,7 +33,7 @@ export async function runStop(ref: string, opts: StopCommandOptions): Promise<vo
     assertMaxLength("--note", opts.note, END_SUMMARY_MAX_LENGTH);
   }
 
-  const initialTicket = await resolveTicketRef(paths, ref);
+  const initialTicket = await backend.resolveTicketRef(ref);
 
   // ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC: a fast, UNLOCKED pre-check against
   // this same `initialTicket` read — same `assertStoppable` the lock below
@@ -52,8 +45,8 @@ export async function runStop(ref: string, opts: StopCommandOptions): Promise<vo
   // line and the lock is still caught there.
   assertStoppable(initialTicket);
 
-  const result = await withLock(paths.lockFile, async (lock) => {
-    const current = await readTicket(paths, initialTicket.id);
+  const result = await backend.transact(async () => {
+    const current = await backend.readTicket(initialTicket.id);
     assertStoppable(current);
     const activeSessionId = current.active_session;
     if (activeSessionId === null) {
@@ -61,15 +54,14 @@ export async function runStop(ref: string, opts: StopCommandOptions): Promise<vo
       // TypeScript's control-flow narrowing below.
       throw new Error("unreachable: assertStoppable should have thrown");
     }
-    const session = await readSession(paths, activeSessionId);
+    const session = await backend.readSession(activeSessionId);
     // ticket_01KYAPN9NXY6RPSV6WGR42CJHJ: session ownership is a warning,
     // not an enforced gate — see sessionOwnershipWarning's own doc.
     const ownershipWarning = sessionOwnershipWarning(session, actor);
 
     const finalSession = buildStoppedSession(session, opts.note);
 
-    await updateSession(
-      paths,
+    await backend.updateSession(
       session.id,
       diffSessionPatch(session, finalSession, SESSION_END_FIELDS),
       finalSession,
@@ -79,11 +71,9 @@ export async function runStop(ref: string, opts: StopCommandOptions): Promise<vo
         payload: opts.note !== undefined ? { note: opts.note } : {},
       },
     );
-    await lock.assertHeld();
 
     const stoppedTicket = buildStoppedTicket(current, opts.note);
-    await updateTicket(
-      paths,
+    await backend.updateTicket(
       current.id,
       diffTicketPatch(current, stoppedTicket, TICKET_FIELDS),
       stoppedTicket,

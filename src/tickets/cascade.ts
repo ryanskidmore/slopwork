@@ -91,26 +91,22 @@
  * tickets) — cheap at v0's target scale, and correct regardless of graph
  * shape.
  *
- * ## Locking contract (A3's fencing contract — `src/repo/lock.ts`)
+ * ## Locking contract (`src/repo/lock.ts` via `StorageBackend.transact`)
  *
- * {@link cascadeOnClose} takes an ALREADY-ACQUIRED {@link LockHandle} — it
- * does NOT call `withLock` itself. A second `acquireLock` on the SAME lock
- * file from the SAME process, while the first is still held, would
- * deadlock (`O_EXCL` creation fails immediately with `EEXIST`, and the
- * only process that could break the "stale" lock is the very one blocked
- * waiting on it). The caller (C3) must invoke this from INSIDE its own
- * `withLock(paths.lockFile, ...)` block, after already writing the closed
- * ticket's terminal state under that same acquisition — this makes "write
- * the closed ticket" + "cascade its unblocks" one transaction, so a
- * concurrent second closure racing the same graph (e.g. closing both
- * blockers of a diamond at once, from two different processes) can never
- * observe — or produce — a torn intermediate state. Every event this
- * function writes is preceded by `lock.assertHeld()` (A3's fencing
- * contract: "every call site that performs more than one write inside a
- * single withLock block MUST call the handle's assertHeld() between
- * writes") — a transaction that ran long enough to be declared stale and
- * reclaimed by someone else fails loudly here (`SlopError`, CONFLICT) the
- * moment it tries its next write, instead of silently continuing.
+ * {@link cascadeOnClose} runs inside an ALREADY-OPEN write transaction —
+ * it does NOT open one itself (a second acquisition of the same lock from
+ * the same process would deadlock: `O_EXCL` creation fails immediately
+ * with `EEXIST`, and the only process that could break the "stale" lock
+ * is the very one blocked waiting on it). The caller (C3's `done`/`drop`)
+ * must invoke this from INSIDE its own `storage.transact(...)` block,
+ * after already writing the closed ticket's terminal state under that
+ * same acquisition — this makes "write the closed ticket" + "cascade its
+ * unblocks" one transaction, so a concurrent second closure racing the
+ * same graph (e.g. closing both blockers of a diamond at once, from two
+ * different processes) can never observe — or produce — a torn
+ * intermediate state. The `tx` parameter is the transaction-scope marker
+ * `transact` hands its callback — requiring it here makes "must be called
+ * inside a transaction" a compile-time property, not a comment.
  *
  * ## Failure semantics on a partial cascade
  *
@@ -154,16 +150,15 @@
 import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import type { Event, Ticket, TicketId } from "../core/index.js";
-import { EXIT_CODES, newEventId } from "../core/index.js";
+import { EXIT_CODES } from "../core/index.js";
 import { SlopError } from "../cli/errors.js";
-import {
-  computeBlockedCounts,
-  createEvent,
-  isLiveBlockerState,
-  listEvents,
-  listTicketsTolerant,
-} from "../repo/index.js";
-import type { EventContext, LockHandle, RepoPaths, TicketReadProblem } from "../repo/index.js";
+import { computeBlockedCounts, isLiveBlockerState } from "./overlay.js";
+import type {
+  EventContext,
+  StorageBackend,
+  StorageTxScope,
+  TicketReadProblem,
+} from "../storage/backend.js";
 
 export interface CascadeOnCloseResult {
   /** Every ticket that is, per THIS call's fresh read of disk,
@@ -190,23 +185,6 @@ export interface CascadeOnCloseResult {
   problems: TicketReadProblem[];
 }
 
-function buildTicketReadyEvent(
-  ticketId: TicketId,
-  closedTicketId: TicketId,
-  ctx: EventContext,
-  clock: Clock,
-): Event {
-  return {
-    id: newEventId(),
-    actor: ctx.actor,
-    session: ctx.session,
-    verb: "ticket.ready",
-    entity: { kind: "ticket", id: ticketId },
-    payload: { unblocked_by: closedTicketId },
-    at: clock.now().toISOString(),
-  };
-}
-
 function isDefined<T>(value: T | undefined): value is T {
   return value !== undefined;
 }
@@ -224,11 +202,11 @@ function isDefined<T>(value: T | undefined): value is T {
  * candidates at all (a closure that unblocks nothing costs nothing here).
  */
 async function priorReadyEventsFor(
-  paths: RepoPaths,
+  backend: StorageBackend,
   candidateIds: ReadonlySet<string>,
 ): Promise<Event[]> {
   if (candidateIds.size === 0) return [];
-  const allEvents = await listEvents(paths);
+  const allEvents = await backend.listEvents();
   return allEvents.filter(
     (event) =>
       event.verb === "ticket.ready" &&
@@ -275,13 +253,17 @@ function alreadyEmittedReadyFor(
  * module doc, "Which tickets are even candidates".
  */
 export async function cascadeOnClose(
-  paths: RepoPaths,
+  backend: StorageBackend,
+  // Unused except as a compile-time gate — see this module's doc,
+  // "Locking contract": requiring the transaction-scope marker `transact`
+  // hands its callback is what makes "must be called inside a
+  // transaction" a property the compiler checks, not just a comment.
+  _tx: StorageTxScope,
   closedTicketId: TicketId,
   ctx: EventContext,
-  lock: LockHandle,
   clock: Clock = systemClock,
 ): Promise<CascadeOnCloseResult> {
-  const { tickets, problems } = await listTicketsTolerant(paths);
+  const { tickets, problems } = await backend.listTicketsTolerant();
 
   const closedTicket = tickets.find((t) => t.id === closedTicketId);
   if (closedTicket === undefined) {
@@ -311,7 +293,7 @@ export async function cascadeOnClose(
   // One read for the whole cascade (module doc: "Emission is deduplicated
   // against the event log") — NOT one `queryEvents`/log-scan per candidate.
   const priorReadyEvents = await priorReadyEventsFor(
-    paths,
+    backend,
     new Set(newlyUnblocked.map((t) => t.id)),
   );
 
@@ -321,9 +303,12 @@ export async function cascadeOnClose(
     // for THIS closure, so a re-invocation (the documented recovery path
     // after a partial cascade) is exactly-once, not at-least-once.
     if (alreadyEmittedReadyFor(priorReadyEvents, ticket.id, closedTicketId)) continue;
-    await lock.assertHeld();
-    const event = buildTicketReadyEvent(ticket.id, closedTicketId, ctx, clock);
-    await createEvent(paths, event);
+    const event = await backend.appendEvent(
+      ctx,
+      { kind: "ticket", id: ticket.id },
+      { verb: "ticket.ready", payload: { unblocked_by: closedTicketId } },
+      clock,
+    );
     events.push(event);
   }
 

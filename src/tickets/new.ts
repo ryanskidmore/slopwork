@@ -17,9 +17,7 @@ import {
   parseExplicitSlug,
   ticketSchema,
 } from "../core/index.js";
-import type { RepoPaths } from "../repo/paths.js";
-import { resolveTicketRef, resolveTicketRefs } from "../repo/refs.js";
-import { listTickets } from "../repo/tickets.js";
+import type { StorageBackend } from "../storage/backend.js";
 import { SlopError } from "../cli/errors.js";
 import { validateTicketEdges } from "./edges.js";
 import { assertLabelHasNoLeadingSigil } from "./labels.js";
@@ -96,9 +94,9 @@ export interface NewTicketResult {
  * USAGE_ERROR (exit 2) via `parseExplicitSlug` before uniqueness is even
  * considered.
  */
-async function resolveSlug(paths: RepoPaths, input: NewTicketInput): Promise<string> {
+async function resolveSlug(backend: StorageBackend, input: NewTicketInput): Promise<string> {
   if (input.slugRaw === undefined) {
-    return pickSlug(paths, input.name);
+    return pickSlug(backend, input.name);
   }
   let base: string;
   try {
@@ -106,7 +104,7 @@ async function resolveSlug(paths: RepoPaths, input: NewTicketInput): Promise<str
   } catch (err) {
     throw new SlopError(err instanceof Error ? err.message : String(err), EXIT_CODES.USAGE_ERROR);
   }
-  const taken = await takenSlugs(paths);
+  const taken = await takenSlugs(backend);
   return nextAvailableSlug(base, taken);
 }
 
@@ -139,7 +137,7 @@ async function resolveSlug(paths: RepoPaths, input: NewTicketInput): Promise<str
  *     subset.
  */
 export async function buildNewTicket(
-  paths: RepoPaths,
+  backend: StorageBackend,
   input: NewTicketInput,
   clock: Clock = systemClock,
 ): Promise<NewTicketResult> {
@@ -167,7 +165,7 @@ export async function buildNewTicket(
       ? parseSpecInput(input.specRaw, input.name)
       : applySpecFieldOverrides(defaultSpec(input.name), specFieldOverrides);
 
-  const parentResolution = await resolveParentRef(paths, input.parentRaw);
+  const parentResolution = await resolveParentRef(backend, input.parentRaw);
   if (parentResolution.kind === "external" && parentResolution.warning) {
     warnings.push(parentResolution.warning);
   }
@@ -182,7 +180,7 @@ export async function buildNewTicket(
   // O(refs x tickets). Dedup below is unchanged.
   const blocks: TicketId[] = [];
   const seenBlocks = new Set<TicketId>();
-  for (const target of await resolveTicketRefs(paths, input.blocksRaw)) {
+  for (const target of await backend.resolveTicketRefs(input.blocksRaw)) {
     if (!seenBlocks.has(target.id)) {
       seenBlocks.add(target.id);
       blocks.push(target.id);
@@ -194,7 +192,7 @@ export async function buildNewTicket(
   // ticket field the resolved ids land in.
   const relatesTo: TicketId[] = [];
   const seenRelatesTo = new Set<TicketId>();
-  for (const target of await resolveTicketRefs(paths, input.relatesToRaw)) {
+  for (const target of await backend.resolveTicketRefs(input.relatesToRaw)) {
     if (!seenRelatesTo.has(target.id)) {
       seenRelatesTo.add(target.id);
       relatesTo.push(target.id);
@@ -203,13 +201,13 @@ export async function buildNewTicket(
 
   const discoveredFrom: TicketId[] = [];
   if (input.discoveredFromRaw !== undefined) {
-    const target = await resolveTicketRef(paths, input.discoveredFromRaw);
+    const target = await backend.resolveTicketRef(input.discoveredFromRaw);
     discoveredFrom.push(target.id);
   }
 
   const id = newTicketId();
   const ancestry = ancestryFor(parentResolution, id);
-  const slug = await resolveSlug(paths, input);
+  const slug = await resolveSlug(backend, input);
   const now = nowIso(clock);
 
   const candidate = {
@@ -253,7 +251,7 @@ export async function buildNewTicket(
   // B3: degree cap (and, uniformly, the cycle checks — always a no-op
   // here, see this function's doc) before this ticket is ever handed back
   // for persisting.
-  const others = await listTickets(paths);
+  const others = await backend.listTickets();
   validateTicketEdges(parsed.data, others);
 
   return { ticket: parsed.data, warnings };

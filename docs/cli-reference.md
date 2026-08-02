@@ -140,8 +140,9 @@ creating the session and the ticket write that points to it.
 
 ```sh
 slop reindex
-slop reindex --strict   # fail on the first unreadable file instead of skipping it
-slop reindex --heal     # also close out any orphaned active sessions found
+slop reindex --strict         # fail on the first unreadable file instead of skipping it
+slop reindex --heal           # also close out any orphaned active sessions found
+slop reindex --shard-events   # migrate flat-layout events/ into events/YYYY-MM/ shards
 ```
 
 `--strict` restores pre-fault-tolerance, all-or-nothing behavior. Without
@@ -157,6 +158,21 @@ The scan is skipped (with a warning) whenever the ticket read itself had
 unreadable files — a corrupt ticket's own `active_session` would
 otherwise be invisible to the scan, which could misreport a genuinely
 live session as orphaned.
+
+`--shard-events` (G2) migrates any events still sitting flat
+(`events/event_<ulid>.jsonc`, the pre-sharding layout) into
+`events/YYYY-MM/` shard directories, one shard per calendar month (UTC)
+derived from each event's own id — see
+[Concepts → The flatfile database](concepts.md#the-flatfile-database) for
+why events shard by month at all. **Never runs implicitly** — event files
+are git-tracked, so the rename lands as a normal, visible commit you
+choose to make, not something a routine `reindex` does on your behalf.
+Idempotent and safe to run repeatedly: a repo that's already fully
+sharded (or has no events at all) reports zero files moved. Reading has
+always transparently handled a mix of flat and sharded events (and
+always will, even after every repo you use has been migrated), so
+`--shard-events` is a housekeeping/performance choice, never a
+requirement.
 
 ---
 
@@ -268,6 +284,13 @@ alternative for the edge/owner repair `edit` used to be the only way to
 do. An explicitly configured `$VISUAL`/`$EDITOR` is exempt from this guard
 even off a real terminal (it's trusted to be non-interactive-safe on
 purpose).
+
+**Requires the flatfile backend** (G2): `edit` opens a real local file, a
+capability [a remote backend doesn't have](storage-backends.md#not-part-of-the-wire-contract-local-file-access).
+Against `backend: remote`, it refuses cleanly (`USAGE_ERROR`, exit `2`)
+naming `update`'s non-interactive flags, same as the non-TTY refusal
+above — never a confusing failure trying to locate a file that was never
+going to exist.
 
 ### `update`
 

@@ -9,8 +9,63 @@ where breaking changes land.
 
 ## Unreleased
 
+### Added
+
+- **Pluggable storage backend** (G2). Every command and `slop web` now go
+  through a `StorageBackend` interface (`src/storage/`) instead of
+  importing the flatfile repo layer directly — sized to what the 22
+  commands and the web explorer actually need: ticket/session CRUD, event
+  append/query, ref resolution, the derived index, and a transactional
+  write scope. `.slop/config.yaml` gains a `backend:` key selecting the
+  implementation (absent, or `backend: flatfile`, is the default and needs
+  no configuration); see [Configuration → Storage
+  backend](docs/configuration.md#storage-backend).
+- **Remote backend stub + wire contract** (`backend: remote`/
+  `backend: {kind: remote, url: ...}`). No real remote store exists yet —
+  every call fails immediately with a clear, non-crashing error (exit `1`)
+  naming the new [`docs/storage-backends.md`](docs/storage-backends.md),
+  which specifies the full JSON-over-HTTP contract (every endpoint, error
+  → exit-code mapping, the transaction lease model, auth via
+  `SLOP_REMOTE_TOKEN`) a real implementation must speak.
+- **Event storage shards by calendar month.** New events land under
+  `.slop/db/events/YYYY-MM/` (UTC month from the event's own id) instead
+  of flat in `events/`; every read path merges flat and sharded layouts
+  transparently, so this is invisible until you look. `slop reindex
+  --shard-events` explicitly migrates an existing flat layout into shards
+  (idempotent, never runs implicitly — see
+  [CLI reference → `reindex`](docs/cli-reference.md#reindex)).
+- `defaults.lock_timeout` in `config.yaml` — how long a mutating command
+  waits for the db write lock before giving up with `CONFLICT` (exit `6`).
+  Defaults to `5s`, matching the previous hardcoded value.
+
+### Changed
+
+- **`.slop/db/.lock` simplified.** The per-acquisition fencing protocol
+  (tokens, `assertHeld()` renewal, dispossession detection) is removed —
+  no real transaction in this codebase ever ran anywhere near its 5-minute
+  stale-lock timeout, so the protocol guarded a scenario with no actual
+  call site. What remains (O_EXCL acquisition, pid-liveness + timeout
+  stale-breaking via an atomic rename-away, capped-backoff retry,
+  `CONFLICT` on timeout) is unchanged in observable behavior, just
+  reachable through `StorageBackend.transact` now rather than
+  `src/repo/lock.ts` directly. See
+  [Concurrency & merging → the db lock](docs/concurrency-and-merging.md#the-db-lock-serializing-the-write-path).
+- The done-cascade (`src/tickets/cascade.ts`) and several other
+  business-logic helpers now take a `StorageBackend` (and, for the
+  cascade specifically, an opaque transaction-scope marker) instead of a
+  flatfile `RepoPaths` — internal only, no CLI-visible change.
+- `slop web`'s data source is now backed by `StorageBackend` instead of
+  reading `.slop/db/` directly — as a side effect, a long-running `slop
+  web` process no longer re-scans the whole db on every request when
+  nothing has changed since the last one (the flatfile driver's
+  in-process read cache).
+
 ### Breaking
 
+- `slop edit` now requires the flatfile backend's local-file capability;
+  against a `remote` backend it refuses cleanly (`USAGE_ERROR`, exit `2`)
+  naming `slop update`'s non-interactive flags instead of trying (and
+  failing) to open a local file that was never going to exist.
 - **Transcripts are removed from the product entirely** (product audit).
   Everything about the feature is gone, locally and remote:
   - the harness-transcript capture machinery (Claude Code / opencode / Codex
