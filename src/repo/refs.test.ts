@@ -34,6 +34,7 @@ function makeIndexRow(
     root_id: overrides.id,
     path: [],
     labels: [],
+    owner: null,
     latest_note: null,
     last_activity_at: "2026-07-23T10:00:00.000Z",
     active_session: null,

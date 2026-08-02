@@ -224,6 +224,7 @@ import { z } from "zod";
 import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import {
+  actorSchema,
   isEventId,
   isTicketId,
   labelSchema,
@@ -271,7 +272,7 @@ import { listTicketsTolerant } from "./tickets.js";
 
 /**
  * C5 bumped this 1 → 2 (`stale`/`review_stale` -> `stale_at`/
- * `review_stale_at`). ticket_01KY9RWFM80BKNE2CDX85QMKGS bumps it again,
+ * `review_stale_at`). ticket_01KY9RWFM80BKNE2CDX85QMKGS bumped it again,
  * 2 → 3: a new required `latest_note` column joins `last_activity_at` as
  * an EFFECTIVE (event-derived), not stored-verbatim, value — see this
  * module's doc section above. A genuine row-shape change, not an
@@ -279,8 +280,23 @@ import { listTicketsTolerant } from "./tickets.js";
  * older binary fails `dbIndexSchema` validation against the new field and
  * falls into the existing `stale_schema_version`/`invalid_schema`
  * auto-heal path, exactly like every prior schema bump.
+ *
+ * t-175oq/t-trqk9 bump it again, 3 → 4, for two independent additions
+ * landing together:
+ *   - `IndexTicketRow.owner` — `ready --owner`/`slop list --owner` (G3)
+ *     need each row's owning actor without a per-row `readTicket` call;
+ *     nullable, mirroring `ticket.owner` itself.
+ *   - `DbIndex.slug_problems` — t-trqk9's duplicate-slug detection (see
+ *     {@link duplicateSlugProblemSchema} below): a cross-clone merge that
+ *     produces two tickets sharing one slug is now recorded here at build
+ *     time instead of silently resolved last-writer-wins.
+ * Both are genuine new required fields (not filling in an already-nullable
+ * one), so — same reasoning as every prior bump — an `index.jsonc` written
+ * by an older binary fails validation against the new shape and rebuilds
+ * transparently rather than silently serving stale/absent values for
+ * either.
  */
-export const INDEX_SCHEMA_VERSION = 3;
+export const INDEX_SCHEMA_VERSION = 4;
 
 export const indexTicketRowSchema = z.object({
   id: ticketIdSchema,
@@ -300,6 +316,10 @@ export const indexTicketRowSchema = z.object({
   latest_note: z.string().nullable(),
   last_activity_at: isoTimestampSchema,
   active_session: sessionIdSchema.nullable(),
+  /** t-175oq/t-trqk9 (schema v4): the ticket's own `owner`, mirrored here
+   * so `ready --owner`/`slop list --owner` never need a per-row
+   * `readTicket` just to filter on it. */
+  owner: actorSchema.nullable(),
 
   // --- Reverse edges (derived; forward edges live only on the source
   // ticket — DECISIONS.md, outgoingEdges()). "parent" has no reverse
@@ -360,18 +380,50 @@ export const ticketReadProblemSchema = z.object({
 });
 export type TicketReadProblem = z.infer<typeof ticketReadProblemSchema>;
 
+/**
+ * t-trqk9: one slug claimed by MORE than one ticket — a cross-clone merge
+ * that produced two tickets with the same slug (`db-index.ts`'s old
+ * last-writer-wins `slugs` map build let this happen silently, leaving one
+ * ticket unreachable by slug). `ids` is every ticket currently claiming
+ * `slug`, sorted ascending by id (= oldest-first, ULIDs sort
+ * chronologically — same convention `tickets/ready.ts`'s `compareReadyOrder`
+ * documents for "age"), length always >= 2 by construction (a slug with
+ * exactly one claimant is never a problem). Resolving `slug` as a `<ref>`
+ * already returns `AMBIGUOUS_REF` (exit 5) listing these same candidates
+ * (`repo/refs.ts`'s `resolveWithIndex` slug-match branch) — this is the
+ * BUILD-time detection half; `slop reindex --heal` is the repair half (see
+ * `src/tickets/slug-heal.ts`).
+ */
+export const duplicateSlugProblemSchema = z.object({
+  slug: slugSchema,
+  ids: z.array(ticketIdSchema).min(2),
+});
+export type DuplicateSlugProblem = z.infer<typeof duplicateSlugProblemSchema>;
+
 export const dbIndexSchema = z.object({
   schema_version: z.literal(INDEX_SCHEMA_VERSION),
   built_at: isoTimestampSchema,
   /** Staleness signature of the entity files this index was built from — see "Content staleness" above. */
   fingerprint: contentFingerprintSchema,
   tickets: z.array(indexTicketRowSchema),
-  /** slug -> ticket id, for O(1) exact-slug ref resolution (refs.ts). */
+  /** slug -> ticket id, for O(1) exact-slug ref resolution (refs.ts). For a
+   * duplicated slug (see `slug_problems` below) this holds ONE of the
+   * candidates (the oldest, deterministically — see `buildIndex`), purely
+   * defensively: `refs.ts`'s resolution always re-checks `index.tickets`
+   * for every ticket actually claiming that slug and returns `AMBIGUOUS_REF`
+   * the moment there's more than one, so this map's exact value in the
+   * duplicate case is never load-bearing for correctness. */
   slugs: z.record(z.string(), ticketIdSchema),
   /** Ticket files skipped while building this index — see "Fault
    * tolerance" above. Empty in the overwhelming common case; never
    * causes `buildIndex` itself to throw. */
   problems: z.array(ticketReadProblemSchema),
+  /** t-trqk9 (schema v4): every slug currently claimed by more than one
+   * ticket. Empty in the overwhelming common case. Never causes
+   * `buildIndex` to throw — like `problems` above, this is a loud warning
+   * (`loadIndex` warns on stderr whenever this is non-empty), not a hard
+   * failure; `slop reindex --heal` is the repair path. */
+  slug_problems: z.array(duplicateSlugProblemSchema),
 });
 export type DbIndex = z.infer<typeof dbIndexSchema>;
 
@@ -600,6 +652,29 @@ function warnAboutIndexProblems(problems: TicketReadProblem[]): void {
   process.stderr.write(`warning: ${formatIndexProblems(problems)}\n`);
 }
 
+/**
+ * t-trqk9: render `slug_problems` as a human-actionable, multi-line report
+ * — the duplicate-slug analogue of {@link formatIndexProblems}, reused by
+ * both {@link loadIndex}'s stderr warning and `slop reindex`'s own report
+ * (src/cli/commands/reindex.ts).
+ */
+export function formatDuplicateSlugProblems(problems: DuplicateSlugProblem[]): string {
+  const header =
+    `${problems.length} slug(s) are claimed by more than one ticket (a cross-clone merge collision) ` +
+    "— resolving any of them by slug is ambiguous (AMBIGUOUS_REF, exit 5) until healed:";
+  const body = problems.map((p) => `  - "${p.slug}": ${p.ids.join(", ")}`);
+  return [
+    header,
+    ...body,
+    "  run `slop reindex --heal` to deterministically re-suffix the newer duplicate(s) " +
+      "(the OLDEST ticket, by id, keeps the slug).",
+  ].join("\n");
+}
+
+function warnAboutSlugProblems(problems: DuplicateSlugProblem[]): void {
+  process.stderr.write(`warning: ${formatDuplicateSlugProblems(problems)}\n`);
+}
+
 /** duration-huge-stale-after-overflows: see `buildIndex`'s call sites. */
 function warnAboutUnrepresentableDuration(field: string, configured: string, ms: number): void {
   if (isRepresentableDurationMs(ms)) return;
@@ -695,6 +770,7 @@ export async function buildIndex(paths: RepoPaths, clock: Clock = systemClock): 
         latest_note: overlay.latest_note,
         last_activity_at: overlay.last_activity_at,
         active_session: ticket.active_session,
+        owner: ticket.owner,
         blocked_by: blockedBy.get(ticket.id) ?? [],
         related_from: relatedFrom.get(ticket.id) ?? [],
         discovered: discovered.get(ticket.id) ?? [],
@@ -721,13 +797,49 @@ export async function buildIndex(paths: RepoPaths, clock: Clock = systemClock): 
     })
     .sort((a, b) => a.id.localeCompare(b.id));
 
-  const slugs: Record<string, TicketId> = {};
+  // t-trqk9: slugs are supposed to be unique by construction (B1's
+  // `nextAvailableSlug` collision suffix), but a cross-clone merge can
+  // still produce two ticket FILES sharing one slug — `nextAvailableSlug`
+  // only ever sees its own clone's tickets at the moment either was
+  // created. The old build here was silent last-writer-wins (whichever
+  // ticket happened to iterate last in `tickets` order won the `slugs[slug]`
+  // map entry, leaving every earlier claimant unreachable by slug with no
+  // record anything was ever wrong). Grouping by slug first — instead of a
+  // single assignment loop — is what makes the collision detectable at all:
+  // every group with more than one id becomes a `slug_problems` entry
+  // (never thrown, same "loud, never silent" fault-tolerance posture as
+  // `problems` above), and the `slugs` map itself still gets exactly one
+  // entry per slug string (the OLDEST-by-id claimant, deterministically —
+  // matching `slop reindex --heal`'s own "oldest keeps the slug" rule, see
+  // src/tickets/slug-heal.ts) so it stays a valid `Record<string,
+  // TicketId>` regardless. That defensive choice is never actually
+  // load-bearing for ref resolution: `repo/refs.ts`'s slug-match branch
+  // re-scans `index.tickets` for every ticket claiming the matched slug and
+  // returns `AMBIGUOUS_REF` the instant there's more than one, so which
+  // single id lands in `slugs[slug]` here never determines what a `<ref>`
+  // lookup actually resolves to.
+  const slugGroups = new Map<string, TicketId[]>();
   for (const ticket of tickets) {
-    // Slugs are unique by construction (B1's nextAvailableSlug collision
-    // suffix); last-writer-wins here is purely defensive against a
-    // hand-edited duplicate, not an expected case.
-    slugs[ticket.slug] = ticket.id;
+    const ids = slugGroups.get(ticket.slug) ?? [];
+    ids.push(ticket.id);
+    slugGroups.set(ticket.slug, ids);
   }
+
+  const slugs: Record<string, TicketId> = {};
+  const slugProblems: DuplicateSlugProblem[] = [];
+  for (const [slug, ids] of slugGroups) {
+    const sorted = [...ids].sort(); // ULIDs sort chronologically — ascending = oldest first.
+    const oldest = sorted[0];
+    if (oldest !== undefined) slugs[slug] = oldest;
+    if (sorted.length > 1) slugProblems.push({ slug, ids: sorted });
+  }
+  // Deterministic order for callers/tests/`--json` consumers — group
+  // insertion order otherwise follows `tickets`' own (ascending-id) order,
+  // which is already close to this but not guaranteed once a slug's own
+  // FIRST-seen ticket isn't its oldest (can't happen here since `tickets`
+  // is itself ascending-id order, but sorting explicitly documents the
+  // guarantee rather than leaning on that coincidence).
+  slugProblems.sort((a, b) => a.slug.localeCompare(b.slug));
 
   return {
     schema_version: INDEX_SCHEMA_VERSION,
@@ -736,6 +848,7 @@ export async function buildIndex(paths: RepoPaths, clock: Clock = systemClock): 
     tickets: rows,
     slugs,
     problems,
+    slug_problems: slugProblems,
   };
 }
 
@@ -842,6 +955,12 @@ export async function loadIndex(
   // list from an earlier build, and that must stay loud until it's fixed.
   if (result.index.problems.length > 0) {
     warnAboutIndexProblems(result.index.problems);
+  }
+  // t-trqk9: same "never silent" treatment for duplicate slugs — a
+  // persisted `slug_problems` list from an earlier build is just as loud
+  // on a "fresh" (non-rebuilt) load as on the rebuild that found it.
+  if (result.index.slug_problems.length > 0) {
+    warnAboutSlugProblems(result.index.slug_problems);
   }
 
   return result;
