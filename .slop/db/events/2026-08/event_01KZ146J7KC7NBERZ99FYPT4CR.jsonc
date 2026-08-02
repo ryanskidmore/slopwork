@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ146J7KC7NBERZ99FYPT4CR",
+  "actor": {
+    "name": "codex-web-resilience",
+    "kind": "agent"
+  },
+  "session": "session_01KZ146J7GCEME06TYK1CBHHDM",
+  "verb": "session.started",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KZ146J7GCEME06TYK1CBHHDM"
+  },
+  "payload": {
+    "harness": "codex",
+    "takeover": false
+  },
+  "at": "2026-08-02T11:36:57.331Z"
+}

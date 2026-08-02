@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ15F9WWYH2969QF6835BNCR",
+  "actor": {
+    "name": "codex-web-resilience",
+    "kind": "human"
+  },
+  "session": "session_01KZ146J7GCEME06TYK1CBHHDM",
+  "verb": "plan.step_checked",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KZ146J7GCEME06TYK1CBHHDM"
+  },
+  "payload": {
+    "step": 6,
+    "checked": true
+  },
+  "at": "2026-08-02T11:59:12.284Z"
+}
