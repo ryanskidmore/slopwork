@@ -13,7 +13,7 @@ documented per-command below and in each command's own `--help`). With
 `--json`, hitting the budget never produces truncated/invalid JSON — it
 degrades to a smaller, still-valid envelope instead. `--budget` counts in
 characters on every command it appears on — `ready`, `list`, `search`,
-`status`, `events`, `context`, and `show --context` — and rejects a
+`status`, `events`, `questions`, `context`, and `show --context` — and rejects a
 negative value as a usage error (exit `2`) rather than silently eliding
 everything.
 
@@ -469,6 +469,7 @@ slop ready --label area:auth
 slop ready --label area:auth --label team:infra   # AND — both labels required
 slop ready --owner priya --priority 0
 slop ready --resumable
+slop ready --include-awaiting
 slop ready --json --budget 3000
 ```
 
@@ -482,6 +483,7 @@ in-review tickets never appear.
 | `--owner <name>` | filter to tickets owned by this exact actor name (t-175oq) |
 | `--priority <0-3>` | filter to tickets at exactly this priority (t-175oq) |
 | `--resumable` | also list stopped or gone-stale in_progress/review tickets worth resuming |
+| `--include-awaiting` | include tickets with an unanswered question (G4) — excluded by default |
 | `--json` | machine-readable |
 | `--budget <n>` | cap output size, eliding lowest-priority/least-relevant tickets first |
 
@@ -489,6 +491,15 @@ in-review tickets never appear.
 priya --label area:auth --label team:infra` returns only tickets owned by
 `priya` carrying BOTH labels. Ordering and `--resumable` semantics are
 unchanged from before t-175oq.
+
+**`--include-awaiting` (G4, t-jggg9):** by default, `ready` (both the
+plain list and `--resumable`) excludes any ticket with the `awaiting_input`
+overlay (see [Concepts → derived
+overlays](concepts.md#derived-overlays-blocked-stale-ready-awaiting_input))
+— a ticket blocked on an unanswered question just stalls an agent that
+picks it up, on the exact same question the last session already hit.
+Pass `--include-awaiting` to opt back into the pre-G4 behavior for a
+specific pull (e.g. a human deliberately re-driving one anyway).
 
 ### `start`
 
@@ -544,6 +555,55 @@ unchecking a step number (1-based) mutates the *current* version in place
 — it does not version-bump. Every step's text must be non-blank; a
 blank/whitespace-only step is a `USAGE_ERROR` (exit 2) naming its 1-based
 position, nothing partially applied.
+
+### `ask`
+
+```sh
+slop ask <ref> "Should we use approach A or B?"
+slop ask <ref> "Which one?" --option "A" --option "B"
+slop ask <ref> "Ship it?" --json
+```
+
+Records a structured question (G4, t-jggg9) — a `question.asked` event,
+ticket-scoped, actor-attributed. This is what makes `<ref>` `awaiting_input`
+(see [Concepts → derived
+overlays](concepts.md#derived-overlays-blocked-stale-ready-awaiting_input))
+until answered via `slop answer`. Replaces the old `slop update <ref>
+--progress "QUESTION: …"` string convention entirely — there is no state, no
+inbox, and no filter behind that convention; this one has all three
+(`slop questions`, `slop status`'s "Awaiting input" section, `slop ready`'s
+default exclusion).
+
+| Flag | Meaning |
+|---|---|
+| `--option <text>` | a multiple-choice option (repeatable) — shown alongside the question in the inbox/web |
+| `--json` | machine-readable result: `{question: {id, ticket, text, options, asked_by, asked_at}}` |
+
+Lock-free, like a pure `update --progress` note — no read-modify-write of
+the ticket file, so concurrent `ask` calls on the same ticket never
+contend.
+
+### `answer`
+
+```sh
+slop answer event_01KY9RVF2DCG6TDQ8EBSGXQXT1 "B, and here's why…"
+slop answer <short-question-id-prefix> "Yes, ship it."
+slop answer <question-id> "…" --json
+```
+
+Answers a question `slop ask` opened — a `question.answered` event
+referencing the question it closes (`payload.question_id`). Once answered,
+the question no longer counts toward `awaiting_input`.
+
+`<question-id>` accepts the same ref forms every other id in this CLI does:
+a full `event_<ULID>` id, or a unique short prefix (more than one match is
+`AMBIGUOUS_REF`, exit `5`; no match is `NOT_FOUND`, exit `4`). Answering an
+already-answered question is a `CONFLICT` (exit `6`) naming who answered it
+and when — never a second `question.answered` event for the same question.
+
+| Flag | Meaning |
+|---|---|
+| `--json` | machine-readable result: `{question_id, ticket, answer: {id, text, by, answered_at}}` |
 
 ### `review`
 
@@ -660,13 +720,21 @@ slop status
 slop status --json --budget 2000
 ```
 
-Project pulse: counts by state, in-progress tickets with sessions, stale
-items, and tickets awaiting review with their MR links.
+Project pulse: counts by state, in-progress tickets with sessions,
+awaiting-input tickets (G4 — unanswered questions), stale items, and
+tickets awaiting review with their MR links.
 
 | Flag | Meaning |
 |---|---|
 | `--json` | machine-readable |
-| `--budget <n>` | elides stale rows, then review rows, then in-progress rows, least-important-first; the counts/derived totals are always kept in full |
+| `--budget <n>` | elides stale rows, then awaiting-input rows, then review rows, then in-progress rows, least-important-first; the counts/derived totals are always kept in full |
+
+The "Awaiting input" section (G4, t-jggg9) lists every ticket with `>=1`
+unanswered question — ticket, open-question count, and the oldest question's
+age — oldest-waiting first. `--json` adds an `awaiting_input: [{id, slug,
+handle, name, open_question_count, oldest_question_at,
+oldest_question_age_ms}]` array alongside the existing `in_progress`/
+`review`/`stale` ones.
 
 ### `show`
 
@@ -677,7 +745,9 @@ slop show <ref> --tree
 slop show <ref> --json
 ```
 
-A ticket's full details: spec, state, edges, sessions, and history.
+A ticket's full details: spec, state, edges, sessions, and history. Any
+open (unanswered) question is surfaced prominently, right at the top,
+before `spec` (G4, t-jggg9) — see `slop ask`/`slop answer`.
 
 | Flag | Meaning |
 |---|---|
@@ -685,6 +755,11 @@ A ticket's full details: spec, state, edges, sessions, and history.
 | `--tree` | render the ticket's ancestry/descendant tree |
 | `--budget <n>` | caps `--context` output only — a single ticket/tree view is never elided |
 | `--json` | machine-readable (ticket, plus `--tree`/`--context` data when given) |
+
+`--json` adds an `awaiting_input: {open: boolean, questions: [{id, text,
+options, asked_by, asked_at}]}` object alongside `ticket`/`handle`/`jira_url`
+— `questions` is every currently-unanswered question on `<ref>`, oldest
+first.
 
 ### `list`
 
@@ -697,6 +772,7 @@ slop list --owner priya --priority 0
 slop list --parent auth-overhaul                # DIRECT children only
 slop list --subtree auth-overhaul                # the whole descendant tree, inclusive
 slop list --limit 20 --offset 20                # page 2, 20 per page
+slop list --awaiting-input                      # only tickets with an unanswered question
 slop list --json --budget 3000
 ```
 
@@ -715,6 +791,7 @@ is plain browsing, no query language, deterministic sort.
 | `--priority <0-3>` | filter to tickets at exactly this priority |
 | `--parent <ref>` | filter to DIRECT children of this ticket only |
 | `--subtree <ref>` | filter to the whole descendant tree rooted at this ticket, INCLUSIVE of the ticket itself |
+| `--awaiting-input` | filter to tickets with an unanswered question (G4) — every row still carries an `awaiting_input` badge/field regardless |
 | `--limit <n>` | cap the number of tickets returned (after filtering/sorting) |
 | `--offset <n>` | skip this many matching tickets before applying `--limit` |
 | `--json` | machine-readable output |
@@ -732,8 +809,9 @@ problems, elided}` — `total` is the match count BEFORE `--limit`/
 `--offset` (what pagination is paging over); `returned` is `tickets.length`
 in this response (after paging, before any `--budget` elision); each
 ticket row is `{id, slug, handle, name, state, priority, labels, owner,
-parent, root_id, last_activity_at}`. `problems` is `{id, path,
-message}[]` (any ticket file skipped while listing, almost always `[]`).
+parent, root_id, last_activity_at, awaiting_input}` (G4's `awaiting_input`
+boolean badge). `problems` is `{id, path, message}[]` (any ticket file
+skipped while listing, almost always `[]`).
 
 ### `search`
 
@@ -751,6 +829,31 @@ a query language (no field filters) — that's the parked SlopQL feature.
 | `--json` | machine-readable |
 | `--limit <n>` | cap result count |
 | `--budget <n>` | elides lowest-ranked results first |
+
+### `questions`
+
+```sh
+slop questions
+slop questions --all
+slop questions --ticket <ref>
+slop questions --json --budget 3000
+```
+
+The elicitations inbox (G4, t-jggg9): every question `slop ask` opened.
+Default: unanswered only, oldest first, grouped by ticket (the ticket whose
+oldest open question has waited longest sorts first).
+
+| Flag | Meaning |
+|---|---|
+| `--all` | include already-answered questions too |
+| `--ticket <ref>` | scope to one ticket |
+| `--json` | machine-readable |
+| `--budget <n>` | cap output size, eliding the newest/least-urgent questions first |
+
+`--json` returns `{groups: [{ticket: {id, slug, handle, name, state},
+questions: [{id, text, options, asked_by, asked_at, answer}]}], total_questions,
+total_tickets, all, elided}` — `answer` is `null` for an open question, or
+`{id, text, by, answered_at}` once answered.
 
 ### `events`
 

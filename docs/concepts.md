@@ -115,6 +115,10 @@ The verb vocabulary is closed (`EVENT_VERBS`), grouped by area:
   payload's `reason` says which), `session.takeover`.
 - **Plans:** `plan.set`, `plan.revised`, `plan.step_checked`.
 - **Review:** `review.requested`.
+- **Elicitations (G4):** `question.asked` (`slop ask`), `question.answered`
+  (`slop answer`) — see
+  [Derived overlays](#derived-overlays-blocked-stale-ready-awaiting_input)
+  below for the `awaiting_input` overlay these two verbs feed.
 
 `slop events` lists these, optionally scoped to a ticket or paged with
 `--since`. See [CLI reference → `events`](cli-reference.md#events).
@@ -178,7 +182,7 @@ above); a bare re-run is still rejected the same way `done`/`drop` are.
 `src/tickets/state.ts` is the single source of truth for transition
 legality.
 
-## Derived overlays: `blocked`, `stale`, `ready`
+## Derived overlays: `blocked`, `stale`, `ready`, `awaiting_input`
 
 None of these are stored on a ticket (D5: "derived, never asserted") —
 they're computed fresh, every time, from stored data plus (for staleness)
@@ -202,6 +206,18 @@ the current clock.
   computed at read time (`now > deadline`) by `slop ready --resumable` and
   `slop status`, against the thresholds in `.slop/config.yaml` — see
   [Configuration](configuration.md#staleness-thresholds).
+- **`awaiting_input`** (G4, t-jggg9) — a ticket has it iff it has one or
+  more *unanswered* questions: a `question.asked` event (`slop ask`) with
+  no later `question.answered` event (`slop answer`) referencing it by the
+  asked event's own id. Unlike `stale`, this needs no clock — it's a pure
+  fold over the ticket's own events (`src/tickets/overlay.ts`'s
+  `computeAwaitingInputOverlay`, built on `src/tickets/questions.ts`'s
+  `deriveQuestions`), computed identically by the CLI's index build and
+  the web explorer. `slop ready` excludes `awaiting_input` tickets by
+  default (`--include-awaiting` overrides — see
+  [CLI reference → `ready`](cli-reference.md#ready)); `slop status`/`slop
+  list`/`slop show` surface it (a section, a badge/`--awaiting-input`
+  filter, and the open questions themselves, respectively).
 
 ## The flatfile database
 
