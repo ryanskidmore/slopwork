@@ -10,19 +10,19 @@
  * matches a provenance timeline's natural reading order.
  */
 import type { BunRequest } from "bun";
-import type { Session, Ticket, TicketId } from "../../core/index.js";
+import type { Session } from "../../core/index.js";
 import type { WebDataSource } from "../data-source.js";
 import { renderMarkdownToString } from "../markdown.js";
 import {
-  buildReverseEdgeIndex,
   computeAwaitingInputByTicket,
   deriveEffectiveTickets,
-  liveBlockers,
+  liveBlockersFromReverseIndex,
   matchTicketByRef,
   staleThresholdsFromConfig,
 } from "../overlays.js";
 import {
   apiErrorResponse,
+  createTicketSummaryContext,
   eventDto,
   jsonResponse,
   provenanceDto,
@@ -81,14 +81,20 @@ export async function handleTicketDetail(
 
   const effectiveTicket = deriveEffectiveTickets([ticket], events)[0] ?? ticket;
   const thresholds = staleThresholdsFromConfig(config);
-  const byId = new Map<TicketId, Ticket>(allTickets.map((t) => [t.id, t]));
   // G4 (t-jggg9): `events` is already scoped to this one ticket (plus its
   // sessions' events, which computeAwaitingInputByTicket's own
   // entity.kind==="ticket" filter ignores) — one ticket's worth of
   // question-verb events is exactly what the awaiting_input overlay
   // needs, no separate whole-db read.
   const awaitingInputByTicket = computeAwaitingInputByTicket(events);
-  const reverseEdges = buildReverseEdgeIndex(allTickets);
+  const summaryContext = createTicketSummaryContext(
+    allTickets,
+    thresholds,
+    config,
+    now,
+    awaitingInputByTicket,
+  );
+  const { byId, reverseEdges } = summaryContext;
   const children = allTickets.filter((t) => t.parent === ticket.id);
 
   const relatesToIds = [
@@ -96,7 +102,7 @@ export async function handleTicketDetail(
   ];
   const relationships: RelationshipsDTO = {
     blocks: refList(ticket.blocks, byId),
-    blocked_by: liveBlockers(ticket.id, allTickets).map((t) => ({
+    blocked_by: liveBlockersFromReverseIndex(ticket.id, byId, reverseEdges).map((t) => ({
       kind: "ref" as const,
       ref: ticketRefDto(t),
     })),
@@ -109,15 +115,7 @@ export async function handleTicketDetail(
   const resolutionHtml = ticket.resolution ? renderMarkdownToString(ticket.resolution) : null;
 
   const body: TicketDetailDTO = {
-    ticket: ticketSummaryDto(
-      effectiveTicket,
-      allTickets,
-      byId,
-      thresholds,
-      config,
-      now,
-      awaitingInputByTicket,
-    ),
+    ticket: ticketSummaryDto(effectiveTicket, summaryContext),
     ancestry: ticket.path.map((id) => refOrDangling(id, byId)),
     children: children.map(ticketRefDto).sort((a, b) => a.name.localeCompare(b.name)),
     relationships,

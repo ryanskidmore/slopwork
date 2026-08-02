@@ -12,7 +12,13 @@ import {
   deriveEffectiveTickets,
   staleThresholdsFromConfig,
 } from "../overlays.js";
-import { configDto, externalParentDto, jsonResponse, ticketSummaryDto } from "./shared.js";
+import {
+  configDto,
+  createTicketSummaryContext,
+  externalParentDto,
+  jsonResponse,
+  ticketSummaryDto,
+} from "./shared.js";
 import type { TreeNodeDTO, TreeResponseDTO } from "./types.js";
 
 function buildChildIndex(tickets: readonly Ticket[]): Map<TicketId, Ticket[]> {
@@ -41,12 +47,18 @@ export async function handleTreeView(
     dataSource.listEvents(),
   ]);
   const tickets = deriveEffectiveTickets(rawTickets, events);
-  const byId = new Map<TicketId, Ticket>(tickets.map((t) => [t.id, t]));
   const thresholds = staleThresholdsFromConfig(config);
   const childIndex = buildChildIndex(tickets);
   // G4 (t-jggg9): reuses the SAME whole-db event read already fetched
   // above for deriveEffectiveTickets — no second listEvents() call.
   const awaitingInputByTicket = computeAwaitingInputByTicket(events);
+  const summaryContext = createTicketSummaryContext(
+    tickets,
+    thresholds,
+    config,
+    now,
+    awaitingInputByTicket,
+  );
 
   // Cycle defence: write-time validation already rejects cycles, but a
   // tree builder should never infinite-loop even against a bad fixture.
@@ -55,15 +67,7 @@ export async function handleTreeView(
     const children = (childIndex.get(ticket.id) ?? []).filter((c) => !visited.has(c.id));
     const hasExternalParent = ticket.parent !== undefined && !isTicketId(ticket.parent);
     return {
-      ticket: ticketSummaryDto(
-        ticket,
-        tickets,
-        byId,
-        thresholds,
-        config,
-        now,
-        awaitingInputByTicket,
-      ),
+      ticket: ticketSummaryDto(ticket, summaryContext),
       children: children.map((c) => buildNode(c, nextVisited)),
       external_parent:
         hasExternalParent && ticket.parent !== undefined

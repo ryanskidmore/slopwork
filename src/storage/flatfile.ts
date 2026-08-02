@@ -36,7 +36,7 @@
  * covers the whole listing. Events are sharded (`events/YYYY-MM/`,
  * events.ts's module doc), so `listEventsTolerant` caches one entry PER
  * shard key (`"events"` for the flat leftovers, `"events/2026-08"` per
- * month — the exact keys `db-index.ts`'s `computeContentFingerprint`
+ * month — the exact keys `db-index.ts`'s `computeEventsFingerprint`
  * already produces), each keyed on THAT shard's own `{count, digest}`.
  * A repeat call re-parses only the shard(s) whose fingerprint actually
  * changed (typically just the current month, where new events keep
@@ -63,7 +63,7 @@ import { isSessionId, isTicketId } from "../core/index.js";
 import type { JsoncPatchEntry } from "../core/jsonc.js";
 import {
   buildIndex,
-  computeContentFingerprint,
+  computeEventsFingerprint,
   fingerprintEntityDir,
   loadIndex,
   writeIndex,
@@ -253,17 +253,15 @@ export class FlatfileBackend implements StorageBackend {
   /**
    * Per-shard incremental cache (module doc, "Events specifically") — the
    * flat `events/` fingerprint plus one per `events/YYYY-MM` shard
-   * currently on disk (the exact keys `computeContentFingerprint` already
+   * currently on disk (the exact keys `computeEventsFingerprint` already
    * produces, reused directly rather than re-deriving shard discovery a
    * second time here). A shard whose fingerprint hasn't moved since the
    * last call is served from cache untouched; only a changed (or
    * never-seen) shard is actually read + parsed.
    */
   async listEventsTolerant(): Promise<Event[]> {
-    const fp = await computeContentFingerprint(this.paths);
-    const shardEntries = Object.entries(fp).filter(
-      ([key]) => key === "events" || key.startsWith("events/"),
-    );
+    const fp = await computeEventsFingerprint(this.paths);
+    const shardEntries = Object.entries(fp);
 
     const perShard = await Promise.all(
       shardEntries.map(async ([key, dirFp]) => {

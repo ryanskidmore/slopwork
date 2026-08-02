@@ -62,6 +62,7 @@ import { join } from "node:path";
 import { cpus, totalmem, platform, release } from "node:os";
 import { spawn, spawnSync } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
+import type { BunRequest } from "bun";
 import { seed, verifySample } from "./seed.js";
 import { round, timeInProcess, timeOnce, timeSubprocess } from "./measure.js";
 import type { Timing } from "./measure.js";
@@ -243,7 +244,53 @@ async function runScale(args: Args, tickets: number): Promise<ScaleResult> {
     ),
   );
 
-  // --- Phase 5: end-to-end CLI latency -------------------------------------
+  // --- Phase 5: storage cache + web summary path ---------------------------
+  // These are the long-lived `slop web` process's common reads. The storage
+  // timing proves an event-cache hit does not inherit the ticket fingerprint's
+  // per-file stats; the API timing covers request-scoped overlay derivation.
+  const { FlatfileBackend } = await import("../src/storage/flatfile.js");
+  const { StorageDataSource } = await import("../src/web/storage-data-source.js");
+  const { handleTicketList } = await import("../src/web/api/tickets.js");
+  const backend = new FlatfileBackend(paths);
+  const dataSource = new StorageDataSource(backend, paths.slopDir);
+  await Promise.all([backend.listTicketsTolerant(), backend.listEventsTolerant()]);
+  timings.push(
+    await timeInProcess("storage: warm ticket listing", () => backend.listTicketsTolerant(), {
+      runs: 5,
+      discard: 1,
+      n: tickets,
+      notes: "cache validation; ticket fingerprint stats each ticket file",
+    }),
+  );
+  timings.push(
+    await timeInProcess("storage: warm event listing", () => backend.listEventsTolerant(), {
+      runs: 5,
+      discard: 1,
+      n: events,
+      notes: "cache validation; event-only fingerprint never scans tickets or sessions",
+    }),
+  );
+  // Serializing an unpaginated million-row response is not a useful routine
+  // benchmark and can consume gigabytes. Cover the handler through 100k rows.
+  if (tickets <= 100_000) {
+    const request = new Request("http://localhost/api/tickets") as BunRequest;
+    timings.push(
+      await timeInProcess(
+        "web: GET /api/tickets summaries",
+        async () => {
+          const response = await handleTicketList(request, dataSource, Date.now());
+          if (!response.ok) throw new Error(`ticket list returned ${response.status}`);
+        },
+        {
+          runs: tickets <= 10_000 ? 3 : 1,
+          n: tickets,
+          notes: "includes cached storage reads, derived overlays, and JSON serialization",
+        },
+      ),
+    );
+  }
+
+  // --- Phase 6: end-to-end CLI latency -------------------------------------
   // Includes binary startup, which is a fixed floor invisible above.
   if (!args.skipSubprocess) {
     for (const [label, cmd] of [

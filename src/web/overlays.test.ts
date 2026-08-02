@@ -10,6 +10,7 @@ import {
   formatRelative,
   isTicketStale,
   liveBlockers,
+  liveBlockersFromReverseIndex,
   matchTicketByRef,
   msSince,
   staleThresholdsFromConfig,
@@ -226,6 +227,21 @@ describe("liveBlockers", () => {
   it("returns an empty array when nothing blocks the target", () => {
     const target = ticket();
     expect(liveBlockers(target.id, [target])).toEqual([]);
+  });
+
+  it("resolves live blockers from a reverse index without semantic drift", () => {
+    const target = ticket();
+    const live = ticket({ state: "open", blocks: [target.id] });
+    const done = ticket({ state: "done", blocks: [target.id] });
+    // Duplicate and self edges cannot be created by normal commands, but
+    // preserving the scan implementation's behavior keeps corrupt snapshots stable.
+    live.blocks.push(target.id);
+    target.blocks.push(target.id);
+    const tickets = [target, live, done];
+    const byId = new Map(tickets.map((candidate) => [candidate.id, candidate]));
+    const reverseEdges = buildReverseEdgeIndex(tickets);
+
+    expect(liveBlockersFromReverseIndex(target.id, byId, reverseEdges)).toEqual([live]);
   });
 });
 

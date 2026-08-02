@@ -7,7 +7,6 @@
  * `overlays.ts`'s `computeStaleReason` doc / web-head-returns-404-despite).
  */
 import type { BunRequest } from "bun";
-import type { Ticket, TicketId } from "../../core/index.js";
 import type { WebDataSource } from "../data-source.js";
 import {
   computeAwaitingInputByTicket,
@@ -16,7 +15,7 @@ import {
   isTicketStale,
   staleThresholdsFromConfig,
 } from "../overlays.js";
-import { configDto, jsonResponse, ticketSummaryDto } from "./shared.js";
+import { configDto, createTicketSummaryContext, jsonResponse, ticketSummaryDto } from "./shared.js";
 import type { StaleResponseDTO } from "./types.js";
 
 export async function handleStalePanel(
@@ -30,11 +29,17 @@ export async function handleStalePanel(
     dataSource.listEvents(),
   ]);
   const tickets = deriveEffectiveTickets(rawTickets, events);
-  const byId = new Map<TicketId, Ticket>(tickets.map((t) => [t.id, t]));
   const thresholds = staleThresholdsFromConfig(config);
   // G4 (t-jggg9): reuses the SAME whole-db event read already fetched
   // above for deriveEffectiveTickets — no second listEvents() call.
   const awaitingInputByTicket = computeAwaitingInputByTicket(events);
+  const summaryContext = createTicketSummaryContext(
+    tickets,
+    thresholds,
+    config,
+    now,
+    awaitingInputByTicket,
+  );
 
   const stale = tickets
     .filter((t) => isTicketStale(t, thresholds, now))
@@ -47,15 +52,7 @@ export async function handleStalePanel(
   const body: StaleResponseDTO = {
     config: configDto(config, warning),
     rows: stale.map(({ ticket, since }) => ({
-      ticket: ticketSummaryDto(
-        ticket,
-        tickets,
-        byId,
-        thresholds,
-        config,
-        now,
-        awaitingInputByTicket,
-      ),
+      ticket: ticketSummaryDto(ticket, summaryContext),
       since,
     })),
   };
