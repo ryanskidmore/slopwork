@@ -10,6 +10,13 @@ describe("computeGitignoreLines", () => {
     expect(computeGitignoreLines()).toContain(".slop/db/mutation-journal/");
   });
 
+  it("always ignores durable local event polling cursor state and its lock", () => {
+    const lines = computeGitignoreLines();
+    expect(lines).toContain(".slop/db/event-cursors/");
+    expect(lines).toContain(".slop/db/.event-cursors.lock");
+    expect(lines).toContain(".slop/db/.event-cursors.lock.stale-*");
+  });
+
   it("always ignores the lock file and atomic-write temp-file globs", () => {
     const lines = computeGitignoreLines();
     expect(lines).toContain(".slop/db/.lock");

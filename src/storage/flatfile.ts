@@ -62,6 +62,13 @@ import type {
 import { isSessionId, isTicketId } from "../core/index.js";
 import type { JsoncPatchEntry } from "../core/jsonc.js";
 import {
+  advanceEventPollCursor,
+  createEventPollCursor,
+  deleteEventPollCursor,
+  readEventPollCursor,
+} from "../repo/event-cursor.js";
+import type { EventPollCursor } from "../repo/event-cursor.js";
+import {
   buildIndex,
   computeEventsFingerprint,
   fingerprintEntityDir,
@@ -314,6 +321,22 @@ export class FlatfileBackend implements StorageBackend {
     }
 
     return mergeEventReadResults(perShard);
+  }
+
+  createEventPollCursor() {
+    return createEventPollCursor(this.paths);
+  }
+
+  readEventPollCursor(cursor: EventPollCursor) {
+    return readEventPollCursor(this.paths, cursor);
+  }
+
+  advanceEventPollCursor(cursor: EventPollCursor, returned: readonly EventId[]) {
+    return advanceEventPollCursor(this.paths, cursor, returned, this.lockTimeoutMs);
+  }
+
+  deleteEventPollCursor(cursor: EventPollCursor) {
+    return deleteEventPollCursor(this.paths, cursor, this.lockTimeoutMs);
   }
 
   // --- ref resolution --------------------------------------------------

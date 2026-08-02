@@ -138,6 +138,10 @@ Events are immutable and append-only (`src/repo/events.ts`'s module doc)
 | `GET /v1/events?since=<id>&ticket=<id>&limit=<n>` | `queryEvents({since, ticket, limit})` — all three query params optional | `Event[]`, cursor (ascending id) order |
 | `GET /v1/events?mode=all` | `listEvents()` (strict) | `Event[]` |
 | `GET /v1/events?mode=tolerant` | `listEventsTolerant()` | `{ events: Event[], problems: EventReadProblem[] }` (readable records survive; every skipped/duplicate/misplaced record is reported with `kind`, `id`, `path`, and `message`) |
+| `POST /v1/event-cursors` | `createEventPollCursor()` | `{ "cursor": "cursor_v1_<32 lowercase hex>" }` and an empty versioned seen-ID set |
+| `GET /v1/event-cursors/:cursor` | `readEventPollCursor(cursor)` | `{ "version": 1, "cursor": EventPollCursor, "seen": EventId[] }` (404 if absent) |
+| `POST /v1/event-cursors/:cursor/advance` | `advanceEventPollCursor(cursor, returned)` — body `{ "returned": EventId[] }` | The updated state after atomically unioning returned IDs |
+| `DELETE /v1/event-cursors/:cursor` | `deleteEventPollCursor(cursor)` | 204 (404 if absent) |
 
 A real implementation is free to shard/partition events however it likes
 server-side (the flatfile driver's own `events/YYYY-MM/` sharding is
@@ -145,6 +149,16 @@ purely a local storage-layout concern) — nothing about this wire contract
 exposes shard layout, since `EventShardMigrationResult` below is the
 flatfile driver's own maintenance operation, not a generic one every
 backend need implement meaningfully (see "Maintenance").
+
+The scalar `since` query is ordered static-snapshot pagination, not a durable
+polling checkpoint. Merge-safe consumers use the cursor endpoints and filter
+the current event set against the exact `seen` membership, advancing only IDs
+actually returned after limits and output budgets. Remote cursor state is
+server-owned and must preserve the versioned exact-membership semantics; it
+must not reinterpret the opaque token as a high-water event ID. Advancement
+is an atomic union. Fetch and advance are separate calls in this v1 interface,
+so delivery is at-least-once and concurrent reads of one cursor may duplicate
+records, but neither can erase the other's progress.
 
 ### Ref resolution
 

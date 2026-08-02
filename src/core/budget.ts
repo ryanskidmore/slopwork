@@ -74,6 +74,11 @@ export interface BudgetedRender {
   withinBudget: boolean;
 }
 
+export interface BudgetedEntriesRender extends BudgetedRender {
+  /** Number of leading entries present in the final rendering. */
+  keptCount: number;
+}
+
 /**
  * Bound a rendering of `entries` (already in elision-priority order —
  * least important LAST, the same convention `tickets/ready.ts`'s
@@ -95,13 +100,13 @@ export function renderEntriesWithBudget<T>(
   render: (kept: readonly T[], elisionNotes: readonly string[]) => string,
   budgetChars: number | undefined,
   options: { format?: RenderFormat; noun?: string } = {},
-): BudgetedRender {
+): BudgetedEntriesRender {
   const format = options.format ?? "text";
   const noun = options.noun ?? "item";
 
   const full = render(entries, []);
   if (budgetChars === undefined || full.length <= budgetChars) {
-    return { text: full, elisions: [], withinBudget: true };
+    return { text: full, elisions: [], withinBudget: true, keptCount: entries.length };
   }
 
   for (let keep = entries.length - 1; keep >= 0; keep--) {
@@ -111,7 +116,7 @@ export function renderEntriesWithBudget<T>(
     ];
     const candidate = render(entries.slice(0, keep), notes);
     if (candidate.length <= budgetChars) {
-      return { text: candidate, elisions: notes, withinBudget: true };
+      return { text: candidate, elisions: notes, withinBudget: true, keptCount: keep };
     }
   }
 
@@ -119,7 +124,7 @@ export function renderEntriesWithBudget<T>(
     entries.length > 0 ? [`all ${entries.length} ${noun}(s) omitted to fit --budget`] : [];
   const zero = render([], finalNotes);
   if (zero.length <= budgetChars) {
-    return { text: zero, elisions: finalNotes, withinBudget: true };
+    return { text: zero, elisions: finalNotes, withinBudget: true, keptCount: 0 };
   }
 
   if (format === "json") {
@@ -128,9 +133,14 @@ export function renderEntriesWithBudget<T>(
     // floor. A budget too small even for `{}`-shaped output to fit is an
     // unmeetable request, reported via `withinBudget: false` rather than
     // by truncating the structure.
-    return { text: zero, elisions: finalNotes, withinBudget: false };
+    return { text: zero, elisions: finalNotes, withinBudget: false, keptCount: 0 };
   }
 
   const rawSlice = budgetChars <= 0 ? "" : zero.slice(0, budgetChars);
-  return { text: rawSlice, elisions: finalNotes, withinBudget: rawSlice.length <= budgetChars };
+  return {
+    text: rawSlice,
+    elisions: finalNotes,
+    withinBudget: rawSlice.length <= budgetChars,
+    keptCount: 0,
+  };
 }

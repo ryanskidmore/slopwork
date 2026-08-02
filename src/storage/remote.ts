@@ -121,6 +121,18 @@ export class RemoteBackend implements StorageBackend {
   listEventsTolerant(): Promise<never> {
     return this.fail("listEventsTolerant");
   }
+  createEventPollCursor(): Promise<never> {
+    return this.fail("createEventPollCursor");
+  }
+  readEventPollCursor(): Promise<never> {
+    return this.fail("readEventPollCursor");
+  }
+  advanceEventPollCursor(): Promise<never> {
+    return this.fail("advanceEventPollCursor");
+  }
+  deleteEventPollCursor(): Promise<never> {
+    return this.fail("deleteEventPollCursor");
+  }
 
   // --- ref resolution ------------------------------------------------------
 

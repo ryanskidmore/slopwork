@@ -73,12 +73,13 @@ Drafts and review items never appear themselves.
     tickets/ticket_<ulid>.jsonc
     sessions/session_<ulid>.jsonc      # plan embedded, versioned
     events/YYYY-MM/event_<ulid>.jsonc  # immutable, one per event
+    event-cursors/cursor_v1_<hex>.jsonc # merge-safe poll state, gitignored
     mutation-journal/event_<ulid>.jsonc # pending entity/event intent — GITIGNORED
     index.jsonc                        # derived — GITIGNORED
   transcripts/session_<ulid>.jsonl     # GITIGNORED by default (D16)
 ```
 
-Merge story: ULID filenames → create-conflicts impossible; events immutable → conflict-free; index and the local mutation journal gitignored → coordination/derived files don't merge; same-ticket edits → ordinary small JSONC diffs. Atomic writes (tmp+rename) everywhere; durable journal replay keeps each ticket/session mutation paired with its audit event after a crash; `.slop/db/.lock` serializes write transactions (done-cascade, reparent) without promising whole-transaction rollback. Event ordering cursors on the event ULID itself.
+Merge story: ULID filenames → create-conflicts impossible; events immutable → conflict-free; index, polling checkpoints, and the local mutation journal gitignored → coordination/derived files don't merge; same-ticket edits → ordinary small JSONC diffs. Atomic writes (tmp+rename) everywhere; durable journal replay keeps each ticket/session mutation paired with its audit event after a crash; `.slop/db/.lock` serializes write transactions (done-cascade, reparent) without promising whole-transaction rollback. Event IDs provide static-snapshot ordering; durable polling uses an opaque versioned checkpoint backed by exact seen-ID membership, because a scalar high-water ID cannot discover an older event merged later.
 
 **config.yaml:**
 
@@ -137,7 +138,7 @@ slop status                              # project pulse: counts by state, in-pr
                                          # sessions, stale, awaiting review (with MR links)
 slop show <ref> [--context] [--tree]
 slop search "text"                       # naive scan over names/specs/notes (SlopQL is F6)
-slop events [--since event_…] [--ticket <ref>] [--json]
+slop events [--since event_… | --poll [cursor_v1_…]] [--ticket <ref>] [--json]
 slop web [--port 4553]                   # read-only explorer
 ```
 

@@ -11,6 +11,30 @@ where breaking changes land.
 
 ### Added
 
+- **Merge-safe event polling cursors** (t-r0hnj). `slop events --since
+  <event_id>` is a scalar ULID watermark: an event created earlier on
+  another clone can still arrive later (after a Git merge of `.slop/db/`)
+  and sort BEFORE that watermark, so it is permanently skipped by every
+  future poll — there is no way to move the watermark backward without
+  re-scanning everything already consumed. `slop events --poll [cursor]`
+  replaces the watermark with an opaque `cursor_v1_<hex>` token over a
+  durable, versioned set of event ids already returned to that consumer
+  (`src/repo/event-cursor.ts`, lock-serialized under the same `.lock`
+  writes already use). A poll only ever advances by unioning the ids it
+  actually returned into that set, so a late-merged event with an older
+  id is still discovered on the next call — it simply isn't in the seen
+  set yet. Four new `StorageBackend` methods carry this over the wire
+  contract: `createEventPollCursor`, `readEventPollCursor`,
+  `advanceEventPollCursor`, `deleteEventPollCursor`
+  (`docs/storage-backends.md`'s `/v1/event-cursors*` endpoints);
+  `FlatfileBackend` implements them against gitignored state under
+  `.slop/db/event-cursors/`, `RemoteBackend` fails loud like every other
+  unimplemented remote method. `--json` now reports `cursor_mode`
+  (`static_snapshot` vs. `merge_safe_poll`) and `poll_cursor` alongside
+  the legacy `next_cursor`; `--since` remains for scripts paging a fixed
+  snapshot but is documented as exclusion-only, not a durable watermark,
+  and warns on every use. `--delete-poll-cursor <cursor>` retires a
+  cursor's stored state.
 - **`slop init` manages `.gitattributes`** (t-mgx82). Same idempotent,
   append-don't-clobber managed-section convention `init` already used for
   `.gitignore`: created if absent, appended if `.gitattributes` exists
