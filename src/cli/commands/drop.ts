@@ -19,6 +19,7 @@ import { SlopError } from "../errors.js";
 import {
   assertMaxLength,
   type BulkOutcome,
+  compactClosedTicketEvents,
   printWarning,
   resolveBulkRefs,
   runSingleOrBulk,
@@ -72,6 +73,10 @@ interface DropOneResult {
   session: Session | null;
   ownershipWarning: string | null;
   cascade: CascadeOnCloseResult;
+  /** t-7eq5s: non-null iff compacting this ticket's events into its
+   * archive failed — see shared.ts's `compactClosedTicketEvents` doc,
+   * "compaction is best-effort". */
+  compactionWarning: string | null;
 }
 
 async function dropOneRef(
@@ -138,11 +143,18 @@ async function dropOneRef(
       session: finalSession?.id ?? null,
     });
 
+    // t-7eq5s: fold this ticket's events into its per-ticket archive, in
+    // the SAME transaction as the terminal-state write above — see
+    // shared.ts's `compactClosedTicketEvents` doc for why a failure here
+    // warns rather than fails the whole `drop` call.
+    const compactionWarning = await compactClosedTicketEvents(backend, current.id);
+
     return {
       session: finalSession,
       ticket: droppedTicket,
       ownershipWarning,
       cascade,
+      compactionWarning,
     };
   });
 }
@@ -173,6 +185,7 @@ function dropJsonBody(
 
 /** Shared by both rendering paths — printed AFTER the transaction commits. */
 function printDropWarnings(result: DropOneResult): void {
+  if (result.compactionWarning !== null) printWarning(result.compactionWarning);
   if (result.ownershipWarning !== null) printWarning(result.ownershipWarning);
   if (result.cascade.problems.length > 0) {
     process.stderr.write(`${formatIndexProblems(result.cascade.problems)}\n`);

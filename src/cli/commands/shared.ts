@@ -10,6 +10,7 @@ import type { Actor, Session } from "../../core/index.js";
 import { SlopError } from "../errors.js";
 import { shortTicketCode } from "../../core/index.js";
 import type { TicketId } from "../../core/index.js";
+import type { StorageBackend } from "../../core/storage-contract.js";
 
 /** Commander "collect" reducer for options that may be repeated, e.g.
  * `--blocks x --blocks y` → `["x", "y"]`. */
@@ -168,6 +169,39 @@ export function sessionOwnershipWarning(session: Session, actor: Actor): string 
     `"${session.actor.name}" (${session.actor.kind}) — proceeding anyway (session ownership is ` +
     'not enforced by design; see docs/agent-workflow.md, "Session ownership").'
   );
+}
+
+/**
+ * t-7eq5s: compact `ticketId`'s events into its per-ticket archive, called
+ * by `done.ts`/`drop.ts` right after they durably write the ticket's
+ * terminal state, inside the SAME transaction. Never throws — a
+ * compaction failure (disk full, a permissions problem, ...) is reported
+ * as a warning string rather than allowed to fail the whole `done`/`drop`
+ * call, because by the time this runs the ticket has ALREADY durably
+ * transitioned in this same transaction: an un-compacted-but-correctly
+ * -closed ticket is a normal, always-safely-retriable state (the exact
+ * "residual loose events" shape this feature's read side already
+ * tolerates transparently — `slop reindex --compact` finishes the job
+ * later), never a reason to report a transition that genuinely succeeded
+ * as a failure. Callers print the non-null result via {@link printWarning}
+ * AFTER their transaction commits, same convention as every other soft
+ * warning in this module (e.g. {@link sessionOwnershipWarning}).
+ */
+export async function compactClosedTicketEvents(
+  backend: StorageBackend,
+  ticketId: TicketId,
+): Promise<string | null> {
+  try {
+    await backend.compactTicketEvents(ticketId);
+    return null;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return (
+      `${ticketId} closed successfully, but compacting its events into an archive failed (${message}) — ` +
+      "its history is still fully intact and readable, just not yet consolidated; re-run " +
+      "`slop reindex --compact` to retry"
+    );
+  }
 }
 
 /** Read all of stdin as UTF-8 text — `--spec -`'s "read from stdin" (B1,
