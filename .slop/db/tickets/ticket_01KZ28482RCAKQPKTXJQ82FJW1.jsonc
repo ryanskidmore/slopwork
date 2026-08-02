@@ -1,0 +1,39 @@
+{
+  "id": "ticket_01KZ28482RCAKQPKTXJQ82FJW1",
+  "name": "Make the test suite safe for concurrent runs on one machine",
+  "slug": "make-the-test-suite-safe",
+  "spec": {
+    "summary": "Multiple agents running the suite concurrently produce flaky failures (spawnSync status null on slop init and friends). Root-cause with evidence, then fix so N concurrent full-gate runs in separate worktrees are reliably green. Prefer injected/mocked seams over incidental system-level dependencies; keep the real-binary acceptance philosophy where it is load-bearing.",
+    "details_md": "Observed incidents: (1) 15 spawn-flakes (spawnSync status null on slop init) when suite accidentally ran 3x concurrently; (2) 43 phantom failures from a stale shared dist/slop when running in the main checkout; (3) general guidance since then has been to serialize all agent gates, which slows every multi-agent workflow. Suspects: process/memory storms from vitest-workers x spawned 96MB binaries (spawnSync null = kill or EAGAIN/ENOMEM - capture the actual errno), port collisions in web/Playwright fixtures, shared build artifacts (dist/slop, src/web/generated) as implicit mutable state.",
+    "acceptance": [
+      "Documented, evidence-backed root cause for each failure mode (actual errno/signal captured, not guessed)",
+      "3 concurrent full-suite runs in separate worktrees pass repeatedly; a reproduction/regression script proves it"
+    ],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "in_progress",
+  "priority": 1,
+  "labels": [
+    "source:product"
+  ],
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ28482RCAKQPKTXJQ82FJW1",
+  "path": [],
+  "active_session": "session_01KZ284E7KQB4MJCW2HQ7C7KV3",
+  "last_activity_at": "2026-08-02T22:04:56.462Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-02T22:04:50.136Z",
+  "updated_at": "2026-08-02T22:04:56.462Z"
+}
