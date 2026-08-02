@@ -4,10 +4,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
 import { EXIT_CODES } from "../../core/exit-codes.js";
-import type { TicketId } from "../../core/index.js";
-import { readTicket, repoPaths, ticketFilePath } from "../../repo/index.js";
+import type { SessionId, TicketId } from "../../core/index.js";
+import { queryEvents, readTicket, repoPaths, ticketFilePath } from "../../repo/index.js";
 import { pickEditorCommand, runEdit } from "./edit.js";
 import { runNew } from "./new.js";
+import { runStart } from "./start.js";
 
 // windows-portability-fsyncdir-crlf-gitignore-cwd-mangling-edi:
 //
@@ -146,6 +147,16 @@ async function jsonNewTicket(
   }
 }
 
+async function jsonStartTicket(root: string, id: TicketId): Promise<SessionId> {
+  const out = captureOutput();
+  try {
+    await withCwd(root, () => runStart(id, { harness: "codex", json: true }));
+    return (JSON.parse(out.stdout()) as { session: { id: SessionId } }).session.id;
+  } finally {
+    out.restore();
+  }
+}
+
 describe("runEdit (in-process)", () => {
   const originalVisual = process.env.VISUAL;
   const originalEditor = process.env.EDITOR;
@@ -201,6 +212,28 @@ describe("runEdit (in-process)", () => {
     }
     const paths = repoPaths(root);
     expect((await readTicket(paths, id)).name).toBe("Renamed via editor");
+  });
+
+  it("attributes an edit event to the edited ticket's active session", async () => {
+    const root = await makeTempRepo("slop-edit-inproc-session-context-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const id = await jsonNewTicket(root, "Active edit ticket");
+    const session = await jsonStartTicket(root, id);
+    const scriptPath = await writeFakeEditor(root);
+    process.env.VISUAL = `node ${scriptPath}`;
+    process.env.SLOP_TEST_FAKE_EDITOR_MODE = "rename";
+    process.env.SLOP_TEST_FAKE_EDITOR_NAME = "Renamed in active session";
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runEdit(id));
+    } finally {
+      out.restore();
+    }
+
+    const events = await queryEvents(repoPaths(root), { ticket: id });
+    const editEvent = events.find((event) => event.payload.method === "edit");
+    expect(editEvent?.session).toBe(session);
   });
 
   it("a nonzero editor exit aborts without saving, leaving the file byte-for-byte unchanged", async () => {

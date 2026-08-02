@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ13AW30ZDTXQ9ZTTGX5014W",
+  "actor": {
+    "name": "codex-session-attribution",
+    "kind": "human"
+  },
+  "session": "session_01KZ13AGQ34CVMZHPVYV77F9ZC",
+  "verb": "plan.set",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KZ13AGQ34CVMZHPVYV77F9ZC"
+  },
+  "payload": {
+    "version": 1,
+    "step_count": 5
+  },
+  "at": "2026-08-02T11:21:49.920Z"
+}

@@ -27,7 +27,7 @@
 import type { Command } from "commander";
 import type { Actor } from "../../core/index.js";
 import { EXIT_CODES, shortTicketCode } from "../../core/index.js";
-import { repoPaths, requireRepoRoot } from "../../repo/index.js";
+import { repoPaths, requireRepoRoot, ticketEventContext } from "../../repo/index.js";
 import { openStorage } from "../../storage/index.js";
 import type { Question } from "../../tickets/questions.js";
 import {
@@ -102,7 +102,7 @@ export async function runAnswer(
     throw new SlopError(alreadyAnsweredMessage(initial), EXIT_CODES.CONFLICT);
   }
 
-  const event = await backend.transact(async () => {
+  const { event, ticket } = await backend.transact(async () => {
     const ticketEvents = await backend.queryEvents({ ticket: initial.ticketId });
     const fresh = deriveQuestions(ticketEvents).find((q) => q.id === initial.id);
     if (!fresh) {
@@ -115,14 +115,17 @@ export async function runAnswer(
     if (fresh.answer !== null) {
       throw new SlopError(alreadyAnsweredMessage(fresh), EXIT_CODES.CONFLICT);
     }
-    return backend.appendEvent(
-      { actor, session: null },
+    // The question can outlive the session that asked it. Attribute the
+    // answer to the ticket's current session at answer time, read fresh
+    // inside the same transaction as the duplicate-answer check.
+    const ticket = await backend.readTicket(initial.ticketId);
+    const event = await backend.appendEvent(
+      ticketEventContext(actor, ticket),
       { kind: "ticket", id: initial.ticketId },
       { verb: "question.answered", payload: { question_id: initial.id, text: trimmed } },
     );
+    return { event, ticket };
   });
-
-  const ticket = await backend.readTicket(initial.ticketId);
 
   if (opts.json) {
     process.stdout.write(

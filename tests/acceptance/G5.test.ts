@@ -61,10 +61,25 @@ interface NewTicketJson {
   handle: string;
 }
 
+interface EventJson {
+  id: string;
+  session: string | null;
+  verb: string;
+  entity: { kind: "ticket" | "session"; id: string };
+  payload: Record<string, unknown>;
+}
+
 function newTicket(dir: string, name: string, ...extraArgs: string[]): NewTicketJson {
   const result = runSlop(["new", name, "--json", ...extraArgs], dir);
   if (result.status !== 0) throw new Error(`slop new "${name}" failed: ${result.stderr}`);
   return JSON.parse(result.stdout) as NewTicketJson;
+}
+
+function ticketEvents(dir: string, ref: string): EventJson[] {
+  const result = runSlop(["events", "--ticket", ref, "--json"], dir);
+  if (result.status !== 0)
+    throw new Error(`slop events --ticket "${ref}" failed: ${result.stderr}`);
+  return (JSON.parse(result.stdout) as { events: EventJson[] }).events;
 }
 
 describe("G5: simplification sweep", () => {
@@ -423,6 +438,99 @@ describe("G5: simplification sweep", () => {
       };
       expect(body.ticket.blocks).toEqual([blocker.id]);
       expect(body.ticket.relates_to).toEqual([relatesTo.id]);
+    });
+  });
+
+  describe("ticket event session attribution", () => {
+    it("surfaces active-session attribution through compiled CLI events, including split children and a restarted answer", async () => {
+      const dir = await makeScratchRepo("slop-g5-event-session-lifecycle-");
+      const ticket = newTicket(dir, "Session-attributed lifecycle");
+      const started = runSlop(["start", ticket.id, "--harness", "codex", "--json"], dir);
+      expect(started.status, started.stderr).toBe(0);
+      const firstSession = (JSON.parse(started.stdout) as { session: { id: string } }).session.id;
+
+      expect(runSlop(["update", ticket.id, "--progress", "active progress"], dir).status).toBe(0);
+      expect(runSlop(["update", ticket.id, "--priority", "1"], dir).status).toBe(0);
+      const asked = runSlop(["ask", ticket.id, "Which direction?", "--json"], dir);
+      expect(asked.status, asked.stderr).toBe(0);
+      const questionId = (JSON.parse(asked.stdout) as { question: { id: string } }).question.id;
+      const split = runSlop(["split", ticket.id, "Session child", "--json"], dir);
+      expect(split.status, split.stderr).toBe(0);
+      const childId = (JSON.parse(split.stdout) as { children: Array<{ id: string }> }).children[0]
+        ?.id;
+      expect(childId).toBeDefined();
+
+      const firstEvents = ticketEvents(dir, ticket.id);
+      expect(
+        firstEvents.find((event) => event.payload.progress === "active progress")?.session,
+      ).toBe(firstSession);
+      expect(firstEvents.find((event) => event.payload.priority === 1)?.session).toBe(firstSession);
+      expect(firstEvents.find((event) => event.id === questionId)?.session).toBe(firstSession);
+      expect(firstEvents.find((event) => event.verb === "ticket.split")?.session).toBe(
+        firstSession,
+      );
+      expect(
+        ticketEvents(dir, childId ?? "").find((event) => event.verb === "ticket.created")?.session,
+      ).toBe(firstSession);
+
+      expect(runSlop(["stop", ticket.id, "--note", "question remains open"], dir).status).toBe(0);
+      const restarted = runSlop(["start", ticket.id, "--harness", "codex", "--json"], dir);
+      expect(restarted.status, restarted.stderr).toBe(0);
+      const secondSession = (JSON.parse(restarted.stdout) as { session: { id: string } }).session
+        .id;
+      expect(secondSession).not.toBe(firstSession);
+      expect(runSlop(["answer", questionId, "Use the second direction"], dir).status).toBe(0);
+
+      const answered = ticketEvents(dir, ticket.id).find(
+        (event) => event.verb === "question.answered" && event.payload.question_id === questionId,
+      );
+      expect(answered?.session).toBe(secondSession);
+    });
+
+    it("keeps bulk tickets and reparented descendants tied to their own sessions, while cold work stays null", async () => {
+      const dir = await makeScratchRepo("slop-g5-event-session-bulk-");
+      const oldParent = newTicket(dir, "Old root");
+      const newParent = newTicket(dir, "New root");
+      const child = newTicket(dir, "Child with session", "--parent", oldParent.id);
+      const descendant = newTicket(dir, "Descendant with session", "--parent", child.id);
+      const peer = newTicket(dir, "Bulk peer with session");
+      const cold = newTicket(dir, "Cold update ticket");
+
+      const startChild = runSlop(["start", child.id, "--harness", "codex", "--json"], dir);
+      const startDescendant = runSlop(
+        ["start", descendant.id, "--harness", "codex", "--json"],
+        dir,
+      );
+      const startPeer = runSlop(["start", peer.id, "--harness", "codex", "--json"], dir);
+      for (const result of [startChild, startDescendant, startPeer]) {
+        expect(result.status, result.stderr).toBe(0);
+      }
+      const childSession = (JSON.parse(startChild.stdout) as { session: { id: string } }).session
+        .id;
+      const descendantSession = (JSON.parse(startDescendant.stdout) as { session: { id: string } })
+        .session.id;
+      const peerSession = (JSON.parse(startPeer.stdout) as { session: { id: string } }).session.id;
+
+      const bulk = runSlop(["update", child.id, peer.id, "--priority", "1"], dir);
+      expect(bulk.status, bulk.stderr).toBe(0);
+      expect(
+        ticketEvents(dir, child.id).find((event) => event.payload.priority === 1)?.session,
+      ).toBe(childSession);
+      expect(
+        ticketEvents(dir, peer.id).find((event) => event.payload.priority === 1)?.session,
+      ).toBe(peerSession);
+
+      const reparent = runSlop(["update", child.id, "--parent", newParent.id], dir);
+      expect(reparent.status, reparent.stderr).toBe(0);
+      const cascade = ticketEvents(dir, descendant.id).find(
+        (event) => event.payload.reparent_root === child.id,
+      );
+      expect(cascade?.session).toBe(descendantSession);
+
+      expect(runSlop(["update", cold.id, "--priority", "1"], dir).status).toBe(0);
+      expect(
+        ticketEvents(dir, cold.id).find((event) => event.payload.priority === 1)?.session,
+      ).toBeNull();
     });
   });
 });

@@ -12,13 +12,13 @@
  * read-modify-write of the ticket file itself, so N agents can `ask` the
  * same ticket at the same instant with zero write contention — each mints
  * its own ULID event file (`entity-file.ts`'s `createEntityFileCanonical`
- * doc). `session` is `null` (not tied to whatever session happens to be
- * active), matching the same convention `update`'s lock-free path uses.
+ * doc). The event uses the resolved ticket snapshot's active session, the
+ * same snapshot convention as `update`'s lock-free progress path.
  */
 import type { Command } from "commander";
 import type { Actor } from "../../core/index.js";
 import { EXIT_CODES, shortTicketCode } from "../../core/index.js";
-import { repoPaths, requireRepoRoot } from "../../repo/index.js";
+import { repoPaths, requireRepoRoot, ticketEventContext } from "../../repo/index.js";
 import { openStorage } from "../../storage/index.js";
 import { QUESTION_OPTION_MAX_LENGTH, QUESTION_TEXT_MAX_LENGTH } from "../../tickets/questions.js";
 import { loadConfig, resolveActor } from "../actor.js";
@@ -57,7 +57,7 @@ export async function runAsk(
   const ticket = await backend.resolveTicketRef(ref);
 
   const event = await backend.appendEvent(
-    { actor, session: null },
+    ticketEventContext(actor, ticket),
     { kind: "ticket", id: ticket.id },
     { verb: "question.asked", payload: { text: trimmed, options } },
   );

@@ -1,17 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
-import { EXIT_CODES } from "../../core/index.js";
+import { type SessionId, type TicketId, EXIT_CODES } from "../../core/index.js";
+import { queryEvents, repoPaths } from "../../repo/index.js";
 import { runAsk } from "./ask.js";
 import { runList } from "./list.js";
 import { runNew } from "./new.js";
+import { runStart } from "./start.js";
 
 // In-process coverage of `runAsk` (G4, t-jggg9) — real v8 coverage, no
 // subprocess. Acceptance-level (spawned-binary) coverage already lives in
 // tests/acceptance/G4.test.ts; this file exercises `runAsk` directly so
 // `src/cli/commands/ask.ts` isn't 0%-covered.
 
-async function jsonNewTicket(root: string, name: string): Promise<{ id: string; slug: string }> {
+async function jsonNewTicket(root: string, name: string): Promise<{ id: TicketId; slug: string }> {
   const out = captureOutput();
   try {
     await withCwd(root, () =>
@@ -24,7 +26,17 @@ async function jsonNewTicket(root: string, name: string): Promise<{ id: string; 
         json: true,
       }),
     );
-    return JSON.parse(out.stdout()) as { id: string; slug: string };
+    return JSON.parse(out.stdout()) as { id: TicketId; slug: string };
+  } finally {
+    out.restore();
+  }
+}
+
+async function jsonStartTicket(root: string, id: TicketId): Promise<SessionId> {
+  const out = captureOutput();
+  try {
+    await withCwd(root, () => runStart(id, { harness: "codex", json: true }));
+    return (JSON.parse(out.stdout()) as { session: { id: SessionId } }).session.id;
   } finally {
     out.restore();
   }
@@ -91,6 +103,25 @@ describe("runAsk (in-process)", () => {
       tickets: { id: string; awaiting_input: boolean }[];
     };
     expect(body.tickets.find((row) => row.id === t.id)?.awaiting_input).toBe(true);
+  });
+
+  it("attributes the lock-free question event to the resolved ticket's active session", async () => {
+    const root = await makeTempRepo("slop-ask-inproc-session-context-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const t = await jsonNewTicket(root, "Active question ticket");
+    const session = await jsonStartTicket(root, t.id);
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runAsk(t.id, "Question in this session?", { option: [] }));
+    } finally {
+      out.restore();
+    }
+
+    const asked = (await queryEvents(repoPaths(root), { ticket: t.id })).find(
+      (event) => event.verb === "question.asked",
+    );
+    expect(asked?.session).toBe(session);
   });
 
   it("rejects an empty question as a USAGE_ERROR", async () => {

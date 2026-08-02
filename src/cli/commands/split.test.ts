@@ -2,11 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
 import { EXIT_CODES } from "../../core/exit-codes.js";
-import type { TicketId } from "../../core/index.js";
-import { readTicket, repoPaths } from "../../repo/index.js";
+import type { SessionId, TicketId } from "../../core/index.js";
+import { queryEvents, readTicket, repoPaths } from "../../repo/index.js";
 import { FlatfileBackend } from "../../storage/flatfile.js";
 import { runNew } from "./new.js";
 import { runSplit } from "./split.js";
+import { runStart } from "./start.js";
 
 // In-process coverage of `runSplit` (real v8 coverage, no subprocess).
 
@@ -24,6 +25,16 @@ async function jsonNewTicket(root: string, name: string): Promise<TicketId> {
       }),
     );
     return (JSON.parse(out.stdout()) as { id: TicketId }).id;
+  } finally {
+    out.restore();
+  }
+}
+
+async function jsonStartTicket(root: string, id: TicketId): Promise<SessionId> {
+  const out = captureOutput();
+  try {
+    await withCwd(root, () => runStart(id, { harness: "codex", json: true }));
+    return (JSON.parse(out.stdout()) as { session: { id: SessionId } }).session.id;
   } finally {
     out.restore();
   }
@@ -110,6 +121,59 @@ describe("runSplit (in-process)", () => {
 
     const after = await readTicket(paths, targetId);
     expect(after.last_activity_at).not.toBe(before.last_activity_at);
+  });
+
+  it("attributes the parent split and split-child creation events to the active parent session", async () => {
+    const root = await makeTempRepo("slop-split-inproc-session-context-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const targetId = await jsonNewTicket(root, "Active split target");
+    const session = await jsonStartTicket(root, targetId);
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runSplit(targetId, ["session child"], { json: true }));
+    } finally {
+      out.restore();
+    }
+    const body = JSON.parse(out.stdout()) as { children: { id: TicketId }[] };
+    const childId = body.children[0]?.id;
+    if (!childId) throw new Error("split produced no child");
+
+    const paths = repoPaths(root);
+    const splitEvent = (await queryEvents(paths, { ticket: targetId })).find(
+      (event) => event.verb === "ticket.split",
+    );
+    const childCreated = (await queryEvents(paths, { ticket: childId })).find(
+      (event) => event.verb === "ticket.created",
+    );
+    expect(splitEvent?.session).toBe(session);
+    expect(childCreated?.session).toBe(session);
+  });
+
+  it("keeps split events null when the parent has no active session", async () => {
+    const root = await makeTempRepo("slop-split-inproc-no-session-context-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const targetId = await jsonNewTicket(root, "Open split target");
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runSplit(targetId, ["cold child"], { json: true }));
+    } finally {
+      out.restore();
+    }
+    const body = JSON.parse(out.stdout()) as { children: { id: TicketId }[] };
+    const childId = body.children[0]?.id;
+    if (!childId) throw new Error("split produced no child");
+
+    const paths = repoPaths(root);
+    const splitEvent = (await queryEvents(paths, { ticket: targetId })).find(
+      (event) => event.verb === "ticket.split",
+    );
+    const childCreated = (await queryEvents(paths, { ticket: childId })).find(
+      (event) => event.verb === "ticket.created",
+    );
+    expect(splitEvent?.session).toBeNull();
+    expect(childCreated?.session).toBeNull();
   });
 
   it("rejects a blank sub-ticket name up front (USAGE_ERROR, exit 2), before the lock is acquired", async () => {

@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ142FFG1YP9Z3G5KM9TM012",
+  "actor": {
+    "name": "codex-session-attribution",
+    "kind": "human"
+  },
+  "session": "session_01KZ13AGQ34CVMZHPVYV77F9ZC",
+  "verb": "plan.step_checked",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KZ13AGQ34CVMZHPVYV77F9ZC"
+  },
+  "payload": {
+    "step": 5,
+    "checked": true
+  },
+  "at": "2026-08-02T11:34:43.440Z"
+}

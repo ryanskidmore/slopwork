@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import type { Actor } from "../../core/index.js";
 import { EXIT_CODES, fixedClock, shortTicketCode, systemClock } from "../../core/index.js";
 import type { JsoncPatchEntry, Ticket } from "../../core/index.js";
-import { repoPaths, requireRepoRoot } from "../../repo/index.js";
+import { repoPaths, requireRepoRoot, ticketEventContext } from "../../repo/index.js";
 import type { StorageBackend } from "../../storage/index.js";
 import { openStorage } from "../../storage/index.js";
 import { validateTicketEdges } from "../../tickets/edges.js";
@@ -247,7 +247,7 @@ async function updateOneRef(
   if (note !== undefined) {
     if (note !== initialTicket.latest_note) {
       await backend.appendEvent(
-        { actor, session: null },
+        ticketEventContext(actor, initialTicket),
         { kind: "ticket", id: initialTicket.id },
         { verb: "ticket.updated", payload: { progress: note } },
       );
@@ -433,7 +433,7 @@ async function updateOneRef(
             current.id,
             patch,
             ticket,
-            { actor, session: null },
+            ticketEventContext(actor, current),
             { verb, payload },
             clock,
           );
@@ -452,7 +452,7 @@ async function updateOneRef(
               descendant.id,
               descendantPatch,
               descendant,
-              { actor, session: null },
+              ticketEventContext(actor, descendant),
               {
                 verb: "ticket.updated",
                 payload: { method: "update", reparent_root: ticket.id },
@@ -480,7 +480,7 @@ async function updateOneRef(
       current.id,
       patch,
       ticket,
-      { actor, session: null },
+      ticketEventContext(actor, current),
       { verb, payload },
       clock,
     );
