@@ -3,9 +3,9 @@
 Slopwork's target scenario is one engineer (or a small team) running two
 or three agents on parallel branches against the *same* `.slop/db/`. This
 doc explains the four mechanisms that make that safe: why the git merge
-story works, the multi-file transaction lock, the lock-free path for
-progress notes, and how `slop start`/`--takeover` handle two agents
-wanting the same ticket.
+story works, the write-path lock that serializes every mutating command,
+the lock-free path for progress notes, and how `slop start`/`--takeover`
+handle two agents wanting the same ticket.
 
 ## Why `.slop/db/` merges cleanly
 
@@ -69,40 +69,62 @@ out from under a stale index. You never need to remember to run
 rebuilds it itself. `slop reindex` remains the explicit manual escape
 hatch (e.g. to force-surface every unreadable ticket file in one pass).
 
-## The db lock: multi-file transactions
+## The db lock: serializing the write path
 
 Single-file writes never need locking — an atomic rename already makes
-any *one* file's write all-or-nothing. The lock at `.slop/db/.lock` exists
-purely for operations that must change **more than one file as one
-logical unit**: today, the done-cascade (closing a ticket, then updating
-whichever dependents just became unblocked).
+any *one* file's write all-or-nothing. But `.slop/db/.lock` isn't scoped
+to multi-file operations alone: it serializes the **whole write path** —
+every one of the 13 mutating commands (`new`, `update` with any real
+field, `edit`, `draft`, `undraft`, `start`, `stop`, `review`, `done`,
+`drop`, `plan`, `split`, `reindex --heal`) takes it around its
+read-modify-write, both for genuine multi-file units (the done-cascade, a
+reparent) AND to keep a plain single-ticket read-modify-write from
+clobbering a concurrent writer's change. The one mutating operation that
+skips it is the lock-free pure `update --progress` event append (below).
+Through the [storage-backend interface](storage-backends.md), this is
+`StorageBackend.transact(fn)` — the flatfile driver implements it as the
+lock acquisition described here; a remote backend implements the
+equivalent exclusivity server-side (see
+[storage-backends.md → Transactions](storage-backends.md#transactions)).
 
 - **Acquisition** is exclusive file creation (`O_EXCL`) — atomic at the OS
   level, so it's never a check-then-create race between two processes.
-  Retries with capped backoff for up to 5 seconds by default before
-  giving up with a `CONFLICT` (exit `6`) naming what's blocking it.
+  Retries with capped backoff until the configured timeout elapses (`5s`
+  by default — configurable per repo via `config.yaml`'s
+  `defaults.lock_timeout`, see
+  [Configuration](configuration.md#slopconfigyaml)) before giving up
+  with a `CONFLICT` (exit `6`) naming what's blocking it.
 - **Stale-lock recovery**: if the lock file already exists, it's
   breakable if its recorded pid is no longer alive, or it's older than a
-  5-minute default staleness timeout — broken via an atomic rename-away,
-  not a plain `rm` (which would be its own race between two contenders
-  that both judge the same lock breakable). This is what stops one
-  `kill -9` from bricking the repo permanently.
-- **Fencing**: every acquisition mints a unique token recorded in the
-  lock file. A holder doing multiple writes inside one lock acquisition
-  calls `assertHeld()` between them, which re-checks its token is still
-  current and — on success — **renews** the lock's timestamp. A holder
-  that's merely slow (contended, I/O-stalled) and keeps checking in is
-  never treated as dead just for running long; a holder that genuinely
-  vanishes is still recoverable after the timeout. A dispossessed holder
-  (its lock was declared stale and taken by someone else) fails loudly on
-  its next `assertHeld()` rather than silently continuing to write.
-- Release always runs in a `finally`, so a thrown error mid-transaction
+  5-minute staleness timeout (also covers pid reuse after a crash) — an
+  unparseable lock file is breakable the same way, judged by its file
+  mtime instead. Breaking is an atomic rename-away plus a
+  verify-by-content-match, not a plain `rm` (which would itself be a race
+  between two contenders that both judge the same lock breakable, one of
+  which could otherwise delete the other's fresh, already-reacquired
+  lock). This is what stops one `kill -9` from bricking the repo
+  permanently.
+- **Release** always runs in a `finally`, so a thrown error mid-transaction
   still releases the lock; release itself is a compare-and-delete against
-  the holder's own token, not a blind delete.
+  the holder's own recorded pid — a process never deletes a lock that was
+  declared stale, broken, and re-acquired by someone else while it was
+  stalled, only its own still-current hold.
+
+There is no per-acquisition fencing token or mid-transaction renewal —
+an earlier design had both (a holder doing multiple writes checked back in
+between each one, and a dispossessed holder failed loudly on its next
+check), removed because no real transaction in this codebase runs
+anywhere near the 5-minute stale timeout (every one is a handful of
+millisecond-scale file writes); the accepted trade-off is that a holder
+that genuinely runs that long could have its lock broken while still
+alive, with nothing to detect the overlap. If a future transaction ever
+needs to run long, that transaction needs redesigning, not this lock
+re-complicating.
 
 You'll only ever see this surface as an occasional retry delay under real
-contention, or a `CONFLICT` if something is genuinely stuck for minutes —
-it's not something you configure or interact with directly.
+contention, or a `CONFLICT` if something is genuinely stuck for the
+configured timeout — it's not something you interact with directly, only
+(optionally) configure.
 
 ## Lock-free progress updates
 
@@ -170,3 +192,5 @@ There are no leases or claims separate from a session. Starting a ticket
 - [Configuration](configuration.md#actor--harness-identity-d17) for how
   an actor's identity is resolved — the audit trail every event above
   carries.
+- [Storage backends](storage-backends.md) for how this lock generalizes
+  to `StorageBackend.transact` and a remote backend's server-side lease.

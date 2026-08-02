@@ -200,9 +200,10 @@ the current clock.
   db/
     tickets/ticket_<ulid>.jsonc
     sessions/session_<ulid>.jsonc      # plan embedded, versioned
-    events/event_<ulid>.jsonc          # immutable, one per event
+    events/event_<ulid>.jsonc          # immutable — flat layout (pre-sharding, or never migrated)
+    events/2026-08/event_<ulid>.jsonc  # immutable — sharded layout (G2), one dir per UTC month
     index.jsonc                        # derived — GITIGNORED, auto-healed
-    .lock                              # multi-file transaction lock
+    .lock                              # write-path transaction lock
 ```
 
 `index.jsonc` is a pure function of the entity files on disk: slug → id
@@ -212,12 +213,44 @@ fresh clone, or a repo that just went through `git merge`/`git pull`/a
 hand-edit all rebuild it on the next command that needs it. `slop reindex`
 is the manual escape hatch.
 
+**Events shard by month (G2).** A freshly-written event lands under
+`events/YYYY-MM/` — the UTC calendar month derived from the event's own
+ULID timestamp, not wall-clock time at write — rather than flat in
+`events/`. Every read path (`slop events`, the derived index, `slop web`,
+...) merges flat and sharded events transparently: an old repo with
+events still sitting flat, a repo mid-migration with a mix of both, and a
+fully-sharded repo all read identically, with no user-visible difference.
+Sharding exists purely for scale: a repo with years of history no longer
+means every read of "the event log" scans one ever-growing directory —
+each shard's own content fingerprint (used by the derived index's
+staleness check, and by the flatfile driver's in-process read cache) only
+changes when THAT month gets a new event, so an unchanged month is never
+re-scanned on a repeat read. Migrating an existing flat layout into shards
+is explicit and manual — `slop reindex --shard-events`
+([CLI reference → `reindex`](cli-reference.md#reindex)) — never automatic,
+since event files are git-tracked and the resulting renames should land as
+a commit you chose to make.
+
 Why the db merges cleanly across parallel agent branches, and how the
 `.lock` file and lock-free progress updates work, is its own topic — see
 [Concurrency & merging](concurrency-and-merging.md).
+
+## Storage backend
+
+Every command, and `slop web`, read and write through one interface,
+`StorageBackend` — never `.slop/db/` files directly. `config.yaml`'s
+`backend:` key selects which implementation: **flatfile** (everything
+above; the default, no configuration needed) or **remote** (a store
+reachable over HTTP — not implemented yet, but the wire contract a real
+implementation must speak is fully specified). See
+[Configuration → Storage backend](configuration.md#storage-backend) for
+how to select one and [Storage backends](storage-backends.md) for the
+full interface/wire-contract design.
 
 ## See also
 
 - [CLI reference](cli-reference.md) — every command that reads or writes
   these entities.
 - [Agent workflow](agent-workflow.md) — how the loop actually gets driven.
+- [Storage backends](storage-backends.md) — the pluggable storage
+  interface and its remote wire contract.

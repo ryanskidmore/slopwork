@@ -56,6 +56,8 @@ against the shipped CLI:
 - [`docs/configuration.md`](docs/configuration.md) — `config.yaml`, actor/harness identity, env vars
 - [`docs/concurrency-and-merging.md`](docs/concurrency-and-merging.md) — the git-merge story, the
   db lock, and lock-free progress updates
+- [`docs/storage-backends.md`](docs/storage-backends.md) — the pluggable storage-backend
+  interface, selecting flatfile vs. remote, and the remote wire contract
 - [`docs/benchmarks.md`](docs/benchmarks.md) — measured scaling limits (1k → 1M tickets) and
   behavior under concurrent writers
 
@@ -213,11 +215,22 @@ src/
   core/                 entity types, schemas, ids, serialization, exit codes
     exit-codes.ts         the exit-code table above
     index.ts               module re-exports; entity types/schemas/ULIDs/JSONC live here
-  repo/                 flatfile store: atomic writes (tmp+rename), `.slop/db/.lock`, ref
-                        resolution, the derived index, and the event writer
+  repo/                 the flatfile DRIVER's internals: atomic writes (tmp+rename),
+                        `.slop/db/.lock`, ref resolution, the derived index, the event writer
+                        (month-sharded, docs/storage-backends.md). Not imported outside
+                        src/storage/ — commands and src/web/ go through the interface below.
     index.ts               re-exports the repo layer (atomic-write, db-index, events, refs,
                             sessions, tickets, ...); ticket/session CRUD is built on this
-  tickets/              ticket-domain logic on top of repo/: state machine, done-cascade,
+  storage/              the pluggable storage-backend interface (docs/storage-backends.md):
+                        commands/web construct one via `openStorage(paths)` and never import
+                        repo/ directly
+    backend.ts              the StorageBackend interface + transaction model
+    flatfile.ts              the default driver — repo/ wrapped behind the interface, plus an
+                            in-process read cache
+    remote.ts                 stub remote driver (every call fails with a clear "see
+                            docs/storage-backends.md" error) selected via config.yaml's `backend:`
+    open.ts                  `openStorage(paths)` — reads config.yaml, picks flatfile/remote
+  tickets/              ticket-domain logic on top of storage/: state machine, done-cascade,
                         staleness, search, ancestry/tree, jira ref parsing
   sessions/             session lifecycle: harness/git capture, plan versioning + diff,
                         context pack, start/stop/finalize
@@ -226,7 +239,8 @@ src/
                             directory (not just fixtures) at http://localhost:4553 by default
     server.ts               Bun.serve wiring: Host-header allowlist, HEAD support, reusePort:false,
                             /api/* routes, static SPA-shell fallback for everything else
-    data-source.ts           the WebDataSource seam; fixture-data-source.ts is the disk-backed impl
+    data-source.ts           the WebDataSource seam; storage-data-source.ts is the real,
+                            StorageBackend-backed impl; fixture-data-source.ts backs tests only
     api/                    read-only JSON API route handlers + the wire-contract types (types.ts)
     frontend/                the React + Tailwind v4 + shadcn/ui-style SPA source (own tsconfig —
                             see "Web UI development" above); bundled by scripts/build-frontend.ts

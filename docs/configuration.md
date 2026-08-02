@@ -14,6 +14,8 @@ remotes:
 defaults:
   stale_after: 60m
   review_stale_after: 24h
+  lock_timeout: 5s
+backend: flatfile              # optional — see "Storage backend" below
 ```
 
 | Field | Meaning | Default |
@@ -24,10 +26,61 @@ defaults:
 | `remotes.jira` | Jira base URL, used to build ticket-detail links for `jira:` parents in `slop web`/`slop show` | absent (never prompted) or `""` (prompted, explicitly declined) |
 | `defaults.stale_after` | how long an `in_progress` ticket can sit with no activity before it's `stale` | `60m` |
 | `defaults.review_stale_after` | how long a `review` ticket can sit unactioned (from `review.requested_at`, not general activity) before it's `stale` | `24h` |
+| `defaults.lock_timeout` | how long a mutating command waits to acquire `.slop/db/.lock` before giving up with `CONFLICT` (exit `6`) — see [Concurrency & merging](concurrency-and-merging.md#the-db-lock-serializing-the-write-path) | `5s` |
+| `backend` | which storage backend this repo uses — see "Storage backend" below | `flatfile` (same as the key being absent) |
 
 Unknown keys (e.g. one left behind by an older slopwork version) are
 ignored; commands warn on stderr about a known-legacy key and keep
 working — delete the stale line to silence the warning.
+
+## Storage backend
+
+`backend:` (G2) selects which [storage backend](storage-backends.md) this
+repo reads and writes through — every command and `slop web` construct
+one via `openStorage()` and go through it exclusively, never touching
+`.slop/db/` files directly outside the backend implementation itself.
+Accepted forms, all equivalent to their normalized shape:
+
+```yaml
+backend: flatfile              # explicit default — same as the key being absent
+```
+
+```yaml
+backend: remote                # shorthand for {kind: remote} with no url configured yet
+```
+
+```yaml
+backend:                       # structured form
+  kind: remote
+  url: https://slop.example.workers.dev
+```
+
+A bare `backend:` line (real-YAML `null`) means the same as the key being
+entirely absent: `flatfile`. The flatfile backend — `.slop/db/{tickets,
+sessions,events}/` on disk, as described throughout
+[Concepts](concepts.md) — needs no configuration at all and remains the
+default for every repo.
+
+`backend: remote` (or the structured form) selects a remote backend —
+today, a **stub**: every operation fails immediately with a clear "remote
+backend not implemented" error (exit `1`) naming
+[docs/storage-backends.md](storage-backends.md), the JSON-over-HTTP wire
+contract a real remote implementation (e.g. a Cloudflare worker) will
+speak once one exists. Configuring this today is still useful for staging
+a repo's config ahead of a real server, or for testing the error path
+itself — it never silently falls back to the flatfile db.
+
+A remote backend's auth token is deliberately **not** configured in
+`config.yaml` (a committed, git-mergeable file) — it comes from the
+`SLOP_REMOTE_TOKEN` environment variable instead. See
+[storage-backends.md](storage-backends.md#authentication) for the exact
+header this becomes on the wire.
+
+`slop edit` requires the flatfile backend's local-file capability ($EDITOR
+opens a real file on disk); against a remote backend it refuses cleanly
+with a `USAGE_ERROR` naming `slop update`'s non-interactive flags as the
+alternative, rather than trying and failing to locate a file that doesn't
+exist locally.
 
 ### Staleness thresholds
 
@@ -98,6 +151,7 @@ harness exposes a session id to the environment today.
 | `CLAUDE_CODE_SESSION_ID` | `slop start` | Claude Code's own session id, captured into `session.harness.session_id` |
 | `EDITOR`, `VISUAL` | `slop edit` | which editor to open the ticket's JSONC file in (`VISUAL` wins if both are set) |
 | `SLOP_WEB_DEBUG` | `slop web` | `1` (or any truthy value) switches to Bun's verbose dev error pages — see [Web UI → Debugging](web-ui.md#debugging) |
+| `SLOP_REMOTE_TOKEN` | every command, when `backend: {kind: remote, ...}` | bearer token for the remote backend's `Authorization` header — see [Storage backend](#storage-backend) and [storage-backends.md](storage-backends.md#authentication) |
 
 None of these need to be set for normal use — `git config user.name` and
 plain harness auto-detection (falling back to `other`) already cover the
