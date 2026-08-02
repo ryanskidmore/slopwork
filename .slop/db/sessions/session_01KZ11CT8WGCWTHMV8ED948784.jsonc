@@ -1,0 +1,51 @@
+{
+  "id": "session_01KZ11CT8WGCWTHMV8ED948784",
+  "ticket": "ticket_01KZ11CPQKWZKJVMFF6BWTVNYQ",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "codex",
+    "session_id": null
+  },
+  "git": {
+    "branch": "fix/audit-yaml-semantics",
+    "commit_at_start": "0c50f3f8541261b22ae1b2c5b66878e8cd9a3e46"
+  },
+  "started_at": "2026-08-02T10:47:56.444Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Map all config parse/stringify call sites and establish one codec contract",
+          "checked": true
+        },
+        {
+          "text": "Add maintained YAML dependency and replace the hand parser with the neutral codec",
+          "checked": true
+        },
+        {
+          "text": "Route repo/storage and web config reads through the shared codec without changing strict/tolerant policies",
+          "checked": true
+        },
+        {
+          "text": "Add conformance and end-to-end agreement coverage for audited YAML constructs",
+          "checked": true
+        },
+        {
+          "text": "Update configuration docs and run focused/full quality gates",
+          "checked": true
+        },
+        {
+          "text": "Commit, push, open PR, and move ticket to review",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-08-02T10:48:01.641Z"
+    }
+  ],
+  "end_summary": null
+}

@@ -16,7 +16,7 @@ import pkg from "../../package.json" with { type: "json" };
 //     Node compatibility.
 //   - No dead-weight wrong-platform binary ships.
 //
-// v0 genuinely requires Bun at runtime (Bun.serve / Bun.file / Bun.YAML /
+// v0 genuinely requires Bun at runtime (Bun.serve / Bun.file /
 // text-imports), so the chosen fix is the second branch: `bin/slop.mjs` is
 // a tiny Node-runnable launcher that delegates to `bun` when present and
 // fails with one clear, actionable line on stderr when it isn't — instead

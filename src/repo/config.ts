@@ -16,18 +16,20 @@
  * config file — every OTHER read path through `loadIndex` (ref resolution,
  * `ready`, `status`, ...) depends on it not to.
  *
- * Reuses `cli/config-yaml.ts`'s `parseConfigYamlText` (a pure, already
- * -tested text->object parser with no I/O of its own) rather than a second
- * implementation of the same restricted YAML subset — the same "reuse a
- * pure cli-owned helper from the repo layer" precedent `repo/paths.ts`/
- * `repo/lock.ts`/`repo/refs.ts` already set by importing `cli/errors.ts`'s
- * `SlopError`. See DECISIONS.md's C5 entry for the fuller rationale.
+ * Reuses core/config-yaml.ts's runtime-neutral YAML 1.2 codec rather than
+ * carrying storage-specific parsing semantics. Strict command readers and
+ * this tolerant reader therefore parse the same value before applying their
+ * intentionally different error policies.
  */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { parseConfigYamlText } from "../cli/config-yaml.js";
 import type { BackendSelection, Config, ConfigDefaults } from "../core/index.js";
-import { configDefaultsSchema, configSchema, normalizeBackendSelection } from "../core/index.js";
+import {
+  configDefaultsSchema,
+  configSchema,
+  normalizeBackendSelection,
+  parseConfigYamlText,
+} from "../core/index.js";
 import { DEFAULT_LOCK_TIMEOUT } from "../core/entities/config.js";
 import { parseDurationMs } from "../core/duration.js";
 import type { RepoPaths } from "./paths.js";

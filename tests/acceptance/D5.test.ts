@@ -46,7 +46,7 @@ import { FIXTURE_NOW_ISO } from "../fixtures/web-db-meta.js";
 // tests/fixtures/web-db/.slop/ and drives it entirely over HTTP — no
 // module in src/web/ is imported directly here. That's a deliberate
 // consequence of a fact worth recording for whoever touches this next:
-// Bun-only globals (`Bun.serve`, `Bun.file`, `Bun.YAML`, `Bun.markdown`,
+// Bun-only globals (`Bun.serve`, `Bun.file`, `Bun.markdown`,
 // and `with { type: "text" }` asset imports — everything src/web/'s
 // server-side code is built on) are **not available inside vitest's test
 // workers**, which run as plain Node.js processes even when the vitest
@@ -219,11 +219,9 @@ describe("D5: slop web", () => {
     });
 
     it("has a config.yaml with the expected top-level keys", () => {
-      // config.yaml can't be parsed portably here — Bun.YAML (like every
-      // other Bun-only API) isn't available under vitest, see this file's
-      // header comment. Its schema-validity is instead proven end-to-end,
-      // for real, by the live server below: FixtureDataSource.getConfig()
-      // runs `configSchema.parse(Bun.YAML.parse(text))` on every request,
+      // Its schema-validity is proven end-to-end by the live server below:
+      // FixtureDataSource.getConfig() runs the canonical YAML codec and
+      // `configSchema` on every request,
       // and the tree/review/stale assertions further down specifically
       // check config-*derived* values (the Jira badge URL built from
       // `remotes.jira`, the stale thresholds text) rendered correctly —

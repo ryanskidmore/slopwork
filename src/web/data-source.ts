@@ -19,9 +19,10 @@
  *    exactly what it reuses from `FixtureDataSource` vs. the storage
  *    layer).
  */
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Config, Event, Session, Ticket, TicketId } from "../core/index.js";
-import { configSchema } from "../core/index.js";
+import { configSchema, parseConfigYamlText } from "../core/index.js";
 
 /**
  * {@link WebDataSource.getConfig}'s return shape — web-corrupt-or-missing-config:
@@ -77,8 +78,8 @@ const FALLBACK_PROJECT_LABEL = "(unknown — config.yaml unavailable)";
 export async function readSlopConfigTolerant(slopRoot: string): Promise<ConfigResult> {
   const path = join(slopRoot, "config.yaml");
   try {
-    const text = await Bun.file(path).text();
-    const parsed: unknown = Bun.YAML.parse(text);
+    const text = await readFile(path, "utf8");
+    const parsed = parseConfigYamlText(text);
     return { config: configSchema.parse(parsed), warning: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -44,7 +44,7 @@ import {
 import { isInteractive, promptLine, promptYesNo } from "../init/prompt.js";
 import type { OnboardingContext } from "../onboarding/render.js";
 import { renderAgentsMd, renderSkillMd } from "../onboarding/render.js";
-import { parseConfigYamlText, stringifyConfigYaml } from "../config-yaml.js";
+import { parseConfigYamlText, stringifyConfigYaml } from "../../core/config-yaml.js";
 import { SlopError } from "../errors.js";
 
 interface InitOptions {

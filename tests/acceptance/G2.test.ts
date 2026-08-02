@@ -61,7 +61,7 @@ function runSlop(args: string[], cwd: string) {
  * `config.yaml` — `extraConfigLines` is appended verbatim after `defaults:`'s
  * block so a test can add `backend:`/a custom `lock_timeout` without
  * `stringifyConfigYaml`'s narrower, `slop init`-only shape (it doesn't know
- * about either field — see cli/config-yaml.ts's own doc). */
+ * about either field — see core/config-yaml.ts's own doc). */
 async function makeScratchRepo(
   prefix: string,
   opts: { lockTimeout?: string; backendLines?: string[] } = {},

@@ -33,6 +33,15 @@ Unknown keys (e.g. one left behind by an older slopwork version) are
 ignored; commands warn on stderr about a known-legacy key and keep
 working — delete the stale line to silence the warning.
 
+The file uses YAML 1.2. Standard YAML forms such as quoted escapes, flow
+maps, and block scalars are supported consistently by the CLI, storage
+selection, and web UI. YAML scalar types are preserved before schema
+validation: for example, `project: true` is a boolean and is rejected,
+while `project: "true"` is the string project name `true`. Mutating and
+onboarding commands report invalid configuration as an error; tolerant
+read paths such as storage selection and `slop web` retain their documented
+flatfile/default fallback behavior.
+
 ## Storage backend
 
 `backend:` (G2) selects which [storage backend](storage-backends.md) this

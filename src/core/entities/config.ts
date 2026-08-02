@@ -15,7 +15,7 @@ export const DEFAULT_LOCK_TIMEOUT = "5s";
 
 /**
  * `null` -> `undefined` for a single field. A real YAML parser (e.g.
- * `Bun.YAML`, used by the web data source) renders a bare `key:` with no
+ * the canonical YAML 1.2 codec) renders a bare `key:` with no
  * value — as written by a default `slop init` for an undetected/unprompted
  * remote, or by a human clearing a line by hand — as `null`, not as the
  * key being absent. Both mean the same thing here ("not configured"), so

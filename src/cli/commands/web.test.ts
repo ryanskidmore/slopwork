@@ -25,8 +25,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 // deliberately corrupted after the fact — same "drive the compiled/source
 // CLI, assert over HTTP" shape as tests/acceptance/D5.test.ts and
 // tests/acceptance/web-real-repo.test.ts, and for the same reason: every
-// Bun-only global this server is built on (`Bun.serve`, `Bun.file`,
-// `Bun.YAML`) is unavailable inside a vitest test worker (verified there
+// Bun-only global this server is built on (`Bun.serve`, `Bun.file`) is
+// unavailable inside a vitest test worker (verified there
 // too — `typeof Bun` is `"undefined"` here), so there is no in-process way
 // to drive this server; a spawned child process is the only option, and
 // arguably the more honest one for exactly this ticket (dev-mode header

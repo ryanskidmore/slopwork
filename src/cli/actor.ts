@@ -23,11 +23,10 @@ import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Actor, ActorKind, Config } from "../core/index.js";
-import { configSchema, EXIT_CODES, resolveActorName } from "../core/index.js";
+import { configSchema, EXIT_CODES, parseConfigYamlText, resolveActorName } from "../core/index.js";
 import type { RepoPaths } from "../repo/paths.js";
 import { detectHarness, sniffHarnessKind } from "../sessions/harness.js";
 import { printWarning } from "./commands/shared.js";
-import { parseConfigYamlText } from "./config-yaml.js";
 import { SlopError } from "./errors.js";
 
 /**
@@ -61,8 +60,8 @@ export function gitUserName(cwd: string, env: NodeJS.ProcessEnv = process.env): 
  * already uses — duplicated rather than imported for the same
  * cross-lane-ownership reason as {@link gitUserName} above (that command
  * module is D1's, mid-flight). `parseConfigYamlText`/`configSchema`
- * themselves are safe, stable, already-shipped primitives (A2's schema,
- * the hand-rolled restricted YAML reader) — only the *file this lives in*
+ * themselves are runtime-neutral core primitives (the canonical YAML 1.2
+ * codec and A2's schema) — only the *file this lives in*
  * is the thing being kept out of D1's way.
  *
  * Every mutating command needs this for D17 (`user:`); `show` needs it for

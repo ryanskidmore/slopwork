@@ -19,7 +19,7 @@
 import { join } from "node:path";
 import { vi } from "vitest";
 import { DEFAULT_REVIEW_STALE_AFTER, DEFAULT_STALE_AFTER } from "../../src/core/index.js";
-import { type ConfigYamlInput, stringifyConfigYaml } from "../../src/cli/config-yaml.js";
+import { type ConfigYamlInput, stringifyConfigYaml } from "../../src/core/config-yaml.js";
 import { atomicWriteFile, ensureDbDirs, type RepoPaths } from "../../src/repo/index.js";
 
 /**

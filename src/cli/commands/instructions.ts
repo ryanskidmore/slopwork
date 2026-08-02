@@ -11,9 +11,8 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Command } from "commander";
-import { configSchema } from "../../core/index.js";
+import { configSchema, parseConfigYamlText } from "../../core/index.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
-import { parseConfigYamlText } from "../config-yaml.js";
 import { renderInstructions } from "../onboarding/render.js";
 import { SlopError } from "../errors.js";
 

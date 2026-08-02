@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
 import { configSchema } from "../../core/index.js";
-import { parseConfigYamlText } from "../config-yaml.js";
+import { parseConfigYamlText } from "../../core/config-yaml.js";
 import { runInit } from "./init.js";
 
 // In-process coverage of `runInit` — the CLI-facing wrapper around D1's
