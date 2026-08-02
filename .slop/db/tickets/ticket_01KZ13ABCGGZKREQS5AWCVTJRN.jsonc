@@ -1,0 +1,59 @@
+{
+  "id": "ticket_01KZ13ABCGGZKREQS5AWCVTJRN",
+  "name": "Attribute ticket mutations to active sessions",
+  "slug": "fix/ticket-event-session-attribution",
+  "spec": {
+    "summary": "Ensure ticket-scoped mutation events carry the ticket's current active session while preserving deliberate no-session cases and correct concurrency snapshots.",
+    "details_md": "",
+    "acceptance": [
+      "Update, edit, split, ask, and answer events use the affected ticket's active session when one exists.",
+      "Bulk updates attribute each ticket independently; reparent descendant events use fresh within-transaction session state.",
+      "Lock-free progress uses its initial ticket snapshot; answer after restart uses the new active session, not the session that asked.",
+      "Split child creation attribution is explicitly defined and tested relative to the active parent session.",
+      "Open tickets without active sessions continue emitting session:null.",
+      "G5 unit, command, acceptance, and CLI/web visibility regressions pass with full static/build gates."
+    ],
+    "context": [
+      "src/repo/events.ts",
+      "src/cli/commands/update.ts",
+      "src/cli/commands/edit.ts",
+      "src/cli/commands/split.ts",
+      "src/cli/commands/ask.ts",
+      "src/cli/commands/answer.ts"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "review",
+  "priority": 1,
+  "labels": [
+    "area:events",
+    "area:cli"
+  ],
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ13ABCGGZKREQS5AWCVTJRN",
+  "path": [],
+  "active_session": "session_01KZ13AGQ34CVMZHPVYV77F9ZC",
+  "last_activity_at": "2026-08-02T11:34:43.513Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "codex-session-attribution",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-08-02T11:21:32.881Z",
+  "updated_at": "2026-08-02T11:34:43.513Z",
+  "review": {
+    "mr": "https://github.com/ryanskidmore/slopwork/pull/13",
+    "requested_at": "2026-08-02T11:34:43.513Z",
+    "by": {
+      "name": "codex-session-attribution",
+      "kind": "human"
+    }
+  }
+}

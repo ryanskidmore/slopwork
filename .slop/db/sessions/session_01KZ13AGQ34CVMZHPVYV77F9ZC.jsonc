@@ -1,0 +1,47 @@
+{
+  "id": "session_01KZ13AGQ34CVMZHPVYV77F9ZC",
+  "ticket": "ticket_01KZ13ABCGGZKREQS5AWCVTJRN",
+  "actor": {
+    "name": "codex-session-attribution",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "codex",
+    "session_id": null
+  },
+  "git": {
+    "branch": "fix/audit-session-attribution",
+    "commit_at_start": "6373ca1e1a865b6dbca190ae49be97927dcad50c"
+  },
+  "started_at": "2026-08-02T11:21:38.275Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Map current event-context construction and transaction snapshots across update/edit/split/ask/answer",
+          "checked": true
+        },
+        {
+          "text": "Define and apply one ticket-scoped active-session context helper with correct snapshot timing",
+          "checked": true
+        },
+        {
+          "text": "Add G5 unit and command regressions for active/open, bulk, descendants, restart, edit, and split cases",
+          "checked": true
+        },
+        {
+          "text": "Add acceptance and CLI/web event visibility coverage; update docs/changelog if semantics need explanation",
+          "checked": true
+        },
+        {
+          "text": "Run focused G5/full/static/build gates, review diff, commit, push, open stacked PR, and move ticket to review",
+          "checked": true
+        }
+      ],
+      "created_at": "2026-08-02T11:21:49.917Z"
+    }
+  ],
+  "end_summary": null
+}

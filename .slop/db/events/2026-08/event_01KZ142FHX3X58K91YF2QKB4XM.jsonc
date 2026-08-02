@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ142FHX3X58K91YF2QKB4XM",
+  "actor": {
+    "name": "codex-session-attribution",
+    "kind": "human"
+  },
+  "session": "session_01KZ13AGQ34CVMZHPVYV77F9ZC",
+  "verb": "review.requested",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ13ABCGGZKREQS5AWCVTJRN"
+  },
+  "payload": {
+    "mr": "https://github.com/ryanskidmore/slopwork/pull/13"
+  },
+  "at": "2026-08-02T11:34:43.517Z"
+}
