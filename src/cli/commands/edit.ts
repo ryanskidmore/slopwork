@@ -152,9 +152,10 @@ export async function runEdit(ref: string): Promise<void> {
       `no $VISUAL/$EDITOR configured and stdin/stdout is not a TTY — refusing to launch "${editorCmd}", ` +
         "which would block forever waiting for interactive input that can never arrive. Set " +
         "$VISUAL or $EDITOR to a non-interactive-safe command if you need `edit` here, or use a " +
-        "non-interactive alternative: `slop update <ref> --parent <ref> / --blocks <±ref> / " +
-        "--owner <name> / --relates-to <±ref>` covers the edge/owner repair `edit` was previously " +
-        "the only way to do (see `slop update --help`).",
+        "non-interactive alternative: `slop update <ref> --parent <ref> / --clear-parent / " +
+        "--blocks <±ref> / --relates-to <±ref> / --discovered-from <±ref> / --owner <name> / " +
+        "--clear-owner` covers the edge/owner repair `edit` was previously the only way to do " +
+        "(see `slop update --help`).",
       EXIT_CODES.USAGE_ERROR,
     );
   }
