@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ1CX81Z8P8JB4RX3FEPT6WR",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": "session_01KZ1CMG3NR26DWQNXFHVS0601",
+  "verb": "plan.step_checked",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KZ1CMG3NR26DWQNXFHVS0601"
+  },
+  "payload": {
+    "step": 3,
+    "checked": true
+  },
+  "at": "2026-08-02T14:09:09.183Z"
+}
