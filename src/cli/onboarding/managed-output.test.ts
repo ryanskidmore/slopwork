@@ -2,8 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { configSchema } from "../../core/index.js";
-import { parseConfigYamlText } from "../../core/config-yaml.js";
+import { configSchema, parseConfigYamlText } from "../../core/index.js";
 import type { OnboardingContext } from "./render.js";
 import { renderAgentsMd, renderSkillMd } from "./render.js";
 
