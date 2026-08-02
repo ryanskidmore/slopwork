@@ -37,7 +37,7 @@
         },
         {
           "text": "Open the pull request and move the tracker ticket to review",
-          "checked": false
+          "checked": true
         }
       ],
       "created_at": "2026-08-02T11:11:27.827Z"
