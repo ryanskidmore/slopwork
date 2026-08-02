@@ -18,7 +18,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, "..", "..");
 const binaryPath = join(repoRoot, "dist", "slop");
 
-// The complete v0 command surface, design.md §4.2 — all 22 commands.
+// The complete v0 command surface, design.md §4.2 — 22 commands — plus
+// G3's `list` (t-km7mb), 23 total.
 const EXPECTED_COMMANDS = [
   "init",
   "instructions",
@@ -39,6 +40,7 @@ const EXPECTED_COMMANDS = [
   "drop",
   "status",
   "show",
+  "list",
   "search",
   "events",
   "web",
@@ -72,9 +74,9 @@ describe("A1: Repo scaffold: TS + Bun build, commander skeleton, vitest, lint/fo
     expect(result.stdout.length).toBeGreaterThan(0);
   });
 
-  it("lists all 22 §4.2 commands in the compiled binary's --help output", () => {
+  it("lists all 23 commands (design.md §4.2's 22 plus G3's `list`) in the compiled binary's --help output", () => {
     const result = runBinary(["--help"]);
-    expect(EXPECTED_COMMANDS).toHaveLength(22);
+    expect(EXPECTED_COMMANDS).toHaveLength(23);
     for (const command of EXPECTED_COMMANDS) {
       const term = new RegExp(`\\b${command}\\b`);
       expect(result.stdout, `expected --help to mention "${command}"`).toMatch(term);
