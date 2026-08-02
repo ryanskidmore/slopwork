@@ -516,9 +516,9 @@ export async function fingerprintEntityDir(
   const hash = createHash("sha256");
   for (const entry of present) {
     hash.update(entry.name);
-    hash.update(" ");
+    hash.update("\0");
     hash.update(String(entry.mtimeMs));
-    hash.update(" ");
+    hash.update("\0");
     hash.update(String(entry.size));
     hash.update("\n");
   }

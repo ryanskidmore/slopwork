@@ -1,0 +1,50 @@
+{
+  "id": "ticket_01KZ1291TZ9J6FZT0W55X85P57",
+  "name": "Restore source and managed-output hygiene",
+  "slug": "fix/source-managed-output-hygiene",
+  "spec": {
+    "summary": "Repair source corruption and stale active artifacts, regenerate managed onboarding, and add deterministic drift/nontext regressions without including event sharding.",
+    "details_md": "",
+    "acceptance": [
+      "Replace literal NUL bytes in db-index source with escaped byte markers without changing content fingerprint hash behavior.",
+      "Repair mojibake and remove active stale transcript artifacts while preserving intentional history and migration compatibility references.",
+      "Regenerate checked-in onboarding outputs from canonical content and fail tests when either managed output drifts.",
+      "Add a repository source scan that rejects literal NUL bytes and mojibake in maintained source files.",
+      "Focused and full static/test/build gates pass; event sharding remains outside this PR."
+    ],
+    "context": [
+      "src/repo/db-index.ts",
+      "src/web/data-source.ts",
+      "src/cli/onboarding",
+      ".slop/AGENTS.md",
+      ".claude/skills/slopwork/SKILL.md"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "in_progress",
+  "priority": 1,
+  "labels": [
+    "area:quality",
+    "area:tooling"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ1291TZ9J6FZT0W55X85P57",
+  "path": [],
+  "active_session": "session_01KZ12954G7FBBYVCXRXZ9V1WG",
+  "last_activity_at": "2026-08-02T11:03:25.074Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "codex-source-hygiene",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-08-02T11:03:21.746Z",
+  "updated_at": "2026-08-02T11:03:25.074Z"
+}

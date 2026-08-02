@@ -300,6 +300,10 @@ whether they can surprise an existing user.
 
 ### Fixed
 
+- **Repository hygiene is enforced:** maintained files are scanned for literal
+  NUL bytes and known mojibake, while checked-in `AGENTS.md`/`SKILL.md` outputs
+  are verified byte-for-byte against the canonical onboarding renderer. Stale
+  transcript settings were also removed from active benchmark/tooling config.
 - **Stored XSS in `slop web`**: the external-parent badge built an `href`
   straight from `config.remotes.jira` without a scheme check, so a
   `javascript:` URL committed to `config.yaml` executed in the web UI's origin

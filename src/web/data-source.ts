@@ -115,7 +115,7 @@ export interface WebDataSource {
   /**
    * The events that belong on a ticket's updates timeline: events whose
    * `entity` is that ticket directly, plus events whose `entity` is one of
-   * that ticket's sessions (session.started/stopped/ended, plan.*, …ā€”
+   * that ticket's sessions (session.started/stopped/ended, plan.*, …) —
    * see event.ts's EVENT_VERBS doc comments for why those are keyed to the
    * session, not the ticket). Returned oldest-first (event id order, which
    * is chronological per D6); callers reverse if they want newest-first.

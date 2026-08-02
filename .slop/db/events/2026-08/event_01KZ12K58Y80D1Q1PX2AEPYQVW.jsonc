@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ12K58Y80D1Q1PX2AEPYQVW",
+  "actor": {
+    "name": "codex-source-hygiene",
+    "kind": "human"
+  },
+  "session": "session_01KZ12954G7FBBYVCXRXZ9V1WG",
+  "verb": "plan.step_checked",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KZ12954G7FBBYVCXRXZ9V1WG"
+  },
+  "payload": {
+    "step": 3,
+    "checked": true
+  },
+  "at": "2026-08-02T11:08:52.894Z"
+}

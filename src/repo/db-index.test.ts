@@ -1,4 +1,5 @@
-import { mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -883,6 +884,25 @@ describe("computeContentFingerprint", () => {
     const fp = await computeContentFingerprint(paths);
     expect(fp.tickets).toEqual({ count: 1, digest: expect.any(String) });
     expect(fp.tickets?.digest.length).toBeGreaterThan(0);
+  });
+
+  it("preserves NUL-delimited tuple hashing without embedding control bytes in source", async () => {
+    const ticket = makeTicket();
+    await createTicket(paths, ticket, ctx, createdEvent);
+    const filePath = ticketFilePath(paths, ticket.id);
+    const metadata = await stat(filePath);
+    const fileName = `${ticket.id}.jsonc`;
+    const expectedDigest = createHash("sha256")
+      .update(fileName)
+      .update("\0")
+      .update(String(metadata.mtimeMs))
+      .update("\0")
+      .update(String(metadata.size))
+      .update("\n")
+      .digest("hex");
+
+    const fingerprint = await computeContentFingerprint(paths);
+    expect(fingerprint.tickets).toEqual({ count: 1, digest: expectedDigest });
   });
 
   it("is readdir+stat only — never reads or parses file content (spot check: garbage content doesn't throw)", async () => {
