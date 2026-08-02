@@ -248,7 +248,7 @@ describe("FlatfileBackend", () => {
       const added = await writeFlatEvent(paths, ticket.id, "2024-01-20T00:00:00.000Z", "flat #2");
       const events = await backend.listEventsTolerant();
 
-      expect(events.map((event) => event.id)).toEqual(
+      expect(events.events.map((event) => event.id)).toEqual(
         expect.arrayContaining([existingShardEvent.id, added.id]),
       );
       const shardReads = readFileMock.mock.calls.filter(([path]) =>
