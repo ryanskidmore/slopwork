@@ -1,0 +1,47 @@
+{
+  "id": "session_01KZ131S95YJT2BTDZN2MDPN32",
+  "ticket": "ticket_01KZ131NZQAW4WW4CVAJ5ZKA3S",
+  "actor": {
+    "name": "codex-shard-migration",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "codex",
+    "session_id": null
+  },
+  "git": {
+    "branch": "chore/audit-dogfood-event-shards",
+    "commit_at_start": "bcb329079a9af3f02edbfba815ce01c20fbc9021"
+  },
+  "started_at": "2026-08-02T11:16:52.133Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Capture pre-migration flat/sharded counts, complete event ID set, and strict/tolerant read health",
+          "checked": true
+        },
+        {
+          "text": "Run the supported slop reindex --shard-events migration with the branch binary",
+          "checked": true
+        },
+        {
+          "text": "Verify post-migration counts, IDs, shard placement, strict/tolerant reads, and clean reindex",
+          "checked": true
+        },
+        {
+          "text": "Run the migration a second time and verify zero moves",
+          "checked": true
+        },
+        {
+          "text": "Review the large rename-only diff, commit, push, open a data-only PR, and move the ticket to review",
+          "checked": false
+        }
+      ],
+      "created_at": "2026-08-02T11:16:58.236Z"
+    }
+  ],
+  "end_summary": null
+}

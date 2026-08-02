@@ -1,0 +1,46 @@
+{
+  "id": "ticket_01KZ131NZQAW4WW4CVAJ5ZKA3S",
+  "name": "Migrate dogfood events to monthly shards",
+  "slug": "chore/dogfood-event-shards",
+  "spec": {
+    "summary": "Use the supported event-sharding migration to move the repository's legacy flat dogfood events into deterministic monthly shards without loss or duplication.",
+    "details_md": "",
+    "acceptance": [
+      "All legacy flat event files are moved by slop reindex --shard-events into YYYY-MM directories.",
+      "Event count and ID set are identical before and after migration, excluding normal tracker events created for this work.",
+      "Strict and tolerant event reads plus reindex succeed after migration.",
+      "A second slop reindex --shard-events run moves zero files.",
+      "The PR is data-only apart from focused tracker ticket/session/events and contains no source changes."
+    ],
+    "context": [
+      ".slop/db/events"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "in_progress",
+  "priority": 1,
+  "labels": [
+    "area:data",
+    "area:dogfood"
+  ],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ131NZQAW4WW4CVAJ5ZKA3S",
+  "path": [],
+  "active_session": "session_01KZ131S95YJT2BTDZN2MDPN32",
+  "last_activity_at": "2026-08-02T11:16:52.135Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "codex-shard-migration",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-08-02T11:16:48.830Z",
+  "updated_at": "2026-08-02T11:16:52.135Z"
+}

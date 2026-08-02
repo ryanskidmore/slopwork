@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ131S9ARFW4XQHY635AVYAQ",
+  "actor": {
+    "name": "codex-shard-migration",
+    "kind": "agent"
+  },
+  "session": "session_01KZ131S95YJT2BTDZN2MDPN32",
+  "verb": "ticket.state_changed",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ131NZQAW4WW4CVAJ5ZKA3S"
+  },
+  "payload": {
+    "from": "open",
+    "to": "in_progress"
+  },
+  "at": "2026-08-02T11:16:52.138Z"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ133C01CRA6ERHPZ7Z1N42V",
+  "actor": {
+    "name": "codex-shard-migration",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ131NZQAW4WW4CVAJ5ZKA3S"
+  },
+  "payload": {
+    "progress": "Pre-migration verification: 912 legacy flat events + 58 sharded tracker events (970 total before this progress event), 970 unique IDs/no duplicates, strict and tolerant readers both returned the identical ordered 970-ID set, and strict reindex succeeded."
+  },
+  "at": "2026-08-02T11:17:44.065Z"
+}

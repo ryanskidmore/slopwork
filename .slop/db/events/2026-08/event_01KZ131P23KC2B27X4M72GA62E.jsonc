@@ -1,0 +1,20 @@
+{
+  "id": "event_01KZ131P23KC2B27X4M72GA62E",
+  "actor": {
+    "name": "codex-shard-migration",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.created",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ131NZQAW4WW4CVAJ5ZKA3S"
+  },
+  "payload": {
+    "method": "new",
+    "state": "open",
+    "adhoc": false,
+    "parent": null
+  },
+  "at": "2026-08-02T11:16:48.835Z"
+}

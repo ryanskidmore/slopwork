@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ134Z5EDW5SDBJ3H8X1WBFE",
+  "actor": {
+    "name": "codex-shard-migration",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ131NZQAW4WW4CVAJ5ZKA3S"
+  },
+  "payload": {
+    "progress": "Supported migration moved exactly 912 flat events into 2026-07/2026-08. Immediate before/after remained 972 total and 972 unique IDs with zero duplicates; sorted ID digest 2a2539d1… and path-independent content digest e2da2324… were unchanged. Strict/tolerant reads returned the same ordered 972 IDs, every file matched its ID-derived shard, strict reindex succeeded, and a second migration reported no flat-layout events."
+  },
+  "at": "2026-08-02T11:18:36.462Z"
+}

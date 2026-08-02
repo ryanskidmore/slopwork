@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ131Z7ZBK4XMR1VVQD13TTQ",
+  "actor": {
+    "name": "codex-shard-migration",
+    "kind": "human"
+  },
+  "session": "session_01KZ131S95YJT2BTDZN2MDPN32",
+  "verb": "plan.set",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KZ131S95YJT2BTDZN2MDPN32"
+  },
+  "payload": {
+    "version": 1,
+    "step_count": 5
+  },
+  "at": "2026-08-02T11:16:58.239Z"
+}

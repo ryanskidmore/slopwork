@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ134YQ32KM1JE4J2C6ZBA1M",
+  "actor": {
+    "name": "codex-shard-migration",
+    "kind": "human"
+  },
+  "session": "session_01KZ131S95YJT2BTDZN2MDPN32",
+  "verb": "plan.step_checked",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KZ131S95YJT2BTDZN2MDPN32"
+  },
+  "payload": {
+    "step": 2,
+    "checked": true
+  },
+  "at": "2026-08-02T11:18:36.003Z"
+}
