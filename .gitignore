@@ -52,5 +52,4 @@ npm-debug.log*
 .slop/db/.lock.stale-*
 .slop/db/.tmp-*
 .slop/db/*/.tmp-*
-.slop/transcripts/
 # --- end slopwork ---

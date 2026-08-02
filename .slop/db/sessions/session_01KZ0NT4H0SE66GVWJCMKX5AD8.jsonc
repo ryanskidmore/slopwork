@@ -1,6 +1,6 @@
 {
-  "id": "session_01KYZRW2FX6TB5FTA07S1EJ2DP",
-  "ticket": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F",
+  "id": "session_01KZ0NT4H0SE66GVWJCMKX5AD8",
+  "ticket": "ticket_01KYZP89SKDFS5RE7NDE2J8W82",
   "actor": {
     "name": "coordinator",
     "kind": "agent"
@@ -11,28 +11,28 @@
   },
   "git": {
     "branch": "main",
-    "commit_at_start": "64589c2bfec1da7e87e4291dc59531591cc559cd"
+    "commit_at_start": "fbc24e6a4842767bc3693c14ace5ce319fcf9318"
   },
-  "started_at": "2026-08-01T22:59:44.765Z",
+  "started_at": "2026-08-02T07:25:30.016Z",
   "ended_at": null,
   "plan": [
     {
       "version": 1,
       "steps": [
         {
-          "text": "Spawn G2 worktree subagent: storage interface, drivers, sharding, lock, overlay fold",
-          "checked": true
+          "text": "Spawn G3 worktree subagent: list, ready filters, bulk ops, graph editing flags, slug shadowing",
+          "checked": false
         },
         {
           "text": "Review agent report + PR",
-          "checked": true
+          "checked": false
         },
         {
           "text": "Mark epic + children in review with MR link",
-          "checked": true
+          "checked": false
         }
       ],
-      "created_at": "2026-08-01T22:59:44.921Z"
+      "created_at": "2026-08-02T07:25:30.190Z"
     }
   ],
   "end_summary": null

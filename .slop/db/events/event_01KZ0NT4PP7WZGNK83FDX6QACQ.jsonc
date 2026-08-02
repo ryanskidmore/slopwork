@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ0NT4PP7WZGNK83FDX6QACQ",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": "session_01KZ0NT4H0SE66GVWJCMKX5AD8",
+  "verb": "plan.set",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KZ0NT4H0SE66GVWJCMKX5AD8"
+  },
+  "payload": {
+    "version": 1,
+    "step_count": 3
+  },
+  "at": "2026-08-02T07:25:30.198Z"
+}

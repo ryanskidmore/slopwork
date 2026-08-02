@@ -14,7 +14,7 @@
     "commit_at_start": "32a25462bab1d06216173107ada0f36d175d9659"
   },
   "started_at": "2026-08-01T22:15:22.719Z",
-  "ended_at": null,
+  "ended_at": "2026-08-02T07:25:20.533Z",
   "plan": [
     {
       "version": 1,
@@ -35,6 +35,5 @@
       "created_at": "2026-08-01T22:15:22.898Z"
     }
   ],
-  "end_summary": null,
-  "transcript_ref": "transcripts/session_01KYZPATTZHQHRY3FY4VCCMYD6.jsonl"
+  "end_summary": "PR #1 merged to main (77febc1). Transcripts removed end to end; gate was green (1812 tests). Post-merge chores done: config key dropped, AGENTS.md/gitignore regenerated, .slop/transcripts deleted."
 }

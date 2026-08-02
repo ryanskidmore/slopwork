@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ0NSV8YEHFF5E1V9D17AJ8Q",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": "session_01KYZPATTZHQHRY3FY4VCCMYD6",
+  "verb": "session.ended",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KYZPATTZHQHRY3FY4VCCMYD6"
+  },
+  "payload": {
+    "reason": "done",
+    "note": "PR #1 merged to main (77febc1). Transcripts removed end to end; gate was green (1812 tests). Post-merge chores done: config key dropped, AGENTS.md/gitignore regenerated, .slop/transcripts deleted."
+  },
+  "at": "2026-08-02T07:25:20.542Z"
+}
