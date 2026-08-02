@@ -55,7 +55,7 @@
         },
         {
           "text": "Batch B: mutation-recovery + event-integrity",
-          "checked": false
+          "checked": true
         },
         {
           "text": "Batch C: session-attribution, release-guardrails, command-snapshots, source-hygiene",
