@@ -45,10 +45,10 @@ function dataSource(tickets: Ticket[]): WebDataSource {
       return [];
     },
     async listEventsForTicket(_ticketId: TicketId) {
-      return [];
+      return { events: [], problems: [] };
     },
     async listEvents() {
-      return [];
+      return { events: [], problems: [] };
     },
   };
 }

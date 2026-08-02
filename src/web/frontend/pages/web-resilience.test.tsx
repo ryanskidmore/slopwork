@@ -21,6 +21,7 @@ const config: ConfigDTO = {
   warning: null,
   remotes: { repo: null, jira: null },
   defaults: { stale_after: "1h", review_stale_after: "24h" },
+  integrity: { event_problems: [] },
 };
 
 function ticket(id: string, name: string, state: TicketSummaryDTO["state"] = "open") {
