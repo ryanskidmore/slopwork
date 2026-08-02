@@ -18,7 +18,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "in_progress",
+  "state": "review",
   "priority": 1,
   "labels": [
     "area:data",
@@ -31,7 +31,7 @@
   "root_id": "ticket_01KZ131NZQAW4WW4CVAJ5ZKA3S",
   "path": [],
   "active_session": "session_01KZ131S95YJT2BTDZN2MDPN32",
-  "last_activity_at": "2026-08-02T11:16:52.135Z",
+  "last_activity_at": "2026-08-02T11:20:01.712Z",
   "latest_note": null,
   "owner": null,
   "provenance": {
@@ -42,5 +42,13 @@
     }
   },
   "created_at": "2026-08-02T11:16:48.830Z",
-  "updated_at": "2026-08-02T11:16:52.135Z"
+  "updated_at": "2026-08-02T11:20:01.712Z",
+  "review": {
+    "mr": "https://github.com/ryanskidmore/slopwork/pull/11",
+    "requested_at": "2026-08-02T11:20:01.712Z",
+    "by": {
+      "name": "codex-shard-migration",
+      "kind": "human"
+    }
+  }
 }

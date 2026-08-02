@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ137JDME6S1PSVXF0T77D59",
+  "actor": {
+    "name": "codex-shard-migration",
+    "kind": "human"
+  },
+  "session": "session_01KZ131S95YJT2BTDZN2MDPN32",
+  "verb": "review.requested",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ131NZQAW4WW4CVAJ5ZKA3S"
+  },
+  "payload": {
+    "mr": "https://github.com/ryanskidmore/slopwork/pull/11"
+  },
+  "at": "2026-08-02T11:20:01.716Z"
+}
