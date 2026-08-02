@@ -35,6 +35,7 @@ import {
   ticketSchema,
   writeCanonical,
 } from "../../src/core/index.js";
+import { stringify as stringifyYaml } from "yaml";
 import { FIXTURE_NOW_ISO } from "./web-db-meta.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -854,7 +855,7 @@ async function main(): Promise<void> {
   for (const event of events) {
     await writeJsonc(eventsDir, event.id, event);
   }
-  const configYaml = Bun.YAML.stringify(config, null, 2);
+  const configYaml = stringifyYaml(config);
   await Bun.write(
     join(fixtureRoot, "config.yaml"),
     configYaml.endsWith("\n") ? configYaml : `${configYaml}\n`,

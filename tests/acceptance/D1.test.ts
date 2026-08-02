@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { parse as parseYaml } from "yaml";
 import type { SessionId, TicketId } from "../../src/core/index.js";
 import { type Config, configSchema } from "../../src/core/index.js";
 import type { RepoPaths } from "../../src/repo/index.js";
@@ -91,32 +92,11 @@ function runSlop(
 
 function readConfig(root: string): Config {
   const text = readFileSync(join(root, ".slop", "config.yaml"), "utf8");
-  // Deliberately NOT importing src/cli/config-yaml.ts's parser here: this
+  // Deliberately NOT importing the production config codec here: this
   // acceptance test's job is to check the *real* CLI's output from the
-  // outside, not to lean on the same module that produced it. A minimal,
-  // independent parse is enough to pull out the handful of fields this
-  // file asserts on, via config.yaml's own restricted (documented) shape.
-  const obj: Record<string, unknown> = {};
-  let currentNested: Record<string, unknown> | null = null;
-  for (const rawLine of text.split("\n")) {
-    const line = rawLine.split(/\s+#/)[0] ?? "";
-    if (line.trim().length === 0) continue;
-    const indented = /^\s/.test(line);
-    const [key, ...rest] = line.trim().split(":");
-    const value = rest.join(":").trim().replace(/^"|"$/g, "");
-    if (!indented) {
-      if (value.length === 0) {
-        currentNested = {};
-        obj[key as string] = currentNested;
-      } else {
-        currentNested = null;
-        obj[key as string] = value;
-      }
-    } else if (currentNested) {
-      currentNested[key as string] = value;
-    }
-  }
-  return configSchema.parse(obj);
+  // outside, not to lean on the same wrapper that produced it. Parse with
+  // the dependency directly, then validate against the public schema.
+  return configSchema.parse(parseYaml(text));
 }
 
 // ---------------------------------------------------------------------------
@@ -209,10 +189,8 @@ describe("D1: init + agent onboarding", () => {
       const dir = await makeScratchRepo("slop-d1-schema-");
       runSlop(["init", "--yes"], dir);
       const text = readFileSync(join(dir, ".slop", "config.yaml"), "utf8");
-      // Round-trip through the exact same parser tests/D1 assertions use,
-      // AND confirm the real CLI's own written bytes are schema-valid via
-      // this file's independent mini-parser too (readConfig already did
-      // configSchema.parse — this just re-asserts the intent explicitly).
+      // Round-trip through an independent use of the YAML dependency and
+      // confirm the real CLI's own written bytes are schema-valid.
       expect(() => configSchema.parse(readConfig(dir))).not.toThrow();
       expect(text).toMatch(/^project: /m);
     });

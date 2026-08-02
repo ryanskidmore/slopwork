@@ -3,7 +3,7 @@
 ## Install
 
 Slopwork needs **Bun ≥ 1.3 at runtime**, no matter which install channel you
-use — the CLI is Bun-native (`Bun.serve`, `Bun.file`, `Bun.YAML`, and
+use — the CLI is Bun-native (`Bun.serve`, `Bun.file`, and
 text-imports throughout `src/`), so there is no pure-Node build.
 
 ```sh

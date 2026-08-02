@@ -10,6 +10,7 @@
  */
 export * from "./budget.js";
 export * from "./clock.js";
+export * from "./config-yaml.js";
 export * from "./duration.js";
 export * from "./entities/index.js";
 export * from "./exit-codes.js";

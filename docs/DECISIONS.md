@@ -974,3 +974,19 @@ Replaces the server-rendered `html\`\`` tagged-template views (`src/web/views/*`
 **Two real bugs found only by rendering the app in an actual (headless) browser, not by tests.** (1) The inline SVG favicon's own attributes used double quotes while embedded inside a double-quoted `href="data:image/svg+xml,...">` — this corrupts HTML parsing; fixed by switching the SVG's internal attributes to single quotes (`src/web/server.ts`). (2) The audit spine's connecting rail (a Tailwind `before:` pseudo-element) rendered with zero visible content: Tailwind only generates a pseudo-element's box when it also has an explicit `content` utility (`before:content-['']`) — every `before:absolute`/`before:bg-spine` utility is inert without it, since a bare `content: normal` (the CSS default) produces no pseudo-element at all. Neither is the kind of bug `bun run typecheck`/`lint`/unit tests can catch (both produce entirely valid TypeScript and valid, schema-correct HTML/CSS) — worth recording as a reason to actually look at a rendered page (`npx playwright screenshot`/`npx playwright install chromium`, no system Chrome required) before calling a UI-heavy change done, not just green-gate it.
 
 **Test strategy: black-box HTTP against `/api/*`, same D5 convention, new assertions.** Every `slop web` test still spawns a real `bun`/`dist/slop` process and drives it over HTTP (D5's entry above, unchanged: Bun-only globals aren't available inside vitest workers) — only the target shape changed, from scraping rendered HTML strings to asserting on parsed JSON fields. `tests/acceptance/D5.test.ts`'s compiled-binary block now doubles as the acceptance criterion's "build-artifact smoke test": it fetches the SPA shell, the JSON API, and the embedded CSS/JS from `dist/slop`, and asserts none of the served output references a CDN host. `src/cli/commands/web.test.ts` (the config/db fault-tolerance suite) and `tests/acceptance/web-real-repo.test.ts` (the real-CLI-lifecycle suite) were ported the same way; one real bug surfaced in the port itself — `slop review` emits TWO `review.requested` events (one on the session entity, one on the ticket entity, only the latter carrying `payload.mr`) — previously invisible because the old HTML page's timeline just dumped whichever event's raw payload `<details>` a human happened to expand, never asserted on which one specifically carried the MR.
+
+## Configuration YAML uses one runtime-neutral YAML 1.2 codec (ticket_01KZ11CPQKWZKJVMFF6BWTVNYQ)
+
+The CLI/init path's restricted hand-written parser and the web path's
+`Bun.YAML` parser accepted different configuration languages. That made a
+single committed `config.yaml` capable of selecting one backend in a CLI
+command while `/api/config` interpreted different values. All production
+readers and the init writer now use `yaml` 2.9 through
+`src/core/config-yaml.ts`, configured for YAML 1.2's core schema.
+
+Parsing remains separate from `configSchema` validation, and caller policy
+remains separate from both. Strict consumers report malformed or
+schema-invalid configuration; tolerant storage/index/web consumers still
+fall back exactly as documented. A shared conformance matrix covers bare
+values, quoted escapes, YAML booleans, flow maps, and block scalars through
+the core codec and through real CLI/storage/web processes.

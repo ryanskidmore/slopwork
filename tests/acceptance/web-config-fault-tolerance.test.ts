@@ -12,7 +12,7 @@ import { makeTempRepo } from "../support/temp-repo.js";
 // one bad merge/hand-edit of config.yaml took the ENTIRE web UI down with
 // an opaque 500 on every single page. This file spawns the real `slop web`
 // server (from source, same convention as tests/acceptance/D5.test.ts — Bun
-// globals like `Bun.serve`/`Bun.YAML` aren't available inside vitest test
+// globals like `Bun.serve` aren't available inside vitest test
 // workers) against a real `slop init`-produced repo whose config.yaml has
 // been deleted or corrupted after the fact, and asserts every degraded
 // `/api/*` route still 200s with the fallback defaults and a non-null
