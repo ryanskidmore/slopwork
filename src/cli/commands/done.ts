@@ -9,9 +9,9 @@ import {
   RESOLUTION_MAX_LENGTH,
   ticketSchema,
 } from "../../core/index.js";
+import { formatIndexProblems } from "../../core/db-index.js";
+import type { StorageBackend } from "../../core/storage-contract.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
-import { formatIndexProblems } from "../../storage/backend.js";
-import type { StorageBackend } from "../../storage/index.js";
 import { openStorage } from "../../storage/index.js";
 import { buildFinalizedSession } from "../../sessions/finalize.js";
 import { diffSessionPatch, SESSION_END_FIELDS } from "../../sessions/patch.js";

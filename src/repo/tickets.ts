@@ -18,7 +18,9 @@ import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import { type Event, type Ticket, type TicketId, isTicketId, ticketSchema } from "../core/index.js";
 import { type JsoncPatchEntry, writeCanonical } from "../core/jsonc.js";
-import type { TicketReadProblem } from "./db-index.js";
+import type { TicketReadProblem } from "../core/db-index.js";
+import type { ListTicketsTolerantResult } from "../core/storage-contract.js";
+export type { ListTicketsTolerantResult } from "../core/storage-contract.js";
 import {
   deleteEntityFile,
   listEntityIds,
@@ -130,11 +132,6 @@ export async function listTicketIds(paths: RepoPaths): Promise<TicketId[]> {
 export async function listTickets(paths: RepoPaths): Promise<Ticket[]> {
   const ids = await listTicketIds(paths);
   return Promise.all(ids.map((id) => readTicket(paths, id)));
-}
-
-export interface ListTicketsTolerantResult {
-  tickets: Ticket[];
-  problems: TicketReadProblem[];
 }
 
 /**

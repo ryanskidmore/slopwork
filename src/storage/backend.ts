@@ -1,7 +1,5 @@
 /**
- * The storage-backend interface (G2, t-y2j03) — the seam between what
- * slopwork's commands/web explorer NEED from a data store and how any
- * particular store provides it.
+ * Compatibility facade for the storage port.
  *
  * Two drivers implement it today:
  *   - {@link ../storage/flatfile.js!FlatfileBackend} — the default: the
@@ -56,212 +54,38 @@
  * recomputed from truth, so partial larger transactions do not leave torn
  * derived state. A remote backend must provide its own equivalent for
  * each create/update endpoint; the lease only supplies exclusivity.
+ *
+ * The contract itself — `StorageBackend`, its transaction marker, and every
+ * shared event/query/tolerant-read DTO below — is owned by
+ * `src/core/storage-contract.ts`; this module re-exports it unchanged so
+ * existing `storage/backend.js` imports keep working while domain and
+ * adapter code depend directly on the inward-owned definitions.
  */
-import type { Clock } from "../core/clock.js";
-import type {
-  Event,
-  EventEntity,
-  EventId,
-  Session,
-  SessionId,
-  Ticket,
-  TicketId,
-} from "../core/index.js";
-import type { JsoncPatchEntry } from "../core/jsonc.js";
-import type { EventPollCursor, EventPollCursorState } from "../repo/event-cursor.js";
-// Type-only imports from the flatfile driver's modules: these shapes are
-// canonically DEFINED next to the zod schemas that validate them (the
-// driver persists/validates the index and result shapes), and re-exported
-// here as the interface's own vocabulary. `import type` only — no runtime
-// dependency from the interface onto any driver.
-import type { DbIndex, LoadIndexResult } from "../repo/db-index.js";
-import type {
-  EventContext,
-  EventQuery,
-  ListEventsTolerantResult,
-  MutationEventSpec,
-} from "../repo/events.js";
-import type { ListSessionsTolerantResult } from "../repo/sessions.js";
-import type { ListTicketsTolerantResult } from "../repo/tickets.js";
-
-export { formatDuplicateSlugProblems, formatIndexProblems } from "../repo/db-index.js";
-export { formatEventReadProblems, warnAboutEventReadProblems } from "../repo/events.js";
-export { parseEventPollCursor } from "../repo/event-cursor.js";
-export type { EventPollCursor, EventPollCursorState } from "../repo/event-cursor.js";
+export { formatDuplicateSlugProblems, formatIndexProblems } from "../core/db-index.js";
 export type {
+  ContentFingerprint,
   DbIndex,
+  DirFingerprint,
   DuplicateSlugProblem,
+  EventReadProblem,
+  IndexLoadReason,
   IndexTicketRow,
   LoadIndexResult,
   TicketReadProblem,
-} from "../repo/db-index.js";
+} from "../core/db-index.js";
+export { parseEventPollCursor } from "../core/storage-contract.js";
 export type {
   EventContext,
+  EventPollCursor,
+  EventPollCursorState,
   EventQuery,
-  EventReadProblem,
+  EventShardMigrationResult,
   ListEventsTolerantResult,
+  ListSessionsTolerantResult,
+  ListTicketsTolerantResult,
   MutationEventSpec,
-} from "../repo/events.js";
-export type { ListSessionsTolerantResult, SessionReadProblem } from "../repo/sessions.js";
-export type { ListTicketsTolerantResult } from "../repo/tickets.js";
-
-/**
- * Opaque marker for "inside a {@link StorageBackend.transact} scope".
- * Only drivers construct one; a function that takes it as a parameter can
- * only be called from inside a transaction callback. It carries no
- * capability — the transaction's exclusivity belongs to the backend the
- * callback closes over — it exists purely for compile-time discipline.
- */
-export interface StorageTxScope {
-  readonly kind: "storage-transaction";
-}
-
-/** What {@link StorageBackend.migrateEventShards} did — see docs/cli-reference.md's `reindex --shard-events`. */
-export interface EventShardMigrationResult {
-  /** Flat-layout event files moved into `events/YYYY-MM/` shards this run (0 = already fully sharded). */
-  moved: number;
-  /** Distinct shard directories that received at least one file. */
-  shards: string[];
-}
-
-export interface StorageBackend {
-  /** Which driver this is — for diagnostics and capability checks. */
-  readonly kind: "flatfile" | "remote";
-
-  // --- tickets ---------------------------------------------------------
-  /** Strict read of one ticket. Throws NOT_FOUND (exit 4) if absent, GENERIC_ERROR on a corrupt file. */
-  readTicket(id: TicketId): Promise<Ticket>;
-  /** Every ticket, strict: throws on the first unreadable file (reindex --strict semantics). */
-  listTickets(): Promise<Ticket[]>;
-  /** Every readable ticket + a problem entry per unreadable one; never throws on a bad file. */
-  listTicketsTolerant(): Promise<ListTicketsTolerantResult>;
-  /** Create a ticket AND emit exactly one event describing it (the A4 emit-on-mutation guarantee). */
-  createTicket(
-    ticket: Ticket,
-    ctx: EventContext,
-    event: MutationEventSpec,
-    clock?: Clock,
-  ): Promise<Event>;
-  /**
-   * Update a ticket AND emit exactly one event. `patch` is the minimal
-   * field-path patch (drives the flatfile driver's comment-preserving
-   * JSONC rewrite); `expectedAfter` is the full post-update ticket and is
-   * authoritative — a backend that has no text to preserve (remote) may
-   * ignore `patch` and store `expectedAfter`.
-   */
-  updateTicket(
-    id: TicketId,
-    patch: JsoncPatchEntry[],
-    expectedAfter: Ticket,
-    ctx: EventContext,
-    event: MutationEventSpec,
-    clock?: Clock,
-  ): Promise<Event>;
-
-  // --- sessions --------------------------------------------------------
-  readSession(id: SessionId): Promise<Session>;
-  /** Every session, strict (throws on the first unreadable file). */
-  listSessions(): Promise<Session[]>;
-  listSessionsTolerant(): Promise<ListSessionsTolerantResult>;
-  createSession(
-    session: Session,
-    ctx: EventContext,
-    event: MutationEventSpec,
-    clock?: Clock,
-  ): Promise<Event>;
-  updateSession(
-    id: SessionId,
-    patch: JsoncPatchEntry[],
-    expectedAfter: Session,
-    ctx: EventContext,
-    event: MutationEventSpec,
-    clock?: Clock,
-  ): Promise<Event>;
-
-  // --- events ----------------------------------------------------------
-  readEvent(id: EventId): Promise<Event>;
-  /**
-   * Mint and append exactly one immutable event — the lock-free write
-   * (safe outside `transact`: every event gets its own fresh ULID
-   * filename, so concurrent appends can never collide). This is what a
-   * pure `update --progress` and the done-cascade's `ticket.ready`
-   * emissions use.
-   */
-  appendEvent(
-    ctx: EventContext,
-    entity: EventEntity,
-    spec: MutationEventSpec,
-    clock?: Clock,
-  ): Promise<Event>;
-  /** ULID-cursor query (`since`/`ticket`/`limit`) — `slop events`' backing read. */
-  queryEvents(query?: EventQuery): Promise<Event[]>;
-  /** Every event, strict, in cursor (ascending id / chronological) order. */
-  listEvents(): Promise<Event[]>;
-  /** Every readable event plus structured diagnostics for every skipped file. */
-  listEventsTolerant(): Promise<ListEventsTolerantResult>;
-  /** Create a constant-size opaque handle backed by an empty exact seen-id set. */
-  createEventPollCursor(): Promise<EventPollCursor>;
-  /** Read and validate the durable state behind an opaque polling cursor. */
-  readEventPollCursor(cursor: EventPollCursor): Promise<EventPollCursorState>;
-  /** Atomically union only event ids actually returned to the consumer. */
-  advanceEventPollCursor(
-    cursor: EventPollCursor,
-    returned: readonly EventId[],
-  ): Promise<EventPollCursorState>;
-  /** Delete local/server-side state once a polling consumer is retired. */
-  deleteEventPollCursor(cursor: EventPollCursor): Promise<void>;
-
-  // --- ref resolution --------------------------------------------------
-  /**
-   * Resolve a user-supplied ref (full id / exact slug / `t-<code>` /
-   * unique short prefix — src/repo/refs.ts's precedence) to a ticket.
-   * Throws NOT_FOUND (4), AMBIGUOUS_REF (5), or USAGE_ERROR (2) for an
-   * external ref.
-   */
-  resolveTicketRef(ref: string): Promise<Ticket>;
-  /** Resolve many refs against one consistent snapshot; first failure throws. */
-  resolveTicketRefs(refs: string[]): Promise<Ticket[]>;
-
-  // --- derived index ---------------------------------------------------
-  /**
-   * The derived index (per-ticket summary rows, slug map, reverse edges,
-   * blocked/ready columns, staleness deadlines, ticket `problems[]`, and
-   * event `event_problems[]`),
-   * transparently rebuilt when stale — the flatfile driver's self-healing
-   * `index.jsonc`. A remote backend serves the equivalent server-derived
-   * data with `rebuilt: false, reason: "fresh"`.
-   */
-  loadIndex(clock?: Clock): Promise<LoadIndexResult>;
-  /** Force a full rebuild (slop reindex). */
-  rebuildIndex(clock?: Clock): Promise<DbIndex>;
-
-  // --- transactions ----------------------------------------------------
-  /**
-   * Run `fn` holding the store's exclusive write scope — see the module
-   * doc's "The transaction model". Timeout/contention surfaces as a
-   * CONFLICT (exit 6) SlopError naming the holder.
-   */
-  transact<T>(fn: (tx: StorageTxScope) => Promise<T>): Promise<T>;
-
-  // --- maintenance (slop reindex) --------------------------------------
-  /** Remove stale atomic-write temp debris (crashed writers). Returns the paths removed. */
-  sweepTempFiles(): Promise<string[]>;
-  /**
-   * G2 (shard-event-storage): move flat-layout `events/event_*.jsonc`
-   * files into `events/YYYY-MM/` shards (month from each event ULID's
-   * own timestamp, UTC). Explicit only — `slop reindex --shard-events`;
-   * never runs implicitly, because event files are git-tracked and the
-   * rename should land as a visible commit. Safe and idempotent.
-   */
-  migrateEventShards(): Promise<EventShardMigrationResult>;
-
-  // --- optional local-file capabilities --------------------------------
-  /**
-   * Absolute path of the locally-editable file holding `id`, when this
-   * backend stores tickets as local files. `slop edit` requires this
-   * capability; a backend without it cannot support $EDITOR-based editing.
-   */
-  localTicketFilePath?(id: TicketId): string;
-  /** Like {@link localTicketFilePath} for sessions — used only to name files in diagnostics. */
-  localSessionFilePath?(id: SessionId): string;
-}
+  SessionReadProblem,
+  StorageBackend,
+  StorageTxScope,
+} from "../core/storage-contract.js";
+export { formatEventReadProblems, warnAboutEventReadProblems } from "../repo/events.js";

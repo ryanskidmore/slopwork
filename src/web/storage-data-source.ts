@@ -26,7 +26,7 @@
  * read directly regardless of which backend is configured.
  */
 import type { Session, Ticket, TicketId } from "../core/index.js";
-import type { StorageBackend } from "../storage/backend.js";
+import type { StorageBackend } from "../core/storage-contract.js";
 import type { ConfigResult, WebDataSource } from "./data-source.js";
 import { readSlopConfigTolerant } from "./data-source.js";
 import { matchTicketByRef } from "./overlays.js";

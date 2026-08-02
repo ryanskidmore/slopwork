@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ1686NEBBPBRJ2PSJA85EMB",
+  "actor": {
+    "name": "codex-dependency-boundaries",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ15K9Z7QSNR003PSSDJ2M25"
+  },
+  "payload": {
+    "progress": "Mapped the recursive production graph and replaced outward ownership with neutral core ports: SlopError moved to core/errors; index schemas/DTOs/formatters to core/db-index; StorageBackend plus event/query/tolerant-read DTOs to core/storage-contract. Compatibility re-exports preserve repo/storage/CLI surfaces. Ticket/session domain no longer imports repo, storage, or CLI; typecheck passes and the recursive graph now has zero SCC cycles (previously repo/db-index and repo/tickets formed one)."
+  },
+  "at": "2026-08-02T12:12:48.174Z"
+}

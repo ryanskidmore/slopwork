@@ -64,9 +64,9 @@
 import type { Command } from "commander";
 import type { TicketId } from "../../core/index.js";
 import { resolveFakeClock, shortTicketCode } from "../../core/index.js";
+import type { StorageBackend } from "../../core/storage-contract.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
-import type { StorageBackend } from "../../storage/index.js";
 import { openStorage } from "../../storage/index.js";
 import type { ReadyEntry } from "../../tickets/ready.js";
 import {

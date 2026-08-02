@@ -23,8 +23,8 @@
  */
 import type { Config, Ticket } from "../core/index.js";
 import { isTicketId } from "../core/index.js";
-import { formatIndexProblems } from "../storage/backend.js";
-import type { SessionReadProblem, StorageBackend } from "../storage/backend.js";
+import { formatIndexProblems } from "../core/db-index.js";
+import type { SessionReadProblem, StorageBackend } from "../core/storage-contract.js";
 import type { ContextPackData } from "../tickets/context.js";
 
 function formatSessionProblems(problems: SessionReadProblem[]): string {

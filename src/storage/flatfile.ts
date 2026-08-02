@@ -61,6 +61,18 @@ import type {
 } from "../core/index.js";
 import { isSessionId, isTicketId } from "../core/index.js";
 import type { JsoncPatchEntry } from "../core/jsonc.js";
+import type { DbIndex, DirFingerprint, LoadIndexResult } from "../core/db-index.js";
+import type {
+  EventContext,
+  EventQuery,
+  EventShardMigrationResult,
+  ListEventsTolerantResult,
+  ListSessionsTolerantResult,
+  ListTicketsTolerantResult,
+  MutationEventSpec,
+  StorageBackend,
+  StorageTxScope,
+} from "../core/storage-contract.js";
 import {
   advanceEventPollCursor,
   createEventPollCursor,
@@ -75,7 +87,6 @@ import {
   loadIndex,
   writeIndex,
 } from "../repo/db-index.js";
-import type { DbIndex, DirFingerprint, LoadIndexResult } from "../repo/db-index.js";
 import {
   appendEvent,
   listEvents,
@@ -87,13 +98,7 @@ import {
   readEvent,
   recoverMutationEvents,
 } from "../repo/events.js";
-import type {
-  EventContext,
-  EventDirectoryResult,
-  EventQuery,
-  ListEventsTolerantResult,
-  MutationEventSpec,
-} from "../repo/events.js";
+import type { EventDirectoryResult } from "../repo/events.js";
 import { DEFAULT_TIMEOUT_MS, withLock } from "../repo/lock.js";
 import { hasPendingMutationJournals } from "../repo/mutation-journal.js";
 import { sweepStaleTempFiles } from "../repo/atomic-write.js";
@@ -107,7 +112,6 @@ import {
   sessionFilePath,
   updateSession,
 } from "../repo/sessions.js";
-import type { ListSessionsTolerantResult } from "../repo/sessions.js";
 import {
   createTicket,
   listTickets,
@@ -116,8 +120,6 @@ import {
   ticketFilePath,
   updateTicket,
 } from "../repo/tickets.js";
-import type { ListTicketsTolerantResult } from "../repo/tickets.js";
-import type { EventShardMigrationResult, StorageBackend, StorageTxScope } from "./backend.js";
 
 export interface FlatfileBackendOptions {
   /** Write-lock acquisition timeout, from config.yaml's `defaults.lock_timeout` (default 5s). */

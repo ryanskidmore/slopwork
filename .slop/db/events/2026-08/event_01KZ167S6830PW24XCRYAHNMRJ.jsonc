@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ167S6830PW24XCRYAHNMRJ",
+  "actor": {
+    "name": "codex-dependency-boundaries",
+    "kind": "human"
+  },
+  "session": "session_01KZ15KN503KPSNDBMK51074TF",
+  "verb": "plan.step_checked",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KZ15KN503KPSNDBMK51074TF"
+  },
+  "payload": {
+    "step": 2,
+    "checked": true
+  },
+  "at": "2026-08-02T12:12:34.376Z"
+}

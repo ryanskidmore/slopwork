@@ -20,6 +20,8 @@ import {
   sessionSchema,
 } from "../core/index.js";
 import { type JsoncPatchEntry, writeCanonical } from "../core/jsonc.js";
+import type { ListSessionsTolerantResult, SessionReadProblem } from "../core/storage-contract.js";
+export type { ListSessionsTolerantResult, SessionReadProblem } from "../core/storage-contract.js";
 import {
   deleteEntityFile,
   listEntityIds,
@@ -125,17 +127,6 @@ export async function listSessions(paths: RepoPaths): Promise<Session[]> {
 /** One session file `listSessionsTolerant` could not read — path, id, and
  * the exact high-quality error `readSession` would have thrown, captured
  * instead of propagated. Mirrors db-index.ts's `TicketReadProblem`. */
-export interface SessionReadProblem {
-  id: SessionId;
-  path: string;
-  message: string;
-}
-
-export interface ListSessionsTolerantResult {
-  sessions: Session[];
-  problems: SessionReadProblem[];
-}
-
 /**
  * Like {@link listSessions}, but never throws on a bad file — mirrors
  * tickets.ts's `listTicketsTolerant` (see that function's doc for the full

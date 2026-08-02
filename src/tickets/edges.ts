@@ -76,7 +76,7 @@
  */
 import type { Ticket, TicketId } from "../core/index.js";
 import { EXIT_CODES, isTicketId } from "../core/index.js";
-import { SlopError } from "../cli/errors.js";
+import { SlopError } from "../core/errors.js";
 
 /** design.md's B3 acceptance criterion names this exact number. */
 export const EDGE_DEGREE_CAP = 500;

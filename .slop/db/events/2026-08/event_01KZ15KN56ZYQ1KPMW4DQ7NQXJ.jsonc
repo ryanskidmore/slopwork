@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ15KN56ZYQ1KPMW4DQ7NQXJ",
+  "actor": {
+    "name": "codex-dependency-boundaries",
+    "kind": "agent"
+  },
+  "session": "session_01KZ15KN503KPSNDBMK51074TF",
+  "verb": "ticket.state_changed",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ15K9Z7QSNR003PSSDJ2M25"
+  },
+  "payload": {
+    "from": "open",
+    "to": "in_progress"
+  },
+  "at": "2026-08-02T12:01:34.886Z"
+}

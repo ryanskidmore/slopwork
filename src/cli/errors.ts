@@ -10,18 +10,12 @@
  * {@link reportError} on anything thrown out of a command action, so
  * individual command modules can just `throw new SlopError(...)`.
  */
+import { SlopError } from "../core/errors.js";
 import { EXIT_CODES, type ExitCode } from "../core/exit-codes.js";
 
-/** An error carrying the exit code `slop` should terminate with. */
-export class SlopError extends Error {
-  readonly exitCode: ExitCode;
-
-  constructor(message: string, exitCode: ExitCode = EXIT_CODES.GENERIC_ERROR) {
-    super(message);
-    this.name = "SlopError";
-    this.exitCode = exitCode;
-  }
-}
+// Compatibility surface for existing command and third-party imports. The
+// error itself belongs to core so repo/domain code never depends on the CLI.
+export { SlopError } from "../core/errors.js";
 
 /** Print `error: <message>` to stderr, formatted consistently. */
 export function printError(message: string): void {

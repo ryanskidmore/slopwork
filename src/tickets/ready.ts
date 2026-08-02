@@ -50,7 +50,7 @@
  */
 import type { RenderFormat, TicketId, TicketState } from "../core/index.js";
 import { renderEntriesWithBudget } from "../core/index.js";
-import type { IndexTicketRow } from "../repo/db-index.js";
+import type { IndexTicketRow } from "../core/db-index.js";
 import { isReviewStale, isStale } from "./staleness.js";
 
 /**

@@ -71,8 +71,8 @@ import {
   renderEntriesWithBudget,
   shortTicketCode,
 } from "../../core/index.js";
+import type { TicketReadProblem } from "../../core/db-index.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
-import type { TicketReadProblem } from "../../repo/index.js";
 import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
 import { openStorage } from "../../storage/index.js";
 import type { RankedResult, SearchField, SearchFieldKind } from "../../tickets/search.js";

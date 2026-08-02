@@ -37,6 +37,7 @@ distills those into what you need to actually use the tool.
 | [Web UI](web-ui.md) | What `slop web` shows — list, tree, ticket detail, review/stale panels |
 | [Configuration](configuration.md) | `.slop/config.yaml`, actor/harness identity resolution, environment variables |
 | [Concurrency & merging](concurrency-and-merging.md) | Why `.slop/db/` merges cleanly, the write-path lock, and lock-free progress updates |
+| [Architecture](architecture.md) | Dependency direction, core-owned ports/contracts, adapters, and enforced exceptions |
 | [Storage backends](storage-backends.md) | The pluggable `StorageBackend` interface, selecting flatfile vs. remote, and the remote wire contract |
 | [Benchmarks](benchmarks.md) | Measured scaling limits: where the flatfile store stops being fast, and how it behaves under heavy concurrency |
 

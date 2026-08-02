@@ -30,7 +30,7 @@ import { systemClock } from "../core/clock.js";
 import type { EventVerb, Ticket, TicketId, TicketState } from "../core/index.js";
 import { EXIT_CODES, nowIso, ticketSchema, ticketStateSchema } from "../core/index.js";
 import type { JsoncPatchEntry } from "../core/jsonc.js";
-import { SlopError } from "../cli/errors.js";
+import { SlopError } from "../core/errors.js";
 import { assertLabelHasNoLeadingSigil } from "./labels.js";
 import { parseOwnerRaw } from "./owner.js";
 import type { ParentResolution } from "./parent.js";

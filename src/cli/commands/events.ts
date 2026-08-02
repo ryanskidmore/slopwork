@@ -111,9 +111,9 @@ import {
   isEventId,
   renderEntriesWithBudget,
 } from "../../core/index.js";
+import type { StorageBackend } from "../../core/storage-contract.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
-import type { StorageBackend } from "../../storage/index.js";
 import type { EventPollCursor } from "../../storage/index.js";
 import { openStorage, parseEventPollCursor } from "../../storage/index.js";
 import { SlopError } from "../errors.js";

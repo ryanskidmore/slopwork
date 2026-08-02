@@ -26,8 +26,8 @@
  */
 import type { Command } from "commander";
 import type { Actor } from "../../core/index.js";
-import { EXIT_CODES, shortTicketCode } from "../../core/index.js";
-import { repoPaths, requireRepoRoot, ticketEventContext } from "../../repo/index.js";
+import { EXIT_CODES, shortTicketCode, ticketEventContext } from "../../core/index.js";
+import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { openStorage, warnAboutEventReadProblems } from "../../storage/index.js";
 import type { Question } from "../../tickets/questions.js";
 import {

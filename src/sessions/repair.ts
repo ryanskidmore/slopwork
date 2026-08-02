@@ -23,8 +23,8 @@
 import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import { EXIT_CODES, nowIso, type Session, type SessionId, sessionSchema } from "../core/index.js";
-import { SlopError } from "../cli/errors.js";
-import type { SessionReadProblem, StorageBackend } from "../storage/backend.js";
+import { SlopError } from "../core/errors.js";
+import type { SessionReadProblem, StorageBackend } from "../core/storage-contract.js";
 import { formatZodIssuesForUsage } from "../tickets/validate.js";
 
 export interface OrphanedSessionScan {

@@ -12,7 +12,7 @@
  */
 import type { Actor } from "../core/index.js";
 import { EXIT_CODES } from "../core/exit-codes.js";
-import { SlopError } from "../cli/errors.js";
+import { SlopError } from "../core/errors.js";
 
 const OWNER_KIND_PREFIX = /^(agent|human):(.*)$/;
 

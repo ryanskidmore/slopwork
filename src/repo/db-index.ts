@@ -220,42 +220,38 @@
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { z } from "zod";
 import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
-import {
-  actorSchema,
-  isEventId,
-  isTicketId,
-  labelSchema,
-  parentRefSchema,
-  prioritySchema,
-  sessionIdSchema,
-  ticketIdSchema,
-  ticketStateSchema,
-} from "../core/index.js";
+import { isEventId, isTicketId } from "../core/index.js";
 import type { Ticket, TicketId } from "../core/index.js";
-import { isoTimestampSchema } from "../core/timestamp.js";
-import { slugSchema } from "../core/slug.js";
 import { parseJsonc, writeCanonical } from "../core/jsonc.js";
 import { isRepresentableDurationMs, parseDurationMs } from "../core/duration.js";
-// C5: pure staleness-deadline formulas — see this module's "C5:
-// stale_at/review_stale_at" doc section above for why importing from
-// tickets/ (normally the reverse dependency direction — tickets/*.ts
-// depends on repo/, not the other way around) is a deliberate, safe
-// exception here: staleness.ts is pure/I-O-free (no import back on
-// repo/), so there is no cycle, only a one-off crossing chosen so the
-// formula lives alongside its sibling pure ticket-domain modules
-// (tickets/ready.ts, tickets/status.ts, tickets/cascade.ts) rather than
-// being duplicated or relocated into core/. See DECISIONS.md's C5 entry.
+import {
+  INDEX_SCHEMA_VERSION,
+  dbIndexSchema,
+  formatDuplicateSlugProblems,
+  formatIndexProblems,
+} from "../core/db-index.js";
+import type {
+  ContentFingerprint,
+  DbIndex,
+  DirFingerprint,
+  DuplicateSlugProblem,
+  IndexLoadReason,
+  IndexTicketRow,
+  LoadIndexResult,
+  TicketReadProblem,
+} from "../core/db-index.js";
+// Pure domain derivations are inward dependencies of this flatfile adapter.
+// Their contract inputs live in core, so neither module imports back into
+// repo/storage and the direction remains acyclic.
 import { computeReviewStaleAt, computeStaleAt } from "../tickets/staleness.js";
 // G2 (unify-effective-overlay): every pure derivation this index build
 // used to define locally — the effective latest_note/last_activity_at
 // fold, live blocked-counts, the ready verdict, reverse edges — now lives
 // in the ONE shared overlay module `src/tickets/overlay.ts`, consumed by
 // this driver AND the web explorer (src/web/overlays.ts) so the two can
-// never drift again. Same deliberate repo->tickets pure-module crossing
-// staleness.ts already established (see the C5 comment above).
+// never drift again.
 import {
   buildReverseEdgeIndex,
   computeAwaitingInputOverlay,
@@ -266,12 +262,7 @@ import {
 } from "../tickets/overlay.js";
 import { atomicWriteFile } from "./atomic-write.js";
 import { loadConfigDefaultsTolerant } from "./config.js";
-import {
-  eventReadProblemSchema,
-  formatEventReadProblems,
-  listEventShardDirs,
-  listEventsTolerant,
-} from "./events.js";
+import { formatEventReadProblems, listEventShardDirs, listEventsTolerant } from "./events.js";
 import type { EventReadProblem } from "./events.js";
 import { isEnoent, readDirSafe } from "./fs-utils.js";
 import type { RepoPaths } from "./paths.js";
@@ -318,152 +309,34 @@ import { listTicketsTolerant } from "./tickets.js";
  * Event-integrity diagnostics bump it 5 -> 6: `event_problems` records
  * every event omitted from derived activity/awaiting-input overlays.
  */
-export const INDEX_SCHEMA_VERSION = 6;
+// The persisted index contract is neutral (`src/core/db-index.ts`); this
+// adapter owns only building, fingerprinting, reading, and writing it.
 
-export const indexTicketRowSchema = z.object({
-  id: ticketIdSchema,
-  slug: slugSchema,
-  name: z.string(),
-  state: ticketStateSchema,
-  priority: prioritySchema,
-  parent: parentRefSchema.nullable(),
-  root_id: ticketIdSchema,
-  path: z.array(ticketIdSchema),
-  labels: z.array(labelSchema),
-  // --- ticket_01KY9RWFM80BKNE2CDX85QMKGS: EFFECTIVE, not stored-verbatim
-  // — see this module's doc section above. `deriveEffectiveOverlay` folds
-  // the ticket's stored baseline together with every `payload.progress`
-  // -carrying event, so this reflects a lock-free `update --progress`
-  // note the ticket FILE itself was never rewritten to contain. ---
-  latest_note: z.string().nullable(),
-  last_activity_at: isoTimestampSchema,
-  active_session: sessionIdSchema.nullable(),
-  /** t-175oq/t-trqk9 (schema v4): the ticket's own `owner`, mirrored here
-   * so `ready --owner`/`slop list --owner` never need a per-row
-   * `readTicket` just to filter on it. */
-  owner: actorSchema.nullable(),
-
-  // --- Reverse edges (derived; forward edges live only on the source
-  // ticket — DECISIONS.md, outgoingEdges()). "parent" has no reverse
-  // entry here: D6's materialised root_id/path already give every
-  // descendant's ancestry without needing a "children of" index. ---
-  /** Tickets whose `blocks` array names this ticket — i.e. who blocks it. */
-  blocked_by: z.array(ticketIdSchema),
-  /** Tickets whose `relates_to` array names this ticket. */
-  related_from: z.array(ticketIdSchema),
-  /** Tickets whose `discovered_from` array names this ticket. */
-  discovered: z.array(ticketIdSchema),
-
-  // --- B4 slots in here: count of *live* (non-done/dropped) entries in
-  // `blocked_by`, and the `ready` query's per-ticket verdict. A3 always
-  // writes `null`. ---
-  blocked_count: z.number().int().nullable(),
-  ready: z.boolean().nullable(),
-
-  // --- C5: content-derived staleness DEADLINES, not booleans — see this
-  // module's "C5: stale_at/review_stale_at" doc section above for why. A
-  // ticket's own state + last_activity_at (in_progress) or
-  // review.requested_at (review) plus config.yaml's stale_after/
-  // review_stale_after; `null` when the state doesn't apply. Read-time
-  // callers compute the live boolean via tickets/staleness.ts's
-  // isStale/isReviewStale against an injected clock — never here. ---
-  stale_at: isoTimestampSchema.nullable(),
-  review_stale_at: isoTimestampSchema.nullable(),
-
-  // --- G4 (t-jggg9): the `awaiting_input` derived overlay — see
-  // INDEX_SCHEMA_VERSION's doc comment above and
-  // src/tickets/overlay.ts's computeAwaitingInputOverlay. Never stored on
-  // the ticket itself; recomputed fresh from the event log on every
-  // build, exactly like `blocked_count`/`ready`/`stale_at` above. ---
-  /** `true` iff this ticket has >=1 unanswered `question.asked` event. */
-  awaiting_input: z.boolean(),
-  /** Count of currently-unanswered questions (0 iff `awaiting_input` is `false`). */
-  open_question_count: z.number().int(),
-  /** The oldest still-open question's `askedAt`, or `null` when `open_question_count` is 0. */
-  oldest_open_question_at: isoTimestampSchema.nullable(),
-});
-export type IndexTicketRow = z.infer<typeof indexTicketRowSchema>;
-
-/** One entity directory's (or, since C5, single tracked file's — see
- * `computeContentFingerprint`'s `config.yaml` entry) cheap staleness
- * signature — see the module doc's "Content staleness". `digest` is a
- * sha256 hex digest over every entity file's own `(filename, mtimeMs,
- * size)` tuple (or, for a single file, just its own `(mtimeMs, size)`),
- * computed from `readdir`/`stat` alone (never file content).
- */
-export const dirFingerprintSchema = z.object({
-  count: z.number().int().min(0),
-  digest: z.string(),
-});
-export type DirFingerprint = z.infer<typeof dirFingerprintSchema>;
-
-/** Keyed by logical directory name — just `"tickets"` today; a map (not a
- * fixed `{tickets: ...}` shape) so a later work item that makes the
- * index's content depend on `sessions/`/`events/` too can add a key here
- * without reshaping anything else. */
-export const contentFingerprintSchema = z.record(z.string(), dirFingerprintSchema);
-export type ContentFingerprint = z.infer<typeof contentFingerprintSchema>;
-
-/** One ticket file `buildIndex` could not read — path, id, and the exact
- * high-quality error `readTicket` would have thrown, captured instead of
- * propagated. See the module doc's "Fault tolerance". */
-export const ticketReadProblemSchema = z.object({
-  id: ticketIdSchema,
-  path: z.string(),
-  message: z.string(),
-});
-export type TicketReadProblem = z.infer<typeof ticketReadProblemSchema>;
-
-/**
- * t-trqk9: one slug claimed by MORE than one ticket — a cross-clone merge
- * that produced two tickets with the same slug (`db-index.ts`'s old
- * last-writer-wins `slugs` map build let this happen silently, leaving one
- * ticket unreachable by slug). `ids` is every ticket currently claiming
- * `slug`, sorted ascending by id (= oldest-first, ULIDs sort
- * chronologically — same convention `tickets/ready.ts`'s `compareReadyOrder`
- * documents for "age"), length always >= 2 by construction (a slug with
- * exactly one claimant is never a problem). Resolving `slug` as a `<ref>`
- * already returns `AMBIGUOUS_REF` (exit 5) listing these same candidates
- * (`repo/refs.ts`'s `resolveWithIndex` slug-match branch) — this is the
- * BUILD-time detection half; `slop reindex --heal` is the repair half (see
- * `src/tickets/slug-heal.ts`).
- */
-export const duplicateSlugProblemSchema = z.object({
-  slug: slugSchema,
-  ids: z.array(ticketIdSchema).min(2),
-});
-export type DuplicateSlugProblem = z.infer<typeof duplicateSlugProblemSchema>;
-
-export const dbIndexSchema = z.object({
-  schema_version: z.literal(INDEX_SCHEMA_VERSION),
-  built_at: isoTimestampSchema,
-  /** Staleness signature of the entity files this index was built from — see "Content staleness" above. */
-  fingerprint: contentFingerprintSchema,
-  tickets: z.array(indexTicketRowSchema),
-  /** slug -> ticket id, for O(1) exact-slug ref resolution (refs.ts). For a
-   * duplicated slug (see `slug_problems` below) this holds ONE of the
-   * candidates (the oldest, deterministically — see `buildIndex`), purely
-   * defensively: `refs.ts`'s resolution always re-checks `index.tickets`
-   * for every ticket actually claiming that slug and returns `AMBIGUOUS_REF`
-   * the moment there's more than one, so this map's exact value in the
-   * duplicate case is never load-bearing for correctness. */
-  slugs: z.record(z.string(), ticketIdSchema),
-  /** Ticket files skipped while building this index — see "Fault
-   * tolerance" above. Empty in the overwhelming common case; never
-   * causes `buildIndex` itself to throw. */
-  problems: z.array(ticketReadProblemSchema),
-  /** Event files omitted while building event-derived overlays. A
-   * non-empty list forces each load to retry the read so an in-place
-   * repair is visible even when the cheap fingerprint is unchanged. */
-  event_problems: z.array(eventReadProblemSchema),
-  /** t-trqk9 (schema v4): every slug currently claimed by more than one
-   * ticket. Empty in the overwhelming common case. Never causes
-   * `buildIndex` to throw — like `problems` above, this is a loud warning
-   * (`loadIndex` warns on stderr whenever this is non-empty), not a hard
-   * failure; `slop reindex --heal` is the repair path. */
-  slug_problems: z.array(duplicateSlugProblemSchema),
-});
-export type DbIndex = z.infer<typeof dbIndexSchema>;
+// Preserve the repo module's public surface while keeping contract ownership
+// in core. This is compatibility only; new consumers import core directly.
+export {
+  INDEX_SCHEMA_VERSION,
+  contentFingerprintSchema,
+  dbIndexSchema,
+  dirFingerprintSchema,
+  duplicateSlugProblemSchema,
+  eventReadProblemSchema,
+  formatDuplicateSlugProblems,
+  formatIndexProblems,
+  indexTicketRowSchema,
+  ticketReadProblemSchema,
+} from "../core/db-index.js";
+export type {
+  ContentFingerprint,
+  DbIndex,
+  DirFingerprint,
+  DuplicateSlugProblem,
+  EventReadProblem,
+  IndexLoadReason,
+  IndexTicketRow,
+  LoadIndexResult,
+  TicketReadProblem,
+} from "../core/db-index.js";
 
 // G2 (unify-effective-overlay): re-exported from the shared overlay
 // module so existing repo-layer consumers/tests keep one stable import
@@ -683,51 +556,12 @@ function fingerprintsEqual(a: ContentFingerprint, b: ContentFingerprint): boolea
   return true;
 }
 
-/**
- * Render `problems` as a human-actionable, multi-line report. Reused by
- * both {@link loadIndex}'s stderr warning and `slop reindex`'s own report
- * (src/cli/commands/reindex.ts), so the message quality `readEntityFile`
- * already provides (exact path, 1-based line:column, specific parse code
- * / zod path) is preserved everywhere problems surface, not re-derived
- * per call site.
- */
-export function formatIndexProblems(problems: TicketReadProblem[]): string {
-  const header = `${problems.length} ticket file(s) could not be read and were skipped while building the index:`;
-  const body = problems.map((p) => {
-    const indented = p.message
-      .split("\n")
-      .map((line) => `    ${line}`)
-      .join("\n");
-    return `  - ${p.path}\n${indented}`;
-  });
-  return [header, ...body].join("\n");
-}
-
 function warnAboutIndexProblems(problems: TicketReadProblem[]): void {
   process.stderr.write(`warning: ${formatIndexProblems(problems)}\n`);
 }
 
 function warnAboutEventProblems(problems: EventReadProblem[]): void {
   process.stderr.write(`warning: ${formatEventReadProblems(problems)}\n`);
-}
-
-/**
- * t-trqk9: render `slug_problems` as a human-actionable, multi-line report
- * — the duplicate-slug analogue of {@link formatIndexProblems}, reused by
- * both {@link loadIndex}'s stderr warning and `slop reindex`'s own report
- * (src/cli/commands/reindex.ts).
- */
-export function formatDuplicateSlugProblems(problems: DuplicateSlugProblem[]): string {
-  const header =
-    `${problems.length} slug(s) are claimed by more than one ticket (a cross-clone merge collision) ` +
-    "— resolving any of them by slug is ambiguous (AMBIGUOUS_REF, exit 5) until healed:";
-  const body = problems.map((p) => `  - "${p.slug}": ${p.ids.join(", ")}`);
-  return [
-    header,
-    ...body,
-    "  run `slop reindex --heal` to deterministically re-suffix the newer duplicate(s) " +
-      "(the OLDEST ticket, by id, keeps the slug).",
-  ].join("\n");
 }
 
 function warnAboutSlugProblems(problems: DuplicateSlugProblem[]): void {
@@ -937,21 +771,6 @@ export async function rebuildIndex(paths: RepoPaths, clock: Clock = systemClock)
   const index = await buildIndex(paths, clock);
   await writeIndex(paths, index);
   return index;
-}
-
-export type IndexLoadReason =
-  | "fresh"
-  | "missing"
-  | "parse_error"
-  | "stale_schema_version"
-  | "invalid_schema"
-  | "stale_content";
-
-export interface LoadIndexResult {
-  index: DbIndex;
-  /** `true` if this call had to rebuild (and rewrite) the index. */
-  rebuilt: boolean;
-  reason: IndexLoadReason;
 }
 
 type ReadIndexResult =

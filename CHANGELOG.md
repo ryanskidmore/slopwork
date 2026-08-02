@@ -174,6 +174,29 @@ where breaking changes land.
 
 ### Changed
 
+- **Enforceable dependency boundaries** (t-y3fg1, docs/architecture.md).
+  Shared contracts that used to live behind `src/cli/`/`src/storage/`
+  adapters now live in `src/core/`, above every adapter: `SlopError`
+  (`core/errors.ts`; `cli/errors.ts` keeps its reporting helpers and a
+  compatibility re-export), the derived-index schema/DTOs and pure problem
+  formatters (`core/db-index.ts`; `repo/db-index.ts` owns only building,
+  fingerprinting, reading, and writing it), and the `StorageBackend` port
+  itself plus its transaction marker and every shared event/query/
+  tolerant-read DTO (`core/storage-contract.ts`; `storage/backend.ts` is
+  now a pure compatibility re-export). `ticketEventContext` — a pure
+  `Actor`+`Ticket` -> `EventContext` derivation CLI commands need before a
+  backend is even selected — moves to `core/storage-contract.ts` for the
+  same reason. No persisted schema, formatter text, command output, exit
+  code, or remote wire shape changed. `tests/acceptance/G2.test.ts`
+  replaces its old immediate-directory import blacklist with a recursive
+  scan of every production `.ts`/`.tsx` file (type and runtime imports
+  treated equally), enforcing the core -> domain -> repo -> storage ->
+  CLI/web layer direction, a symbol-level allowlist for the CLI's narrow
+  pre-backend-selection repo imports (`RepoPaths`/`repoPaths`/
+  `requireRepoRoot`/`findRepoRoot`/`ensureDbDirs`/`atomicWriteFile`), and
+  deterministic strongly-connected-component detection over the whole
+  module graph — catching nested files, re-exports, and type-only
+  inversions the old blacklist could miss.
 - **`.slop/db/.lock` simplified.** The per-acquisition fencing protocol
   (tokens, `assertHeld()` renewal, dispossession detection) is removed —
   no real transaction in this codebase ever ran anywhere near its 5-minute

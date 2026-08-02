@@ -38,12 +38,13 @@ import {
   ticketStateSchema,
 } from "../../core/index.js";
 import type { Ticket, TicketId, TicketState } from "../../core/index.js";
-import { computeAwaitingInputByTicket } from "../../repo/index.js";
+import type { TicketReadProblem } from "../../core/db-index.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
-import type { EventReadProblem, TicketReadProblem } from "../../storage/index.js";
+import type { EventReadProblem } from "../../storage/index.js";
 import { openStorage, warnAboutEventReadProblems } from "../../storage/index.js";
 import { filterTickets, paginateTickets } from "../../tickets/list.js";
+import { computeAwaitingInputByTicket } from "../../tickets/overlay.js";
 import { SlopError } from "../errors.js";
 import { collect, parseBudgetOption, parseIntegerOption, parsePriority } from "./shared.js";
 

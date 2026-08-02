@@ -23,7 +23,7 @@ import type {
   TicketId,
 } from "../core/index.js";
 import { EXIT_CODES, newSessionId, nowIso, sessionSchema, ticketSchema } from "../core/index.js";
-import { SlopError } from "../cli/errors.js";
+import { SlopError } from "../core/errors.js";
 import { formatZodIssuesForUsage } from "../tickets/validate.js";
 
 /**

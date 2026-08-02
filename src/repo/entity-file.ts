@@ -16,7 +16,7 @@ import type { z } from "zod";
 import { EXIT_CODES } from "../core/exit-codes.js";
 import { formatParseErrors, parseJsonc, writeCanonical, writeUpdate } from "../core/jsonc.js";
 import type { JsoncPatchEntry } from "../core/jsonc.js";
-import { SlopError } from "../cli/errors.js";
+import { SlopError } from "../core/errors.js";
 import { isEnoent, readDirSafe } from "./fs-utils.js";
 import { atomicWriteFile } from "./atomic-write.js";
 

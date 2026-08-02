@@ -60,7 +60,7 @@ import { idMatchesRef, isShortTicketCodeRef, isTicketId, shortTicketCode } from 
 import type { Ticket } from "../core/index.js";
 import { EXTERNAL_REF_PATTERN } from "../core/entities/ref.js";
 import { EXIT_CODES } from "../core/exit-codes.js";
-import { SlopError } from "../cli/errors.js";
+import { SlopError } from "../core/errors.js";
 import { loadIndex } from "./db-index.js";
 import type { DbIndex, IndexTicketRow } from "./db-index.js";
 import type { RepoPaths } from "./paths.js";
