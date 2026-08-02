@@ -1,0 +1,36 @@
+{
+  "id": "ticket_01KZ1S8B22JSZ150JSK67840W6",
+  "name": "Rebase six conflicted PRs post-merge-wave; mark .slop/db as generated",
+  "slug": "rebase-six-conflicted-prs-post",
+  "spec": {
+    "summary": "Six merges (5/6/9/10/12/17) moved main; remaining PRs 7/13/14/15/16/18 all CONFLICTING. Rebase each (chains: 14 then 18, 15 then 16), union CHANGELOG conflicts, full gates, force-push, verify MERGEABLE. Also mark .slop/db/** linguist-generated in .gitattributes so PR diffs collapse tracker files.",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "in_progress",
+  "priority": 1,
+  "labels": [
+    "source:salvage"
+  ],
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ1S8B22JSZ150JSK67840W6",
+  "path": [],
+  "active_session": "session_01KZ1S96P9WHEEK54HZEZ28HZM",
+  "last_activity_at": "2026-08-02T17:45:23.927Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-02T17:44:55.763Z",
+  "updated_at": "2026-08-02T17:45:23.927Z"
+}

@@ -1,0 +1,36 @@
+{
+  "id": "ticket_01KZ1S96SQTM2EWDQ2P2DT6085",
+  "name": "slop init manages .gitattributes: generated markers for GitHub + GitLab",
+  "slug": "slop-init-manages-gitattributes",
+  "spec": {
+    "summary": "init should own a managed .gitattributes section the same way it owns .gitignore rules: mark .slop/db/** linguist-generated (GitHub) and gitlab-generated (GitLab) so tracker files collapse in PR/MR diffs, plus the LF-enforcement rule for .slop/db JSONC. Idempotent re-runs, append-don't-clobber user content, tests + docs (getting-started, configuration).",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "open",
+  "priority": 1,
+  "labels": [
+    "source:product"
+  ],
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ1S96SQTM2EWDQ2P2DT6085",
+  "path": [],
+  "active_session": null,
+  "last_activity_at": "2026-08-02T17:45:24.089Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-02T17:45:24.089Z",
+  "updated_at": "2026-08-02T17:45:24.089Z"
+}

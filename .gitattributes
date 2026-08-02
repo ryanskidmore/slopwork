@@ -4,3 +4,8 @@
 # quietly break the diff-minimal-write / git-merge story the flatfile db
 # depends on (docs/spikes/jsonc.md, "Recommended FormattingOptions").
 *.jsonc text eol=lf
+
+# Tracker database — machine-written by slop. Mark as generated so code
+# hosts collapse these files in PR/MR diffs by default (linguist-generated
+# is GitHub's marker, gitlab-generated is GitLab's).
+.slop/db/** linguist-generated gitlab-generated
