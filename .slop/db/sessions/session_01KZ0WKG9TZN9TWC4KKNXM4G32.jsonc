@@ -21,7 +21,7 @@
       "steps": [
         {
           "text": "Spawn G5 worktree subagent: simplification sweep",
-          "checked": false
+          "checked": true
         },
         {
           "text": "Review agent report + PR",
