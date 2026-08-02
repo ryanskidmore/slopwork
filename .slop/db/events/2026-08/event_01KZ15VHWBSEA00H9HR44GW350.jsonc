@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ15VHWBSEA00H9HR44GW350",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ14E4SZ1QP6Q2XSWB4J1XB6"
+  },
+  "payload": {
+    "progress": "Implemented structured event integrity across repo/storage/index/CLI/web, including no-cache and forced-reindex repair visibility. Full suite: 1,972/1,972 pass; typecheck/lint/format/build pass. Coverage test suite passes but repository thresholds remain red (79.28% statements, 74.46% functions, 80.27% lines vs 82/80/83), recorded as residual gate debt rather than hidden."
+  },
+  "at": "2026-08-02T12:05:53.675Z"
+}

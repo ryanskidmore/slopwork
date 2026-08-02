@@ -137,7 +137,7 @@ Events are immutable and append-only (`src/repo/events.ts`'s module doc)
 | `POST /v1/events` | `appendEvent(ctx, entity, spec, clock?)` — body `{ "ctx": EventContext, "entity": EventEntity, "spec": MutationEventSpec, "clock"?: string }` | `Event` — the server mints `id`/`at`, exactly like the flatfile driver's `newEventId()`/clock does; the client never supplies them |
 | `GET /v1/events?since=<id>&ticket=<id>&limit=<n>` | `queryEvents({since, ticket, limit})` — all three query params optional | `Event[]`, cursor (ascending id) order |
 | `GET /v1/events?mode=all` | `listEvents()` (strict) | `Event[]` |
-| `GET /v1/events?mode=tolerant` | `listEventsTolerant()` | `Event[]` (corrupt records silently excluded server-side) |
+| `GET /v1/events?mode=tolerant` | `listEventsTolerant()` | `{ events: Event[], problems: EventReadProblem[] }` (readable records survive; every skipped/duplicate/misplaced record is reported with `kind`, `id`, `path`, and `message`) |
 
 A real implementation is free to shard/partition events however it likes
 server-side (the flatfile driver's own `events/YYYY-MM/` sharding is

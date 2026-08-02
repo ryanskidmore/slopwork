@@ -9,6 +9,9 @@ import type { WebDataSource } from "../data-source.js";
 import { configDto, jsonResponse } from "./shared.js";
 
 export async function handleConfig(_req: BunRequest, dataSource: WebDataSource): Promise<Response> {
-  const { config, warning } = await dataSource.getConfig();
-  return jsonResponse(configDto(config, warning));
+  const [{ config, warning }, eventResult] = await Promise.all([
+    dataSource.getConfig(),
+    dataSource.listEvents(),
+  ]);
+  return jsonResponse(configDto(config, warning, eventResult.problems));
 }

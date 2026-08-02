@@ -14,7 +14,7 @@ export async function handleReviewPanel(
   dataSource: WebDataSource,
   now: number,
 ): Promise<Response> {
-  const [tickets, { config, warning }, events] = await Promise.all([
+  const [tickets, { config, warning }, eventResult] = await Promise.all([
     dataSource.listTickets(),
     dataSource.getConfig(),
     // G4 (t-jggg9): needed for the awaiting_input overlay badge — see
@@ -22,7 +22,7 @@ export async function handleReviewPanel(
     dataSource.listEvents(),
   ]);
   const thresholds = staleThresholdsFromConfig(config);
-  const awaitingInputByTicket = computeAwaitingInputByTicket(events);
+  const awaitingInputByTicket = computeAwaitingInputByTicket(eventResult.events);
   const summaryContext = createTicketSummaryContext(
     tickets,
     thresholds,
@@ -36,7 +36,7 @@ export async function handleReviewPanel(
     .sort((a, b) => (a.review?.requested_at ?? "").localeCompare(b.review?.requested_at ?? ""));
 
   const body: ReviewResponseDTO = {
-    config: configDto(config, warning),
+    config: configDto(config, warning, eventResult.problems),
     tickets: inReview.map((ticket) => ticketSummaryDto(ticket, summaryContext)),
   };
   return jsonResponse(body);

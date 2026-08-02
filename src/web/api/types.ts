@@ -217,6 +217,18 @@ export interface TicketDetailDTO {
   events: EventDTO[];
   sessions: SessionDTO[];
   provenance: ProvenanceDTO;
+  integrity: IntegrityDTO;
+}
+
+export interface EventReadProblemDTO {
+  kind: "invalid_filename" | "read_error" | "id_mismatch" | "wrong_shard" | "duplicate_id";
+  id: string | null;
+  path: string;
+  message: string;
+}
+
+export interface IntegrityDTO {
+  event_problems: EventReadProblemDTO[];
 }
 
 export interface ConfigDTO {
@@ -224,6 +236,7 @@ export interface ConfigDTO {
   warning: string | null;
   remotes: { repo: string | null; jira: string | null };
   defaults: { stale_after: string; review_stale_after: string };
+  integrity: IntegrityDTO;
 }
 
 /** Stable, 1-based page metadata for `GET /api/tickets`. `total` on the

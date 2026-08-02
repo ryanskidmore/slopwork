@@ -57,8 +57,9 @@
  * read path and no write path ever migrates a flat file on its own.
  */
 import { mkdir, rename, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { decodeTime } from "ulid";
+import { z } from "zod";
 import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import {
@@ -70,6 +71,7 @@ import {
   type SessionId,
   type Ticket,
   type TicketId,
+  eventIdSchema,
   eventSchema,
   isEventId,
   newEventId,
@@ -313,14 +315,67 @@ export async function listEvents(paths: RepoPaths): Promise<Event[]> {
  * chronological) order — the filtering only ever removes entries, never
  * reorders survivors.
  */
-export async function listEventsTolerant(paths: RepoPaths): Promise<Event[]> {
-  const ids = await listEventIds(paths);
-  const settled = await Promise.allSettled(ids.map((id) => readEvent(paths, id)));
+export const eventReadProblemSchema = z.object({
+  kind: z.enum(["invalid_filename", "read_error", "id_mismatch", "wrong_shard", "duplicate_id"]),
+  id: eventIdSchema.nullable(),
+  path: z.string(),
+  message: z.string(),
+});
+export type EventReadProblem = z.infer<typeof eventReadProblemSchema>;
+
+export interface ListEventsTolerantResult {
+  events: Event[];
+  problems: EventReadProblem[];
+}
+
+export interface EventDirectoryResult extends ListEventsTolerantResult {
+  dir: string;
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/** Merge directory-local reads into one cursor-ordered result and reject
+ * duplicate ids deterministically. Callers put shards before the legacy
+ * flat directory, matching {@link readEvent}'s shard-first precedence. */
+export function mergeEventReadResults(
+  batches: readonly EventDirectoryResult[],
+): ListEventsTolerantResult {
   const events: Event[] = [];
-  for (const outcome of settled) {
-    if (outcome.status === "fulfilled") events.push(outcome.value);
+  const problems = batches.flatMap((batch) => batch.problems);
+  const firstPathById = new Map<string, string>();
+
+  for (const batch of batches) {
+    for (const event of batch.events) {
+      const path = join(batch.dir, `${event.id}.jsonc`);
+      const firstPath = firstPathById.get(event.id);
+      if (firstPath !== undefined) {
+        problems.push({
+          kind: "duplicate_id",
+          id: event.id,
+          path,
+          message: `${path}: duplicate event id ${event.id}; first readable copy is ${firstPath}`,
+        });
+        continue;
+      }
+      firstPathById.set(event.id, path);
+      events.push(event);
+    }
   }
-  return events;
+
+  events.sort((a, b) => a.id.localeCompare(b.id));
+  problems.sort((a, b) => a.path.localeCompare(b.path) || a.kind.localeCompare(b.kind));
+  return { events, problems };
+}
+
+export async function listEventsTolerant(paths: RepoPaths): Promise<ListEventsTolerantResult> {
+  const shardDirs = await listEventShardDirs(paths);
+  const batches = await Promise.all([
+    ...shardDirs.map((dir) => listEventsInDirTolerant(dir, basename(dir))),
+    listEventsInDirTolerant(paths.eventsDir),
+  ]);
+  return mergeEventReadResults(batches);
 }
 
 /**
@@ -341,16 +396,98 @@ export async function listEventsTolerant(paths: RepoPaths): Promise<Event[]> {
  * event count, only with that one shard's own (bounded, ~one calendar
  * month's worth) size.
  */
-export async function listEventsInDirTolerant(dir: string): Promise<Event[]> {
-  const ids = await listEntityIds(dir, isEventId);
-  const settled = await Promise.allSettled(
-    ids.map((id) => readEntityFile(join(dir, `${id}.jsonc`), eventSchema)),
-  );
+export async function listEventsInDirTolerant(
+  dir: string,
+  expectedShard?: string,
+): Promise<EventDirectoryResult> {
+  const entries = await readDirSafe(dir);
+  const files = entries
+    .filter((name) => name.endsWith(".jsonc") && !name.startsWith(".tmp-"))
+    .sort();
   const events: Event[] = [];
-  for (const outcome of settled) {
-    if (outcome.status === "fulfilled") events.push(outcome.value);
+  const problems: EventReadProblem[] = [];
+
+  await Promise.all(
+    files.map(async (file) => {
+      const path = join(dir, file);
+      const id = file.slice(0, -".jsonc".length);
+      if (!isEventId(id)) {
+        problems.push({
+          kind: "invalid_filename",
+          id: null,
+          path,
+          message: `${path}: filename must be a valid event_<ulid>.jsonc`,
+        });
+        return;
+      }
+
+      let event: Event;
+      try {
+        event = await readEntityFile(path, eventSchema);
+      } catch (err) {
+        problems.push({ kind: "read_error", id, path, message: errorMessage(err) });
+        return;
+      }
+
+      if (event.id !== id) {
+        problems.push({
+          kind: "id_mismatch",
+          id,
+          path,
+          message: `${path}: event payload id ${event.id} does not match filename id ${id}`,
+        });
+        return;
+      }
+      let actualShard: string | undefined;
+      if (expectedShard !== undefined) {
+        try {
+          actualShard = eventShardMonth(event.id);
+        } catch (err) {
+          problems.push({
+            kind: "read_error",
+            id,
+            path,
+            message: `${path}: event id does not contain a decodable ULID timestamp (${errorMessage(err)})`,
+          });
+          return;
+        }
+      }
+      if (expectedShard !== undefined && actualShard !== expectedShard) {
+        problems.push({
+          kind: "wrong_shard",
+          id,
+          path,
+          message: `${path}: event ${id} belongs in shard ${actualShard}, not ${expectedShard}`,
+        });
+        return;
+      }
+      events.push(event);
+    }),
+  );
+
+  return {
+    dir,
+    events: events.sort((a, b) => a.id.localeCompare(b.id)),
+    problems: problems.sort((a, b) => a.path.localeCompare(b.path)),
+  };
+}
+
+export function formatEventReadProblems(problems: readonly EventReadProblem[]): string {
+  const header = `${problems.length} event file problem(s) were found; affected events were skipped:`;
+  const body = problems.map((problem) => {
+    const indented = problem.message
+      .split("\n")
+      .map((line) => `    ${line}`)
+      .join("\n");
+    return `  - [${problem.kind}] ${problem.path}\n${indented}`;
+  });
+  return [header, ...body].join("\n");
+}
+
+export function warnAboutEventReadProblems(problems: readonly EventReadProblem[]): void {
+  if (problems.length > 0) {
+    process.stderr.write(`warning: ${formatEventReadProblems(problems)}\n`);
   }
-  return events;
 }
 
 // --- A4: emit-on-mutation hook --------------------------------------------

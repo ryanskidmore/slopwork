@@ -21,8 +21,9 @@
  */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { Config, Event, Session, Ticket, TicketId } from "../core/index.js";
+import type { Config, Session, Ticket, TicketId } from "../core/index.js";
 import { configSchema, parseConfigYamlText } from "../core/index.js";
+import type { ListEventsTolerantResult } from "../storage/backend.js";
 
 /**
  * {@link WebDataSource.getConfig}'s return shape — web-corrupt-or-missing-config:
@@ -129,7 +130,10 @@ export interface WebDataSource {
    * a second time in the same request. Omit it to have this method fetch
    * them itself, unchanged from before.
    */
-  listEventsForTicket(ticketId: TicketId, knownSessions?: readonly Session[]): Promise<Event[]>;
+  listEventsForTicket(
+    ticketId: TicketId,
+    knownSessions?: readonly Session[],
+  ): Promise<ListEventsTolerantResult>;
 
   /**
    * ticket_01KY9S0172V8AYCYV9KWS6RC9P: every event in the db, unfiltered.
@@ -146,5 +150,5 @@ export interface WebDataSource {
    * that need chronological order sort themselves (this is a bulk read for
    * grouping-by-ticket, not a timeline).
    */
-  listEvents(): Promise<Event[]>;
+  listEvents(): Promise<ListEventsTolerantResult>;
 }

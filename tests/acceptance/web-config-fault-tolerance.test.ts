@@ -4,6 +4,7 @@ import { unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { newEventId } from "../../src/core/index.js";
 import { makeTempRepo } from "../support/temp-repo.js";
 
 // web-corrupt-or-missing-config: `FixtureDataSource.getConfig()`
@@ -102,7 +103,17 @@ async function initRepo(): Promise<string> {
 }
 
 interface ConfigBearing {
-  config: { warning: string | null };
+  config: {
+    warning: string | null;
+    integrity: { event_problems: EventProblem[] };
+  };
+}
+
+interface EventProblem {
+  kind: string;
+  id: string | null;
+  path: string;
+  message: string;
 }
 
 /** `/api/config` returns the config projection flat (no wrapping `config` key); every other route nests it — see src/web/api/*.ts. */
@@ -168,5 +179,34 @@ describe("web: corrupt or missing config.yaml degrades instead of 500ing", () =>
     expect(res.status).toBe(200);
     const body = (await res.json()) as ConfigBearing;
     expect(body.config.warning).toBeNull();
+  });
+});
+
+describe("web: event integrity is visible without taking derived views down", () => {
+  it("returns structured problems from config and page APIs while keeping readable data", async () => {
+    const root = await initRepo();
+    const created = runSlop(["new", "Readable web ticket", "--json"], root);
+    expect(created.status, created.stderr).toBe(0);
+    const eventId = newEventId();
+    const path = join(root, ".slop", "db", "events", `${eventId}.jsonc`);
+    await writeFile(path, "{ corrupt {{{", "utf8");
+
+    server = await startWebServer(root);
+    const configRes = await fetch(new URL("/api/config", server.baseUrl));
+    expect(configRes.status).toBe(200);
+    const config = (await configRes.json()) as {
+      integrity: { event_problems: EventProblem[] };
+    };
+    expect(config.integrity.event_problems).toMatchObject([
+      { kind: "read_error", id: eventId, path },
+    ]);
+
+    const ticketsRes = await fetch(new URL("/api/tickets", server.baseUrl));
+    expect(ticketsRes.status).toBe(200);
+    const tickets = (await ticketsRes.json()) as ConfigBearing & { total: number };
+    expect(tickets.total).toBe(1);
+    expect(tickets.config.integrity.event_problems).toMatchObject([
+      { kind: "read_error", id: eventId, path },
+    ]);
   });
 });

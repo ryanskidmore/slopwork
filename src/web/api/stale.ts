@@ -23,16 +23,16 @@ export async function handleStalePanel(
   dataSource: WebDataSource,
   now: number,
 ): Promise<Response> {
-  const [rawTickets, { config, warning }, events] = await Promise.all([
+  const [rawTickets, { config, warning }, eventResult] = await Promise.all([
     dataSource.listTickets(),
     dataSource.getConfig(),
     dataSource.listEvents(),
   ]);
-  const tickets = deriveEffectiveTickets(rawTickets, events);
+  const tickets = deriveEffectiveTickets(rawTickets, eventResult.events);
   const thresholds = staleThresholdsFromConfig(config);
   // G4 (t-jggg9): reuses the SAME whole-db event read already fetched
   // above for deriveEffectiveTickets — no second listEvents() call.
-  const awaitingInputByTicket = computeAwaitingInputByTicket(events);
+  const awaitingInputByTicket = computeAwaitingInputByTicket(eventResult.events);
   const summaryContext = createTicketSummaryContext(
     tickets,
     thresholds,
@@ -50,7 +50,7 @@ export async function handleStalePanel(
     .sort((a, b) => a.since.localeCompare(b.since));
 
   const body: StaleResponseDTO = {
-    config: configDto(config, warning),
+    config: configDto(config, warning, eventResult.problems),
     rows: stale.map(({ ticket, since }) => ({
       ticket: ticketSummaryDto(ticket, summaryContext),
       since,

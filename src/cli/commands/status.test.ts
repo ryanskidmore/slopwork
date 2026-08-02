@@ -8,6 +8,7 @@ import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cl
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
 import type { Session, Ticket, TicketId } from "../../core/index.js";
 import {
+  newEventId,
   newSessionId,
   newTicketId,
   sessionSchema,
@@ -264,6 +265,29 @@ describe("runStatus (in-process)", () => {
     try {
       await withCwd(root, () => runStatus({}));
       expect(out.stdout().toLowerCase()).toContain("no tickets yet");
+    } finally {
+      out.restore();
+    }
+  });
+
+  it("reports structured event integrity problems in JSON while keeping status usable", async () => {
+    const root = await makeTempRepo("slop-status-inproc-event-integrity-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    await jsonNewTicket(root, "Readable status ticket");
+    const eventId = newEventId();
+    const path = join(root, ".slop", "db", "events", `${eventId}.jsonc`);
+    await writeFile(path, "{ corrupt {{{", "utf8");
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runStatus({ json: true }));
+      const body = JSON.parse(out.stdout()) as {
+        counts: { total: number };
+        event_problems: { kind: string; id: string | null; path: string }[];
+      };
+      expect(body.counts.total).toBe(1);
+      expect(body.event_problems).toMatchObject([{ kind: "read_error", id: eventId, path }]);
+      expect(out.stderr()).toContain("event file problem");
     } finally {
       out.restore();
     }

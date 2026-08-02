@@ -77,7 +77,8 @@ export async function handleTicketDetail(
   }
 
   const sessions = await dataSource.listSessionsForTicket(ticket.id);
-  const events = await dataSource.listEventsForTicket(ticket.id, sessions);
+  const eventResult = await dataSource.listEventsForTicket(ticket.id, sessions);
+  const events = eventResult.events;
 
   const effectiveTicket = deriveEffectiveTickets([ticket], events)[0] ?? ticket;
   const thresholds = staleThresholdsFromConfig(config);
@@ -131,6 +132,7 @@ export async function handleTicketDetail(
     events: events.map(eventDto),
     sessions: sessions.map((s) => sessionDto(s, ticket.active_session)),
     provenance: provenanceDto(ticket, byId),
+    integrity: { event_problems: eventResult.problems },
   };
 
   return jsonResponse(body);

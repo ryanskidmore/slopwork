@@ -110,7 +110,7 @@ import {
 import type { IndexTicketRow } from "../../repo/index.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
-import type { StorageBackend } from "../../storage/index.js";
+import type { EventReadProblem, StorageBackend } from "../../storage/index.js";
 import { openStorage } from "../../storage/index.js";
 import { isReviewStale, isStale } from "../../tickets/staleness.js";
 import type {
@@ -216,6 +216,7 @@ interface StatusData {
   /** G4 (t-jggg9): tickets with >=1 unanswered question, oldest-first. */
   awaitingInput: AwaitingInputTicketRow[];
   problems: StatusProblem[];
+  eventProblems: EventReadProblem[];
 }
 
 async function gatherStatus(backend: StorageBackend, clock: Clock): Promise<StatusData> {
@@ -294,6 +295,7 @@ async function gatherStatus(backend: StorageBackend, clock: Clock): Promise<Stat
     stale,
     awaitingInput,
     problems,
+    eventProblems: index.event_problems,
   };
 }
 
@@ -498,6 +500,7 @@ function buildJson(
       oldest_question_age_ms: msSince(row.oldestOpenQuestionAt, nowMs),
     })),
     problems: data.problems,
+    event_problems: data.eventProblems,
     elided: elisions,
   };
   return `${JSON.stringify(body, null, 2)}\n`;

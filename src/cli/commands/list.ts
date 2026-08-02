@@ -41,8 +41,8 @@ import type { Ticket, TicketId, TicketState } from "../../core/index.js";
 import { computeAwaitingInputByTicket } from "../../repo/index.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
-import type { TicketReadProblem } from "../../storage/index.js";
-import { openStorage } from "../../storage/index.js";
+import type { EventReadProblem, TicketReadProblem } from "../../storage/index.js";
+import { openStorage, warnAboutEventReadProblems } from "../../storage/index.js";
 import { filterTickets, paginateTickets } from "../../tickets/list.js";
 import { SlopError } from "../errors.js";
 import { collect, parseBudgetOption, parseIntegerOption, parsePriority } from "./shared.js";
@@ -141,6 +141,7 @@ function buildJson(
   offset: number,
   limit: number | undefined,
   problems: readonly TicketReadProblem[],
+  eventProblems: readonly EventReadProblem[],
   elisions: readonly string[],
   awaitingInputIds: ReadonlySet<TicketId>,
 ): string {
@@ -151,6 +152,7 @@ function buildJson(
     offset,
     limit: limit ?? null,
     problems,
+    event_problems: eventProblems,
     elided: elisions,
   };
   return `${JSON.stringify(body, null, 2)}\n`;
@@ -198,7 +200,7 @@ export async function runList(text: string | undefined, opts: ListCommandOptions
   const subtreeId: TicketId | undefined =
     opts.subtree !== undefined ? (await backend.resolveTicketRef(opts.subtree)).id : undefined;
 
-  const [{ tickets, problems }, events] = await Promise.all([
+  const [{ tickets, problems }, eventResult] = await Promise.all([
     backend.listTicketsTolerant(),
     // G4 (t-jggg9): a whole-db event read, once, to derive the
     // awaiting_input badge/filter — same "bulk read, not N+1" shape
@@ -208,8 +210,9 @@ export async function runList(text: string | undefined, opts: ListCommandOptions
   if (problems.length > 0) {
     process.stderr.write(`warning: ${formatListProblems(problems)}\n`);
   }
+  warnAboutEventReadProblems(eventResult.problems);
 
-  const awaitingInputByTicket = computeAwaitingInputByTicket(events);
+  const awaitingInputByTicket = computeAwaitingInputByTicket(eventResult.events);
   const awaitingInputIds = new Set<TicketId>(
     [...awaitingInputByTicket.entries()]
       .filter(([, overlay]) => overlay.awaitingInput)
@@ -235,7 +238,16 @@ export async function runList(text: string | undefined, opts: ListCommandOptions
     page,
     (kept, elisions) =>
       opts.json
-        ? buildJson(kept, total, offset, opts.limit, problems, elisions, awaitingInputIds)
+        ? buildJson(
+            kept,
+            total,
+            offset,
+            opts.limit,
+            problems,
+            eventResult.problems,
+            elisions,
+            awaitingInputIds,
+          )
         : buildText(kept, total, elisions, awaitingInputIds),
     opts.budget,
     { format: opts.json ? "json" : "text", noun: "ticket" },

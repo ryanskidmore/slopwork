@@ -1098,3 +1098,22 @@ comment preservation, delete semantics, corrupt/divergent conflict cases,
 and a real child process held inside the entity→event window, killed with
 `SIGKILL`, then recovered by `openStorage` through the dead holder's stale
 lock.
+
+## Audit hardening — corrupt event reads are tolerant but never silent (t-7p6v8)
+
+Bulk event readers now return `{ events, problems }`: readable events
+survive, while syntax/schema/read failures, invalid filenames,
+filename/payload id mismatches, wrong-month placement, and duplicate ids
+produce structured path-bearing diagnostics. Those diagnostics cross the
+`StorageBackend`/remote contract, are persisted as `event_problems` in
+index schema v6, surface through `reindex`, `status --json`, list commands,
+and the web API, and drive the web shell's audit-integrity alert.
+
+Two repair-visibility rules are deliberate. A shard with any read problem
+is never stored in the flatfile backend's in-memory cache, and an index
+carrying any `event_problems` is rebuilt on every load. Event fingerprints
+are intentionally cheap (count/max id), so either cache could otherwise
+retain an omission after a same-path repair whose count and maximum id did
+not change. Once the file is repaired, the next read admits it and the
+diagnostic disappears without requiring a process restart or manual cache
+invalidation.

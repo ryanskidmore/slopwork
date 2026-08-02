@@ -68,18 +68,21 @@ export class StorageDataSource implements WebDataSource {
     // ticket's sessions (handleTicketDetail does, for its own "Sessions"
     // section) can pass them in via `knownSessions` to skip re-scanning the
     // sessions directory a second time in the same request.
-    const [events, sessions] = await Promise.all([
+    const [eventResult, sessions] = await Promise.all([
       this.backend.listEventsTolerant(),
       knownSessions ? Promise.resolve(knownSessions) : this.listSessionsForTicket(ticketId),
     ]);
     const sessionIds = new Set<string>(sessions.map((s) => s.id));
-    const relevant = events.filter(
+    const relevant = eventResult.events.filter(
       (e) =>
         (e.entity.kind === "ticket" && e.entity.id === ticketId) ||
         (e.entity.kind === "session" && sessionIds.has(e.entity.id)),
     );
     // Event ids are ULIDs (D6): lexicographic order is chronological order.
-    return relevant.sort((a, b) => a.id.localeCompare(b.id));
+    return {
+      events: relevant.sort((a, b) => a.id.localeCompare(b.id)),
+      problems: eventResult.problems,
+    };
   }
 
   async listEvents() {

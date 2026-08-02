@@ -99,7 +99,7 @@ export async function handleTicketList(
   };
   if (filters.state && !isTicketState(filters.state)) filters.state = "";
 
-  const [rawTickets, { config, warning }, events] = await Promise.all([
+  const [rawTickets, { config, warning }, eventResult] = await Promise.all([
     dataSource.listTickets(),
     dataSource.getConfig(),
     dataSource.listEvents(),
@@ -107,11 +107,11 @@ export async function handleTicketList(
   // Effective last_activity_at/latest_note (overlays.ts's deriveEffectiveTickets doc) —
   // a lock-free `update --progress` note must show up here and reset staleness,
   // exactly like `slop show`/the ticket detail page.
-  const tickets = deriveEffectiveTickets(rawTickets, events);
+  const tickets = deriveEffectiveTickets(rawTickets, eventResult.events);
   const thresholds = staleThresholdsFromConfig(config);
   // G4 (t-jggg9): reuses the SAME whole-db event read already fetched
   // above for deriveEffectiveTickets — no second listEvents() call.
-  const awaitingInputByTicket = computeAwaitingInputByTicket(events);
+  const awaitingInputByTicket = computeAwaitingInputByTicket(eventResult.events);
   const summaryContext = createTicketSummaryContext(
     tickets,
     thresholds,
@@ -133,7 +133,7 @@ export async function handleTicketList(
   const hasNext = pageStart + pageTickets.length < filteredTotal;
 
   const body: TicketListResponseDTO = {
-    config: configDto(config, warning),
+    config: configDto(config, warning, eventResult.problems),
     tickets: pageTickets.map((ticket) => ticketSummaryDto(ticket, summaryContext)),
     total: tickets.length,
     pagination: {

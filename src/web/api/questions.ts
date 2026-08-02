@@ -23,18 +23,18 @@ export async function handleQuestionsPanel(
   _req: BunRequest,
   dataSource: WebDataSource,
 ): Promise<Response> {
-  const [tickets, { config, warning }, events] = await Promise.all([
+  const [tickets, { config, warning }, eventResult] = await Promise.all([
     dataSource.listTickets(),
     dataSource.getConfig(),
     dataSource.listEvents(),
   ]);
   const byId = new Map<TicketId, Ticket>(tickets.map((t) => [t.id, t]));
 
-  const open = unansweredQuestions(deriveQuestions(events));
+  const open = unansweredQuestions(deriveQuestions(eventResult.events));
   const groups = groupQuestionsByTicket(open);
 
   const body: QuestionsResponseDTO = {
-    config: configDto(config, warning),
+    config: configDto(config, warning, eventResult.problems),
     // A question's own ticket should always resolve (tickets are never
     // deleted, only dropped/done) — a group whose ticket somehow can't be
     // found (a corrupt/unreadable ticket file) is skipped rather than

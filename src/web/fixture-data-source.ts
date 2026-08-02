@@ -35,6 +35,7 @@ import { join } from "node:path";
 import {
   type Event,
   eventSchema,
+  isEventId,
   parseJsonc,
   type Session,
   sessionSchema,
@@ -42,6 +43,7 @@ import {
   type TicketId,
   ticketSchema,
 } from "../core/index.js";
+import type { EventReadProblem, ListEventsTolerantResult } from "../storage/backend.js";
 import type { ConfigResult, WebDataSource } from "./data-source.js";
 import { readSlopConfigTolerant } from "./data-source.js";
 import { matchTicketByRef } from "./overlays.js";
@@ -135,6 +137,66 @@ function parseEntity<T>(schema: { parse: (input: unknown) => T }, text: string, 
   }
 }
 
+async function readEventDir(dir: string): Promise<ListEventsTolerantResult> {
+  let entries: string[];
+  try {
+    entries = await readdir(dir);
+  } catch (err) {
+    if (err instanceof Error && "code" in err && err.code === "ENOENT") {
+      return { events: [], problems: [] };
+    }
+    throw err;
+  }
+
+  const events: Event[] = [];
+  const problems: EventReadProblem[] = [];
+  await Promise.all(
+    entries
+      .filter((name) => name.endsWith(".jsonc") && !name.startsWith(".tmp-"))
+      .sort()
+      .map(async (file) => {
+        const path = join(dir, file);
+        const id = file.slice(0, -".jsonc".length);
+        if (!isEventId(id)) {
+          problems.push({
+            kind: "invalid_filename",
+            id: null,
+            path,
+            message: `${path}: filename must be a valid event_<ulid>.jsonc`,
+          });
+          return;
+        }
+        try {
+          const event = parseEntity(eventSchema, await Bun.file(path).text(), path);
+          if (event.id !== id) {
+            problems.push({
+              kind: "id_mismatch",
+              id,
+              path,
+              message: `${path}: event payload id ${event.id} does not match filename id ${id}`,
+            });
+          } else {
+            events.push(event);
+          }
+        } catch (err) {
+          problems.push({
+            kind: "read_error",
+            id,
+            path,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }),
+  );
+  problems.sort((a, b) => a.path.localeCompare(b.path));
+  if (problems.length > 0)
+    warnSkippedFiles(
+      dir,
+      problems.map((problem) => problem.message),
+    );
+  return { events: events.sort((a, b) => a.id.localeCompare(b.id)), problems };
+}
+
 export class FixtureDataSource implements WebDataSource {
   /** Root of a `.slop` directory (design.md §3) — the directory that directly contains `config.yaml` and `db/`. */
   constructor(private readonly slopRoot: string) {}
@@ -171,35 +233,36 @@ export class FixtureDataSource implements WebDataSource {
   /** The full `db/events/` directory, fault-tolerantly read — shared by
    * {@link listEventsForTicket} and {@link listEvents} so the two never
    * drift on what counts as a readable event file. */
-  private readAllEvents(): Promise<Event[]> {
-    return readJsoncDir(join(this.slopRoot, "db", "events"), (text, path) =>
-      parseEntity(eventSchema, text, path),
-    );
+  private readAllEvents(): Promise<ListEventsTolerantResult> {
+    return readEventDir(join(this.slopRoot, "db", "events"));
   }
 
   async listEventsForTicket(
     ticketId: TicketId,
     knownSessions?: readonly Session[],
-  ): Promise<Event[]> {
+  ): Promise<ListEventsTolerantResult> {
     // web-every-request-full-rescans: a caller that already fetched this
     // ticket's sessions (handleTicketDetail does, for its own "Sessions"
     // section) can pass them in via `knownSessions` to skip re-scanning the
     // sessions directory a second time in the same request.
-    const [events, sessions] = await Promise.all([
+    const [eventResult, sessions] = await Promise.all([
       this.readAllEvents(),
       knownSessions ? Promise.resolve(knownSessions) : this.listSessionsForTicket(ticketId),
     ]);
     const sessionIds = new Set<string>(sessions.map((s) => s.id));
-    const relevant = events.filter(
+    const relevant = eventResult.events.filter(
       (e) =>
         (e.entity.kind === "ticket" && e.entity.id === ticketId) ||
         (e.entity.kind === "session" && sessionIds.has(e.entity.id)),
     );
     // Event ids are ULIDs (D6): lexicographic order is chronological order.
-    return relevant.sort((a, b) => a.id.localeCompare(b.id));
+    return {
+      events: relevant.sort((a, b) => a.id.localeCompare(b.id)),
+      problems: eventResult.problems,
+    };
   }
 
-  async listEvents(): Promise<Event[]> {
+  async listEvents(): Promise<ListEventsTolerantResult> {
     return this.readAllEvents();
   }
 }

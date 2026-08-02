@@ -266,7 +266,13 @@ import {
 } from "../tickets/overlay.js";
 import { atomicWriteFile } from "./atomic-write.js";
 import { loadConfigDefaultsTolerant } from "./config.js";
-import { listEventShardDirs, listEventsTolerant } from "./events.js";
+import {
+  eventReadProblemSchema,
+  formatEventReadProblems,
+  listEventShardDirs,
+  listEventsTolerant,
+} from "./events.js";
+import type { EventReadProblem } from "./events.js";
 import { isEnoent, readDirSafe } from "./fs-utils.js";
 import type { RepoPaths } from "./paths.js";
 import { listTicketsTolerant } from "./tickets.js";
@@ -308,8 +314,11 @@ import { listTicketsTolerant } from "./tickets.js";
  * started life nullable specifically to allow a later fill-in without a
  * bump) — so, same reasoning as every prior bump, a pre-G4 `index.jsonc`
  * fails validation against the new shape and rebuilds transparently.
+ *
+ * Event-integrity diagnostics bump it 5 -> 6: `event_problems` records
+ * every event omitted from derived activity/awaiting-input overlays.
  */
-export const INDEX_SCHEMA_VERSION = 5;
+export const INDEX_SCHEMA_VERSION = 6;
 
 export const indexTicketRowSchema = z.object({
   id: ticketIdSchema,
@@ -443,6 +452,10 @@ export const dbIndexSchema = z.object({
    * tolerance" above. Empty in the overwhelming common case; never
    * causes `buildIndex` itself to throw. */
   problems: z.array(ticketReadProblemSchema),
+  /** Event files omitted while building event-derived overlays. A
+   * non-empty list forces each load to retry the read so an in-place
+   * repair is visible even when the cheap fingerprint is unchanged. */
+  event_problems: z.array(eventReadProblemSchema),
   /** t-trqk9 (schema v4): every slug currently claimed by more than one
    * ticket. Empty in the overwhelming common case. Never causes
    * `buildIndex` to throw — like `problems` above, this is a loud warning
@@ -694,6 +707,10 @@ function warnAboutIndexProblems(problems: TicketReadProblem[]): void {
   process.stderr.write(`warning: ${formatIndexProblems(problems)}\n`);
 }
 
+function warnAboutEventProblems(problems: EventReadProblem[]): void {
+  process.stderr.write(`warning: ${formatEventReadProblems(problems)}\n`);
+}
+
 /**
  * t-trqk9: render `slug_problems` as a human-actionable, multi-line report
  * — the duplicate-slug analogue of {@link formatIndexProblems}, reused by
@@ -748,7 +765,7 @@ function warnAboutUnrepresentableDuration(field: string, configured: string, ms:
  * fresh fingerprint catches the difference and rebuilds again. */
 export async function buildIndex(paths: RepoPaths, clock: Clock = systemClock): Promise<DbIndex> {
   const fingerprint = await computeContentFingerprint(paths);
-  const [{ tickets, problems }, configDefaults, events] = await Promise.all([
+  const [{ tickets, problems }, configDefaults, eventResult] = await Promise.all([
     listTicketsTolerant(paths),
     // C5: tolerant — never throws, falls back to schema defaults (60m/24h)
     // when config.yaml is missing/unparseable (see repo/config.ts).
@@ -758,6 +775,7 @@ export async function buildIndex(paths: RepoPaths, clock: Clock = systemClock): 
     // the whole index build down.
     listEventsTolerant(paths),
   ]);
+  const { events, problems: eventProblems } = eventResult;
   const staleAfterMs = parseDurationMs(configDefaults.stale_after);
   const reviewStaleAfterMs = parseDurationMs(configDefaults.review_stale_after);
   // duration-huge-stale-after-overflows: an absurdly large stale_after/
@@ -897,6 +915,7 @@ export async function buildIndex(paths: RepoPaths, clock: Clock = systemClock): 
     tickets: rows,
     slugs,
     problems,
+    event_problems: eventProblems,
     slug_problems: slugProblems,
   };
 }
@@ -960,6 +979,13 @@ async function tryReadValidIndex(paths: RepoPaths): Promise<ReadIndexResult> {
     return { ok: false, reason: "invalid_schema" };
   }
 
+  // Event fingerprints intentionally avoid file contents. While any
+  // event remains unreadable, retry every load so repairing that file in
+  // place cannot leave its omission trapped in a "fresh" index.
+  if (parsed.data.event_problems.length > 0) {
+    return { ok: false, reason: "stale_content" };
+  }
+
   // Schema-valid — now the cheap content-staleness check (readdir+stat
   // only, see the module doc's "Content staleness").
   const currentFingerprint = await computeContentFingerprint(paths);
@@ -1004,6 +1030,9 @@ export async function loadIndex(
   // list from an earlier build, and that must stay loud until it's fixed.
   if (result.index.problems.length > 0) {
     warnAboutIndexProblems(result.index.problems);
+  }
+  if (result.index.event_problems.length > 0) {
+    warnAboutEventProblems(result.index.event_problems);
   }
   // t-trqk9: same "never silent" treatment for duplicate slugs — a
   // persisted `slug_problems` list from an earlier build is just as loud
