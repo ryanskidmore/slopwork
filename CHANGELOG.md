@@ -140,6 +140,34 @@ where breaking changes land.
   web` process no longer re-scans the whole db on every request when
   nothing has changed since the last one (the flatfile driver's
   in-process read cache).
+- **Benchmarks reweighted to a realistic event ratio** (G5, t-ukxun):
+  `bench/` now seeds ~9 events per ticket (this repo's own observed
+  dogfood ratio), through the real `events/<YYYY-MM>/` shard layout,
+  instead of a never-measured 2:1 ratio capped at 200,000 events. The
+  1,000,000-ticket rung is dropped (it measured a scale far past where
+  slopwork is designed to run, at real seed/run cost). `docs/benchmarks.md`
+  is refreshed with fresh 1k/10k/100k numbers — the realistic ratio
+  surfaces a real finding: `slop show`/`slop search` (both unconditional
+  full-event-log scans) are markedly slower than the old ratio implied.
+- **Docs corrections from the audit** (G5, t-drz1d): `docs/DECISIONS.md`
+  gained a short preamble disambiguating its own `##` headings' lane-letter
+  numbering (e.g. "D5" = lane D's 5th implementation-plan item) from
+  design.md's separate D1–D17 decision table — additive only, no entries
+  rewritten. `docs/concurrency-and-merging.md` now documents three
+  cross-clone realities honestly: same-slug creation across clones (handled
+  — `reindex --heal`), `active_session` double-claims across clones
+  (unhandled, tracked as t-621mr), and unconditional `updated_at` merge
+  conflicts (accepted v0 behavior, tracked as t-687rg).
+- **Post-G3 polish** (G5, t-z4ci3): the Commander argv shim
+  (`src/cli/argv.ts`) now also covers `update --blocks <±ref>`/
+  `update --relates-to <±ref>` — the same leading-dash-value hazard
+  `--label`/`--discovered-from` already had (e.g. `update <ref> --blocks
+  -oldblocker` now parses correctly). `slop edit`'s non-TTY refusal message
+  names the full current set of `update`'s edge/owner-repair flags
+  (`--clear-owner`/`--clear-parent` added alongside the existing
+  `--parent`/`--blocks`/`--relates-to`/`--owner`). `docs/getting-started.md`
+  refreshed for the current command surface: `slop list`, bulk `done`/`drop`,
+  and `ask`/`answer`/`questions` now appear in the walkthrough.
 
 ### Breaking
 
@@ -170,6 +198,49 @@ where breaking changes land.
   Everything else about sessions is unchanged: harness kind detection,
   `harness.session_id` capture, git branch/commit capture, plans, and end
   summaries all still work exactly as before.
+
+- **Simplification sweep** (G5, product audit): five de-engineering passes,
+  landed together.
+  - **Exit code `3` (`NOT_IMPLEMENTED`) is removed entirely.** It was
+    reserved-but-unreachable scaffolding from early v0 — no command ever
+    threw it. `EXIT_CODES` no longer defines it, and it's gone from
+    README/`docs/cli-reference.md`'s exit-code tables. `4`/`5`/`6` keep
+    their original numbers; nothing is renumbered down to fill the gap, so
+    any existing exit-code-branching logic keeps meaning exactly what it
+    always has.
+  - **One `SLOP_FAKE_NOW` env var replaces three.** `SLOP_STATUS_FAKE_NOW`,
+    `SLOP_READY_FAKE_NOW`, and `SLOP_WEB_FAKE_NOW` (each an identically
+    -shaped, test-only clock override) are consolidated into a single
+    `SLOP_FAKE_NOW`, honored everywhere a clock is injected
+    (`core/clock.ts`'s `resolveFakeClock`). Test-only, never a
+    user-facing/documented flag, absent from every real invocation.
+  - **`adhoc` is folded into `provenance.method`.** The ticket schema's
+    standalone `adhoc: boolean` field is removed — `provenance.method ===
+    "adhoc"` (set by `new --adhoc`) is now the single source of truth for
+    adhoc-ness, whose only behavior is exempting `done` from the
+    review-skip nag. `new --adhoc`'s own behavior is unchanged. A ticket
+    file written before this change that still carries a standalone
+    `adhoc:` key loads fine — the unknown key is silently ignored, the
+    same pattern this changelog's transcript-removal entry established for
+    `transcript_ref`.
+  - **`--budget` elision is one shared strategy, not six-plus bespoke
+    ladders.** `ready`/`list`/`search`/`status`/`events`/`questions`/
+    `context`/`show --context` all now go through one function
+    (`core/budget.ts`'s `renderEntriesWithBudget`) — the per-command
+    elision orderings and the context pack's old session-then-binary
+    -search-details_md ladder are gone in favor of one generic "drop the
+    least-important entries from the tail" rule. Guarantees are
+    unchanged: `--json` under budget is always valid, never truncated
+    mid-structure; `counts`/`derived`/`problems`-shaped summary fields are
+    never elided; every response carries an explicit elision indicator;
+    `events`' `next_cursor`/`has_more` still let a caller resume without
+    losing events. `docs/cli-reference.md` gained one shared "Budget"
+    section replacing the per-command paragraphs.
+  - Dead web components (`components/ui/badge.tsx`, `label.tsx`, and the
+    now-unused `@radix-ui/react-label` dependency) and dead test scaffolding
+    (`tests/support/cli-harness.ts`'s unused `BOOTSTRAP_DEFAULTS`, the
+    already-removed `SLOP_TEST_CLAUDE_HOME` knob still being scrubbed from
+    several env-strip lists) are removed.
 
 ## 0.2.0 — 2026-07-24
 
