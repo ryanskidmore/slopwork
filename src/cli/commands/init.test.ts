@@ -9,8 +9,9 @@ import { runInit } from "./init.js";
 
 // In-process coverage of `runInit` — the CLI-facing wrapper around D1's
 // full `slop init` flow (config.yaml autodetection, db/ skeleton +
-// .gitkeep placeholders, AGENTS.md/SKILL.md generation, .gitignore
-// management, the CLAUDE.md link offer). Driven directly against a fresh
+// .gitkeep placeholders, AGENTS.md/SKILL.md generation, .gitignore/
+// .gitattributes management (t-mgx82), the CLAUDE.md link offer). Driven
+// directly against a fresh
 // mkdtemp() root via withCwd (tests/support/cli-harness.ts) — every call
 // below deterministically runs with CLAUDECODE unset (withCwd scrubs it,
 // and every other harness-identity env var, for the duration of the call
@@ -50,6 +51,10 @@ describe("runInit — fresh repo", () => {
 
     const gitignore = await readFile(join(root, ".gitignore"), "utf8");
     expect(gitignore).toContain(".slop/");
+
+    const gitattributes = await readFile(join(root, ".gitattributes"), "utf8");
+    expect(gitattributes).toContain(".slop/db/** linguist-generated gitlab-generated");
+    expect(gitattributes).toContain(".slop/db/**/*.jsonc text eol=lf");
   });
 
   it("--jira sets remotes.jira non-interactively", async () => {
@@ -109,6 +114,48 @@ describe("runInit — re-running against an already-initialized repo", () => {
     expect(after).toBe(before);
     const config = configSchema.parse(parseConfigYamlText(after));
     expect(config.project).toBe("original");
+  });
+
+  it("re-running init is byte-identical for .gitattributes (t-mgx82: no churn)", async () => {
+    const root = await makeTempRepo("slop-init-gitattributes-idempotent-");
+    const out1 = captureOutput();
+    try {
+      await withCwd(root, () => runInit({ yes: true, project: "p", user: "u" }));
+    } finally {
+      out1.restore();
+    }
+    const gitattributesPath = join(root, ".gitattributes");
+    const first = await readFile(gitattributesPath, "utf8");
+
+    const out2 = captureOutput();
+    try {
+      await withCwd(root, () => runInit({ yes: true }));
+    } finally {
+      out2.restore();
+    }
+    const second = await readFile(gitattributesPath, "utf8");
+    expect(second).toBe(first);
+    expect(second.match(/linguist-generated/g)).toHaveLength(1);
+    expect(second.match(/eol=lf/g)).toHaveLength(1);
+  });
+
+  it("appends the managed section to an existing .gitattributes without touching user content", async () => {
+    const root = await makeTempRepo("slop-init-gitattributes-append-");
+    const userContent = "*.png binary\n*.psd -text -diff\n";
+    await writeFile(join(root, ".gitattributes"), userContent);
+
+    const out = captureOutput();
+    try {
+      await withCwd(root, () => runInit({ yes: true, project: "p", user: "u" }));
+    } finally {
+      out.restore();
+    }
+
+    const gitattributes = await readFile(join(root, ".gitattributes"), "utf8");
+    expect(gitattributes).toContain(userContent.trim());
+    expect(gitattributes).toContain(".slop/db/** linguist-generated gitlab-generated");
+    expect(gitattributes).toContain(".slop/db/**/*.jsonc text eol=lf");
+    expect(gitattributes.startsWith(userContent.trimEnd())).toBe(true);
   });
 
   it("throws a SlopError when an existing config.yaml fails schema validation", async () => {

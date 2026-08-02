@@ -11,6 +11,16 @@ where breaking changes land.
 
 ### Added
 
+- **`slop init` manages `.gitattributes`** (t-mgx82). Same idempotent,
+  append-don't-clobber managed-section convention `init` already used for
+  `.gitignore`: created if absent, appended if `.gitattributes` exists
+  without the section, byte-identical on repeat runs, and never touches
+  content outside its own markers. The managed section marks the tracker
+  database as generated for both GitHub and GitLab
+  (`.slop/db/** linguist-generated gitlab-generated`, so it collapses in
+  PR/MR diffs by default) and scopes LF enforcement to just the db
+  (`.slop/db/**/*.jsonc text eol=lf`), which the flatfile db's merge story
+  depends on.
 - **`slop ready` is leaf-first.** Direct or transitive parents with any
   nonterminal descendant are omitted from both the strict and `--resumable`
   queues, so agents pull actionable leaf work instead of umbrella tickets.

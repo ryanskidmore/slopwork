@@ -5,21 +5,22 @@
  * writes agent onboarding (`.slop/AGENTS.md`, and
  * `.claude/skills/slopwork/SKILL.md` when a Claude Code setup is
  * detected — all rendered from the single canonical source in
- * src/cli/onboarding/), maintains a clearly-labelled, idempotent section of
- * `.gitignore` (D14/D16), and (Fix 4, adversarial review / E2 Defect 2)
- * lays down a tracked `.gitkeep` placeholder in each of `db/tickets/`,
- * `db/sessions/`, `db/events/` so the directory skeleton is always
- * complete and committable, even before any entity of that kind exists —
- * see `writeDbDirPlaceholders`'s doc below.
+ * src/cli/onboarding/), maintains clearly-labelled, idempotent managed
+ * sections of `.gitignore` (D14/D16) and `.gitattributes` (t-mgx82: GitHub/
+ * GitLab generated-file markers + scoped LF enforcement for the db), and
+ * (Fix 4, adversarial review / E2 Defect 2) lays down a tracked `.gitkeep`
+ * placeholder in each of `db/tickets/`, `db/sessions/`, `db/events/` so the
+ * directory skeleton is always complete and committable, even before any
+ * entity of that kind exists — see `writeDbDirPlaceholders`'s doc below.
  *
  * Safety contract this file must uphold end to end: re-running `init`
  * against an already-initialized repo never touches `config.yaml` or any
  * `db/` content — only the generated docs (AGENTS.md/SKILL.md, always
  * fully regenerated — they're pure derivations of config + the canonical
- * source, never hand-edited) and the managed `.gitignore` section are
- * refreshed. And no code path here may block on stdin unless it already
- * checked {@link isInteractive} — an agent driving this unattended must
- * never hang.
+ * source, never hand-edited) and the managed `.gitignore`/`.gitattributes`
+ * sections are refreshed. And no code path here may block on stdin unless
+ * it already checked {@link isInteractive} — an agent driving this
+ * unattended must never hang.
  */
 import { existsSync } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
@@ -34,6 +35,7 @@ import {
 } from "../../core/index.js";
 import { type RepoPaths, atomicWriteFile, ensureDbDirs, findRepoRoot } from "../../repo/index.js";
 import { detectClaudeCode } from "../init/claude-detect.js";
+import { computeGitattributesLines, upsertGitattributesSection } from "../init/gitattributes.js";
 import { computeGitignoreLines, upsertGitignoreSection } from "../init/gitignore.js";
 import {
   getGitRemoteUrl,
@@ -227,6 +229,19 @@ async function updateGitignore(root: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// .gitattributes (t-mgx82)
+// ---------------------------------------------------------------------------
+
+async function updateGitattributes(root: string): Promise<void> {
+  const gitattributesPath = join(root, ".gitattributes");
+  const existing = existsSync(gitattributesPath) ? await readFile(gitattributesPath, "utf8") : "";
+  const { text, changed } = upsertGitattributesSection(existing, computeGitattributesLines());
+  if (changed) {
+    await atomicWriteFile(gitattributesPath, text);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // CLAUDE.md link offer (design.md §5.1)
 // ---------------------------------------------------------------------------
 
@@ -289,7 +304,7 @@ function report(args: {
   if (alreadyInitialized && wasExisting) {
     process.stdout.write(
       `slopwork is already initialized at ${root} — config.yaml and db/ left untouched; ` +
-        `refreshed AGENTS.md${skillInstalled ? "/SKILL.md" : ""} and .gitignore.\n`,
+        `refreshed AGENTS.md${skillInstalled ? "/SKILL.md" : ""}, .gitignore, and .gitattributes.\n`,
     );
   } else {
     process.stdout.write(`Initialized slopwork at ${root}\n`);
@@ -305,6 +320,7 @@ function report(args: {
     );
   }
   process.stdout.write("  .gitignore          (slopwork section up to date)\n");
+  process.stdout.write("  .gitattributes      (slopwork section up to date)\n");
 
   if (claudeMdResult === "linked") {
     process.stdout.write("  CLAUDE.md           (added a pointer to slopwork)\n");
@@ -337,6 +353,7 @@ export async function runInit(opts: InitOptions): Promise<void> {
   await writeAgentsMd(paths, config);
   const skillInstalled = await maybeInstallSkill(root, config);
   await updateGitignore(root);
+  await updateGitattributes(root);
   const claudeMdResult = await maybeLinkClaudeMd(root, opts);
 
   report({ root, alreadyInitialized, wasExisting, skillInstalled, claudeMdResult });
@@ -347,7 +364,7 @@ export function registerInitCommand(program: Command): void {
     .command("init")
     .description(
       "Initialize .slop/ in this repo: config.yaml (with repo/jira autodetection), " +
-        "db/ directories, AGENTS.md, and gitignore entries.",
+        "db/ directories, AGENTS.md, and managed gitignore/gitattributes entries.",
     )
     .option("--jira <url>", 'set remotes.jira non-interactively (pass "" for explicitly blank)')
     .option("--project <name>", "override the autodetected project name")

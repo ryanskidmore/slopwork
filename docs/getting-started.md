@@ -46,6 +46,15 @@ It writes:
   detected in this repo
 - a managed section in `.gitignore` (the derived index, the lock file,
   and atomic-write temp files)
+- a managed section in `.gitattributes` — `.slop/db/** linguist-generated
+  gitlab-generated` so the tracker database collapses in PR/MR diffs on
+  both GitHub and GitLab, plus `.slop/db/**/*.jsonc text eol=lf` scoping LF
+  enforcement to just the db (the flatfile merge story depends on it). If
+  your repo already has an equivalent hand-written rule (as this repo's own
+  root `.gitattributes` did, before `init` managed this section), it's safe
+  to leave it — `init` never rewrites or dedupes lines outside its own
+  managed section — but you can delete it now that `init` owns an
+  equivalent.
 
 `--yes` accepts every autodetected default and never prompts (safe for
 agents/CI). Interactively, it will also ask whether to add a pointer to an
@@ -53,7 +62,7 @@ existing `CLAUDE.md`. Useful flags: `--jira <url>` (pass `""` to explicitly
 leave it blank), `--project <name>`, `--user <name>`, `--link-claude-md`.
 Re-running `init` on an already-initialized repo never touches
 `config.yaml` or `db/` — it only refreshes the generated docs and the
-gitignore section.
+gitignore/gitattributes sections.
 
 Full flag reference: [CLI reference → `init`](cli-reference.md#init).
 
