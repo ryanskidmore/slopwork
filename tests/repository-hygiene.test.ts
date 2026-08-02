@@ -7,6 +7,27 @@ import { describe, expect, it } from "vitest";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "..");
 
+/**
+ * Checked-in binary assets (e.g. tests/browser/**\/*.spec.ts-snapshots'
+ * Playwright reference screenshots) routinely contain literal NUL bytes and
+ * byte sequences that coincidentally match the mojibake markers below —
+ * that's normal for arbitrary binary data, not a text-encoding problem. This
+ * suite's job is source/text hygiene, so known binary extensions are
+ * excluded from the scan rather than producing permanent false positives the
+ * moment any binary asset is committed.
+ */
+const BINARY_EXTENSIONS = [
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".ico",
+  ".woff",
+  ".woff2",
+  ".ttf",
+  ".eot",
+];
+
 function maintainedPaths(): string[] {
   const result = spawnSync(
     "git",
@@ -16,7 +37,12 @@ function maintainedPaths(): string[] {
   if (result.status !== 0) {
     throw new Error(`git ls-files failed: ${result.stderr.toString("utf8")}`);
   }
-  return result.stdout.toString("utf8").split("\0").filter(Boolean).sort();
+  return result.stdout
+    .toString("utf8")
+    .split("\0")
+    .filter(Boolean)
+    .filter((path) => !BINARY_EXTENSIONS.some((ext) => path.toLowerCase().endsWith(ext)))
+    .sort();
 }
 
 describe("repository source hygiene", () => {

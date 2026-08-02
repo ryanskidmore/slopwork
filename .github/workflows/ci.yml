@@ -39,7 +39,14 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # test:browser (Playwright) needs a real Chromium; installed once here
+      # rather than folded into check:required, since it's an OS-level
+      # browser download/apt-deps step, not a `bun run` script concern.
+      - name: Install Playwright Chromium
+        run: bunx playwright install --with-deps chromium
+
       # One repository-owned gate is shared with release.yml, so release
-      # cannot silently use weaker tests or a different package smoke test.
+      # cannot silently use weaker tests, skip the frontend/browser suites,
+      # or use a different package smoke test.
       - name: Run required gate
         run: bun run check:required

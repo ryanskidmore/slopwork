@@ -1,28 +1,121 @@
-import { GitBranch } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronsDown, ChevronsUp, GitBranch } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { TreeNodeDTO, TreeResponseDTO } from "../../api/types.js";
 import { EmptyState } from "../components/empty-state.js";
+import { QueryErrorState } from "../components/query-error-state.js";
 import { LabelChips, OverlayBadges, PriorityBadge, StateBadge } from "../components/state-badge.js";
 import { TicketLink } from "../components/ticket-link.js";
+import { Button } from "../components/ui/button.js";
 import { Skeleton } from "../components/ui/skeleton.js";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../components/ui/tooltip.js";
+import { useApiQuery } from "../hooks/use-api-query.js";
 import { fetchTree } from "../lib/api.js";
 
-function TreeNode({ node }: { node: TreeNodeDTO }) {
+export const TREE_EXPANSION_STORAGE_KEY = "slop-web-tree-expanded";
+
+function loadTree(signal: AbortSignal): Promise<TreeResponseDTO> {
+  return fetchTree({ signal });
+}
+
+function readExpanded(): Set<string> | null {
+  try {
+    const raw = window.localStorage.getItem(TREE_EXPANSION_STORAGE_KEY);
+    if (raw === null) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed)
+      ? new Set(parsed.filter((value): value is string => typeof value === "string"))
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeExpanded(expanded: ReadonlySet<string>): void {
+  try {
+    window.localStorage.setItem(TREE_EXPANSION_STORAGE_KEY, JSON.stringify([...expanded].sort()));
+  } catch {
+    // Storage may be unavailable in privacy mode; the in-memory controls still work.
+  }
+}
+
+function branchIds(nodes: readonly TreeNodeDTO[]): string[] {
+  return nodes.flatMap((node) => [
+    ...(node.children.length > 0 ? [node.ticket.id] : []),
+    ...branchIds(node.children),
+  ]);
+}
+
+function defaultExpanded(nodes: readonly TreeNodeDTO[]): Set<string> {
+  return new Set(nodes.filter((node) => node.children.length > 0).map((node) => node.ticket.id));
+}
+
+function TreeNode({
+  node,
+  depth,
+  expanded,
+  onToggle,
+}: {
+  node: TreeNodeDTO;
+  depth: number;
+  expanded: ReadonlySet<string>;
+  onToggle: (id: string) => void;
+}) {
+  const hasChildren = node.children.length > 0;
+  const isExpanded = hasChildren && expanded.has(node.ticket.id);
+  const toggleLabel = `${isExpanded ? "Collapse" : "Expand"} children of ${node.ticket.name}`;
+
   return (
-    <li>
-      <div className="flex flex-wrap items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-accent/60">
-        <StateBadge state={node.ticket.state} />
-        <PriorityBadge priority={node.ticket.priority} />
-        <TicketLink ticket={node.ticket} />
-        <span className="font-mono text-xs text-muted-foreground">{node.ticket.slug}</span>
-        <OverlayBadges overlay={node.ticket.overlay} />
-        <LabelChips labels={node.ticket.labels} />
-        {node.external_parent && <ExternalParentBadge parent={node.external_parent} />}
+    <li role="treeitem" aria-expanded={hasChildren ? isExpanded : undefined}>
+      <div
+        className="grid min-h-9 min-w-0 grid-cols-[1.75rem_minmax(0,1fr)] items-start rounded-md py-1 pr-1.5 hover:bg-accent/60"
+        style={{ paddingInlineStart: `${Math.min(depth, 6) * 12}px` }}
+      >
+        {hasChildren ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                aria-label={toggleLabel}
+                onClick={() => onToggle(node.ticket.id)}
+              >
+                {isExpanded ? (
+                  <ChevronDown aria-hidden="true" />
+                ) : (
+                  <ChevronRight aria-hidden="true" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{toggleLabel}</TooltipContent>
+          </Tooltip>
+        ) : (
+          <span className="size-7" aria-hidden="true" />
+        )}
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5 pt-1">
+          <StateBadge state={node.ticket.state} />
+          <PriorityBadge priority={node.ticket.priority} />
+          <span className="min-w-0 max-w-full [&_a]:min-w-0 [&_a]:break-words [&>span]:min-w-0 sm:overflow-hidden sm:[&_a]:block sm:[&_a]:truncate sm:[&_a]:break-normal">
+            <TicketLink ticket={node.ticket} />
+          </span>
+          <span className="max-w-full break-all font-mono text-xs text-muted-foreground sm:truncate sm:break-normal">
+            {node.ticket.slug}
+          </span>
+          <OverlayBadges overlay={node.ticket.overlay} />
+          <LabelChips labels={node.ticket.labels} />
+          {node.external_parent && <ExternalParentBadge parent={node.external_parent} />}
+        </div>
       </div>
-      {node.children.length > 0 && (
-        <ul className="ml-5 border-l border-border pl-3">
+      {isExpanded && (
+        <ul role="group" className="border-l border-border/70">
           {node.children.map((child) => (
-            <TreeNode key={child.ticket.id} node={child} />
+            <TreeNode
+              key={child.ticket.id}
+              node={child}
+              depth={depth + 1}
+              expanded={expanded}
+              onToggle={onToggle}
+            />
           ))}
         </ul>
       )}
@@ -58,38 +151,65 @@ function ExternalParentBadge({ parent }: { parent: NonNullable<TreeNodeDTO["exte
 }
 
 export function TreePage() {
-  const [data, setData] = useState<TreeResponseDTO | null>(null);
+  const { data, error, loading, retry } = useApiQuery<TreeResponseDTO>(loadTree);
+  const [expanded, setExpanded] = useState<Set<string> | null>(() => readExpanded());
 
   useEffect(() => {
-    let cancelled = false;
-    fetchTree().then((res) => {
-      if (!cancelled) setData(res);
+    if (data && expanded === null) setExpanded(defaultExpanded(data.roots));
+  }, [data, expanded]);
+
+  useEffect(() => {
+    if (expanded !== null) writeExpanded(expanded);
+  }, [expanded]);
+
+  const visibleExpanded = expanded ?? new Set<string>();
+  const toggle = (id: string) => {
+    setExpanded((current) => {
+      const next = new Set(current ?? (data ? defaultExpanded(data.roots) : []));
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  };
+  const hasBranches = Boolean(data && branchIds(data.roots).length > 0);
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-lg font-semibold">Tree</h1>
-        {data && (
-          <p className="text-sm text-muted-foreground">
-            {data.roots.length} root{data.roots.length === 1 ? "" : "s"} of {data.total} ticket
-            {data.total === 1 ? "" : "s"} total. External parents show as an "↑" badge, not a node
-            you can open.
-          </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold">Tree</h1>
+          {data && (
+            <p className="text-sm text-muted-foreground">
+              {data.roots.length} root{data.roots.length === 1 ? "" : "s"} of {data.total} ticket
+              {data.total === 1 ? "" : "s"} total. External parents appear as linked badges.
+            </p>
+          )}
+        </div>
+        {hasBranches && (
+          <div className="flex shrink-0 items-center gap-1" aria-label="Tree display controls">
+            <TreeControl
+              label="Expand all branches"
+              icon={ChevronsDown}
+              onClick={() => setExpanded(new Set(branchIds(data?.roots ?? [])))}
+            />
+            <TreeControl
+              label="Collapse all branches"
+              icon={ChevronsUp}
+              onClick={() => setExpanded(new Set())}
+            />
+          </div>
         )}
       </div>
 
-      {!data && (
+      {loading && (
         <div className="flex flex-col gap-2">
           <Skeleton className="h-7 w-2/3" />
           <Skeleton className="h-7 w-1/2" />
           <Skeleton className="h-7 w-3/5" />
         </div>
       )}
+
+      {error && <QueryErrorState title="Ticket tree unavailable" error={error} onRetry={retry} />}
 
       {data && data.roots.length === 0 && (
         <EmptyState
@@ -100,12 +220,39 @@ export function TreePage() {
       )}
 
       {data && data.roots.length > 0 && (
-        <ul className="flex flex-col gap-1">
+        <ul role="tree" aria-label="Ticket hierarchy" className="flex min-w-0 flex-col gap-1">
           {data.roots.map((root) => (
-            <TreeNode key={root.ticket.id} node={root} />
+            <TreeNode
+              key={root.ticket.id}
+              node={root}
+              depth={0}
+              expanded={visibleExpanded}
+              onToggle={toggle}
+            />
           ))}
         </ul>
       )}
     </div>
+  );
+}
+
+function TreeControl({
+  label,
+  icon: Icon,
+  onClick,
+}: {
+  label: string;
+  icon: typeof ChevronsDown;
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="outline" size="icon" aria-label={label} onClick={onClick}>
+          <Icon aria-hidden="true" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 }

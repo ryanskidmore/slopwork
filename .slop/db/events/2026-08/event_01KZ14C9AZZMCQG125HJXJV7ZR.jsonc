@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ14C9AZZMCQG125HJXJV7ZR",
+  "actor": {
+    "name": "codex-web-resilience",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ1467SS3N0PZ9EJ6XCCPJ66"
+  },
+  "payload": {
+    "progress": "Mapped the failure and test surfaces: tree/review/stale/questions have uncaught non-abortable fetches, router has no errorElement, tree eagerly expands all nodes with cumulative indentation, mobile nav icon links lose names below sm, and CI has no DOM/browser gate. Chosen design: shared timeout+abort query hook, explicit retry state, persisted depth-1 tree expansion, separate jsdom Vitest config, and Chromium Playwright smoke against the committed web fixture."
+  },
+  "at": "2026-08-02T11:40:04.831Z"
+}

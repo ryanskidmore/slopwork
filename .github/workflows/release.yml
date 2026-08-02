@@ -47,8 +47,15 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # Identical to CI: includes coverage thresholds, compiled-binary smoke,
-      # and installation/execution of the exact npm tarball.
+      # test:browser (Playwright) needs a real Chromium; installed once here
+      # rather than folded into check:required, since it's an OS-level
+      # browser download/apt-deps step, not a `bun run` script concern.
+      - name: Install Playwright Chromium
+        run: bunx playwright install --with-deps chromium
+
+      # Identical to CI: includes the frontend/browser suites, coverage
+      # thresholds, compiled-binary smoke, and installation/execution of the
+      # exact npm tarball.
       - name: Run required gate
         run: bun run check:required
 

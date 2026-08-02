@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ146J7RC6KX09XSQ88FFSSX",
+  "actor": {
+    "name": "codex-web-resilience",
+    "kind": "agent"
+  },
+  "session": "session_01KZ146J7GCEME06TYK1CBHHDM",
+  "verb": "ticket.state_changed",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ1467SS3N0PZ9EJ6XCCPJ66"
+  },
+  "payload": {
+    "from": "open",
+    "to": "in_progress"
+  },
+  "at": "2026-08-02T11:36:57.336Z"
+}

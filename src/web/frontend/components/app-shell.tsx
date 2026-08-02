@@ -6,10 +6,11 @@ import {
   Search,
   TimerReset,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { fetchConfig } from "../lib/api.js";
 import type { ConfigDTO } from "../../api/types.js";
+import { useApiQuery } from "../hooks/use-api-query.js";
+import { fetchConfig } from "../lib/api.js";
 import { CommandPalette, useCommandPaletteShortcut } from "./command-palette.js";
 import { ThemeToggle } from "./theme-toggle.js";
 import { Button } from "./ui/button.js";
@@ -24,31 +25,26 @@ const NAV_ITEMS = [
 
 function navClass(isActive: boolean): string {
   return (
-    "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors " +
+    "flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-md px-2 text-sm font-medium transition-colors " +
+    "sm:inline-flex sm:h-auto sm:px-2.5 sm:py-1.5 " +
     (isActive
       ? "bg-secondary text-secondary-foreground"
       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground")
   );
 }
 
+function loadConfig(signal: AbortSignal): Promise<ConfigDTO> {
+  return fetchConfig({ signal });
+}
+
 export function AppShell() {
-  const [config, setConfig] = useState<ConfigDTO | null>(null);
+  const {
+    data: config,
+    error: configError,
+    retry: retryConfig,
+  } = useApiQuery<ConfigDTO>(loadConfig);
   const [paletteOpen, setPaletteOpen] = useState(false);
   useCommandPaletteShortcut(setPaletteOpen);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchConfig()
-      .then((c) => {
-        if (!cancelled) setConfig(c);
-      })
-      .catch(() => {
-        /* best-effort — the topbar just shows a generic label if this fails */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -59,7 +55,7 @@ export function AppShell() {
         Skip to content
       </a>
       <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/75">
-        <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-3 sm:gap-4 sm:px-4">
+        <div className="mx-auto grid max-w-7xl grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 px-3 py-2 sm:flex sm:h-14 sm:gap-4 sm:px-4 sm:py-0">
           <div className="flex shrink-0 items-center gap-2 font-semibold">
             <SpineMark />
             <span className="hidden sm:inline">
@@ -70,7 +66,7 @@ export function AppShell() {
             </span>
           </div>
           <nav
-            className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto sm:gap-1"
+            className="order-last col-span-4 grid min-w-0 grid-cols-5 items-center gap-1 sm:order-none sm:flex sm:flex-1"
             aria-label="Main"
           >
             {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
@@ -78,6 +74,7 @@ export function AppShell() {
                 key={to}
                 to={to}
                 aria-label={label}
+                title={label}
                 className={({ isActive }) => navClass(isActive)}
               >
                 <Icon className="size-4" aria-hidden="true" />
@@ -107,6 +104,17 @@ export function AppShell() {
           className="border-b border-overlay-stale/40 bg-overlay-stale/10 px-4 py-2 text-sm text-overlay-stale"
         >
           <strong className="font-semibold">Config warning:</strong> {config.warning}
+        </div>
+      )}
+      {configError && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-center gap-x-2 border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive"
+        >
+          Project configuration is unavailable.
+          <button type="button" className="font-medium underline" onClick={retryConfig}>
+            Retry
+          </button>
         </div>
       )}
       <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">

@@ -81,6 +81,8 @@ crashing.
 ```sh
 bun install            # install dependencies
 bun run test           # run the test suite (vitest)
+bun run test:web       # run frontend component tests (vitest + jsdom)
+bun run test:browser   # run browser tests (requires Chromium below)
 bun run lint            # lint src/ and tests/ (oxlint)
 bun run format          # apply formatting (oxfmt, in place)
 bun run format:check     # check formatting without writing
@@ -120,6 +122,9 @@ bun run build:web        # one-shot: regenerate src/web/generated/{app.js,app.cs
 bun run dev:web           # same, but rebuilds on every src/web/frontend/ change
 bun run typecheck:web      # tsc --noEmit against src/web/frontend/tsconfig.json (DOM libs, react-jsx —
                             # deliberately separate from the root tsconfig's Bun-only setup)
+bun run test:web           # component behavior under jsdom
+bunx playwright install chromium  # one-time local browser install
+bun run test:browser       # desktop/mobile flows against a real fixture server
 ```
 
 `build:web` is also a `pretest`/`prebuild` hook (see `package.json`), so `bun run test` and
@@ -202,6 +207,11 @@ and `--version`).
   land its `tests/acceptance/<ID>.test.ts` alongside its implementation.
 - The test runner is **vitest** (`bun run test` → `vitest run`), which runs cleanly under Bun; no
   fallback to `bun test` was needed. See `vitest.config.ts`.
+- **Frontend component tests** use their own jsdom config (`bun run test:web`) so DOM behavior is
+  covered without weakening the root suite's Bun-only environment. **Browser tests** use
+  Playwright (`bun run test:browser`) against `tests/fixtures/web-db`, with desktop/mobile layout,
+  keyboard, retry, persistence, and screenshot checks. Install its browser once with
+  `bunx playwright install chromium` (`--with-deps` is used by CI/release runners).
 - **Sandboxing**: every test runs against an isolated `mkdtemp()` temp directory, never this repo's
   own root, and a `globalSetup` hook (`tests/support/repo-slop-guard.ts`) hashes this repo's own
   `.slop/` before and after the whole suite, failing the run loudly if anything touched it.
