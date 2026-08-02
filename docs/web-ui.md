@@ -78,11 +78,22 @@ for each row, with `blocked`/`stale`/`awaiting_input` badges where they apply.
 
 ### Tree view (`/tree`)
 
-The parent/child hierarchy. An external parent (`jira:PROJ-123`) renders
-as a **badge linking out to the Jira URL** built from `remotes.jira` in
-`config.yaml` — external parents terminate the local tree (they're a leaf
--upward badge, never a traversable node), matching
-[Concepts → Edge](concepts.md#edge).
+The parent/child hierarchy starts with root branches expanded, keeping every
+root and its immediate children visible without eagerly opening an arbitrarily
+deep repository. Each branch has a named expand/collapse control; toolbar
+controls expand or collapse the whole hierarchy, and the choice persists in
+the browser across reloads. An external parent (`jira:PROJ-123`) renders as a
+**badge linking out to the Jira URL** built from `remotes.jira` in `config.yaml`
+— external parents terminate the local tree (they're a leaf-upward badge,
+never a traversable node), matching [Concepts → Edge](concepts.md#edge).
+
+## Failure handling
+
+Page reads are abortable and time out rather than leaving an indefinite loading
+state. Tree, review, questions, and stale views show the server error with an
+explicit retry action; configuration failure remains a non-blocking banner.
+Unexpected route/render failures use a page-level recovery view with reload and
+ticket-list actions. The viewer remains read-only throughout.
 
 ### Ticket detail (`/tickets/:ref`)
 

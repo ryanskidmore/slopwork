@@ -39,9 +39,9 @@ How to cut a release of `slopwork` and publish it to npm.
    Pushing the `vX.Y.Z` tag is what triggers `.github/workflows/release.yml`.
 
 3. **Watch the release run** (Actions tab → Release). It runs the same `bun run check:required`
-   gate as CI (lint, format check, typecheck, coverage thresholds, build, compiled-binary smoke,
-   and installed-tarball verification), confirms the pushed tag matches `package.json`'s version,
-   then runs `npm publish --access public`,
+   gate as CI (lint, format check, typecheck, coverage thresholds, frontend component tests, build,
+   browser smoke tests, compiled-binary smoke, and installed-tarball verification), confirms the
+   pushed tag matches `package.json`'s version, then runs `npm publish --access public`,
    authenticating via OIDC trusted publishing (no token secret involved). Provenance attestation
    is generated automatically as part of trusted publishing. Any gate failure aborts the release
    before anything is published.

@@ -1,14 +1,19 @@
 import { HelpCircle } from "lucide-react";
-import { useEffect, useState } from "react";
 import type { QuestionsResponseDTO } from "../../api/types.js";
 import { EmptyState } from "../components/empty-state.js";
+import { QueryErrorState } from "../components/query-error-state.js";
 import { StateBadge } from "../components/state-badge.js";
 import { TicketLink } from "../components/ticket-link.js";
 import { Card, CardContent } from "../components/ui/card.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { useNow } from "../hooks/use-now.js";
+import { useApiQuery } from "../hooks/use-api-query.js";
 import { fetchQuestions } from "../lib/api.js";
 import { formatAbsolute, formatRelative } from "../lib/format.js";
+
+function loadQuestions(signal: AbortSignal): Promise<QuestionsResponseDTO> {
+  return fetchQuestions({ signal });
+}
 
 /**
  * `/questions` — the elicitations inbox (G4, t-jggg9): every unanswered
@@ -18,18 +23,8 @@ import { formatAbsolute, formatRelative } from "../lib/format.js";
  * question, unlike review's one-MR-per-ticket).
  */
 export function QuestionsPage() {
-  const [data, setData] = useState<QuestionsResponseDTO | null>(null);
+  const { data, error, loading, retry } = useApiQuery<QuestionsResponseDTO>(loadQuestions);
   const now = useNow();
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchQuestions().then((res) => {
-      if (!cancelled) setData(res);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   return (
     <div className="flex flex-col gap-4">
@@ -43,12 +38,14 @@ export function QuestionsPage() {
         )}
       </div>
 
-      {!data && (
+      {loading && (
         <div className="flex flex-col gap-2">
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-24 w-full" />
         </div>
       )}
+
+      {error && <QueryErrorState title="Questions unavailable" error={error} onRetry={retry} />}
 
       {data && data.groups.length === 0 && (
         <EmptyState

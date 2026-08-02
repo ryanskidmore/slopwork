@@ -1,7 +1,7 @@
 import { GitPullRequestArrow } from "lucide-react";
-import { useEffect, useState } from "react";
 import type { ReviewResponseDTO } from "../../api/types.js";
 import { EmptyState } from "../components/empty-state.js";
+import { QueryErrorState } from "../components/query-error-state.js";
 import { PriorityBadge, StaleBadge } from "../components/state-badge.js";
 import { TicketLink } from "../components/ticket-link.js";
 import { Skeleton } from "../components/ui/skeleton.js";
@@ -15,19 +15,14 @@ import {
 } from "../components/ui/table.js";
 import { fetchReview } from "../lib/api.js";
 import { formatAbsolute, formatDurationShort } from "../lib/format.js";
+import { useApiQuery } from "../hooks/use-api-query.js";
+
+function loadReview(signal: AbortSignal): Promise<ReviewResponseDTO> {
+  return fetchReview({ signal });
+}
 
 export function ReviewPage() {
-  const [data, setData] = useState<ReviewResponseDTO | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchReview().then((res) => {
-      if (!cancelled) setData(res);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { data, error, loading, retry } = useApiQuery<ReviewResponseDTO>(loadReview);
 
   return (
     <div className="flex flex-col gap-4">
@@ -41,12 +36,14 @@ export function ReviewPage() {
         )}
       </div>
 
-      {!data && (
+      {loading && (
         <div className="flex flex-col gap-2">
           <Skeleton className="h-9 w-full" />
           <Skeleton className="h-9 w-full" />
         </div>
       )}
+
+      {error && <QueryErrorState title="Review queue unavailable" error={error} onRetry={retry} />}
 
       {data && data.tickets.length === 0 && (
         <EmptyState

@@ -49,8 +49,8 @@ async function getJson<T>(path: string, options: ApiRequestOptions = {}): Promis
   return (await res.json()) as T;
 }
 
-export function fetchConfig(): Promise<ConfigDTO> {
-  return getJson("/api/config");
+export function fetchConfig(options: ApiRequestOptions = {}): Promise<ConfigDTO> {
+  return getJson("/api/config", options);
 }
 
 export interface TicketListFilters {
@@ -75,22 +75,25 @@ export function fetchTicketList(
   return getJson(`/api/tickets${qs ? `?${qs}` : ""}`, options);
 }
 
-export function fetchTree(): Promise<TreeResponseDTO> {
-  return getJson("/api/tree");
+export function fetchTree(options: ApiRequestOptions = {}): Promise<TreeResponseDTO> {
+  return getJson("/api/tree", options);
 }
 
-export function fetchTicketDetail(ref: string): Promise<TicketDetailDTO> {
-  return getJson(`/api/tickets/${encodeURIComponent(ref)}`);
+export function fetchTicketDetail(
+  ref: string,
+  options: ApiRequestOptions = {},
+): Promise<TicketDetailDTO> {
+  return getJson(`/api/tickets/${encodeURIComponent(ref)}`, options);
 }
 
-export function fetchReview(): Promise<ReviewResponseDTO> {
-  return getJson("/api/review");
+export function fetchReview(options: ApiRequestOptions = {}): Promise<ReviewResponseDTO> {
+  return getJson("/api/review", options);
 }
 
-export function fetchStale(): Promise<StaleResponseDTO> {
-  return getJson("/api/stale");
+export function fetchStale(options: ApiRequestOptions = {}): Promise<StaleResponseDTO> {
+  return getJson("/api/stale", options);
 }
 
-export function fetchQuestions(): Promise<QuestionsResponseDTO> {
-  return getJson("/api/questions");
+export function fetchQuestions(options: ApiRequestOptions = {}): Promise<QuestionsResponseDTO> {
+  return getJson("/api/questions", options);
 }

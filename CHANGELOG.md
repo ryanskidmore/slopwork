@@ -16,6 +16,11 @@ where breaking changes land.
   queues, so agents pull actionable leaf work instead of umbrella tickets.
   Terminal (`done`/`dropped`) descendants do not suppress a parent; ordering
   among eligible tickets remains priority then age.
+- **Frontend regression gates for `slop web`.** A jsdom component suite covers
+  fetch timeout/retry, route recovery, and tree interaction/persistence; a
+  Playwright Chromium suite exercises real desktop/mobile flows, keyboard
+  controls, accessible navigation names, layout bounds, and visual snapshots.
+  Both CI and release workflows enforce the new gates.
 - **Elicitations: structured questions, `awaiting_input`, questions inbox**
   (G4, t-jggg9). The only agent→human escalation channel used to be a
   string convention (`update --progress "QUESTION: …"`) with no state, no
@@ -309,6 +314,13 @@ whether they can surprise an existing user.
   NUL bytes and known mojibake, while checked-in `AGENTS.md`/`SKILL.md` outputs
   are verified byte-for-byte against the canonical onboarding renderer. Stale
   transcript settings were also removed from active benchmark/tooling config.
+- **`slop web` no longer strands failed reads in loading states.** Tree,
+  review, questions, stale, and project configuration requests are abortable,
+  time bounded, and recover through explicit retry states; unexpected route
+  errors have a page-level fallback. The tree now opens only root branches by
+  default, persists named expand/collapse controls, supports expand/collapse
+  all, wraps cleanly on mobile, and the icon-only mobile navigation exposes
+  accessible names.
 - **Stored XSS in `slop web`**: the external-parent badge built an `href`
   straight from `config.remotes.jira` without a scheme check, so a
   `javascript:` URL committed to `config.yaml` executed in the web UI's origin
