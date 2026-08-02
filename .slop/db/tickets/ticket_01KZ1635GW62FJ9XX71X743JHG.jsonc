@@ -1,0 +1,46 @@
+{
+  "id": "ticket_01KZ1635GW62FJ9XX71X743JHG",
+  "name": "Make event polling merge-safe",
+  "slug": "make-event-polling-merge-safe",
+  "spec": {
+    "summary": "Replace scalar ULID polling checkpoints with a versioned merge-safe cursor protocol that cannot permanently miss late-merged events.",
+    "details_md": "",
+    "acceptance": [
+      "Polling discovers events merged later from old clocks, independent origins, and empty polls without replay loss.",
+      "Page limits advance only across returned events; serialized cursors validate strictly and remain bounded with a documented policy.",
+      "Legacy scalar --since remains explicitly snapshot-only and migration/backcompat is fail-loud.",
+      "Storage/remote/CLI JSON contracts and docs describe the actual guarantee."
+    ],
+    "context": [
+      "src/repo/events.ts",
+      "src/cli/commands/events.ts",
+      "src/storage/backend.ts"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "in_progress",
+  "priority": 0,
+  "labels": [],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [
+    "ticket_01KZ12QP04YSS8860GKR661F5P"
+  ],
+  "root_id": "ticket_01KZ1635GW62FJ9XX71X743JHG",
+  "path": [],
+  "active_session": "session_01KZ163B342TFSZVENZ7ZQXZS7",
+  "last_activity_at": "2026-08-02T12:10:08.874Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-08-02T12:10:03.170Z",
+  "updated_at": "2026-08-02T12:10:08.874Z"
+}

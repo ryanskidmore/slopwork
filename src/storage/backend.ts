@@ -68,6 +68,7 @@ import type {
   TicketId,
 } from "../core/index.js";
 import type { JsoncPatchEntry } from "../core/jsonc.js";
+import type { EventPollCursor, EventPollCursorState } from "../repo/event-cursor.js";
 // Type-only imports from the flatfile driver's modules: these shapes are
 // canonically DEFINED next to the zod schemas that validate them (the
 // driver persists/validates the index and result shapes), and re-exported
@@ -85,6 +86,8 @@ import type { ListTicketsTolerantResult } from "../repo/tickets.js";
 
 export { formatDuplicateSlugProblems, formatIndexProblems } from "../repo/db-index.js";
 export { formatEventReadProblems, warnAboutEventReadProblems } from "../repo/events.js";
+export { parseEventPollCursor } from "../repo/event-cursor.js";
+export type { EventPollCursor, EventPollCursorState } from "../repo/event-cursor.js";
 export type {
   DbIndex,
   DuplicateSlugProblem,
@@ -196,6 +199,17 @@ export interface StorageBackend {
   listEvents(): Promise<Event[]>;
   /** Every readable event plus structured diagnostics for every skipped file. */
   listEventsTolerant(): Promise<ListEventsTolerantResult>;
+  /** Create a constant-size opaque handle backed by an empty exact seen-id set. */
+  createEventPollCursor(): Promise<EventPollCursor>;
+  /** Read and validate the durable state behind an opaque polling cursor. */
+  readEventPollCursor(cursor: EventPollCursor): Promise<EventPollCursorState>;
+  /** Atomically union only event ids actually returned to the consumer. */
+  advanceEventPollCursor(
+    cursor: EventPollCursor,
+    returned: readonly EventId[],
+  ): Promise<EventPollCursorState>;
+  /** Delete local/server-side state once a polling consumer is retired. */
+  deleteEventPollCursor(cursor: EventPollCursor): Promise<void>;
 
   // --- ref resolution --------------------------------------------------
   /**

@@ -18,6 +18,7 @@ export * from "./config.js";
 export * from "./db-index.js";
 export * from "./entity-file.js";
 export * from "./events.js";
+export * from "./event-cursor.js";
 export * from "./fs-utils.js";
 export * from "./lock.js";
 export * from "./paths.js";

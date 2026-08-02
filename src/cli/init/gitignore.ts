@@ -20,7 +20,7 @@ const SECTION_END = "# --- end slopwork ---";
 /**
  * D14 — the exact lines `slop init` is responsible for.
  *
- * Also always ignores the lock file and
+ * Also always ignores polling checkpoint state, lock files, and
  * atomic-write temp files: a `kill -9` mid-transaction can leave the lock
  * file and/or a temp file (see atomic-write.ts's TEMP_FILE_PREFIX) on
  * disk. Left untracked, a `git add -A` would commit these ephemeral
@@ -51,6 +51,9 @@ export function computeGitignoreLines(): string[] {
   return [
     ".slop/db/index.jsonc",
     ".slop/db/mutation-journal/",
+    ".slop/db/event-cursors/",
+    ".slop/db/.event-cursors.lock",
+    ".slop/db/.event-cursors.lock.stale-*",
     ".slop/db/.lock",
     ".slop/db/.lock.stale-*",
     ".slop/db/.lock.released-*",

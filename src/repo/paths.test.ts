@@ -25,6 +25,8 @@ describe("repoPaths", () => {
     expect(paths.ticketsDir).toBe(join(scratch, ".slop", "db", "tickets"));
     expect(paths.sessionsDir).toBe(join(scratch, ".slop", "db", "sessions"));
     expect(paths.eventsDir).toBe(join(scratch, ".slop", "db", "events"));
+    expect(paths.eventCursorsDir).toBe(join(scratch, ".slop", "db", "event-cursors"));
+    expect(paths.eventCursorLockFile).toBe(join(scratch, ".slop", "db", ".event-cursors.lock"));
     expect(paths.indexFile).toBe(join(scratch, ".slop", "db", "index.jsonc"));
     expect(paths.lockFile).toBe(join(scratch, ".slop", "db", ".lock"));
   });
@@ -81,6 +83,7 @@ describe("ensureDbDirs", () => {
       paths.ticketsDir,
       paths.sessionsDir,
       paths.eventsDir,
+      paths.eventCursorsDir,
       paths.mutationJournalDir,
     ]) {
       const st = await stat(dir);

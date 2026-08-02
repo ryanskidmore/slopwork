@@ -445,7 +445,13 @@ describe("D3: events command", () => {
     it("--json shape: events + query + count + next_cursor + has_more", () => {
       const limit = 10;
       const resp = runEventsJson(fixture.dir, ["--limit", String(limit)]);
-      expect(resp.query).toEqual({ since: null, ticket: null, limit });
+      expect(resp.query).toEqual({
+        since: null,
+        ticket: null,
+        limit,
+        poll_cursor: null,
+        cursor_mode: "static_snapshot",
+      });
       expect(resp.events).toHaveLength(limit);
       expect(resp.count).toBe(limit);
       expect(resp.has_more).toBe(true);
@@ -563,7 +569,13 @@ describe("D3: events command", () => {
       // housekeeping-gitignore-lock-stale: `--limit` now always has an
       // EFFECTIVE value in the response — DEFAULT_EVENTS_LIMIT when the
       // flag was omitted, never `null` (see events.ts's module doc).
-      expect(resp.query).toEqual({ since: null, ticket: null, limit: DEFAULT_EVENTS_LIMIT });
+      expect(resp.query).toEqual({
+        since: null,
+        ticket: null,
+        limit: DEFAULT_EVENTS_LIMIT,
+        poll_cursor: null,
+        cursor_mode: "static_snapshot",
+      });
     });
   });
 

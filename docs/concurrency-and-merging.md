@@ -16,8 +16,10 @@ same ticket.
   sessions/session_<ulid>.jsonc
   events/event_<ulid>.jsonc
   mutation-journal/event_<ulid>.jsonc  # pending only, GITIGNORED
+  event-cursors/cursor_v1_<hex>.jsonc  # polling state, GITIGNORED
   index.jsonc      # derived, GITIGNORED
   .lock            # never committed
+  .event-cursors.lock # never committed
 ```
 
 Four properties combine to make this git-mergeable across branches with
@@ -55,6 +57,31 @@ Atomic writes (temp file + rename, `src/repo/atomic-write.ts`) mean a
 process crash mid-write never leaves a half-written entity file on disk
 either — a reader always sees the old content or the new content, never a
 torn write.
+
+## Polling after merges
+
+Event ULIDs define a useful deterministic order, but they are not a safe
+distributed high-water mark. Clone B can author an event with an older clock,
+or simply before clone A's latest event, and merge it only after clone A has
+advanced a scalar `--since` cursor. That event then sorts before the cursor
+and is permanently invisible to scalar polling.
+
+`slop events --poll` solves this with an opaque, versioned checkpoint backed
+by the exact IDs returned to that consumer. Every call scans the merged event
+set for IDs absent from the checkpoint, applies filters and limits, renders
+the page, then atomically unions only the IDs that were actually returned.
+This makes late origins, clock rollback, same-millisecond independent writers,
+empty polls, and limited pages no-miss cases. `--since` remains available only
+for static-snapshot compatibility and prints a warning.
+
+The flatfile checkpoint lives under gitignored `event-cursors/`, so tokens are
+local to that clone; a remote backend owns the equivalent server-side state.
+The token is constant-size, while exact state grows with consumed history, the
+deliberate storage cost of supporting arbitrary legacy IDs without origin or
+sequence metadata. Delete retired cursors. Delivery is at-least-once: a crash
+between presenting a page and advancing state, or simultaneous reads using
+one token, may repeat an ID. Atomic union prevents lost checkpoint state, and
+consumers should deduplicate by event ID and use one token per logical worker.
 
 ## Crash recovery for entity + event pairs
 

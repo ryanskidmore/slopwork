@@ -49,6 +49,9 @@ npm-debug.log*
 # --- slopwork (managed by `slop init`) ---
 .slop/db/index.jsonc
 .slop/db/mutation-journal/
+.slop/db/event-cursors/
+.slop/db/.event-cursors.lock
+.slop/db/.event-cursors.lock.stale-*
 .slop/db/.lock
 .slop/db/.lock.stale-*
 .slop/db/.tmp-*

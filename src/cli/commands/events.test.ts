@@ -1,8 +1,12 @@
+import { copyFile, mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { ulid } from "ulid";
 import { bootstrapRepo, captureOutput, withCwd } from "../../../tests/support/cli-harness.js";
 import { makeTempRepo } from "../../../tests/support/temp-repo.js";
 import { EXIT_CODES } from "../../core/exit-codes.js";
-import type { TicketId } from "../../core/index.js";
+import { eventSchema, type Event, type TicketId } from "../../core/index.js";
+import { createEvent, ensureDbDirs, eventShardMonth, type RepoPaths } from "../../repo/index.js";
 import { DEFAULT_EVENTS_LIMIT, runEvents } from "./events.js";
 import { runNew } from "./new.js";
 import { runStart } from "./start.js";
@@ -28,7 +32,140 @@ async function jsonNewTicket(root: string, name: string): Promise<TicketId> {
   }
 }
 
+function eventAt(atMs: number, suffix = ""): Event {
+  return eventSchema.parse({
+    id: `event_${ulid(atMs)}`,
+    actor: { name: `producer${suffix}`, kind: "agent" },
+    session: null,
+    verb: "ticket.updated",
+    entity: { kind: "ticket", id: `ticket-merged${suffix}` },
+    payload: { progress: `merged${suffix}` },
+    at: new Date(atMs).toISOString(),
+  });
+}
+
+async function pollJson(
+  root: string,
+  poll: true | string,
+  limit = 100,
+): Promise<{
+  events: Event[];
+  poll_cursor: string;
+  next_cursor: null;
+  has_more: boolean;
+}> {
+  const out = captureOutput();
+  try {
+    await withCwd(root, () => runEvents({ poll, limit, json: true }));
+    return JSON.parse(out.stdout());
+  } finally {
+    out.restore();
+  }
+}
+
+async function mergeEventFile(source: RepoPaths, target: RepoPaths, event: Event): Promise<void> {
+  const shard = eventShardMonth(event.id);
+  await mkdir(join(target.eventsDir, shard), { recursive: true });
+  await copyFile(
+    join(source.eventsDir, shard, `${event.id}.jsonc`),
+    join(target.eventsDir, shard, `${event.id}.jsonc`),
+  );
+}
+
 describe("runEvents (in-process)", () => {
+  it("a two-clone late merge with an older ULID is discovered after an empty checkpoint", async () => {
+    const cloneA = await makeTempRepo("slop-events-poll-clone-a-");
+    const cloneB = await makeTempRepo("slop-events-poll-clone-b-");
+    await bootstrapRepo(cloneA, { project: "p", user: "ryan" });
+    await bootstrapRepo(cloneB, { project: "p", user: "ryan" });
+    const first = await pollJson(cloneA, true);
+    expect(first.events).toEqual([]);
+
+    const late = eventAt(Date.UTC(2020, 0, 1), "-clone-b");
+    const cloneBPaths = await ensureDbDirs(cloneB);
+    const cloneAPaths = await ensureDbDirs(cloneA);
+    await createEvent(cloneBPaths, late);
+    // Copying the immutable event file models the material effect of Git
+    // merging clone B after clone A checkpointed an empty event set.
+    await mergeEventFile(cloneBPaths, cloneAPaths, late);
+
+    const next = await pollJson(cloneA, first.poll_cursor);
+    expect(next.events.map((event) => event.id)).toEqual([late.id]);
+    expect(next.poll_cursor).toBe(first.poll_cursor);
+    expect(next.next_cursor).toBeNull();
+  });
+
+  it("continues limited pages without gaps or duplicates and advances only returned ids", async () => {
+    const root = await makeTempRepo("slop-events-poll-pages-");
+    const producerA = await makeTempRepo("slop-events-poll-producer-a-");
+    const producerB = await makeTempRepo("slop-events-poll-producer-b-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    await bootstrapRepo(producerA, { project: "p", user: "ryan" });
+    await bootstrapRepo(producerB, { project: "p", user: "ryan" });
+    const paths = await ensureDbDirs(root);
+    const producerAPaths = await ensureDbDirs(producerA);
+    const producerBPaths = await ensureDbDirs(producerB);
+    const events = [eventAt(1_000, "-a"), eventAt(1_000, "-b"), eventAt(500, "-rollback")];
+    await createEvent(producerAPaths, events[0]!);
+    await createEvent(producerBPaths, events[1]!);
+    await createEvent(producerBPaths, events[2]!);
+    for (const event of [events[0]!]) await mergeEventFile(producerAPaths, paths, event);
+    for (const event of [events[1]!, events[2]!]) {
+      await mergeEventFile(producerBPaths, paths, event);
+    }
+
+    let page = await pollJson(root, true, 1);
+    const cursor = page.poll_cursor;
+    const returned = [...page.events];
+    expect(page.has_more).toBe(true);
+    while (page.has_more) {
+      page = await pollJson(root, cursor, 1);
+      returned.push(...page.events);
+    }
+    expect(returned.map((event) => event.id).sort()).toEqual(
+      events.map((event) => event.id).sort(),
+    );
+    expect(new Set(returned.map((event) => event.id)).size).toBe(3);
+    expect((await pollJson(root, cursor, 1)).events).toEqual([]);
+  });
+
+  it("does not checkpoint an event elided by the output budget", async () => {
+    const root = await makeTempRepo("slop-events-poll-budget-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const event = eventAt(2_000, "-budget");
+    await createEvent(await ensureDbDirs(root), event);
+
+    const out = captureOutput();
+    let cursor!: string;
+    try {
+      await withCwd(root, () => runEvents({ poll: true, json: true, budget: 1 }));
+      const body = JSON.parse(out.stdout()) as { events: Event[]; poll_cursor: string };
+      expect(body.events).toEqual([]);
+      cursor = body.poll_cursor;
+    } finally {
+      out.restore();
+    }
+    expect((await pollJson(root, cursor)).events.map((item) => item.id)).toEqual([event.id]);
+  });
+
+  it("rejects malformed/unknown poll tokens and forbids mixing polling with scalar since", async () => {
+    const root = await makeTempRepo("slop-events-poll-validation-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    await expect(withCwd(root, () => runEvents({ poll: "bad" }))).rejects.toMatchObject({
+      exitCode: EXIT_CODES.USAGE_ERROR,
+    });
+    await expect(
+      withCwd(root, () => runEvents({ poll: "cursor_v1_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" })),
+    ).rejects.toMatchObject({ exitCode: EXIT_CODES.NOT_FOUND });
+    await expect(
+      withCwd(root, () =>
+        runEvents({
+          poll: "cursor_v1_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          since: "event_01AAAAAAAAAAAAAAAAAAAAAAAA",
+        }),
+      ),
+    ).rejects.toMatchObject({ exitCode: EXIT_CODES.USAGE_ERROR });
+  });
   it("lists every event, human text, in chronological order", async () => {
     const root = await makeTempRepo("slop-events-inproc-human-");
     await bootstrapRepo(root, { project: "p", user: "ryan" });
@@ -139,12 +276,35 @@ describe("runEvents (in-process)", () => {
     const out = captureOutput();
     try {
       await withCwd(root, () => runEvents({ json: true, since: cursor }));
+      expect(out.stderr()).toContain("static-snapshot pagination");
+      expect(out.stderr()).toContain("use --poll");
     } finally {
       out.restore();
     }
     const body = JSON.parse(out.stdout()) as { events: { id: string }[] };
     expect(body.events.every((e) => e.id > cursor)).toBe(true);
     expect(body.events.length).toBeGreaterThan(0);
+  });
+
+  it("keeps --since backward compatible while making its late-merge limitation explicit", async () => {
+    const root = await makeTempRepo("slop-events-inproc-since-static-");
+    await bootstrapRepo(root, { project: "p", user: "ryan" });
+    const paths = await ensureDbDirs(root);
+    const high = eventAt(Date.UTC(2025, 0, 1), "-high");
+    const lateOld = eventAt(Date.UTC(2020, 0, 1), "-late-old");
+    await createEvent(paths, high);
+
+    const out = captureOutput();
+    try {
+      await createEvent(paths, lateOld);
+      await withCwd(root, () => runEvents({ json: true, since: high.id }));
+      const body = JSON.parse(out.stdout()) as { events: Event[]; query: { cursor_mode: string } };
+      expect(body.events).toEqual([]);
+      expect(body.query.cursor_mode).toBe("static_snapshot");
+      expect(out.stderr()).toContain("can miss events merged later with older ids");
+    } finally {
+      out.restore();
+    }
   });
 
   it("rejects a malformed --since cursor (USAGE_ERROR, exit 2)", async () => {

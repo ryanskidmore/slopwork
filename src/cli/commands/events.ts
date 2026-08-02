@@ -1,11 +1,20 @@
 /**
  * `slop events` — design.md §3, §4.2; work item D3.
  *
- * The hard part (ULID-cursor pagination, immune to `index.jsonc` rebuilds)
- * already exists in `repo/events.ts`'s `queryEvents` (A4). This module is
- * the CLI-facing wrapper: flag parsing, `--since`/`--ticket` error shaping,
- * `--limit`-based paging with a `next_cursor` a caller can page on, and two
- * output renderings (human, `--json`).
+ * This module exposes two deliberately different cursor contracts:
+ *
+ * - `--since <event-id>` preserves the original ascending-ULID pagination
+ *   API for a static snapshot. It cannot be a durable Git-merge polling
+ *   watermark: an older id merged later sorts before the scalar forever.
+ * - `--poll [cursor]` is the merge-safe polling API. Its opaque, constant-
+ *   size token names local/backend state containing the exact set of ids
+ *   actually returned to that consumer. Omit the token once to create it,
+ *   then reuse the returned `poll_cursor`; empty polls do not stop older or
+ *   late-origin events from being discovered later.
+ *
+ * Both paths apply `--ticket`, `--limit`, and `--budget`. Poll state advances
+ * only through records present in the final rendering, never through events
+ * merely fetched and then filtered, limited, or elided.
  *
  * ## The `--ticket` widening decision (D3's call, per A4's own doc comment
  * on `EventQuery.ticket`)
@@ -49,23 +58,28 @@
  *
  * ```json
  * {
- *   "query": { "since": "event_… | null", "ticket": "ticket_… | null", "limit": number | null },
+ *   "query": {
+ *     "since": "event_… | null",
+ *     "poll_cursor": "cursor_v1_… | null",
+ *     "cursor_mode": "static_snapshot | merge_safe_poll",
+ *     "ticket": "ticket_… | null",
+ *     "limit": number
+ *   },
  *   "events": [ { "id", "at", "verb", "actor", "session", "entity", "payload" }, … ],
  *   "count": number,           // events.length
- *   "next_cursor": "event_… | null",
+ *   "next_cursor": "event_… | null", // static-snapshot mode only
+ *   "poll_cursor": "cursor_v1_… | null",
  *   "has_more": boolean,
  *   "elided": ["<note>", ...]  // E1's --budget; only non-empty when a budget forced elision
  * }
  * ```
  *
  * `events[]` entries are the real `Event` records (event.ts's schema),
- * unmodified. `next_cursor` is always the id of the last event in `events`
- * when `events` is non-empty; when it's empty (nothing new since the input
- * cursor), `next_cursor` echoes the input `--since` cursor back (or `null`
- * if none was given) so a polling caller can keep reusing it — re-issuing
- * the same query later, once new events land, picks them up without the
- * caller having to special-case "empty page" vs "no cursor yet". A caller
- * pages by looping `--since <next_cursor>` until `has_more` is `false`.
+ * unmodified. In static-snapshot mode a caller pages by passing
+ * `next_cursor` back through `--since`; the command warns that this scalar
+ * can miss older ids merged later. In merge-safe mode, `next_cursor` is
+ * always `null` and the stable `poll_cursor` is reused for every page and
+ * later poll.
  *
  * housekeeping-gitignore-lock-stale: `--limit` defaults to
  * {@link DEFAULT_EVENTS_LIMIT} when omitted (was previously unbounded —
@@ -73,16 +87,15 @@
  * `query.limit` in the `--json` body always reflects the EFFECTIVE limit
  * actually applied, default or explicit, never `null`. `has_more` is
  * `true` whenever the effective limit or `--budget` held back events the
- * caller hasn't seen yet. Whenever `has_more` is `true`, `next_cursor` is
- * GUARANTEED to differ from the input `--since` (or from `null` if none
- * was given) — i.e. genuinely usable to make forward progress — never the
- * degenerate "has_more: true, next_cursor: null/unchanged" combination a
- * caller could get stuck retrying forever (the bug this fix closes: a
+ * caller hasn't seen yet. In static mode, whenever `has_more` is `true`,
+ * `next_cursor` is guaranteed to differ from the input `--since` (or from
+ * `null` if none was given). In poll mode, progress is recorded behind the
+ * stable opaque cursor instead. A
  * `--budget` small enough to elide every fetched event from the rendered
  * page used to report exactly that combination). When `--budget` (E1)
  * elides ALL fetched events from what would otherwise be the page,
  * `has_more` is reported as `false` instead — paging with the SAME
- * `--since`/`--limit` would only re-fetch and re-elide the identical
+ * cursor/`--limit` would only re-fetch and re-elide the identical
  * events, so it is not genuinely "more" the caller can reach; `elided`
  * already names this explicitly ("all N event(s) omitted to fit
  * --budget"), which is the actionable signal (raise `--budget`), not
@@ -101,7 +114,8 @@ import {
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
 import type { StorageBackend } from "../../storage/index.js";
-import { openStorage } from "../../storage/index.js";
+import type { EventPollCursor } from "../../storage/index.js";
+import { openStorage, parseEventPollCursor } from "../../storage/index.js";
 import { SlopError } from "../errors.js";
 import { parseBudgetOption, parseIntegerOption } from "./shared.js";
 
@@ -111,6 +125,8 @@ interface EventsOptions {
   json?: boolean;
   limit?: number;
   budget?: number;
+  poll?: boolean | string;
+  deletePollCursor?: string;
 }
 
 /** Validate `--since`'s shape (USAGE_ERROR, exit 2) without touching disk. */
@@ -201,9 +217,11 @@ async function fetchPage(
   since: EventId | undefined,
   predicate: ((event: Event) => boolean) | undefined,
   limit: number | undefined,
+  seen: ReadonlySet<EventId> = new Set(),
 ): Promise<EventsPage> {
   const fetched = await backend.queryEvents({ since });
-  const matched = predicate ? fetched.filter(predicate) : fetched;
+  const unseen = fetched.filter((event) => !seen.has(event.id));
+  const matched = predicate ? unseen.filter(predicate) : unseen;
 
   let page = matched;
   let hasMore = false;
@@ -258,21 +276,33 @@ function formatHumanLine(event: Event): string {
  * makes `next_cursor !== (since ?? null)` a hard invariant of `has_more:
  * true` — never the reverse-inferrable "true but stuck" combination.
  */
-function pageFor(page: EventsPage, kept: readonly Event[], since: EventId | undefined): EventsPage {
+function pageFor(
+  page: EventsPage,
+  kept: readonly Event[],
+  since: EventId | undefined,
+  polling: boolean,
+): EventsPage {
   const last = kept[kept.length - 1];
-  const nextCursor = last ? last.id : (since ?? null);
-  const madeProgress = nextCursor !== (since ?? null);
+  const nextCursor = polling ? null : last ? last.id : (since ?? null);
+  const madeProgress = polling ? kept.length > 0 : nextCursor !== (since ?? null);
   const hasMore = madeProgress && (page.hasMore || kept.length < page.events.length);
   return { events: [...kept], nextCursor, hasMore };
 }
 
-function buildHuman(page: EventsPage, kept: readonly Event[], elisions: readonly string[]): string {
+function buildHuman(
+  page: EventsPage,
+  kept: readonly Event[],
+  elisions: readonly string[],
+  pollCursor: EventPollCursor | undefined,
+): string {
   const lines: string[] = [];
   if (kept.length === 0) {
     lines.push("no events");
   } else {
     for (const event of kept) lines.push(formatHumanLine(event));
-    if (page.hasMore && page.nextCursor) {
+    if (page.hasMore && pollCursor) {
+      lines.push(`-- more unseen events: continue with --poll ${pollCursor}`);
+    } else if (page.hasMore && page.nextCursor) {
       lines.push(`-- more events: continue with --since ${page.nextCursor}`);
     }
   }
@@ -290,12 +320,20 @@ function buildJson(
   ticketId: TicketId | undefined,
   limit: number,
   elisions: readonly string[],
+  pollCursor: EventPollCursor | undefined,
 ): string {
   const body = {
-    query: { since: since ?? null, ticket: ticketId ?? null, limit },
+    query: {
+      since: since ?? null,
+      poll_cursor: pollCursor ?? null,
+      cursor_mode: pollCursor ? "merge_safe_poll" : "static_snapshot",
+      ticket: ticketId ?? null,
+      limit,
+    },
     events: page.events,
     count: page.events.length,
     next_cursor: page.nextCursor,
+    poll_cursor: pollCursor ?? null,
     has_more: page.hasMore,
     elided: elisions,
   };
@@ -307,10 +345,48 @@ export async function runEvents(opts: EventsOptions): Promise<void> {
   const paths = repoPaths(root);
   const backend = await openStorage(paths);
 
+  if (opts.deletePollCursor !== undefined) {
+    if (opts.poll !== undefined || opts.since !== undefined || opts.ticket !== undefined) {
+      throw new SlopError(
+        "--delete-poll-cursor cannot be combined with --poll, --since, or --ticket",
+        EXIT_CODES.USAGE_ERROR,
+      );
+    }
+    const cursor = parseEventPollCursor(opts.deletePollCursor);
+    await backend.deleteEventPollCursor(cursor);
+    process.stdout.write(
+      opts.json
+        ? `${JSON.stringify({ deleted_poll_cursor: cursor }, null, 2)}\n`
+        : `deleted event polling cursor ${cursor}\n`,
+    );
+    return;
+  }
+
+  if (opts.poll !== undefined && opts.since !== undefined) {
+    throw new SlopError(
+      "--poll and --since are different cursor contracts and cannot be combined",
+      EXIT_CODES.USAGE_ERROR,
+    );
+  }
+
   let since: EventId | undefined;
   if (opts.since !== undefined) {
     since = parseSinceCursor(opts.since);
     await verifyCursorExists(backend, since);
+    process.stderr.write(
+      "warning: --since is static-snapshot pagination and can miss events merged later with older ids; use --poll for durable polling\n",
+    );
+  }
+
+  let pollCursor: EventPollCursor | undefined;
+  let seen = new Set<EventId>();
+  if (opts.poll !== undefined) {
+    pollCursor =
+      typeof opts.poll === "string"
+        ? parseEventPollCursor(opts.poll)
+        : await backend.createEventPollCursor();
+    const state = await backend.readEventPollCursor(pollCursor);
+    seen = new Set(state.seen);
   }
 
   // housekeeping-gitignore-lock-stale: `--limit` always has an EFFECTIVE
@@ -327,17 +403,33 @@ export async function runEvents(opts: EventsOptions): Promise<void> {
     predicate = await ticketEventPredicate(backend, ticket.id);
   }
 
-  const page = await fetchPage(backend, since, predicate, limit);
+  const page = await fetchPage(backend, since, predicate, limit, seen);
 
   const rendered = renderEntriesWithBudget(
     page.events,
     (kept, elisions) =>
       opts.json
-        ? buildJson(pageFor(page, kept, since), since, ticketId, limit, elisions)
-        : buildHuman(pageFor(page, kept, since), kept, elisions),
+        ? buildJson(
+            pageFor(page, kept, since, pollCursor !== undefined),
+            since,
+            ticketId,
+            limit,
+            elisions,
+            pollCursor,
+          )
+        : buildHuman(
+            pageFor(page, kept, since, pollCursor !== undefined),
+            kept,
+            elisions,
+            pollCursor,
+          ),
     opts.budget,
     { format: opts.json ? "json" : "text", noun: "event" },
   );
+  if (pollCursor !== undefined) {
+    const returned = page.events.slice(0, rendered.keptCount).map((event) => event.id);
+    await backend.advanceEventPollCursor(pollCursor, returned);
+  }
   process.stdout.write(rendered.text);
 }
 
@@ -345,15 +437,26 @@ export async function runEvents(opts: EventsOptions): Promise<void> {
 export function registerEventsCommand(program: Command): void {
   program
     .command("events")
-    .description("List immutable events, optionally since a cursor or scoped to a ticket.")
-    .option("--since <event_id>", "exclusive cursor: only events after this event id")
+    .description("List immutable events, page a snapshot, or poll merge-safely.")
+    .option(
+      "--since <event_id>",
+      "deprecated for polling: page after this id in the current ordered snapshot",
+    )
+    .option(
+      "--poll [cursor]",
+      "merge-safe polling: omit cursor to create one, then pass the returned cursor to continue",
+    )
+    .option(
+      "--delete-poll-cursor <cursor>",
+      "delete a retired polling cursor and its local/server-side seen state",
+    )
     .option("--ticket <ref>", "only events for this ticket (id, slug, or short prefix)")
     .option(
       "--limit <n>",
       `cap the number of events returned (default ${DEFAULT_EVENTS_LIMIT})`,
       parseIntegerOption("--limit"),
     )
-    .option("--json", "machine-readable output (events + a next cursor for paging)")
+    .option("--json", "machine-readable output with explicit cursor mode and checkpoint")
     .option(
       "--budget <n>",
       `cap output size to N ${CONTEXT_PACK_BUDGET_UNIT} (elides the newest trailing events first, ` +

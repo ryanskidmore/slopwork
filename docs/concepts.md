@@ -119,8 +119,10 @@ The verb vocabulary is closed (`EVENT_VERBS`), grouped by area:
   [Derived overlays](#derived-overlays-blocked-stale-ready-awaiting_input)
   below for the `awaiting_input` overlay these two verbs feed.
 
-`slop events` lists these, optionally scoped to a ticket or paged with
-`--since`. See [CLI reference → `events`](cli-reference.md#events).
+`slop events` lists these, optionally scoped to a ticket. Use `--poll` for
+merge-safe incremental consumption; `--since` only pages a current ordered
+snapshot and can miss older IDs merged later. See
+[CLI reference → `events`](cli-reference.md#events).
 
 ### Actor
 
@@ -234,8 +236,10 @@ the current clock.
     events/event_<ulid>.jsonc          # immutable — flat layout (pre-sharding, or never migrated)
     events/2026-08/event_<ulid>.jsonc  # immutable — sharded layout (G2), one dir per UTC month
     mutation-journal/event_<ulid>.jsonc # pending entity/event intent — GITIGNORED
+    event-cursors/cursor_v1_<hex>.jsonc # exact polling checkpoint — GITIGNORED
     index.jsonc                        # derived — GITIGNORED, auto-healed
     .lock                              # write-path transaction lock
+    .event-cursors.lock                # polling-checkpoint lock — GITIGNORED
 ```
 
 `index.jsonc` is a pure function of the entity files on disk: slug → id
@@ -254,6 +258,15 @@ flatfile storage open. Corrupt or divergent entries fail loudly instead
 of overwriting human edits. See
 [Concurrency & merging → Crash recovery](concurrency-and-merging.md#crash-recovery-for-entity--event-pairs)
 for the state machine and operational details.
+
+`event-cursors/` is also local state, but it serves consumers rather than
+writers. Each opaque `--poll` token names a versioned exact set of event IDs
+already returned to that consumer. Exact membership is what survives late
+Git merges, clock rollback, independent same-millisecond writers, and gaps;
+a single high-water event ID cannot. The token itself stays fixed-size, while
+the ignored state grows by one ID per consumed event and should be deleted
+when the consumer is retired. See the CLI reference for portability and
+at-least-once delivery limits.
 
 **Events shard by month (G2).** A freshly-written event lands under
 `events/YYYY-MM/` — the UTC calendar month derived from the event's own

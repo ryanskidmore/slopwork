@@ -895,19 +895,44 @@ total_tickets, all, elided}` — `answer` is `null` for an open question, or
 ```sh
 slop events
 slop events --ticket <ref>
-slop events --since event_01KY… --json
+slop events --poll --json
+slop events --poll cursor_v1_0123… --json
+slop events --since event_01KY… --json  # static-snapshot compatibility
 ```
 
 Lists immutable events in cursor order — ascending by event id, which
-sorts chronologically (oldest first).
+sorts chronologically (oldest first). For durable automation, use
+`--poll`: its opaque token records exactly which event IDs were actually
+returned and therefore still discovers an older-clock event that arrives
+after a Git merge. Omit the cursor on the first call, persist the returned
+`poll_cursor`, and reuse it on every later call. Empty results do not
+retire or advance the token.
 
 | Flag | Meaning |
 |---|---|
-| `--since <event_id>` | exclusive cursor: only events after this id |
+| `--since <event_id>` | deprecated for polling; exclusive pagination in the current ordered snapshot only |
+| `--poll [cursor]` | create or continue a merge-safe polling checkpoint |
+| `--delete-poll-cursor <cursor>` | delete a retired checkpoint and its local/server-side state |
 | `--ticket <ref>` | scope to one ticket (id, slug, or short prefix) |
 | `--limit <n>` | cap result count |
-| `--json` | events plus a `next_cursor` for paging |
+| `--json` | events plus `cursor_mode`, `poll_cursor`, and the legacy `next_cursor` |
 | `--budget <n>` | cap output size — see [Budget](#budget); `next_cursor`/`has_more` are recomputed to match what's actually returned |
+
+`--since` is retained for scripts paging a fixed snapshot, but it is not a
+durable polling watermark. A scalar ULID cannot describe a Git-merged set:
+an event created earlier on another clone can arrive later and sort before
+the scalar forever. The command warns on every `--since` use. There is no
+lossless automatic conversion from a legacy event ID to `--poll`; start a
+new polling cursor and consume its initial backlog before switching over.
+
+Polling tokens are constant-size and opaque. With the flatfile backend they
+name gitignored state under `.slop/db/event-cursors/`; that state stores one
+ID per event returned to the consumer and therefore grows with consumed
+history. Delete retired cursors explicitly. Tokens are backend-local and do
+not travel with a clone. State advancement is an atomic union, but delivery
+is at-least-once: a crash before checkpointing, or concurrent use of one
+token, can repeat records. Consumers must deduplicate by event ID and should
+give each logical worker its own token.
 
 ### `web`
 
