@@ -238,6 +238,27 @@ export function buildReverseEdgeIndex(tickets: readonly Ticket[]): ReverseEdgeIn
   return { blockedBy, relatedFrom, discovered };
 }
 
+/** Resolve one ticket's live blockers from an already-built reverse-edge
+ * index. The index is request/snapshot scoped, so callers rendering many
+ * tickets pay one full edge walk and then only visit each incoming edge. */
+export function liveBlockersFromReverseIndex(
+  ticketId: TicketId,
+  byId: ReadonlyMap<TicketId, Ticket>,
+  reverseEdges: ReverseEdgeIndex,
+): Ticket[] {
+  const blockers: Ticket[] = [];
+  const seen = new Set<TicketId>();
+  for (const blockerId of reverseEdges.blockedBy.get(ticketId) ?? []) {
+    // Preserve liveBlockers' semantics for self-edges and duplicate ids,
+    // even if a hand-edited/corrupt snapshot gets past write validation.
+    if (blockerId === ticketId || seen.has(blockerId)) continue;
+    seen.add(blockerId);
+    const blocker = byId.get(blockerId);
+    if (blocker && isLiveBlockerState(blocker.state)) blockers.push(blocker);
+  }
+  return blockers;
+}
+
 /**
  * G4 (t-jggg9): the `awaiting_input` overlay's summary shape — a ticket
  * has it iff `openQuestionCount > 0`; `oldestOpenQuestionAt` is the oldest

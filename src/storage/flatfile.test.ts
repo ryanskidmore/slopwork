@@ -19,11 +19,17 @@ import { FlatfileBackend } from "./flatfile.js";
 // (see that file's own doc comment for why this is the established way
 // to prove "how many times did this actually re-read a file" in this
 // codebase).
-const { readFileMock } = vi.hoisted(() => ({ readFileMock: vi.fn() }));
+const { readFileMock, readdirMock, statMock } = vi.hoisted(() => ({
+  readFileMock: vi.fn(),
+  readdirMock: vi.fn(),
+  statMock: vi.fn(),
+}));
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
   readFileMock.mockImplementation(actual.readFile);
-  return { ...actual, readFile: readFileMock };
+  readdirMock.mockImplementation(actual.readdir);
+  statMock.mockImplementation(actual.stat);
+  return { ...actual, readFile: readFileMock, readdir: readdirMock, stat: statMock };
 });
 
 const ctx: EventContext = { actor: { name: "ryan", kind: "human" }, session: null };
@@ -71,6 +77,26 @@ async function writeEventInMonth(
   return event;
 }
 
+async function writeFlatEvent(
+  paths: RepoPaths,
+  ticketId: string,
+  seedIso: string,
+  note: string,
+): Promise<Event> {
+  const id = `event_${ulid(Date.parse(seedIso))}` as EventId;
+  const event: Event = {
+    id,
+    actor: ctx.actor,
+    session: null,
+    verb: "ticket.updated",
+    entity: { kind: "ticket", id: ticketId as never },
+    payload: { progress: note },
+    at: seedIso,
+  };
+  await createEntityFileCanonical(join(paths.eventsDir, `${id}.jsonc`), event);
+  return event;
+}
+
 let scratch: string;
 let paths: RepoPaths;
 let backend: FlatfileBackend;
@@ -80,6 +106,8 @@ beforeEach(async () => {
   paths = await ensureDbDirs(scratch);
   backend = new FlatfileBackend(paths);
   readFileMock.mockClear();
+  readdirMock.mockClear();
+  statMock.mockClear();
 });
 
 afterEach(async () => {
@@ -104,6 +132,33 @@ describe("FlatfileBackend", () => {
   });
 
   describe("listEventsTolerant: per-shard incremental cache (t-6tqw9)", () => {
+    it("fingerprints only event directories, never tickets, sessions, or config", async () => {
+      await Promise.all(
+        Array.from({ length: 64 }, async () => {
+          const ticket = makeTicket();
+          await createEntityFileCanonical(join(paths.ticketsDir, `${ticket.id}.jsonc`), ticket);
+        }),
+      );
+      readdirMock.mockClear();
+      statMock.mockClear();
+
+      await backend.listEventsTolerant();
+
+      const unrelatedDirectoryReads = readdirMock.mock.calls.filter(([path]) =>
+        [paths.ticketsDir, paths.sessionsDir].includes(String(path)),
+      );
+      const unrelatedStats = statMock.mock.calls.filter(([path]) => {
+        const value = String(path);
+        return (
+          value.startsWith(paths.ticketsDir) ||
+          value.startsWith(paths.sessionsDir) ||
+          value === join(paths.slopDir, "config.yaml")
+        );
+      });
+      expect(unrelatedDirectoryReads).toHaveLength(0);
+      expect(unrelatedStats).toHaveLength(0);
+    });
+
     it("a second call with nothing changed re-reads NO event file in either shard", async () => {
       const ticket = makeTicket();
       await backend.createTicket(ticket, ctx, createdEvent);
@@ -174,6 +229,36 @@ describe("FlatfileBackend", () => {
       expect(readsUnderFeb).toHaveLength(0);
       // January's shard (now 2 files) WAS re-read.
       expect(readsUnderJan.length).toBeGreaterThan(0);
+    });
+
+    it("adding a flat-layout event invalidates only the flat event cache", async () => {
+      const ticket = makeTicket();
+      await backend.createTicket(ticket, ctx, createdEvent);
+      const existingShardEvent = await writeEventInMonth(
+        paths,
+        ticket.id,
+        "2024-02",
+        "2024-02-15T00:00:00.000Z",
+        "sharded",
+      );
+      await writeFlatEvent(paths, ticket.id, "2024-01-10T00:00:00.000Z", "flat #1");
+      await backend.listEventsTolerant();
+
+      readFileMock.mockClear();
+      const added = await writeFlatEvent(paths, ticket.id, "2024-01-20T00:00:00.000Z", "flat #2");
+      const events = await backend.listEventsTolerant();
+
+      expect(events.map((event) => event.id)).toEqual(
+        expect.arrayContaining([existingShardEvent.id, added.id]),
+      );
+      const shardReads = readFileMock.mock.calls.filter(([path]) =>
+        String(path).startsWith(join(paths.eventsDir, "2024-02")),
+      );
+      const flatReads = readFileMock.mock.calls.filter(
+        ([path]) => String(path).startsWith(paths.eventsDir) && !String(path).includes("/2024-02/"),
+      );
+      expect(shardReads).toHaveLength(0);
+      expect(flatReads.length).toBeGreaterThan(0);
     });
 
     it("a mutation through the backend invalidates the cache — a read-after-write is always real", async () => {

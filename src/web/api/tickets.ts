@@ -6,14 +6,14 @@
  * effective `last_activity_at`).
  */
 import type { BunRequest } from "bun";
-import { TICKET_STATES, type Ticket, type TicketId, type TicketState } from "../../core/index.js";
+import { TICKET_STATES, type Ticket, type TicketState } from "../../core/index.js";
 import type { WebDataSource } from "../data-source.js";
 import {
   computeAwaitingInputByTicket,
   deriveEffectiveTickets,
   staleThresholdsFromConfig,
 } from "../overlays.js";
-import { configDto, jsonResponse, ticketSummaryDto } from "./shared.js";
+import { configDto, createTicketSummaryContext, jsonResponse, ticketSummaryDto } from "./shared.js";
 import type { TicketListResponseDTO } from "./types.js";
 
 function isTicketState(value: string): value is TicketState {
@@ -65,11 +65,17 @@ export async function handleTicketList(
   // a lock-free `update --progress` note must show up here and reset staleness,
   // exactly like `slop show`/the ticket detail page.
   const tickets = deriveEffectiveTickets(rawTickets, events);
-  const byId = new Map<TicketId, Ticket>(tickets.map((t) => [t.id, t]));
   const thresholds = staleThresholdsFromConfig(config);
   // G4 (t-jggg9): reuses the SAME whole-db event read already fetched
   // above for deriveEffectiveTickets — no second listEvents() call.
   const awaitingInputByTicket = computeAwaitingInputByTicket(events);
+  const summaryContext = createTicketSummaryContext(
+    tickets,
+    thresholds,
+    config,
+    now,
+    awaitingInputByTicket,
+  );
 
   const allLabels = [...new Set(tickets.flatMap((t) => t.labels))].sort();
   const allOwners = [
@@ -82,9 +88,7 @@ export async function handleTicketList(
 
   const body: TicketListResponseDTO = {
     config: configDto(config, warning),
-    tickets: filtered.map((t) =>
-      ticketSummaryDto(t, tickets, byId, thresholds, config, now, awaitingInputByTicket),
-    ),
+    tickets: filtered.map((ticket) => ticketSummaryDto(ticket, summaryContext)),
     total: tickets.length,
     facets: { labels: allLabels, owners: allOwners, states: [...TICKET_STATES] },
   };

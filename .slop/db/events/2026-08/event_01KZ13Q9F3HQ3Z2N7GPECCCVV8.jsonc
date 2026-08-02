@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ13Q9F3HQ3Z2N7GPECCCVV8",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ12YSBTYHZS6TPKQC0MVZB0"
+  },
+  "payload": {
+    "progress": "Committed 5b99636, pushed fix/audit-read-performance, and opened PR #12. Residual: response size remains linear but unpaginated; intentionally left to the separate product/API finding."
+  },
+  "at": "2026-08-02T11:28:36.835Z"
+}

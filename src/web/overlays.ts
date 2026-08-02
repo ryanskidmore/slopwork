@@ -38,9 +38,10 @@
  *    imported, for the same reason `computeBlockedTicketIds` below already
  *    stands alone: this module doesn't depend on the repo layer's locking/
  *    persisted-index machinery, per the class doc on `FixtureDataSource`.
- *  - {@link liveBlockers}: the ticket-detail "reason" list for a `blocked`
- *    badge — which specific non-done/dropped tickets are blocking this one,
- *    not just the boolean {@link computeBlockedTicketIds} already gives.
+ *  - {@link liveBlockers} / {@link liveBlockersFromReverseIndex}: the
+ *    ticket-detail and summary-list "reason" lists for a `blocked` badge —
+ *    which specific non-done/dropped tickets are blocking this one, not just
+ *    the boolean {@link computeBlockedTicketIds} already gives.
  *  - {@link computeStaleReason}: the ticket-detail "reason" for a `stale`
  *    badge — which clock (in_progress's `last_activity_at` vs review's
  *    `review.requested_at`) is overdue, and since when — matching exactly
@@ -82,6 +83,7 @@ export {
   // G4 (t-jggg9): the `awaiting_input` overlay — see this module's doc.
   computeAwaitingInputByTicket,
   deriveEffectiveTickets,
+  liveBlockersFromReverseIndex,
   type AwaitingInputOverlay,
   type ReverseEdgeIndex,
 } from "../tickets/overlay.js";
@@ -145,9 +147,9 @@ export function computeBlockedTicketIds(tickets: readonly Ticket[]): Set<TicketI
  * `ticketId` in its own `blocks` array. `computeBlockedTicketIds` above
  * answers the boolean ("is anything blocked") for a whole ticket set in one
  * pass; this answers "blocked by WHAT, specifically" for one ticket at a
- * time — the ticket-detail page's own use, called once per page render
- * rather than once per row of a list, so an O(tickets) scan here (instead
- * of a precomputed reverse index) is the right trade for this call site.
+ * time. Callers rendering more than one ticket use
+ * {@link liveBlockersFromReverseIndex} with one snapshot-scoped reverse index
+ * instead of repeating this O(tickets) scan for every row.
  */
 export function liveBlockers(ticketId: TicketId, tickets: readonly Ticket[]): Ticket[] {
   return tickets.filter(

@@ -35,10 +35,12 @@ import type {
 } from "./types.js";
 import {
   type AwaitingInputOverlay,
+  buildReverseEdgeIndex,
   computeStaleReason,
   isTicketStale,
-  liveBlockers,
+  liveBlockersFromReverseIndex,
   msSince,
+  type ReverseEdgeIndex,
   type StaleReason,
   type StaleThresholds,
 } from "../overlays.js";
@@ -74,6 +76,34 @@ const VERB_LABELS: Record<EventVerb, string> = {
   "question.asked": "asked a question",
   "question.answered": "answered a question",
 };
+
+/** Immutable derivations shared by every summary produced from one ticket
+ * snapshot. Building this once keeps list/tree/review/stale rendering O(T+E). */
+export interface TicketSummaryContext {
+  byId: ReadonlyMap<TicketId, Ticket>;
+  reverseEdges: ReverseEdgeIndex;
+  thresholds: StaleThresholds;
+  config: Config;
+  now: number;
+  awaitingInputByTicket: ReadonlyMap<TicketId, AwaitingInputOverlay>;
+}
+
+export function createTicketSummaryContext(
+  tickets: readonly Ticket[],
+  thresholds: StaleThresholds,
+  config: Config,
+  now: number,
+  awaitingInputByTicket: ReadonlyMap<TicketId, AwaitingInputOverlay>,
+): TicketSummaryContext {
+  return {
+    byId: new Map(tickets.map((ticket) => [ticket.id, ticket])),
+    reverseEdges: buildReverseEdgeIndex(tickets),
+    thresholds,
+    config,
+    now,
+    awaitingInputByTicket,
+  };
+}
 
 export function jsonResponse(data: unknown, init?: ResponseInit): Response {
   return Response.json(data, init);
@@ -193,7 +223,7 @@ function awaitingInputReasonDto(
 
 /**
  * `blocked_by` is built as full {@link TicketRefDTO}s directly (every live
- * blocker, by construction, exists in `allTickets`) rather than through
+ * blocker, by construction, exists in the context snapshot) rather than through
  * {@link refOrDangling} — there's nothing dangling to guard against here.
  *
  * `awaitingInputByTicket` (G4): the whole-db map
@@ -203,24 +233,17 @@ function awaitingInputReasonDto(
  * get `awaiting_input: false` for every ticket; every existing call site
  * was updated alongside this signature change.
  */
-export function overlayDto(
-  ticket: Ticket,
-  allTickets: readonly Ticket[],
-  thresholds: StaleThresholds,
-  configDefaults: { stale_after: string; review_stale_after: string },
-  now: number,
-  awaitingInputByTicket: ReadonlyMap<TicketId, AwaitingInputOverlay>,
-): OverlayDTO {
-  const blockers = liveBlockers(ticket.id, allTickets);
-  const staleReason = computeStaleReason(ticket, thresholds, now);
-  const awaitingInput = awaitingInputByTicket.get(ticket.id) ?? NOT_AWAITING_INPUT;
+export function overlayDto(ticket: Ticket, context: TicketSummaryContext): OverlayDTO {
+  const blockers = liveBlockersFromReverseIndex(ticket.id, context.byId, context.reverseEdges);
+  const staleReason = computeStaleReason(ticket, context.thresholds, context.now);
+  const awaitingInput = context.awaitingInputByTicket.get(ticket.id) ?? NOT_AWAITING_INPUT;
   return {
     blocked: blockers.length > 0,
     blocked_by: blockers.map(ticketRefDto).sort((a, b) => a.name.localeCompare(b.name)),
-    stale: isTicketStale(ticket, thresholds, now),
-    stale_reason: staleReasonDto(staleReason, configDefaults, now),
+    stale: isTicketStale(ticket, context.thresholds, context.now),
+    stale_reason: staleReasonDto(staleReason, context.config.defaults, context.now),
     awaiting_input: awaitingInput.awaitingInput,
-    awaiting_input_reason: awaitingInputReasonDto(awaitingInput, now),
+    awaiting_input_reason: awaitingInputReasonDto(awaitingInput, context.now),
   };
 }
 
@@ -244,15 +267,7 @@ export function provenanceDto(ticket: Ticket, byId: ReadonlyMap<TicketId, Ticket
   };
 }
 
-export function ticketSummaryDto(
-  ticket: Ticket,
-  allTickets: readonly Ticket[],
-  byId: ReadonlyMap<TicketId, Ticket>,
-  thresholds: StaleThresholds,
-  config: Config,
-  now: number,
-  awaitingInputByTicket: ReadonlyMap<TicketId, AwaitingInputOverlay>,
-): TicketSummaryDTO {
+export function ticketSummaryDto(ticket: Ticket, context: TicketSummaryContext): TicketSummaryDTO {
   return {
     id: ticket.id,
     handle: shortTicketCode(ticket.id),
@@ -268,16 +283,9 @@ export function ticketSummaryDto(
     latest_note: ticket.latest_note,
     created_at: ticket.created_at,
     updated_at: ticket.updated_at,
-    parent: parentDto(ticket, byId, config),
-    overlay: overlayDto(
-      ticket,
-      allTickets,
-      thresholds,
-      config.defaults,
-      now,
-      awaitingInputByTicket,
-    ),
-    review: reviewDto(ticket, now),
+    parent: parentDto(ticket, context.byId, context.config),
+    overlay: overlayDto(ticket, context),
+    review: reviewDto(ticket, context.now),
   };
 }
 

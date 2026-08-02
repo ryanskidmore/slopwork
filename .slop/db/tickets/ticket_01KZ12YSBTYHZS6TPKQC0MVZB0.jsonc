@@ -1,0 +1,53 @@
+{
+  "id": "ticket_01KZ12YSBTYHZS6TPKQC0MVZB0",
+  "name": "Make web summaries and event cache reads linear",
+  "slug": "make-web-summaries-and-event",
+  "spec": {
+    "summary": "Eliminate quadratic web blocker derivation and unrelated filesystem scans in the event cache fingerprint.",
+    "details_md": "Precompute live reverse blockers once per web response snapshot and reuse them across list/tree/review/stale/detail summary conversion. Give FlatfileBackend event caching an event-only fingerprint that covers flat and sharded events without statting tickets or sessions.",
+    "acceptance": [
+      "Web summary DTO derivation computes reverse/live blockers once per response snapshot and preserves blocker semantics across summary endpoints and detail.",
+      "Event cache fingerprinting reads only event paths while invalidating for flat and sharded event changes.",
+      "Deterministic operation-count tests demonstrate linear summary work and no ticket/session stats on cached event reads."
+    ],
+    "context": [
+      "src/web/api/shared.ts",
+      "src/web/api/tickets.ts",
+      "src/web/api/tree.ts",
+      "src/storage/flatfile.ts",
+      "scripts/bench.ts"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "review",
+  "priority": 1,
+  "labels": [],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ12YSBTYHZS6TPKQC0MVZB0",
+  "path": [],
+  "active_session": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z",
+  "last_activity_at": "2026-08-02T11:28:36.905Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-08-02T11:15:13.964Z",
+  "updated_at": "2026-08-02T11:28:36.905Z",
+  "review": {
+    "mr": "https://github.com/ryanskidmore/slopwork/pull/12",
+    "requested_at": "2026-08-02T11:28:36.905Z",
+    "by": {
+      "name": "Ryan Skidmore",
+      "kind": "human"
+    }
+  }
+}

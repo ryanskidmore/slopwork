@@ -563,7 +563,7 @@ async function fingerprintConfigFile(configPath: string): Promise<DirFingerprint
  * events tree" — events.ts's sharded layout (t-6tqw9) splits events
  * across the flat `events/` directory (old events, never migrated) and
  * any number of `events/YYYY-MM/` shards, and this function fingerprints
- * exactly one of those at a time; {@link computeContentFingerprint} below
+ * exactly one of those at a time; {@link computeEventsFingerprint} below
  * calls it once per directory (the flat one, always, plus once per shard
  * `events.ts`'s `listEventShardDirs` reports currently exists) and
  * assembles the results into one key per directory. Reused as-is for
@@ -584,6 +584,23 @@ export async function fingerprintEventsDir(dir: string): Promise<DirFingerprint>
     .sort();
   const last = ids[ids.length - 1];
   return { count: ids.length, digest: last ?? "empty" };
+}
+
+/** The event-only subset of the repository fingerprint. Event listing caches
+ * use this so a read never scans unrelated ticket, session, or config files. */
+export async function computeEventsFingerprint(paths: RepoPaths): Promise<ContentFingerprint> {
+  const shardDirs = await listEventShardDirs(paths);
+  const [events, shardEntries] = await Promise.all([
+    fingerprintEventsDir(paths.eventsDir),
+    Promise.all(
+      shardDirs.map(async (dir): Promise<readonly [string, DirFingerprint]> => {
+        const month = basename(dir);
+        const fingerprint = await fingerprintEventsDir(dir);
+        return [`events/${month}`, fingerprint] as const;
+      }),
+    ),
+  ]);
+  return { events, ...Object.fromEntries(shardEntries) };
 }
 
 /**
@@ -613,7 +630,9 @@ export async function fingerprintEventsDir(dir: string): Promise<DirFingerprint>
  *     per shard directory {@link listEventShardDirs} (events.ts) reports
  *     currently exists on disk, each holding that ONE shard's own
  *     `{count, digest}` — computed the same cheap, zero-file-read way,
- *     scoped to just that directory's own contents.
+ *     scoped to just that directory's own contents. The event-only work is
+ *     exposed through {@link computeEventsFingerprint}; the full repository
+ *     fingerprint below composes that result with tickets and config.
  * `listEventShardDirs` (not a second, parallel "what shards exist"
  * implementation of its own) is reused here deliberately — single source
  * of truth for shard discovery between the write path (events.ts) and
@@ -632,20 +651,12 @@ export async function fingerprintEventsDir(dir: string): Promise<DirFingerprint>
  */
 export async function computeContentFingerprint(paths: RepoPaths): Promise<ContentFingerprint> {
   const configPath = join(paths.slopDir, "config.yaml");
-  const shardDirs = await listEventShardDirs(paths);
-  const [tickets, config, events, shardEntries] = await Promise.all([
+  const [tickets, config, eventFingerprint] = await Promise.all([
     fingerprintEntityDir(paths.ticketsDir, isTicketId),
     fingerprintConfigFile(configPath),
-    fingerprintEventsDir(paths.eventsDir),
-    Promise.all(
-      shardDirs.map(async (dir): Promise<readonly [string, DirFingerprint]> => {
-        const month = basename(dir);
-        const fingerprint = await fingerprintEventsDir(dir);
-        return [`events/${month}`, fingerprint] as const;
-      }),
-    ),
+    computeEventsFingerprint(paths),
   ]);
-  return { tickets, config, events, ...Object.fromEntries(shardEntries) };
+  return { tickets, config, ...eventFingerprint };
 }
 
 function fingerprintsEqual(a: ContentFingerprint, b: ContentFingerprint): boolean {
