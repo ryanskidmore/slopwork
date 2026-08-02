@@ -21,7 +21,7 @@
       "steps": [
         {
           "text": "Spawn G3 worktree subagent: list, ready filters, bulk ops, graph editing flags, slug shadowing",
-          "checked": false
+          "checked": true
         },
         {
           "text": "Review agent report + PR",
