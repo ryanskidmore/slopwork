@@ -1,0 +1,51 @@
+{
+  "id": "ticket_01KZ11CQSZDEPJRS4V057PVAYN",
+  "name": "Make flatfile lock acquisition and release token-safe",
+  "slug": "fix/audit-lock-safety",
+  "spec": {
+    "summary": "Restore strict mutual exclusion for the flatfile write lock.",
+    "details_md": "Replace pid-only lock ownership and unsafe stale-lock relocation with a unique acquisition identity, token-aware release, and conservative stale recovery that never steals from a potentially live process.",
+    "acceptance": [
+      "Concurrent contenders cannot overlap through a stale-break race.",
+      "Release cannot delete a replacement lock, including replacements owned by the same pid.",
+      "A distinct token identifies every acquisition and same-pid nested/competing acquisitions remain distinct.",
+      "Stale recovery only removes locks whose owner is confirmed dead; age alone never steals from a potentially live owner."
+    ],
+    "context": [
+      "src/repo/lock.ts",
+      "src/repo/lock.test.ts"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "review",
+  "priority": 0,
+  "labels": [],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ11CQSZDEPJRS4V057PVAYN",
+  "path": [],
+  "active_session": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0",
+  "last_activity_at": "2026-08-02T11:05:53.608Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-08-02T10:47:53.974Z",
+  "updated_at": "2026-08-02T11:05:53.608Z",
+  "review": {
+    "mr": "https://github.com/ryanskidmore/slopwork/pull/7",
+    "requested_at": "2026-08-02T11:05:53.608Z",
+    "by": {
+      "name": "Ryan Skidmore",
+      "kind": "human"
+    }
+  }
+}

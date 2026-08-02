@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ11CXN4VEYZR5NA7Z4NM4NN",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "human"
+  },
+  "session": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0",
+  "verb": "plan.set",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0"
+  },
+  "payload": {
+    "version": 1,
+    "step_count": 4
+  },
+  "at": "2026-08-02T10:47:59.908Z"
+}

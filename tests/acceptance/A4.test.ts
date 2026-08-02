@@ -458,8 +458,8 @@ describe("A4: Event writer", () => {
 
       // The lock was released in `finally` even though the transaction
       // threw — acquirable again immediately, not stuck.
-      await acquireLock(paths.lockFile, { timeoutMs: 500 });
-      await releaseLock(paths.lockFile);
+      const lock = await acquireLock(paths.lockFile, { timeoutMs: 500 });
+      await releaseLock(paths.lockFile, lock);
     });
 
     it("session mutations compose the same way as ticket mutations under one lock", async () => {

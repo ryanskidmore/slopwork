@@ -241,10 +241,14 @@ describe("A3: Flatfile repo layer", () => {
   // spawned-worker test that proved a dispossessed holder fails loudly —
   // were removed along with the feature. The lock is now a plain O_EXCL
   // acquire/release with stale-breaking (dead pid instantly; any holder
-  // past staleTimeoutMs; unparseable lock files by mtime) — see
-  // src/repo/lock.ts's module doc for the retained TOCTOU-safe break and
-  // the accepted long-transaction trade-off, and src/repo/lock.test.ts
-  // for the unit coverage of what remains.
+  // past staleTimeoutMs; unparseable lock files by mtime), t-cloj2
+  // follow-up ("make acquisition and release token-safe"): every
+  // acquisition carries a unique token, and release is the same
+  // rename-then-verify shape stale-breaking already used, closing a TOCTOU
+  // where a delayed release could destroy a lock someone else legitimately
+  // reacquired in the gap — see src/repo/lock.ts's module doc for the
+  // retained TOCTOU-safe break/release and the accepted long-transaction
+  // trade-off, and src/repo/lock.test.ts for the unit coverage of both.
 
   describe('"ambiguous prefix errors git-style"', () => {
     it("lists every candidate with id/name/slug and exits 5; not-found exits 4; exact slug beats an ambiguous prefix", async () => {

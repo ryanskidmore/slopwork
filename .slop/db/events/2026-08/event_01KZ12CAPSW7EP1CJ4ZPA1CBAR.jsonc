@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ12CAPSW7EP1CJ4ZPA1CBAR",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ11CQSZDEPJRS4V057PVAYN"
+  },
+  "payload": {
+    "progress": "Documentation now records the claimed-directory protocol and manual-recovery tradeoff. Focused lock/config/A4/G2 suite: 67 passed; full Vitest suite: 1,948 passed; lock coverage: 91.15% statements, 87.5% branches, 100% functions, 95.45% lines; build/typecheck/lint/format pass. Repository-wide coverage still exits nonzero on pre-existing G3/G4 global/CLI thresholds being repaired separately."
+  },
+  "at": "2026-08-02T11:05:09.081Z"
+}
