@@ -11,6 +11,24 @@ where breaking changes land.
 
 ### Added
 
+- **Bounded the remaining unbounded web API collections** (t-m1j8y): the
+  review/stale/questions panels and a ticket's events/sessions timeline now
+  take the same validated, capped `page`/`limit` query params `GET
+  /api/tickets` already established (50 default, 100 max, a 400
+  `ApiErrorDTO` over the max or on a non-positive-integer value) — same
+  envelope shape (`page`/`limit`/`total`/`total_pages`/`previous_page`/
+  `next_page`), just without the extra whole-repo-vs-filtered split that
+  endpoint alone needs. `GET /api/tree` bounds the nested hierarchy
+  differently, since it has no "page N" of its own: a total node budget (500
+  default, 1,000 max) walked breadth-first across roots, plus a per-branch
+  depth budget (6 default, 12 max); each node now carries `has_children`/
+  `children_truncated` so a client can tell "this subtree is complete" from
+  "there's more here, not shown" even where the walk stopped short. The SPA
+  gained a reusable `CollectionLoadMore` control + `useLoadMoreCollection`
+  hook (review/stale/questions panels, and the ticket-detail page's
+  events/sessions tabs) and the tree page now reads `has_children`/
+  `children_truncated` instead of inferring from a (possibly bounded)
+  `children` array, with a banner when the whole response was truncated.
 - **Merge-safe event polling cursors** (t-r0hnj). `slop events --since
   <event_id>` is a scalar ULID watermark: an event created earlier on
   another clone can still arrive later (after a Git merge of `.slop/db/`)
