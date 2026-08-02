@@ -3,12 +3,12 @@
  * operations slopwork actually performs, and report where they stop being fast.
  *
  * Run it:
- *   bun bench/run.ts --scales 1000,10000,100000 --out bench/results.json
- *   bun bench/run.ts --scales 1000000 --skip-subprocess     # the big one
+ *   bun bench/run.ts --scales 1000,10000,100000 --out bench/results-ladder.json
  *
  * Flags:
  *   --scales a,b,c     ticket counts to sweep (default 1000,10000,100000)
- *   --events N          extra progress events seeded per scale (default 2x tickets, capped)
+ *   --events N          events seeded per scale, TOTAL (default: 9x tickets —
+ *                       see the ratio note below; pass this to override)
  *   --workers N         concurrent writers in the concurrency phases (default 64)
  *   --dir PATH          where to build the fixtures. MUST be a real disk, not
  *                       tmpfs — see the note below. Default: ./.bench-work
@@ -16,6 +16,32 @@
  *   --skip-subprocess   skip the end-to-end CLI timings (they spawn the binary
  *                       once per run and dominate wall-clock at large scales)
  *   --keep              don't delete the fixtures afterward
+ *
+ * ## Why 9 events per ticket (G5, t-ukxun)
+ *
+ * This harness used to default to 2 events/ticket (capped at 200,000 total,
+ * a cap sized for a 1,000,000-ticket rung this harness no longer runs — see
+ * below). That ratio was never measured against anything; this repo's own
+ * dogfood `.slop/db/` — the one real data point available — runs close to
+ * 9 events per ticket (progress notes, state changes, plan revisions, review
+ * requests, and now G4's ask/answer events, all accumulating over a
+ * ticket's real lifecycle). Seeding at 2:1 understated the index/fingerprint
+ * cost real usage actually pays, since every event is a file the cold-build
+ * fingerprint scan and the warm-load fingerprint both have to see. The
+ * default is now 9x tickets, with no cap: the 1M rung this cap existed to
+ * protect is gone (below), so nothing left at 1k/10k/100k needs it.
+ *
+ * ## Why there's no 1,000,000-ticket rung anymore (G5, t-ukxun)
+ *
+ * Git history (`bench/results-1m.json`, before this change removed it) has
+ * that data if it's ever needed again, but this harness's own docs
+ * (`docs/benchmarks.md`) already said the practical ceiling sits one to two
+ * orders of magnitude above where slopwork is designed to run (§2 of
+ * design.md: one engineer, 2-3 agents, hundreds to low thousands of
+ * tickets) — a 1M-ticket rung measured a scale nobody using this tool for
+ * its stated purpose will ever reach, at real cost (tens of minutes to seed
+ * and run, gigabytes of fixture disk). Dropped rather than kept as a number
+ * nobody should run at.
  *
  * ## Why the fixture directory matters
  *
@@ -114,10 +140,13 @@ async function runScale(args: Args, tickets: number): Promise<ScaleResult> {
   await rm(root, { recursive: true, force: true });
   await mkdir(root, { recursive: true });
 
-  // Events default: 2 per ticket up to a ceiling, so the event log is a real
-  // participant (it feeds the index fingerprint + effective-overlay derivation)
-  // without the seed itself becoming the dominant cost at 1M.
-  const events = args.events ?? Math.min(tickets * 2, 200_000);
+  // Events default: 9 per ticket, uncapped — this repo's own observed
+  // dogfood ratio (see this module's doc, "Why 9 events per ticket"), so
+  // the event log is a REALISTIC participant in the index fingerprint +
+  // effective-overlay derivation costs measured below, not an
+  // under-counted one.
+  const EVENTS_PER_TICKET = 9;
+  const events = args.events ?? tickets * EVENTS_PER_TICKET;
   const fanout = Math.min(1000, Math.max(1, Math.floor(tickets / 10)));
 
   log(`\n=== scale ${tickets.toLocaleString()} tickets / ${events.toLocaleString()} events ===`);

@@ -97,7 +97,8 @@ export function timeSubprocess(
   return summarize(label, samples, undefined, options.notes);
 }
 
-/** Wall-clock for one shot of something inherently one-shot (a 1M-file seed). */
+/** Wall-clock for one shot of something inherently one-shot (e.g. one wave of
+ * N concurrent worker processes racing against the same fixture). */
 export async function timeOnce(
   label: string,
   fn: () => Promise<unknown>,

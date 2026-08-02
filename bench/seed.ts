@@ -1,23 +1,33 @@
 /**
  * Benchmark seeder — builds a `.slop/db` of arbitrary size FAST.
  *
- * Why this bypasses the CLI: seeding 1,000,000 tickets by spawning `slop new`
- * a million times would take days and would measure process startup, not the
- * datastore. This writes entity files directly through the same primitives the
- * repo layer uses (`writeCanonical` + a plain write), then lets the real
- * `loadIndex`/`buildIndex` path do all the reading during the actual
- * measurements. Every ticket it emits is schema-valid — `--verify` asserts
- * that by running the real `ticketSchema` over a sample, so a seeding bug can
- * never quietly become a "look how fast it is" result.
+ * Why this bypasses the CLI: seeding a six-figure ticket count by spawning
+ * `slop new` that many times would take hours and would measure process
+ * startup, not the datastore. This writes entity files directly through the
+ * same primitives the repo layer uses (`writeCanonical` + a plain write),
+ * then lets the real `loadIndex`/`buildIndex` path do all the reading during
+ * the actual measurements. Every ticket it emits is schema-valid —
+ * `--verify` asserts that by running the real `ticketSchema` over a sample,
+ * so a seeding bug can never quietly become a "look how fast it is" result.
+ * Events land in their real `events/<YYYY-MM>/` shard (G2), never flat, so
+ * the index/fingerprint scans measured here exercise the same
+ * shard-directory enumeration a real repo's `buildIndex` does.
  *
  * Deliberately NOT atomic-write: `atomicWriteFile` costs a temp file + fsync +
  * directory fsync per entity, which is the right thing for a real mutation and
  * pure overhead for building a fixture. Seeding is not what's being measured.
+ *
+ * G5 (t-ukxun): this harness previously also swept a 1,000,000-ticket rung.
+ * That column is gone — see docs/benchmarks.md's methodology note for why —
+ * but nothing about this seeder's own bypass-the-CLI, bypass-atomic-write
+ * rationale was scale-specific, so both still apply verbatim at the rungs
+ * this now actually runs (1k/10k/100k).
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { newEventId, newTicketId, ticketSchema, writeCanonical } from "../src/core/index.js";
-import type { Ticket, TicketId } from "../src/core/index.js";
+import type { EventId, Ticket, TicketId } from "../src/core/index.js";
+import { eventShardMonth } from "../src/repo/index.js";
 
 export interface SeedOptions {
   /** Directory that will contain `.slop/` (not `.slop/` itself). */
@@ -64,7 +74,6 @@ function buildTicket(index: number, id: TicketId, blocks: TicketId[] = []): Tick
     state: "open",
     priority: (index % 4) as 0 | 1 | 2 | 3,
     labels: index % 5 === 0 ? ["area:bench"] : [],
-    adhoc: false,
     blocks,
     relates_to: [],
     discovered_from: [],
@@ -92,8 +101,8 @@ function buildEvent(ticketId: TicketId, n: number): Record<string, unknown> {
   };
 }
 
-/** Write `items` in bounded-concurrency batches so a 1M-file seed doesn't try
- * to hold a million promises (or file descriptors) at once. */
+/** Write `items` in bounded-concurrency batches so a six-figure seed doesn't
+ * try to hold every promise (or file descriptor) open at once. */
 async function writeBatched<T>(
   items: readonly T[],
   batchSize: number,
@@ -135,15 +144,27 @@ export async function seed(options: SeedOptions): Promise<SeedResult> {
 
   if (eventCount > 0) {
     const eventIndexes = Array.from({ length: eventCount }, (_, n) => n);
+    // G5 (t-ukxun): seed through the CURRENT (G2, shard-event-storage)
+    // physical layout — `events/<YYYY-MM>/event_<ulid>.jsonc` — never
+    // flat, so the index/fingerprint scans this harness measures exercise
+    // the same shard-directory enumeration a real repo's `buildIndex`
+    // does (see `src/repo/events.ts`'s module doc). `shardDirsMkdirred`
+    // caches which shard directories already exist so a seed of hundreds
+    // of thousands of events (all minted "now," so they land in the same
+    // one or two month shards) doesn't `mkdir` the same directory once
+    // per file.
+    const shardDirsMkdirred = new Set<string>();
     await writeBatched(eventIndexes, batchSize, async (n) => {
       const target = ids[n % ids.length];
       if (target === undefined) return;
       const event = buildEvent(target, n);
-      await writeFile(
-        join(eventsDir, `${event.id as string}.jsonc`),
-        writeCanonical(event),
-        "utf8",
-      );
+      const id = event.id as EventId;
+      const shardDir = join(eventsDir, eventShardMonth(id));
+      if (!shardDirsMkdirred.has(shardDir)) {
+        await mkdir(shardDir, { recursive: true });
+        shardDirsMkdirred.add(shardDir);
+      }
+      await writeFile(join(shardDir, `${id}.jsonc`), writeCanonical(event), "utf8");
     });
   }
 
