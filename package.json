@@ -42,7 +42,7 @@
     "dev:web": "bun scripts/build-frontend.ts --watch",
     "prebuild": "bun run build:web",
     "build": "bun build ./src/cli/index.ts --compile --outfile dist/slop",
-    "check:required": "bun run lint && bun run format:check && bun run typecheck && bun run test:coverage && bun run build && bun run verify:dist && bun run verify:package",
+    "check:required": "bun run lint && bun run format:check && bun run typecheck && bun run build && bun run test:coverage && bun run verify:dist && bun run verify:package",
     "start": "bun src/cli/index.ts",
     "pretest": "bun run build:web",
     "test": "vitest run",
