@@ -10,7 +10,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "in_progress",
+  "state": "done",
   "priority": 1,
   "labels": [
     "source:salvage"
@@ -20,9 +20,9 @@
   "discovered_from": [],
   "root_id": "ticket_01KZ21JY9G2NK1F84B3W325WYM",
   "path": [],
-  "active_session": "session_01KZ21KAC04ZT1SKVEJAA4NDCA",
-  "last_activity_at": "2026-08-02T20:10:43.982Z",
-  "latest_note": null,
+  "active_session": null,
+  "last_activity_at": "2026-08-02T20:41:14.229Z",
+  "latest_note": "PRs 14 and 18 re-rebased through second merge wave, gates green, both now merged (18 merged by coordinator on Ryan's authorization).",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -32,5 +32,5 @@
     }
   },
   "created_at": "2026-08-02T20:10:31.601Z",
-  "updated_at": "2026-08-02T20:10:43.982Z"
+  "updated_at": "2026-08-02T20:41:14.229Z"
 }

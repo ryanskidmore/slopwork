@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ23B5PTNJ1Q5BBEPFT5EA8V",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": "session_01KZ21KAC04ZT1SKVEJAA4NDCA",
+  "verb": "session.ended",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KZ21KAC04ZT1SKVEJAA4NDCA"
+  },
+  "payload": {
+    "reason": "done",
+    "note": "PRs 14 and 18 re-rebased through second merge wave, gates green, both now merged (18 merged by coordinator on Ryan's authorization)."
+  },
+  "at": "2026-08-02T20:41:14.202Z"
+}

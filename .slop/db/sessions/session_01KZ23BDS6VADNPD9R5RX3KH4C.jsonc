@@ -1,0 +1,20 @@
+{
+  "id": "session_01KZ23BDS6VADNPD9R5RX3KH4C",
+  "ticket": "ticket_01KZ1P45S0TBRBRWK1CHB170PP",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "harness": {
+    "kind": "claude-code",
+    "session_id": "d4635e1a-1026-4110-a973-7e19232602ca"
+  },
+  "git": {
+    "branch": "main",
+    "commit_at_start": "eb571b2e765506991040cebc25ece06eb392fbfe"
+  },
+  "started_at": "2026-08-02T20:41:22.470Z",
+  "ended_at": null,
+  "plan": [],
+  "end_summary": null
+}

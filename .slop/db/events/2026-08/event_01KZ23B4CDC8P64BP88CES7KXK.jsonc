@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ23B4CDC8P64BP88CES7KXK",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0",
+  "verb": "ticket.done",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ11CQSZDEPJRS4V057PVAYN"
+  },
+  "payload": {
+    "from": "review"
+  },
+  "at": "2026-08-02T20:41:12.845Z"
+}

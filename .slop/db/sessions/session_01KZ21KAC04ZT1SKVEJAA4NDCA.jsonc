@@ -14,7 +14,7 @@
     "commit_at_start": "1ec9306de717c2a694ae80b72e1d79cfab444922"
   },
   "started_at": "2026-08-02T20:10:43.968Z",
-  "ended_at": null,
+  "ended_at": "2026-08-02T20:41:14.202Z",
   "plan": [],
-  "end_summary": null
+  "end_summary": "PRs 14 and 18 re-rebased through second merge wave, gates green, both now merged (18 merged by coordinator on Ryan's authorization)."
 }

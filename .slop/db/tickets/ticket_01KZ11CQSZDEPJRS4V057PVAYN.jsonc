@@ -18,18 +18,17 @@
     "meta": {},
     "v": 1
   },
-  "state": "review",
+  "state": "done",
   "priority": 0,
   "labels": [],
-  "adhoc": false,
   "blocks": [],
   "relates_to": [],
   "discovered_from": [],
   "root_id": "ticket_01KZ11CQSZDEPJRS4V057PVAYN",
   "path": [],
-  "active_session": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0",
-  "last_activity_at": "2026-08-02T11:05:53.608Z",
-  "latest_note": null,
+  "active_session": null,
+  "last_activity_at": "2026-08-02T20:41:12.845Z",
+  "latest_note": "Audit-fix program fully merged: PRs 5,6,7,9,10,12,13,14,15,16,17,18,19 all on main (PR 11 closed as superseded). Batch-closed after final merges of 14/18 and 19.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -39,13 +38,5 @@
     }
   },
   "created_at": "2026-08-02T10:47:53.974Z",
-  "updated_at": "2026-08-02T11:05:53.608Z",
-  "review": {
-    "mr": "https://github.com/ryanskidmore/slopwork/pull/7",
-    "requested_at": "2026-08-02T11:05:53.608Z",
-    "by": {
-      "name": "Ryan Skidmore",
-      "kind": "human"
-    }
-  }
+  "updated_at": "2026-08-02T20:41:12.845Z"
 }

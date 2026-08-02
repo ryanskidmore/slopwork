@@ -25,21 +25,20 @@
     "meta": {},
     "v": 1
   },
-  "state": "review",
+  "state": "done",
   "priority": 1,
   "labels": [
     "web",
     "resilience"
   ],
-  "adhoc": false,
   "blocks": [],
   "relates_to": [],
   "discovered_from": [],
   "root_id": "ticket_01KZ1467SS3N0PZ9EJ6XCCPJ66",
   "path": [],
-  "active_session": "session_01KZ146J7GCEME06TYK1CBHHDM",
-  "last_activity_at": "2026-08-02T11:59:18.329Z",
-  "latest_note": null,
+  "active_session": null,
+  "last_activity_at": "2026-08-02T20:41:13.765Z",
+  "latest_note": "Audit-fix program fully merged: PRs 5,6,7,9,10,12,13,14,15,16,17,18,19 all on main (PR 11 closed as superseded). Batch-closed after final merges of 14/18 and 19.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -49,13 +48,5 @@
     }
   },
   "created_at": "2026-08-02T11:36:46.709Z",
-  "updated_at": "2026-08-02T11:59:18.329Z",
-  "review": {
-    "mr": "https://github.com/ryanskidmore/slopwork/pull/16",
-    "requested_at": "2026-08-02T11:59:18.329Z",
-    "by": {
-      "name": "codex-web-resilience",
-      "kind": "human"
-    }
-  }
+  "updated_at": "2026-08-02T20:41:13.765Z"
 }

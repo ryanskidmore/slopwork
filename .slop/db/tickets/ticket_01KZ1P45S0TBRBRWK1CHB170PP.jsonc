@@ -10,7 +10,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "open",
+  "state": "in_progress",
   "priority": 2,
   "labels": [
     "source:salvage"
@@ -20,8 +20,8 @@
   "discovered_from": [],
   "root_id": "ticket_01KZ1P45S0TBRBRWK1CHB170PP",
   "path": [],
-  "active_session": null,
-  "last_activity_at": "2026-08-02T16:50:13.525Z",
+  "active_session": "session_01KZ23BDS6VADNPD9R5RX3KH4C",
+  "last_activity_at": "2026-08-02T20:41:22.494Z",
   "latest_note": null,
   "owner": null,
   "provenance": {
@@ -32,5 +32,5 @@
     }
   },
   "created_at": "2026-08-02T16:50:13.525Z",
-  "updated_at": "2026-08-02T16:50:13.525Z"
+  "updated_at": "2026-08-02T20:41:22.494Z"
 }

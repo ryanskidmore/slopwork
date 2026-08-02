@@ -14,7 +14,7 @@
     "commit_at_start": "0c50f3f8541261b22ae1b2c5b66878e8cd9a3e46"
   },
   "started_at": "2026-08-02T11:01:08.069Z",
-  "ended_at": null,
+  "ended_at": "2026-08-02T20:41:13.312Z",
   "plan": [
     {
       "version": 1,
@@ -47,5 +47,5 @@
       "created_at": "2026-08-02T11:01:08.282Z"
     }
   ],
-  "end_summary": null
+  "end_summary": "Audit-fix program fully merged: PRs 5,6,7,9,10,12,13,14,15,16,17,18,19 all on main (PR 11 closed as superseded). Batch-closed after final merges of 14/18 and 19."
 }
