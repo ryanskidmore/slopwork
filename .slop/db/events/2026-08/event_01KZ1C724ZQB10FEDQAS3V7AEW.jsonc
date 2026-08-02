@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ1C724ZQB10FEDQAS3V7AEW",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": "session_01KZ12RVC1D9T1KK04KQFCMYTH",
+  "verb": "session.ended",
+  "entity": {
+    "kind": "session",
+    "id": "session_01KZ12RVC1D9T1KK04KQFCMYTH"
+  },
+  "payload": {
+    "reason": "done",
+    "note": "PR #8 merged to main. Budget unification, honest benchmarks (9:1 ratio, 1M rung dropped), exit code 3 removed, SLOP_FAKE_NOW consolidation, adhoc folded into provenance, docs corrections, post-G3 polish — all live. Coverage gate work rode this PR."
+  },
+  "at": "2026-08-02T13:57:02.239Z"
+}

@@ -12,13 +12,12 @@
     "meta": {},
     "v": 1
   },
-  "state": "review",
+  "state": "done",
   "priority": 1,
   "labels": [
     "group:g5",
     "source:product-audit"
   ],
-  "adhoc": false,
   "parent": "ticket_01KYZP8A340W5A8X70TYQ6XVT8",
   "blocks": [],
   "relates_to": [],
@@ -27,9 +26,9 @@
   "path": [
     "ticket_01KYZP8A340W5A8X70TYQ6XVT8"
   ],
-  "active_session": "session_01KZ12RTNE6MQQ3GGW9FGCK7MS",
-  "last_activity_at": "2026-08-02T11:11:58.809Z",
-  "latest_note": null,
+  "active_session": null,
+  "last_activity_at": "2026-08-02T13:57:02.040Z",
+  "latest_note": "PR #8 merged to main. Budget unification, honest benchmarks (9:1 ratio, 1M rung dropped), exit code 3 removed, SLOP_FAKE_NOW consolidation, adhoc folded into provenance, docs corrections, post-G3 polish — all live. Coverage gate work rode this PR.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -39,13 +38,5 @@
     }
   },
   "created_at": "2026-08-01T22:14:51.663Z",
-  "updated_at": "2026-08-02T11:11:58.809Z",
-  "review": {
-    "mr": "https://github.com/ryanskidmore/slopwork/pull/8",
-    "requested_at": "2026-08-02T11:11:58.809Z",
-    "by": {
-      "name": "coordinator",
-      "kind": "agent"
-    }
-  }
+  "updated_at": "2026-08-02T13:57:02.040Z"
 }

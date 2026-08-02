@@ -14,7 +14,7 @@
     "commit_at_start": "0c50f3f8541261b22ae1b2c5b66878e8cd9a3e46"
   },
   "started_at": "2026-08-02T11:11:58.266Z",
-  "ended_at": null,
+  "ended_at": "2026-08-02T13:57:01.953Z",
   "plan": [],
-  "end_summary": null
+  "end_summary": "PR #8 merged to main. Budget unification, honest benchmarks (9:1 ratio, 1M rung dropped), exit code 3 removed, SLOP_FAKE_NOW consolidation, adhoc folded into provenance, docs corrections, post-G3 polish — all live. Coverage gate work rode this PR."
 }
