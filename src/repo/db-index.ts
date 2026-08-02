@@ -219,7 +219,7 @@
  */
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { z } from "zod";
 import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
@@ -264,7 +264,7 @@ import {
 } from "../tickets/overlay.js";
 import { atomicWriteFile } from "./atomic-write.js";
 import { loadConfigDefaultsTolerant } from "./config.js";
-import { listEventsTolerant } from "./events.js";
+import { listEventShardDirs, listEventsTolerant } from "./events.js";
 import { isEnoent, readDirSafe } from "./fs-utils.js";
 import type { RepoPaths } from "./paths.js";
 import { listTicketsTolerant } from "./tickets.js";
@@ -393,11 +393,22 @@ interface StatTuple {
   size: number;
 }
 
-async function fingerprintTicketsDir(dir: string): Promise<DirFingerprint> {
+/**
+ * Generalized entity-directory fingerprint — a `{count, digest}` over
+ * every entity file's `(filename, mtimeMs, size)` tuple, computed from
+ * `readdir`/`stat` alone (never file content). Exported (G2) so the
+ * flatfile driver's cross-call read cache (src/storage/flatfile.ts) can
+ * key cached ticket/session listings on the exact same staleness signal
+ * the index auto-heal already trusts.
+ */
+export async function fingerprintEntityDir(
+  dir: string,
+  isId: (value: string) => boolean,
+): Promise<DirFingerprint> {
   const names = await readDirSafe(dir);
   const entityNames = names.filter((name) => {
     if (!name.endsWith(".jsonc")) return false;
-    return isTicketId(name.slice(0, -".jsonc".length));
+    return isId(name.slice(0, -".jsonc".length));
   });
 
   const stats = await Promise.all(
@@ -434,7 +445,7 @@ async function fingerprintTicketsDir(dir: string): Promise<DirFingerprint> {
 
 /**
  * C5: `config.yaml`'s own `(mtimeMs, size)` fingerprint — the single-file
- * analogue of {@link fingerprintTicketsDir}, shaped the same
+ * analogue of {@link fingerprintEntityDir}, shaped the same
  * (`DirFingerprint`) so it fits `ContentFingerprint`'s existing
  * `Record<string, DirFingerprint>` shape with no schema change. `count` is
  * `0`/`1` for absent/present, so a config.yaml being created or deleted
@@ -455,18 +466,33 @@ async function fingerprintConfigFile(configPath: string): Promise<DirFingerprint
 }
 
 /**
- * ticket_01KY9RWFM80BKNE2CDX85QMKGS: `events/`'s own fingerprint — cheaper
- * than {@link fingerprintTicketsDir}'s (zero `stat` calls, `readdir` only)
- * because it can be: events are immutable and strictly append-only
+ * ticket_01KY9RWFM80BKNE2CDX85QMKGS: ONE event directory's own fingerprint
+ * — cheaper than {@link fingerprintEntityDir}'s (zero per-file `stat`
+ * calls) because it can be: events are immutable and strictly append-only
  * (events.ts's module doc — no `updateEvent`, no `deleteEvent`), so
  * `{count, digest: <max event id>}` is already a complete signature of
- * "every event id currently on disk" — ids are ULIDs, so the lexically
+ * "every event id currently in `dir`" — ids are ULIDs, so the lexically
  * greatest one is also the most recently appended, and any append at all
- * changes both `count` and `digest`. This is what lets `loadIndex()`
- * notice a lock-free `update --progress` event even though appending one
+ * changes both `count` and `digest`.
+ *
+ * G2 (shard-event-storage): `dir` is deliberately just "one directory
+ * containing `event_<ulid>.jsonc` files directly" rather than "the whole
+ * events tree" — events.ts's sharded layout (t-6tqw9) splits events
+ * across the flat `events/` directory (old events, never migrated) and
+ * any number of `events/YYYY-MM/` shards, and this function fingerprints
+ * exactly one of those at a time; {@link computeContentFingerprint} below
+ * calls it once per directory (the flat one, always, plus once per shard
+ * `events.ts`'s `listEventShardDirs` reports currently exists) and
+ * assembles the results into one key per directory. Reused as-is for
+ * both cases with no change needed: a shard directory contains nothing
+ * but `event_<ulid>.jsonc` files, so `readDirSafe` + the same
+ * `.jsonc`-suffix/`isEventId` filter already used for the flat directory
+ * is exactly the right listing for a shard too. This is what lets
+ * `loadIndex()` notice a lock-free `update --progress` event — in
+ * whichever directory it actually landed in — even though appending one
  * never touches `tickets/` or `config.yaml`.
  */
-async function fingerprintEventsDir(dir: string): Promise<DirFingerprint> {
+export async function fingerprintEventsDir(dir: string): Promise<DirFingerprint> {
   const names = await readDirSafe(dir);
   const ids = names
     .filter((name) => name.endsWith(".jsonc"))
@@ -485,18 +511,58 @@ async function fingerprintEventsDir(dir: string): Promise<DirFingerprint> {
  * itself (key `"config"`) — `stale_at`/`review_stale_at` are computed
  * from its `defaults.*` thresholds, so a hand-edit to config.yaml must
  * invalidate the index exactly like a ticket-file edit does.
- * ticket_01KY9RWFM80BKNE2CDX85QMKGS: also fingerprints `events/` (key
- * `"events"`, {@link fingerprintEventsDir}) — see this module's doc
- * section above.
+ * ticket_01KY9RWFM80BKNE2CDX85QMKGS: also fingerprints events, via
+ * {@link fingerprintEventsDir}.
+ *
+ * G2 (shard-event-storage, t-6tqw9): events are now fingerprinted
+ * per-directory, not as one combined blob, since a lock-free progress
+ * event or a fresh `ticket.created` event can land in any one of several
+ * directories (the flat `events/` dir, or whichever `events/YYYY-MM/`
+ * shard its own id's month names) and the auto-heal check needs to
+ * notice a change in ANY of them:
+ *   - key `"events"` — the flat `events/` directory's OWN fingerprint,
+ *     scoped to files sitting directly in it (never shard contents).
+ *     ALWAYS present, even when zero flat files remain (`{count: 0,
+ *     digest: "empty"}`) — including after every flat event has been
+ *     migrated into shards — so this key's presence/shape never depends
+ *     on whether migration has ever run, only its CONTENT does.
+ *   - one additional key `` `events/${month}` `` (e.g. `"events/2026-08"`)
+ *     per shard directory {@link listEventShardDirs} (events.ts) reports
+ *     currently exists on disk, each holding that ONE shard's own
+ *     `{count, digest}` — computed the same cheap, zero-file-read way,
+ *     scoped to just that directory's own contents.
+ * `listEventShardDirs` (not a second, parallel "what shards exist"
+ * implementation of its own) is reused here deliberately — single source
+ * of truth for shard discovery between the write path (events.ts) and
+ * this fingerprint.
+ *
+ * No schema change was needed to add these dynamically-named keys:
+ * {@link ContentFingerprint} was already `z.record(z.string(),
+ * dirFingerprintSchema)` — open-ended, not a fixed `{tickets, config,
+ * events}` shape — specifically so a later work item could do exactly
+ * this. {@link fingerprintsEqual} (below) is likewise already fully
+ * generic over arbitrary key sets: a shard key present in one snapshot
+ * and absent in the other (a shard appearing via a new write, or
+ * disappearing — there is no delete path today, but nothing here assumes
+ * one) already correctly counts as "not equal" with no changes needed
+ * there either.
  */
 export async function computeContentFingerprint(paths: RepoPaths): Promise<ContentFingerprint> {
   const configPath = join(paths.slopDir, "config.yaml");
-  const [tickets, config, events] = await Promise.all([
-    fingerprintTicketsDir(paths.ticketsDir),
+  const shardDirs = await listEventShardDirs(paths);
+  const [tickets, config, events, shardEntries] = await Promise.all([
+    fingerprintEntityDir(paths.ticketsDir, isTicketId),
     fingerprintConfigFile(configPath),
     fingerprintEventsDir(paths.eventsDir),
+    Promise.all(
+      shardDirs.map(async (dir): Promise<readonly [string, DirFingerprint]> => {
+        const month = basename(dir);
+        const fingerprint = await fingerprintEventsDir(dir);
+        return [`events/${month}`, fingerprint] as const;
+      }),
+    ),
   ]);
-  return { tickets, config, events };
+  return { tickets, config, events, ...Object.fromEntries(shardEntries) };
 }
 
 function fingerprintsEqual(a: ContentFingerprint, b: ContentFingerprint): boolean {

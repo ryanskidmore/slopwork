@@ -23,8 +23,42 @@
  *     tests/acceptance/A4.test.ts for the property test.
  *   - {@link EventQuery} / {@link queryEvents} — the ULID-cursor
  *     pagination primitive D3's `slop events --since` builds directly on.
+ *
+ * G2 (shard-event-storage, t-6tqw9) lands here too: a *new* event is now
+ * written to `events/YYYY-MM/event_<ulid>.jsonc` — the UTC month of the
+ * event's OWN id, per {@link eventShardMonth} — rather than flat in
+ * `events/`. This is purely a physical-layout change for one reason: a
+ * single flat directory of every event ever written, forever, does not
+ * scale the way `tickets/`/`sessions/` do (those stay bounded by the
+ * number of *live* entities; events only ever accumulate). Sharding by
+ * month keeps any one directory's `readdir` cost bounded by a repo's
+ * recent activity, not its entire history.
+ *
+ * Nothing about the LOGICAL model changes: an event's id is still its
+ * only identity, ids still sort chronologically as plain strings, and
+ * every read primitive below (`readEvent`, `listEventIds`, `listEvents`,
+ * `listEventsTolerant`, `queryEvents`) transparently merges whatever sits
+ * flat in `events/` (old events, never migrated — there is no automatic
+ * migration, see {@link migrateFlatEventsToShards}) together with every
+ * `events/YYYY-MM/` shard, as one seamless collection. No caller of any
+ * read primitive needs to know or care which layout a given id's file
+ * actually lives in. {@link eventFilePath} is the one deliberate
+ * exception: it keeps meaning exactly what it always has (the FLAT path),
+ * because tests rely on it to plant/verify flat-layout files directly —
+ * see that function's own doc comment.
+ *
+ * {@link listEventShardDirs} (which shard subdirectories currently exist)
+ * and {@link migrateFlatEventsToShards} (an explicit, idempotent,
+ * caller-triggered move of every flat event into its shard) are also
+ * consumed directly by the flatfile storage driver
+ * (src/storage/flatfile.ts) — for its temp-file sweep and its `slop
+ * reindex --shard-events`-style migration entry point, respectively. This
+ * module does not call either of them automatically from anywhere: no
+ * read path and no write path ever migrates a flat file on its own.
  */
+import { mkdir, rename, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { decodeTime } from "ulid";
 import type { Clock } from "../core/clock.js";
 import { systemClock } from "../core/clock.js";
 import {
@@ -38,16 +72,122 @@ import {
   eventSchema,
   isEventId,
   newEventId,
+  parsePrefixedId,
 } from "../core/index.js";
 import { createEntityFileCanonical, listEntityIds, readEntityFile } from "./entity-file.js";
+import { isEnoent, readDirSafe } from "./fs-utils.js";
 import type { RepoPaths } from "./paths.js";
 
+/**
+ * The FLAT path for `id` — `events/<id>.jsonc`, ignoring sharding
+ * entirely. Kept meaning exactly this, unconditionally, even though a
+ * *new* event is never written here (see {@link createEvent}): several
+ * tests deliberately plant a corrupt/poisoned event file at this exact
+ * path to verify tolerant reads still skip it gracefully, which is
+ * effectively a test of "an old, never-migrated flat event still reads
+ * correctly" — a real backward-compatibility property, not an
+ * implementation detail. Callers that want wherever `id` ACTUALLY lives
+ * (flat or sharded) should go through {@link readEvent}, not this.
+ */
 export function eventFilePath(paths: RepoPaths, id: EventId): string {
   return join(paths.eventsDir, `${id}.jsonc`);
 }
 
+/**
+ * The `YYYY-MM` (UTC) month `id` belongs to, per its own embedded ULID
+ * timestamp (`ulid`'s `decodeTime`, applied to the raw ULID body after
+ * stripping the `event_` prefix — core/ids.ts's `parsePrefixedId`). This
+ * is the single source of truth both {@link createEvent} (which month to
+ * write a brand-new event into) and every shard-aware read below (which
+ * month a given id's file WOULD be in, if it's sharded at all) derive
+ * their answer from — never a separately-passed clock reading. The id IS
+ * the event's canonical timestamp: an event's `at` field is a
+ * human-readable echo of the same moment recorded at mint time
+ * (`appendEvent` below), not a second, independently-adjustable source of
+ * truth, so re-deriving the shard from the id alone is what lets a
+ * caller locate any event's file without needing to already know (or
+ * track) which month it landed in.
+ */
+export function eventShardMonth(id: EventId): string {
+  const parsed = parsePrefixedId(id);
+  // Unreachable for any real `EventId`: the branded type is only ever
+  // produced via `eventIdSchema`'s regex, which `parsePrefixedId` also
+  // matches against. Guarded anyway rather than asserting, so a
+  // hand-rolled bad cast fails loudly instead of producing a nonsense
+  // path silently.
+  if (parsed === null) throw new Error(`not a valid event id: ${id}`);
+  const at = new Date(decodeTime(parsed.ulid));
+  const year = at.getUTCFullYear();
+  const month = String(at.getUTCMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+/** The sharded path `id` WOULD live at — `events/<eventShardMonth(id)>/<id>.jsonc`
+ * — regardless of whether a file actually exists there yet. Private: every
+ * external caller wants either the always-flat {@link eventFilePath} or
+ * the "wherever it actually is" resolution {@link readEvent}/{@link
+ * createEvent} already do internally; nothing outside this module needs
+ * to compute a shard path it hasn't verified exists. */
+function shardedEventFilePath(paths: RepoPaths, id: EventId): string {
+  return join(paths.eventsDir, eventShardMonth(id), `${id}.jsonc`);
+}
+
+/** Whether a file exists at `path` — `stat`, ENOENT mapped to `false`,
+ * anything else rethrown. The existence CHECK this module's shard/flat
+ * resolution is built on: deciding where to read by asking "does a file
+ * exist here" first, rather than by "try the shard, catch, retry flat",
+ * is deliberate — the latter would risk masking a real JSONC-parse or
+ * schema-validation error at the correct (existing) path behind a
+ * spurious fallback attempt at the other, non-existent one. */
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch (err) {
+    if (isEnoent(err)) return false;
+    throw err;
+  }
+}
+
+/**
+ * Read one event by id, transparently across the flat/sharded layout
+ * split (module doc above): checks whether `id`'s computed shard path
+ * ({@link shardedEventFilePath}) exists first, and reads from there if
+ * so; otherwise falls back to the flat path ({@link eventFilePath}) —
+ * which is also what gets read (and named in the resulting error) when
+ * `id` exists at NEITHER location, preserving `readEntityFile`'s exact
+ * "no such file: <path>" NOT_FOUND message and exit code verbatim. The
+ * existence check happens up front, via {@link fileExists}, specifically
+ * so a genuine parse/validation error at whichever path actually holds
+ * `id` propagates as-is rather than risking a masked/retried outcome.
+ *
+ * `id` here is caller-supplied and not yet confirmed to name a real
+ * event (e.g. `slop events --since <cursor>` with a hand-typed or
+ * malicious cursor) — unlike {@link createEvent}'s freshly-minted-by-
+ * `newEventId` ids, it can be well-formed per {@link isEventId}'s regex
+ * (so `eventShardMonth`'s own `parsePrefixedId` call succeeds) yet still
+ * fail to actually DECODE as a ULID timestamp: the `ulid` package's
+ * `decodeTime` throws for a syntactically valid id whose leading
+ * characters encode a timestamp past the ULID spec's valid range (e.g.
+ * an id built from all `Z`s). Computing the shard path is therefore
+ * wrapped in its own try/catch: a decode failure just means "this id can
+ * never have been sharded," so the flat-path fallback below is used
+ * instead — which correctly reports NOT_FOUND for a well-formed-but-
+ * never-issued id exactly like any other, rather than letting a raw,
+ * uncaught `ULIDError` escape this function (and surface as a GENERIC_ERROR,
+ * not the NOT_FOUND every other unresolvable id gets).
+ */
 export async function readEvent(paths: RepoPaths, id: EventId): Promise<Event> {
-  return readEntityFile(eventFilePath(paths, id), eventSchema);
+  const flatPath = eventFilePath(paths, id);
+  let path = flatPath;
+  try {
+    const shardPath = shardedEventFilePath(paths, id);
+    if (await fileExists(shardPath)) path = shardPath;
+  } catch {
+    // Not a valid ULID timestamp — can't have been sharded; fall through
+    // to the flat path, which reports this id's absence normally.
+  }
+  return readEntityFile(path, eventSchema);
 }
 
 /**
@@ -56,9 +196,66 @@ export async function readEvent(paths: RepoPaths, id: EventId): Promise<Event> {
  * withMutationEvent} instead — this function alone just writes whatever
  * `Event` it's handed, with no guarantee it's paired with the mutation it
  * describes.
+ *
+ * G2 (shard-event-storage): always writes into `event.id`'s shard —
+ * `events/<eventShardMonth(event.id)>/event_<ulid>.jsonc` — never flat.
+ * No directory-creation step is needed here: `createEntityFileCanonical`
+ * (via `atomicWriteFile`, atomic-write.ts) already `mkdir(dir, {recursive:
+ * true})`s the target's containing directory before writing, so a
+ * brand-new `events/YYYY-MM/` shard springs into existence for free on
+ * its first write.
  */
 export async function createEvent(paths: RepoPaths, event: Event): Promise<void> {
-  await createEntityFileCanonical(eventFilePath(paths, event.id), event);
+  await createEntityFileCanonical(shardedEventFilePath(paths, event.id), event);
+}
+
+/** A shard subdirectory's name is exactly 4 digits, a hyphen, then 2
+ * digits (`YYYY-MM`) — deliberately an exact-shape match, not a loose
+ * sniff, so a stray unrelated directory someone drops under `events/`
+ * (or a typo'd name) is treated as "not a shard" and skipped rather than
+ * scanned as one. */
+const SHARD_DIR_NAME_PATTERN = /^\d{4}-\d{2}$/;
+
+/**
+ * Every `events/YYYY-MM/` shard subdirectory CURRENTLY on disk, directly
+ * under `paths.eventsDir`, as absolute paths sorted ascending (shard
+ * names are `YYYY-MM`, so lexical order is also chronological order).
+ * Consumed directly by the flatfile storage driver
+ * (src/storage/flatfile.ts) to extend its temp-file sweep into every
+ * shard, not just the flat `events/` directory itself.
+ *
+ * Uses {@link readDirSafe} (ENOENT → `[]`) for the top-level listing of
+ * `paths.eventsDir` — deliberately preserving an existing, tested
+ * property this must NOT regress: if `paths.eventsDir` exists but is a
+ * plain FILE rather than a directory, `readdir` throws `ENOTDIR`, which
+ * `readDirSafe` does NOT swallow (only `ENOENT` is), so that error still
+ * surfaces here too (src/cli/commands/web.test.ts's
+ * "web-one-malformed-db-file-500s-every-page-and-leaks-filesystem" test
+ * relies on exactly this for `events/` itself). A name matching
+ * {@link SHARD_DIR_NAME_PATTERN} is then confirmed to actually BE a
+ * directory via `stat` before being counted — a stray FILE that happens
+ * to be named e.g. `2026-08` must not be mistaken for a shard.
+ */
+export async function listEventShardDirs(paths: RepoPaths): Promise<string[]> {
+  const names = await readDirSafe(paths.eventsDir);
+  const candidates = names.filter((name) => SHARD_DIR_NAME_PATTERN.test(name));
+  const dirs: string[] = [];
+  await Promise.all(
+    candidates.map(async (name) => {
+      const full = join(paths.eventsDir, name);
+      try {
+        const info = await stat(full);
+        if (info.isDirectory()) dirs.push(full);
+      } catch (err) {
+        // Deleted between readdir and stat — a benign race with a
+        // concurrent migration/sweep, not an error; just excluded below,
+        // same tolerance {@link fingerprintEntityDir} already applies to
+        // an analogous readdir-then-stat race.
+        if (!isEnoent(err)) throw err;
+      }
+    }),
+  );
+  return dirs.sort();
 }
 
 /**
@@ -67,9 +264,23 @@ export async function createEvent(paths: RepoPaths, event: Event): Promise<void>
  * ULID itself"), since ULIDs sort chronologically as plain strings, and
  * core/ids.ts's shared monotonic factory keeps that total and strictly
  * increasing even for ids minted within the same millisecond.
+ *
+ * G2 (shard-event-storage): the union of ids sitting flat in `events/`
+ * (old events, never migrated — {@link listEntityIds} already ignores
+ * subdirectories, since it only matches `.jsonc`-suffixed regular
+ * filenames from a non-recursive `readdir`) and ids in every
+ * `events/YYYY-MM/` shard ({@link listEventShardDirs}), merged and
+ * re-sorted. Every caller downstream of this (`listEvents`,
+ * `listEventsTolerant`, `queryEvents`) inherits the flat+sharded merge
+ * for free, without needing to know which layout any given id is in.
  */
 export async function listEventIds(paths: RepoPaths): Promise<EventId[]> {
-  return listEntityIds(paths.eventsDir, isEventId);
+  const shardDirs = await listEventShardDirs(paths);
+  const idLists = await Promise.all([
+    listEntityIds(paths.eventsDir, isEventId),
+    ...shardDirs.map((dir) => listEntityIds(dir, isEventId)),
+  ]);
+  return idLists.flat().sort();
 }
 
 /** Every event on disk, read and validated, in cursor order. */
@@ -92,6 +303,36 @@ export async function listEvents(paths: RepoPaths): Promise<Event[]> {
 export async function listEventsTolerant(paths: RepoPaths): Promise<Event[]> {
   const ids = await listEventIds(paths);
   const settled = await Promise.allSettled(ids.map((id) => readEvent(paths, id)));
+  const events: Event[] = [];
+  for (const outcome of settled) {
+    if (outcome.status === "fulfilled") events.push(outcome.value);
+  }
+  return events;
+}
+
+/**
+ * Like {@link listEventsTolerant}, but scoped to ONE directory (the flat
+ * `events/` dir itself, or a single `events/YYYY-MM/` shard) rather than
+ * the whole merged flat+sharded collection — files are read directly from
+ * `dir` (never through {@link readEvent}'s flat/shard resolution, since the
+ * caller already knows exactly where they live).
+ *
+ * ticket_01KY9S0172V8AYCYV9KWS6RC9P (t-6tqw9): this is what lets the
+ * flatfile storage driver's read cache (`src/storage/flatfile.ts`) treat
+ * each shard as an independent cache entry, keyed on that shard's OWN
+ * cheap `{count, digest}` fingerprint (`db-index.ts`'s
+ * `computeContentFingerprint`) — a repeat read against a db where only
+ * THIS month's shard changed re-parses only this one (bounded) directory,
+ * reusing every other month's already-parsed events untouched. Fingerprint
+ * cost for an unchanged shard therefore never grows with total historical
+ * event count, only with that one shard's own (bounded, ~one calendar
+ * month's worth) size.
+ */
+export async function listEventsInDirTolerant(dir: string): Promise<Event[]> {
+  const ids = await listEntityIds(dir, isEventId);
+  const settled = await Promise.allSettled(
+    ids.map((id) => readEntityFile(join(dir, `${id}.jsonc`), eventSchema)),
+  );
   const events: Event[] = [];
   for (const outcome of settled) {
     if (outcome.status === "fulfilled") events.push(outcome.value);
@@ -314,4 +555,67 @@ export async function queryEvents(paths: RepoPaths, query: EventQuery = {}): Pro
     }
   }
   return events;
+}
+
+// --- G2 (shard-event-storage): explicit, opt-in migration -----------------
+
+/**
+ * Move every FLAT event file (`events/event_<ulid>.jsonc` — i.e. exactly
+ * what `listEntityIds(paths.eventsDir, isEventId)` finds, NOT recursing
+ * into any `events/YYYY-MM/` shard, which is by definition already
+ * sharded) into its own `events/<eventShardMonth(id)>/` shard, computed
+ * from each event's own id exactly like {@link createEvent} does for a
+ * brand-new one.
+ *
+ * A plain `rename`, not copy-then-delete: source and destination are
+ * always within the same `events/` directory tree, so this is a same
+ * -device move — atomic and cheap, unlike a cross-filesystem move would
+ * be. The destination shard directory may not exist yet on a repo's
+ * very first migration of a given month, so it's `mkdir(dir, {recursive:
+ * true})`ed immediately before each rename — the same self-heal
+ * `atomicWriteFile` (atomic-write.ts) already applies to every OTHER
+ * entity write, reproduced here by hand since this function moves an
+ * existing file rather than writing a new one through that helper.
+ *
+ * Idempotent and safe to call repeatedly: a second call, with no flat
+ * files left to move (either because the first call already moved
+ * everything, or because there was never anything flat to begin with),
+ * finds an empty flat-id list and returns `{ moved: 0, shards: [] }`
+ * without touching anything — including any shard directory that already
+ * exists from a previous run, which is left completely alone (nothing
+ * moves INTO an already-sharded event, and nothing here ever reads or
+ * revisits an already-sharded file).
+ *
+ * `shards` reports only the labels that received at least one file THIS
+ * run — a shard that already existed (from an earlier run, or because
+ * some other event was already written there directly) but got nothing
+ * new this call is NOT included, so a caller can tell "what actually
+ * changed just now" from "what shards exist in total"
+ * ({@link listEventShardDirs} answers the latter).
+ *
+ * Acquires no lock of its own: this is a plain filesystem operation, and
+ * the caller (src/storage/flatfile.ts's `migrateEventShards`, which wraps
+ * this call in its own `transact`/`withLock`) is responsible for
+ * serializing access against concurrent writers. Never invoked
+ * automatically from anywhere in this module — no read path and no write
+ * path calls this; it only ever runs when something external explicitly
+ * asks for it.
+ */
+export async function migrateFlatEventsToShards(
+  paths: RepoPaths,
+): Promise<{ moved: number; shards: string[] }> {
+  const flatIds = await listEntityIds(paths.eventsDir, isEventId);
+  const shardsTouched = new Set<string>();
+  let moved = 0;
+
+  for (const id of flatIds) {
+    const month = eventShardMonth(id);
+    const shardDir = join(paths.eventsDir, month);
+    await mkdir(shardDir, { recursive: true });
+    await rename(eventFilePath(paths, id), join(shardDir, `${id}.jsonc`));
+    shardsTouched.add(month);
+    moved++;
+  }
+
+  return { moved, shards: [...shardsTouched].sort() };
 }

@@ -1,16 +1,21 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { ulid } from "ulid";
 import { fixedClock } from "../core/clock.js";
 import { type Event, type EventId, eventSchema, newEventId, newTicketId } from "../core/index.js";
+import { writeCanonical } from "../core/jsonc.js";
 import * as eventsModule from "./events.js";
 import {
   type EventContext,
   createEvent,
   eventFilePath,
+  eventShardMonth,
   listEventIds,
+  listEventShardDirs,
   listEvents,
+  migrateFlatEventsToShards,
   queryEvents,
   readEvent,
   withMutationEvent,
@@ -28,6 +33,44 @@ function makeEvent(overrides: Partial<Event> = {}): Event {
     at: "2026-07-23T10:00:00.000Z",
     ...overrides,
   });
+}
+
+/**
+ * G2 (shard-event-storage): a full, valid `Event` whose id's OWN embedded
+ * ULID timestamp is `atMs` — NOT "now". `newEventId` (core/ids.ts) always
+ * mints against the real wall clock and has no seed-time parameter, so
+ * it's useless for deliberately landing an event in an arbitrary/old
+ * shard month; this instead mints the raw ULID body directly via the
+ * `ulid` package's own seed-time overload, distinct from core/ids.ts's
+ * shared monotonic factory.
+ */
+function makeEventAt(atMs: number, overrides: Partial<Event> = {}): Event {
+  return eventSchema.parse({
+    id: `event_${ulid(atMs)}`,
+    actor: { name: "ryan", kind: "human" },
+    session: null,
+    verb: "ticket.created",
+    entity: { kind: "ticket", id: newTicketId() },
+    at: new Date(atMs).toISOString(),
+    ...overrides,
+  });
+}
+
+/** Plant `event` directly at its FLAT path — simulating an old,
+ * never-migrated event, bypassing {@link createEvent} (which always
+ * shards a brand-new write). */
+async function plantFlat(paths: RepoPaths, event: Event): Promise<void> {
+  await writeFile(eventFilePath(paths, event.id), writeCanonical(event));
+}
+
+/** Plant `event` directly at its already-sharded path — simulating an
+ * event some EARLIER run already sharded (or wrote there directly),
+ * bypassing {@link createEvent} so the test controls the exact on-disk
+ * state independently of whatever `createEvent` itself would do. */
+async function plantSharded(paths: RepoPaths, event: Event): Promise<void> {
+  const dir = join(paths.eventsDir, eventShardMonth(event.id));
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, `${event.id}.jsonc`), writeCanonical(event));
 }
 
 let scratch: string;
@@ -114,6 +157,221 @@ describe("eventFilePath", () => {
   it("is <eventsDir>/<id>.jsonc", () => {
     const id = newEventId();
     expect(eventFilePath(paths, id)).toBe(join(paths.eventsDir, `${id}.jsonc`));
+  });
+});
+
+// G2 (shard-event-storage, t-6tqw9): a brand-new event now lands in
+// `events/<eventShardMonth(id)>/`, never flat.
+describe("createEvent — shards a brand-new event by its own id's month", () => {
+  it("writes into events/<eventShardMonth(id)>/<id>.jsonc, not flat", async () => {
+    const event = makeEvent();
+    await createEvent(paths, event);
+
+    const shardPath = join(paths.eventsDir, eventShardMonth(event.id), `${event.id}.jsonc`);
+    await expect(stat(shardPath)).resolves.toBeDefined();
+    await expect(stat(eventFilePath(paths, event.id))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("creates a brand-new shard directory for free (atomicWriteFile's mkdir self-heal), with no separate directory-creation step of its own", async () => {
+    const event = makeEvent();
+    // Sanity: the shard directory genuinely doesn't exist yet.
+    const shardDir = join(paths.eventsDir, eventShardMonth(event.id));
+    await expect(stat(shardDir)).rejects.toMatchObject({ code: "ENOENT" });
+
+    await createEvent(paths, event);
+    await expect(stat(shardDir).then((s) => s.isDirectory())).resolves.toBe(true);
+  });
+
+  it("two events minted in the same month land in the SAME shard directory", async () => {
+    const a = makeEvent();
+    const b = makeEvent();
+    await createEvent(paths, a);
+    await createEvent(paths, b);
+    expect(eventShardMonth(a.id)).toBe(eventShardMonth(b.id));
+
+    const shardDir = join(paths.eventsDir, eventShardMonth(a.id));
+    const names = (await readdir(shardDir)).sort();
+    expect(names).toEqual([`${a.id}.jsonc`, `${b.id}.jsonc`].sort());
+  });
+});
+
+// G2: every read primitive merges the flat layout (old events, never
+// migrated) and any number of `events/YYYY-MM/` shards transparently —
+// no caller needs to know or care which layout a given id is in.
+describe("reads merge the flat and sharded layouts transparently", () => {
+  it("readEvent finds an event whichever layout it actually lives in", async () => {
+    const flatEvent = makeEventAt(new Date("2020-03-10T00:00:00.000Z").getTime());
+    await plantFlat(paths, flatEvent);
+    const shardedEvent = makeEvent(); // createEvent always shards
+    await createEvent(paths, shardedEvent);
+
+    await expect(readEvent(paths, flatEvent.id)).resolves.toEqual(flatEvent);
+    await expect(readEvent(paths, shardedEvent.id)).resolves.toEqual(shardedEvent);
+  });
+
+  it("listEventIds / listEvents return the union of flat + every shard, as one seamlessly-ordered collection", async () => {
+    const flatOld = makeEventAt(new Date("2019-11-01T00:00:00.000Z").getTime());
+    const flatNewer = makeEventAt(new Date("2019-11-02T00:00:00.000Z").getTime());
+    await plantFlat(paths, flatOld);
+    await plantFlat(paths, flatNewer);
+
+    const shardedA = makeEventAt(new Date("2021-05-01T00:00:00.000Z").getTime());
+    const shardedB = makeEventAt(new Date("2022-09-01T00:00:00.000Z").getTime());
+    await createEvent(paths, shardedA);
+    await createEvent(paths, shardedB);
+
+    const expectedIds = [flatOld, flatNewer, shardedA, shardedB].map((e) => e.id).sort();
+    await expect(listEventIds(paths)).resolves.toEqual(expectedIds);
+
+    const events = await listEvents(paths);
+    expect(events.map((e) => e.id)).toEqual(expectedIds);
+  });
+
+  it("readEvent throws the same NOT_FOUND, naming the FLAT path, when an id exists in neither layout", async () => {
+    const missing = newEventId();
+    await expect(readEvent(paths, missing)).rejects.toMatchObject({ exitCode: 4 });
+    await expect(readEvent(paths, missing)).rejects.toThrow(eventFilePath(paths, missing));
+  });
+
+  it("a genuine parse error at the id's ACTUAL (sharded) location propagates as-is — never masked by a spurious flat-fallback retry", async () => {
+    const poisoned = makeEvent();
+    const shardPath = join(paths.eventsDir, eventShardMonth(poisoned.id), `${poisoned.id}.jsonc`);
+    await mkdir(join(paths.eventsDir, eventShardMonth(poisoned.id)), { recursive: true });
+    await writeFile(shardPath, "{ not valid jsonc {{{");
+
+    // A NOT_FOUND (exit 4) here would mean the existence check picked the
+    // flat path instead and reported "missing" — the real bug this test
+    // guards against. The real error is GENERIC_ERROR (exit 1).
+    await expect(readEvent(paths, poisoned.id)).rejects.toMatchObject({ exitCode: 1 });
+  });
+
+  it("a genuine parse error at the id's ACTUAL (flat) location propagates as-is too", async () => {
+    const poisoned = makeEvent();
+    await writeFile(eventFilePath(paths, poisoned.id), "{ not valid jsonc {{{");
+    await expect(readEvent(paths, poisoned.id)).rejects.toMatchObject({ exitCode: 1 });
+  });
+});
+
+describe("listEventShardDirs", () => {
+  it("is empty for a fresh repo with no shards at all", async () => {
+    await expect(listEventShardDirs(paths)).resolves.toEqual([]);
+  });
+
+  it("returns every shard subdirectory as an absolute path, sorted ascending", async () => {
+    const older = makeEventAt(new Date("2021-02-01T00:00:00.000Z").getTime());
+    const newer = makeEventAt(new Date("2023-08-01T00:00:00.000Z").getTime());
+    await createEvent(paths, newer); // deliberately created out of order
+    await createEvent(paths, older);
+
+    await expect(listEventShardDirs(paths)).resolves.toEqual([
+      join(paths.eventsDir, eventShardMonth(older.id)),
+      join(paths.eventsDir, eventShardMonth(newer.id)),
+    ]);
+  });
+
+  it("ignores a stray FILE (not a directory) whose name happens to match the YYYY-MM shape", async () => {
+    await writeFile(join(paths.eventsDir, "2026-08"), "not a directory");
+    await expect(listEventShardDirs(paths)).resolves.toEqual([]);
+  });
+
+  it("ignores directories that don't match the exact YYYY-MM shape", async () => {
+    await mkdir(join(paths.eventsDir, "not-a-shard"), { recursive: true });
+    await mkdir(join(paths.eventsDir, "2026-8"), { recursive: true }); // not zero-padded
+    await mkdir(join(paths.eventsDir, "20268"), { recursive: true });
+    await expect(listEventShardDirs(paths)).resolves.toEqual([]);
+  });
+
+  it("propagates ENOTDIR (never silently 'empty') when paths.eventsDir itself is a plain file — same non-swallowed-error property readDirSafe already guarantees elsewhere", async () => {
+    await rm(paths.eventsDir, { recursive: true, force: true });
+    await writeFile(paths.eventsDir, "oops, a file where a directory should be");
+    await expect(listEventShardDirs(paths)).rejects.toMatchObject({ code: "ENOTDIR" });
+  });
+});
+
+describe("migrateFlatEventsToShards", () => {
+  it("is a no-op on a repo with nothing flat to migrate", async () => {
+    await expect(migrateFlatEventsToShards(paths)).resolves.toEqual({ moved: 0, shards: [] });
+  });
+
+  it("moves every flat event file into events/<eventShardMonth(id)>/, preserving its content exactly", async () => {
+    const a = makeEventAt(new Date("2020-06-15T00:00:00.000Z").getTime());
+    const b = makeEventAt(new Date("2020-06-20T00:00:00.000Z").getTime()); // same month as a
+    const c = makeEventAt(new Date("2021-01-05T00:00:00.000Z").getTime()); // different month
+    await plantFlat(paths, a);
+    await plantFlat(paths, b);
+    await plantFlat(paths, c);
+
+    const result = await migrateFlatEventsToShards(paths);
+    expect(result.moved).toBe(3);
+    expect(result.shards).toEqual([eventShardMonth(a.id), eventShardMonth(c.id)].sort());
+
+    // Nothing left flat...
+    for (const event of [a, b, c]) {
+      await expect(stat(eventFilePath(paths, event.id))).rejects.toMatchObject({ code: "ENOENT" });
+    }
+    // ...and every event reads back correctly from its new shard, byte for
+    // byte the same content it had flat.
+    for (const event of [a, b, c]) {
+      const shardPath = join(paths.eventsDir, eventShardMonth(event.id), `${event.id}.jsonc`);
+      const raw = await readFile(shardPath, "utf8");
+      expect(eventSchema.parse(JSON.parse(raw))).toEqual(event);
+    }
+    await expect(readEvent(paths, a.id)).resolves.toEqual(a);
+  });
+
+  it("a mix of already-sharded + flat events ends up fully sharded, without touching or double-counting the pre-existing shard file", async () => {
+    // `preexisting` is already sharded BEFORE migration runs (planted
+    // directly, bypassing createEvent) — migration must leave it alone.
+    const preexisting = makeEventAt(new Date("2020-06-01T00:00:00.000Z").getTime());
+    await plantSharded(paths, preexisting);
+
+    // `flatSameMonth` is flat, and its own id's month is the SAME month
+    // `preexisting` already occupies — migration must move it in
+    // alongside `preexisting`, not overwrite/duplicate/skip it.
+    const flatSameMonth = makeEventAt(new Date("2020-06-15T00:00:00.000Z").getTime());
+    await plantFlat(paths, flatSameMonth);
+
+    // `flatOtherMonth` is flat, in a totally different month.
+    const flatOtherMonth = makeEventAt(new Date("2022-03-01T00:00:00.000Z").getTime());
+    await plantFlat(paths, flatOtherMonth);
+
+    const result = await migrateFlatEventsToShards(paths);
+
+    // Only the two FLAT files were moved this run — the pre-existing
+    // sharded one was never touched, so it's not counted.
+    expect(result.moved).toBe(2);
+    expect(result.shards).toEqual(
+      [eventShardMonth(flatSameMonth.id), eventShardMonth(flatOtherMonth.id)].sort(),
+    );
+
+    // Every event — old and new — is findable now, fully sharded.
+    const allIds = [preexisting, flatSameMonth, flatOtherMonth].map((e) => e.id).sort();
+    await expect(listEventIds(paths)).resolves.toEqual(allIds);
+
+    // The shared shard directory holds BOTH events that belong in it —
+    // the pre-existing one wasn't clobbered by the newly-moved one.
+    const sharedDir = join(paths.eventsDir, eventShardMonth(preexisting.id));
+    const namesInSharedDir = (await readdir(sharedDir)).sort();
+    expect(namesInSharedDir).toEqual(
+      [`${preexisting.id}.jsonc`, `${flatSameMonth.id}.jsonc`].sort(),
+    );
+  });
+
+  it("is idempotent: a second call after a successful migration is a no-op", async () => {
+    const a = makeEventAt(new Date("2020-06-15T00:00:00.000Z").getTime());
+    const b = makeEventAt(new Date("2021-01-05T00:00:00.000Z").getTime());
+    await plantFlat(paths, a);
+    await plantFlat(paths, b);
+
+    const first = await migrateFlatEventsToShards(paths);
+    expect(first.moved).toBe(2);
+
+    const second = await migrateFlatEventsToShards(paths);
+    expect(second).toEqual({ moved: 0, shards: [] });
+
+    // And the events are still all there, untouched by the no-op second run.
+    const allIds = [a, b].map((e) => e.id).sort();
+    await expect(listEventIds(paths)).resolves.toEqual(allIds);
   });
 });
 

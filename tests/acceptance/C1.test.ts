@@ -163,9 +163,18 @@ function collect(proc: ChildProcess): Promise<SpawnResult> {
 async function snapshotDb(paths: RepoPaths): Promise<Record<string, string>> {
   const snapshot: Record<string, string> = {};
   for (const dir of [paths.ticketsDir, paths.sessionsDir, paths.eventsDir]) {
-    const names = await readdir(dir).catch(() => [] as string[]);
-    for (const name of names.sort()) {
-      snapshot[join(dir, name)] = await readFile(join(dir, name), "utf8");
+    // G2 (shard-event-storage): `recursive: true` so this still catches
+    // every file under `events/YYYY-MM/` shard subdirectories, not just
+    // `events/`'s own flat entries — `withFileTypes` so directory entries
+    // themselves (the shard dirs) are skipped rather than fed to
+    // `readFile`, which throws EISDIR on a directory.
+    const entries = await readdir(dir, { recursive: true, withFileTypes: true }).catch(() => []);
+    const files = entries
+      .filter((entry) => entry.isFile())
+      .map((entry) => join(entry.parentPath, entry.name))
+      .sort();
+    for (const fullPath of files) {
+      snapshot[fullPath] = await readFile(fullPath, "utf8");
     }
   }
   return snapshot;

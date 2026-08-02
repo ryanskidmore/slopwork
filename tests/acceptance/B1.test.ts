@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { type Ticket, isTicketId, parseJsonc, ticketSchema } from "../../src/core/index.js";
-import { ensureDbDirs } from "../../src/repo/index.js";
+import { ensureDbDirs, listEventIds } from "../../src/repo/index.js";
 import type { RepoPaths } from "../../src/repo/index.js";
 
 // B1: `new` / `show` / `edit` / `update`
@@ -842,10 +842,16 @@ describe("B1: new / show / edit / update", () => {
     it("emits an event for each mutation (ticket.updated / ticket.state_changed)", async () => {
       const fixture = await makeFixture();
       const { id } = await createTicketViaCli(fixture, "Event ticket");
-      const beforeCount = (await readdir(fixture.paths.eventsDir)).length;
+      // G2 (shard-event-storage): a plain (non-recursive) `readdir` of
+      // `paths.eventsDir` no longer sees every event — the ones this CLI
+      // run appends land in an `events/YYYY-MM/` shard, not flat — so the
+      // total event count now has to go through the shard-aware
+      // `listEventIds` (src/repo/events.ts, re-exported from the repo
+      // barrel) instead of counting flat directory entries directly.
+      const beforeCount = (await listEventIds(fixture.paths)).length;
       const result = runSlop(["update", id, "--priority", "0"], fixture.root);
       expect(result.status, result.stderr).toBe(0);
-      const afterCount = (await readdir(fixture.paths.eventsDir)).length;
+      const afterCount = (await listEventIds(fixture.paths)).length;
       expect(afterCount).toBe(beforeCount + 1);
     });
   });
