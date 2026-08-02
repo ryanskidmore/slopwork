@@ -20,6 +20,8 @@ function row(
     blockedCount: null,
     stale: false,
     reviewStale: false,
+    awaitingInputCount: 0,
+    oldestOpenQuestionAt: null,
     ...overrides,
   };
 }

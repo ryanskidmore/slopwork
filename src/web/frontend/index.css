@@ -91,6 +91,10 @@
     --overlay-blocked-foreground: oklch(98% 0.02 35);
     --overlay-stale: oklch(58% 0.07 75);
     --overlay-stale-foreground: oklch(20% 0.02 75);
+    /* G4 (t-jggg9): awaiting_input — a distinct hue from blocked (35)/stale
+       (75)/every state hue, same lower-chroma overlay treatment. */
+    --overlay-awaiting-input: oklch(55% 0.13 275);
+    --overlay-awaiting-input-foreground: oklch(98% 0.02 275);
 
     --priority-0: oklch(52% 0.19 25);
     --priority-1: oklch(58% 0.14 55);
@@ -160,6 +164,8 @@
     --overlay-blocked-foreground: oklch(15% 0.02 35);
     --overlay-stale: oklch(68% 0.07 75);
     --overlay-stale-foreground: oklch(18% 0.02 75);
+    --overlay-awaiting-input: oklch(68% 0.13 275);
+    --overlay-awaiting-input-foreground: oklch(15% 0.02 275);
 
     --priority-0: oklch(68% 0.19 25);
     --priority-1: oklch(72% 0.14 55);
@@ -208,6 +214,8 @@
       --overlay-blocked-foreground: oklch(15% 0.02 35);
       --overlay-stale: oklch(68% 0.07 75);
       --overlay-stale-foreground: oklch(18% 0.02 75);
+      --overlay-awaiting-input: oklch(68% 0.13 275);
+      --overlay-awaiting-input-foreground: oklch(15% 0.02 275);
       --priority-0: oklch(68% 0.19 25);
       --priority-1: oklch(72% 0.14 55);
       --priority-2: oklch(68% 0.014 250);
@@ -257,6 +265,8 @@
 
   --color-overlay-blocked: var(--overlay-blocked);
   --color-overlay-blocked-foreground: var(--overlay-blocked-foreground);
+  --color-overlay-awaiting-input: var(--overlay-awaiting-input);
+  --color-overlay-awaiting-input-foreground: var(--overlay-awaiting-input-foreground);
   --color-overlay-stale: var(--overlay-stale);
   --color-overlay-stale-foreground: var(--overlay-stale-foreground);
 

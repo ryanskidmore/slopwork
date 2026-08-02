@@ -65,6 +65,19 @@ export interface ListQueryOptions {
   subtreeId?: TicketId;
   /** Case-insensitive substring match against `name`/`slug`/`spec.summary`, joined into one haystack — same shape as the web UI's `q` filter (`src/web/api/tickets.ts`'s `matchesFilters`), not a multi-word AND scan the way `slop search` is (`list` is a filter, not a ranked search). */
   text?: string;
+  /**
+   * G4 (t-jggg9): the set of ticket ids currently `awaiting_input` (>=1
+   * unanswered question) — event-derived, so this pure module can't
+   * compute it itself; the CLI layer precomputes it once
+   * (`overlay.ts`'s `computeAwaitingInputByTicket`) and passes it in, same
+   * "pure module stays event-free" split as `deriveEffectiveOverlay`'s own
+   * separation from `db-index.ts`. Always used for the `--awaiting-input`
+   * filter below; also read by the CLI layer directly (not through this
+   * module) to render each row's badge.
+   */
+  awaitingInputIds?: ReadonlySet<TicketId>;
+  /** `--awaiting-input` — keep ONLY tickets present in `awaitingInputIds`. `undefined`/`false` applies no filter (unlike `ready`, `list` never excludes awaiting-input tickets by default — it's a plain browse, not a "workable now" query). */
+  awaitingInput?: boolean;
 }
 
 function matchesStates(t: Ticket, states: readonly TicketState[] | undefined): boolean {
@@ -98,6 +111,16 @@ function matchesText(t: Ticket, text: string | undefined): boolean {
   return haystack.includes(needle);
 }
 
+/** G4: see {@link ListQueryOptions.awaitingInput}'s doc. */
+function matchesAwaitingInput(
+  t: Ticket,
+  awaitingInput: boolean | undefined,
+  awaitingInputIds: ReadonlySet<TicketId> | undefined,
+): boolean {
+  if (awaitingInput !== true) return true;
+  return awaitingInputIds?.has(t.id) ?? false;
+}
+
 /** Apply every given filter (AND across filter KINDS; each filter's own
  * internal semantics are documented on {@link ListQueryOptions}), then sort
  * via {@link compareListOrder}. */
@@ -114,7 +137,8 @@ export function filterTickets(
         matchesPriority(t, options.priority) &&
         matchesParent(t, options.parentId) &&
         matchesSubtree(t, options.subtreeId) &&
-        matchesText(t, options.text),
+        matchesText(t, options.text) &&
+        matchesAwaitingInput(t, options.awaitingInput, options.awaitingInputIds),
     )
     .slice()
     .sort(compareListOrder);

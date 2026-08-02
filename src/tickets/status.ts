@@ -62,6 +62,10 @@ export interface StatusTicketRow {
   stale: boolean;
   /** C5: live-computed (`now > review_stale_at`) — always known, `review` rows only. */
   reviewStale: boolean;
+  /** G4 (t-jggg9): count of currently-unanswered questions (index row's `open_question_count`) — 0 means not awaiting input. */
+  awaitingInputCount: number;
+  /** The oldest still-open question's `askedAt` (index row's `oldest_open_question_at`); `null` iff `awaitingInputCount` is 0. */
+  oldestOpenQuestionAt: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -126,6 +130,40 @@ export function staleTicketRows(rows: readonly StatusTicketRow[]): StaleTicketRo
     }
   }
   return out.sort((a, b) => a.id.localeCompare(b.id));
+}
+
+// ---------------------------------------------------------------------------
+// Awaiting-input section (G4, t-jggg9)
+// ---------------------------------------------------------------------------
+
+export interface AwaitingInputTicketRow {
+  id: string;
+  slug: string;
+  name: string;
+  openQuestionCount: number;
+  /** The oldest still-open question's `askedAt` — always a real timestamp here (this row only exists when `openQuestionCount > 0`). */
+  oldestOpenQuestionAt: string;
+}
+
+/** Tickets with >=1 unanswered question, oldest-open-question-first — the
+ * longest-waiting human question surfaces at the top, same
+ * longest-waiting-first convention {@link sortReviewRows} uses for the
+ * awaiting-review section. */
+export function awaitingInputTicketRows(
+  rows: readonly StatusTicketRow[],
+): AwaitingInputTicketRow[] {
+  const out: AwaitingInputTicketRow[] = [];
+  for (const row of rows) {
+    if (row.awaitingInputCount <= 0 || row.oldestOpenQuestionAt === null) continue;
+    out.push({
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      openQuestionCount: row.awaitingInputCount,
+      oldestOpenQuestionAt: row.oldestOpenQuestionAt,
+    });
+  }
+  return out.sort((a, b) => a.oldestOpenQuestionAt.localeCompare(b.oldestOpenQuestionAt));
 }
 
 // ---------------------------------------------------------------------------

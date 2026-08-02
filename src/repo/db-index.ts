@@ -258,6 +258,7 @@ import { computeReviewStaleAt, computeStaleAt } from "../tickets/staleness.js";
 // staleness.ts already established (see the C5 comment above).
 import {
   buildReverseEdgeIndex,
+  computeAwaitingInputOverlay,
   computeBlockedCounts,
   computeReady,
   deriveEffectiveOverlay,
@@ -295,8 +296,20 @@ import { listTicketsTolerant } from "./tickets.js";
  * by an older binary fails validation against the new shape and rebuilds
  * transparently rather than silently serving stale/absent values for
  * either.
+ *
+ * G4 (t-jggg9) bumps it again, 4 → 5: `awaiting_input`/
+ * `open_question_count`/`oldest_open_question_at` — the `awaiting_input`
+ * derived overlay (a ticket has it iff it has >=1 unanswered
+ * `question.asked` event with no later `question.answered` referencing
+ * it — `src/tickets/overlay.ts`'s `computeAwaitingInputOverlay`), computed
+ * from the SAME per-ticket grouped events this build already reads for
+ * the effective-overlay fold. Genuine new required fields, not an
+ * already-nullable fill-in (unlike B4's `blocked_count`/`ready`, which
+ * started life nullable specifically to allow a later fill-in without a
+ * bump) — so, same reasoning as every prior bump, a pre-G4 `index.jsonc`
+ * fails validation against the new shape and rebuilds transparently.
  */
-export const INDEX_SCHEMA_VERSION = 4;
+export const INDEX_SCHEMA_VERSION = 5;
 
 export const indexTicketRowSchema = z.object({
   id: ticketIdSchema,
@@ -347,6 +360,18 @@ export const indexTicketRowSchema = z.object({
   // isStale/isReviewStale against an injected clock — never here. ---
   stale_at: isoTimestampSchema.nullable(),
   review_stale_at: isoTimestampSchema.nullable(),
+
+  // --- G4 (t-jggg9): the `awaiting_input` derived overlay — see
+  // INDEX_SCHEMA_VERSION's doc comment above and
+  // src/tickets/overlay.ts's computeAwaitingInputOverlay. Never stored on
+  // the ticket itself; recomputed fresh from the event log on every
+  // build, exactly like `blocked_count`/`ready`/`stale_at` above. ---
+  /** `true` iff this ticket has >=1 unanswered `question.asked` event. */
+  awaiting_input: z.boolean(),
+  /** Count of currently-unanswered questions (0 iff `awaiting_input` is `false`). */
+  open_question_count: z.number().int(),
+  /** The oldest still-open question's `askedAt`, or `null` when `open_question_count` is 0. */
+  oldest_open_question_at: isoTimestampSchema.nullable(),
 });
 export type IndexTicketRow = z.infer<typeof indexTicketRowSchema>;
 
@@ -432,12 +457,18 @@ export type DbIndex = z.infer<typeof dbIndexSchema>;
 // path; the DEFINITIONS live in src/tickets/overlay.ts now — see this
 // module's import comment above.
 export {
+  computeAwaitingInputByTicket,
+  computeAwaitingInputOverlay,
   computeBlockedCounts,
   computeReady,
   deriveEffectiveOverlay,
   isLiveBlockerState,
 } from "../tickets/overlay.js";
-export type { EffectiveOverlay, EffectiveOverlaySource } from "../tickets/overlay.js";
+export type {
+  AwaitingInputOverlay,
+  EffectiveOverlay,
+  EffectiveOverlaySource,
+} from "../tickets/overlay.js";
 
 interface StatTuple {
   name: string;
@@ -757,6 +788,10 @@ export async function buildIndex(paths: RepoPaths, clock: Clock = systemClock): 
       // activity, and must reset the staleness clock exactly like a
       // locked one always has.
       const overlay = deriveEffectiveOverlay(ticket, eventsByTicket.get(ticket.id) ?? []);
+      // G4: computed from the SAME per-ticket grouped events the
+      // effective-overlay fold above already reads — see
+      // src/tickets/overlay.ts's computeAwaitingInputOverlay.
+      const awaitingInput = computeAwaitingInputOverlay(eventsByTicket.get(ticket.id) ?? []);
       return {
         id: ticket.id,
         slug: ticket.slug,
@@ -793,6 +828,9 @@ export async function buildIndex(paths: RepoPaths, clock: Clock = systemClock): 
           },
           reviewStaleAfterMs,
         ),
+        awaiting_input: awaitingInput.awaitingInput,
+        open_question_count: awaitingInput.openQuestionCount,
+        oldest_open_question_at: awaitingInput.oldestOpenQuestionAt,
       };
     })
     .sort((a, b) => a.id.localeCompare(b.id));

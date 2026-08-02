@@ -38,6 +38,7 @@ import {
   ticketStateSchema,
 } from "../../core/index.js";
 import type { Ticket, TicketId, TicketState } from "../../core/index.js";
+import { computeAwaitingInputByTicket } from "../../repo/index.js";
 import { repoPaths, requireRepoRoot } from "../../repo/index.js";
 import { CONTEXT_PACK_BUDGET_UNIT } from "../../sessions/context-budget.js";
 import type { TicketReadProblem } from "../../storage/index.js";
@@ -53,6 +54,7 @@ interface ListCommandOptions {
   priority?: number;
   parent?: string;
   subtree?: string;
+  awaitingInput?: boolean;
   limit?: number;
   offset?: number;
   json?: boolean;
@@ -102,9 +104,11 @@ interface ListJsonRow {
   parent: string | null;
   root_id: string;
   last_activity_at: string;
+  /** G4 (t-jggg9): `true` iff this ticket has >=1 unanswered question. */
+  awaiting_input: boolean;
 }
 
-function toJsonRow(t: Ticket): ListJsonRow {
+function toJsonRow(t: Ticket, awaitingInputIds: ReadonlySet<TicketId>): ListJsonRow {
   return {
     id: t.id,
     slug: t.slug,
@@ -117,13 +121,18 @@ function toJsonRow(t: Ticket): ListJsonRow {
     parent: t.parent ?? null,
     root_id: t.root_id,
     last_activity_at: t.last_activity_at,
+    awaiting_input: awaitingInputIds.has(t.id),
   };
 }
 
-function formatRow(t: Ticket): string {
+function formatRow(t: Ticket, awaitingInputIds: ReadonlySet<TicketId>): string {
   const labels = t.labels.length > 0 ? `  labels: ${t.labels.join(",")}` : "";
   const owner = t.owner ? `  owner: ${t.owner.name} (${t.owner.kind})` : "";
-  return `  [P${t.priority}] ${t.id}  ${t.slug}  (${t.state})  "${t.name}"${labels}${owner}`;
+  // G4: badge mirrors the web list's overlay badge treatment — a plain
+  // bracketed tag, not a whole extra column, same spirit as `ready.ts`'s
+  // `[STALE]` review tag.
+  const awaitingInput = awaitingInputIds.has(t.id) ? "  [AWAITING INPUT]" : "";
+  return `  [P${t.priority}] ${t.id}  ${t.slug}  (${t.state})  "${t.name}"${labels}${owner}${awaitingInput}`;
 }
 
 function buildJson(
@@ -133,9 +142,10 @@ function buildJson(
   limit: number | undefined,
   problems: readonly TicketReadProblem[],
   elisions: readonly string[],
+  awaitingInputIds: ReadonlySet<TicketId>,
 ): string {
   const body = {
-    tickets: kept.map(toJsonRow),
+    tickets: kept.map((t) => toJsonRow(t, awaitingInputIds)),
     total,
     returned: kept.length,
     offset,
@@ -146,9 +156,14 @@ function buildJson(
   return `${JSON.stringify(body, null, 2)}\n`;
 }
 
-function buildText(kept: readonly Ticket[], total: number, elisions: readonly string[]): string {
+function buildText(
+  kept: readonly Ticket[],
+  total: number,
+  elisions: readonly string[],
+  awaitingInputIds: ReadonlySet<TicketId>,
+): string {
   const lines: string[] = [`${kept.length} of ${total} matching ticket(s):`];
-  for (const t of kept) lines.push(formatRow(t));
+  for (const t of kept) lines.push(formatRow(t, awaitingInputIds));
   if (elisions.length > 0) {
     lines.push("");
     lines.push(`(--budget, ${CONTEXT_PACK_BUDGET_UNIT}):`);
@@ -183,10 +198,23 @@ export async function runList(text: string | undefined, opts: ListCommandOptions
   const subtreeId: TicketId | undefined =
     opts.subtree !== undefined ? (await backend.resolveTicketRef(opts.subtree)).id : undefined;
 
-  const { tickets, problems } = await backend.listTicketsTolerant();
+  const [{ tickets, problems }, events] = await Promise.all([
+    backend.listTicketsTolerant(),
+    // G4 (t-jggg9): a whole-db event read, once, to derive the
+    // awaiting_input badge/filter — same "bulk read, not N+1" shape
+    // `deriveEffectiveTickets`'s web-side callers already use.
+    backend.listEventsTolerant(),
+  ]);
   if (problems.length > 0) {
     process.stderr.write(`warning: ${formatListProblems(problems)}\n`);
   }
+
+  const awaitingInputByTicket = computeAwaitingInputByTicket(events);
+  const awaitingInputIds = new Set<TicketId>(
+    [...awaitingInputByTicket.entries()]
+      .filter(([, overlay]) => overlay.awaitingInput)
+      .map(([id]) => id),
+  );
 
   const filtered = filterTickets(tickets, {
     states,
@@ -196,6 +224,8 @@ export async function runList(text: string | undefined, opts: ListCommandOptions
     parentId,
     subtreeId,
     text,
+    awaitingInputIds,
+    awaitingInput: opts.awaitingInput,
   });
 
   const offset = opts.offset ?? 0;
@@ -205,8 +235,8 @@ export async function runList(text: string | undefined, opts: ListCommandOptions
     page,
     (kept, elisions) =>
       opts.json
-        ? buildJson(kept, total, offset, opts.limit, problems, elisions)
-        : buildText(kept, total, elisions),
+        ? buildJson(kept, total, offset, opts.limit, problems, elisions, awaitingInputIds)
+        : buildText(kept, total, elisions, awaitingInputIds),
     opts.budget,
     { format: opts.json ? "json" : "text", noun: "ticket" },
   );
@@ -244,6 +274,11 @@ export function registerListCommand(program: Command): void {
     .option(
       "--subtree <ref>",
       "filter to the whole descendant tree rooted at this ticket, inclusive of the ticket itself",
+    )
+    .option(
+      "--awaiting-input",
+      "filter to tickets with an unanswered question (G4) — every row still carries an " +
+        "awaiting_input badge/field regardless of this flag",
     )
     .option(
       "--limit <n>",

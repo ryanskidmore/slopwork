@@ -55,6 +55,10 @@
  *    import path. This module no longer imports from `src/repo/` at all —
  *    the web package depends only on `src/core/` and the pure
  *    `src/tickets/` domain modules.
+ *  - {@link computeAwaitingInputByTicket} (G4, t-jggg9): same
+ *    one-implementation discipline for the `awaiting_input` overlay —
+ *    re-exported from `src/tickets/overlay.ts` for every
+ *    `src/web/api/*` caller, exactly like the bullet above.
  */
 import {
   type Config,
@@ -75,7 +79,10 @@ import {
 // every existing `src/web/api/*` import site — see this module's doc.
 export {
   buildReverseEdgeIndex,
+  // G4 (t-jggg9): the `awaiting_input` overlay — see this module's doc.
+  computeAwaitingInputByTicket,
   deriveEffectiveTickets,
+  type AwaitingInputOverlay,
   type ReverseEdgeIndex,
 } from "../tickets/overlay.js";
 

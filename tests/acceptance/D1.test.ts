@@ -436,8 +436,9 @@ describe("D1: init + agent onboarding", () => {
         if (match?.[1]) realCommands.add(match[1]);
       }
       // design.md §4.2's original v0 command surface was 22; G3 (t-km7mb)
-      // added `slop list`, making it 23.
-      expect(realCommands.size).toBe(23);
+      // added `slop list`, making it 23. G4 (t-jggg9) adds `ask`/`answer`/
+      // `questions` (elicitations), making it 26.
+      expect(realCommands.size).toBe(26);
 
       for (const cmd of mentioned) {
         expect(

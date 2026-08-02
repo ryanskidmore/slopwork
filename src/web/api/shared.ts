@@ -17,6 +17,7 @@ import {
   type TicketId,
 } from "../../core/index.js";
 import type {
+  AwaitingInputReasonDTO,
   ConfigDTO,
   EventDTO,
   ExternalParentDTO,
@@ -24,6 +25,8 @@ import type {
   OverlayDTO,
   ParentDTO,
   ProvenanceDTO,
+  QuestionDTO,
+  QuestionGroupDTO,
   RefOrDanglingDTO,
   ReviewDTO,
   StaleReasonDTO,
@@ -31,6 +34,7 @@ import type {
   TicketSummaryDTO,
 } from "./types.js";
 import {
+  type AwaitingInputOverlay,
   computeStaleReason,
   isTicketStale,
   liveBlockers,
@@ -39,6 +43,17 @@ import {
   type StaleThresholds,
 } from "../overlays.js";
 import { safeUrl } from "../url-safety.js";
+import type { Question } from "../../tickets/questions.js";
+
+/** G4 (t-jggg9): the zero value for a ticket absent from a
+ * `computeAwaitingInputByTicket` map (no question-verb events at all) —
+ * see that function's own doc for why absence means "not awaiting input"
+ * rather than "unknown". */
+const NOT_AWAITING_INPUT: AwaitingInputOverlay = {
+  awaitingInput: false,
+  openQuestionCount: 0,
+  oldestOpenQuestionAt: null,
+};
 
 const VERB_LABELS: Record<EventVerb, string> = {
   "ticket.created": "created",
@@ -56,6 +71,8 @@ const VERB_LABELS: Record<EventVerb, string> = {
   "plan.revised": "plan revised",
   "plan.step_checked": "plan step checked",
   "review.requested": "requested review",
+  "question.asked": "asked a question",
+  "question.answered": "answered a question",
 };
 
 export function jsonResponse(data: unknown, init?: ResponseInit): Response {
@@ -161,10 +178,30 @@ function staleReasonDto(
   };
 }
 
+/** G4: `overlay.awaiting_input_reason`'s DTO — `null` iff `overlay.awaiting_input` is `false`. */
+function awaitingInputReasonDto(
+  overlay: AwaitingInputOverlay,
+  now: number,
+): AwaitingInputReasonDTO | null {
+  if (!overlay.awaitingInput || overlay.oldestOpenQuestionAt === null) return null;
+  return {
+    open_question_count: overlay.openQuestionCount,
+    oldest_question_at: overlay.oldestOpenQuestionAt,
+    oldest_question_age_ms: msSince(overlay.oldestOpenQuestionAt, now),
+  };
+}
+
 /**
  * `blocked_by` is built as full {@link TicketRefDTO}s directly (every live
  * blocker, by construction, exists in `allTickets`) rather than through
  * {@link refOrDangling} — there's nothing dangling to guard against here.
+ *
+ * `awaitingInputByTicket` (G4): the whole-db map
+ * `computeAwaitingInputByTicket` (src/tickets/overlay.ts) produced from a
+ * `dataSource.listEvents()` read — a REQUIRED parameter (not optional/
+ * defaulted) so a route author can't forget to compute it and silently
+ * get `awaiting_input: false` for every ticket; every existing call site
+ * was updated alongside this signature change.
  */
 export function overlayDto(
   ticket: Ticket,
@@ -172,14 +209,18 @@ export function overlayDto(
   thresholds: StaleThresholds,
   configDefaults: { stale_after: string; review_stale_after: string },
   now: number,
+  awaitingInputByTicket: ReadonlyMap<TicketId, AwaitingInputOverlay>,
 ): OverlayDTO {
   const blockers = liveBlockers(ticket.id, allTickets);
   const staleReason = computeStaleReason(ticket, thresholds, now);
+  const awaitingInput = awaitingInputByTicket.get(ticket.id) ?? NOT_AWAITING_INPUT;
   return {
     blocked: blockers.length > 0,
     blocked_by: blockers.map(ticketRefDto).sort((a, b) => a.name.localeCompare(b.name)),
     stale: isTicketStale(ticket, thresholds, now),
     stale_reason: staleReasonDto(staleReason, configDefaults, now),
+    awaiting_input: awaitingInput.awaitingInput,
+    awaiting_input_reason: awaitingInputReasonDto(awaitingInput, now),
   };
 }
 
@@ -210,6 +251,7 @@ export function ticketSummaryDto(
   thresholds: StaleThresholds,
   config: Config,
   now: number,
+  awaitingInputByTicket: ReadonlyMap<TicketId, AwaitingInputOverlay>,
 ): TicketSummaryDTO {
   return {
     id: ticket.id,
@@ -226,7 +268,14 @@ export function ticketSummaryDto(
     created_at: ticket.created_at,
     updated_at: ticket.updated_at,
     parent: parentDto(ticket, byId, config),
-    overlay: overlayDto(ticket, allTickets, thresholds, config.defaults, now),
+    overlay: overlayDto(
+      ticket,
+      allTickets,
+      thresholds,
+      config.defaults,
+      now,
+      awaitingInputByTicket,
+    ),
     review: reviewDto(ticket, now),
   };
 }
@@ -248,4 +297,33 @@ export function eventDto(event: Event): EventDTO {
     progress_note: progress,
     payload: event.payload,
   };
+}
+
+/** G4 (t-jggg9): one folded `Question` (src/tickets/questions.ts) as the
+ * `/api/questions` panel's wire shape. */
+export function questionDto(question: Question): QuestionDTO {
+  return {
+    id: question.id,
+    text: question.text,
+    options: question.options,
+    asked_by: question.askedBy,
+    asked_at: question.askedAt,
+    answer: question.answer
+      ? {
+          id: question.answer.id,
+          text: question.answer.text,
+          by: question.answer.by,
+          answered_at: question.answer.at,
+        }
+      : null,
+  };
+}
+
+/** One ticket's group of questions — `ticket` is the caller's
+ * responsibility to resolve (a question's own ticket should always exist,
+ * tickets are never deleted, only dropped/done — but a corrupt/unreadable
+ * ticket file is still possible, so the route handler skips a group it
+ * can't resolve a real ticket for rather than calling this with one). */
+export function questionGroupDto(ticket: Ticket, questions: readonly Question[]): QuestionGroupDTO {
+  return { ticket: ticketRefDto(ticket), questions: questions.map(questionDto) };
 }

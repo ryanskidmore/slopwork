@@ -50,10 +50,10 @@ build/dev-loop details.
   spends its boldness on.
 - **State is consistent everywhere.** `draft`/`open`/`in_progress`/
   `review`/`done`/`dropped` each get one fixed color, used identically in
-  the ticket list, tree, review/stale panels, and ticket detail.
-  `blocked`/`stale` are separate, lower-key OVERLAY badges (an icon +
-  outline treatment) layered on top — attention states, not a seventh
-  "state".
+  the ticket list, tree, review/stale/questions panels, and ticket detail.
+  `blocked`/`stale`/`awaiting_input` (G4, t-jggg9) are separate, lower-key
+  OVERLAY badges (an icon + outline treatment) layered on top — attention
+  states, not a seventh "state".
 - **Identifiers are real monospace and copy-on-click.** Ticket ids,
   `t-<code>` handles, slugs, session ids, and git SHAs render in a
   bundled monospace font; clicking one copies it.
@@ -72,7 +72,7 @@ Every ticket, filterable by **state**, **label**, **priority**, and
 db), plus a free-text search box — all reflected in the URL's query
 string, so a filtered view is bookmarkable/shareable. Shows state,
 priority, name, slug, labels, owner, and last activity for each row, with
-`blocked`/`stale` badges where they apply.
+`blocked`/`stale`/`awaiting_input` badges where they apply.
 
 ### Tree view (`/tree`)
 
@@ -86,7 +86,11 @@ as a **badge linking out to the Jira URL** built from `remotes.jira` in
 
 Everything about one ticket, across four tabs:
 
-- **Timeline** (default tab) — the audit spine described above.
+- **Timeline** (default tab) — the audit spine described above, including
+  `question.asked`/`question.answered` events (G4, t-jggg9): a question's
+  detail shows its multiple-choice options (if any), and an answer's own
+  entry visually pairs with the question it closes (a `re: "<question
+  text>"` line under the answer).
 - **Spec** — `summary`, `details_md` rendered as markdown, `acceptance[]`,
   `context[]`, `meta`, and the long-form `--outcome` resolution writeup
   (also markdown), when set.
@@ -99,10 +103,11 @@ Everything about one ticket, across four tabs:
   was discovered from it) — the reverse direction is derived, never
   stored (see [Concepts](concepts.md#edge)).
 
-Above the tabs: the `blocked`/`stale` overlay badges (hover for the
-reason — which live tickets are blocking it, or which clock is overdue
-and since when), the meta grid (owner, labels, parent, latest note, last
-activity, provenance, …), and — when the ticket is in review — its MR
+Above the tabs: the `blocked`/`stale`/`awaiting_input` overlay badges
+(hover for the reason — which live tickets are blocking it, which clock is
+overdue and since when, or how many open questions and how long the
+oldest has waited), the meta grid (owner, labels, parent, latest note,
+last activity, provenance, …), and — when the ticket is in review — its MR
 link and review-staleness.
 
 ### Review panel (`/review`)
@@ -110,6 +115,14 @@ link and review-staleness.
 Every ticket currently in `review`, with its MR link and how long it's
 been waiting — sorted **longest-awaiting-first**, the order a human
 triaging reviews actually wants.
+
+### Questions panel (`/questions`)
+
+G4 (t-jggg9) — every unanswered question across the project, oldest first,
+grouped by ticket (the ticket whose oldest open question has waited
+longest sorts first), same "who's waited longest" ordering the review
+panel uses. Each question shows its text, who asked it and when, and its
+multiple-choice options (if any) — the web counterpart of `slop questions`.
 
 ### Stale panel (`/stale`)
 
@@ -131,6 +144,7 @@ also call directly (still strictly read-only — GET/HEAD only, same
 | `GET /api/tree` | the parent/child hierarchy, nested, with external-parent badges resolved |
 | `GET /api/tickets/:ref` | one ticket: spec (markdown pre-rendered to sanitized HTML), relationships, overlays, events, sessions |
 | `GET /api/review` | tickets in review, longest-awaiting-first |
+| `GET /api/questions` | unanswered questions across the project, oldest first, grouped by ticket (G4) |
 | `GET /api/stale` | stale tickets, longest-idle-first |
 
 `:ref` accepts the same forms as everywhere else in the CLI: a full
@@ -145,13 +159,18 @@ response shapes.
 
 ## Staying in sync with the CLI
 
-The web UI computes `blocked`/`stale` itself, in memory, straight from the
-entity files and `config.yaml` on every request — it does not read
-`index.jsonc` and never needs `slop reindex`. It also folds in
-lock-free `update --progress` events the same way the CLI's derived index
-does, so a progress note posted by an agent seconds ago already shows up
-in `latest_note`/`last_activity_at` and any staleness it resets — see
+The web UI computes `blocked`/`stale`/`awaiting_input` itself, in memory,
+straight from the entity files and `config.yaml` on every request — it
+does not read `index.jsonc` and never needs `slop reindex`. It also folds
+in lock-free `update --progress` events the same way the CLI's derived
+index does, so a progress note posted by an agent seconds ago already
+shows up in `latest_note`/`last_activity_at` and any staleness it resets —
+see
 [Concurrency & merging](concurrency-and-merging.md#lock-free-progress-updates).
+`awaiting_input` (G4) is derived the same shared way (`slop ask`/`slop
+answer` are themselves lock-free event appends, same as `update
+--progress`): a question posted by an agent shows up on `/questions` and
+the ticket's overlay immediately, with no reindex needed there either.
 
 ## Debugging
 

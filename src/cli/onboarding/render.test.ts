@@ -122,17 +122,19 @@ describe("D1 onboarding content: one source, three renderings", () => {
 
   it("the budget/--json house rule matches the CLI's ACTUAL shipped surface, not a stale claim in either direction", () => {
     // content.ts's `--budget`/`--json` house rule has been corrected
-    // three times: first (D1) narrowed from the draft's over-broad
+    // four times: first (D1) narrowed from the draft's over-broad
     // "ready/show" claim (only `ready` had both flags then), then (E1)
     // widened again once `--json`/`--budget` genuinely landed on
     // `show`/`status`/`search`/`events`/`context` too, then (t-km7mb)
-    // widened once more for `list` — see content.ts's own comment. Assert
-    // the CURRENT, accurate claim, and that the old-wrong phrasing
-    // ("...--budget N`... on `ready`/`show`" with no other commands named)
-    // never regresses back in.
+    // widened once more for `list`, then (G4) for `questions` — see
+    // content.ts's own comment. Assert the CURRENT, accurate claim, and
+    // that the old-wrong phrasing ("...--budget N`... on `ready`/`show`"
+    // with no other commands named) never regresses back in.
     const body = renderOnboardingBody(ctx);
     expect(body).not.toMatch(/--json --budget N.*on `ready`\/`show`/s);
-    expect(body).toMatch(/`ready`, `list`, `status`, `search`, `events`, and `context`/);
+    expect(body).toMatch(
+      /`ready`, `list`, `status`, `search`, `events`, `questions`, and `context`/,
+    );
     expect(body).toMatch(/`show --context`/);
   });
 });

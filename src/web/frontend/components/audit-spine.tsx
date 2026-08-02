@@ -16,7 +16,15 @@ import type { ActorDTO, EventDTO } from "../../api/types.js";
 import { formatAbsolute, formatRelative } from "../lib/format.js";
 import { CopyableId } from "./copyable-id.js";
 
-function eventDetail(event: EventDTO): string | null {
+/**
+ * G4 (t-jggg9): `question.answered`'s detail line pairs it with the
+ * question it closes — `questionsById` is a lookup built once per render
+ * (`AuditSpine` below) from every `question.asked` event in the SAME
+ * timeline, keyed by its own event id (which is exactly what
+ * `payload.question_id` references — src/core/entities/event.ts's
+ * EVENT_VERBS doc).
+ */
+function eventDetail(event: EventDTO, questionsById: ReadonlyMap<string, EventDTO>): string | null {
   const p = event.payload;
   switch (event.verb) {
     case "ticket.state_changed":
@@ -39,6 +47,19 @@ function eventDetail(event: EventDTO): string | null {
       return typeof p.step === "number"
         ? `step ${p.step} ${p.checked ? "checked" : "unchecked"}`
         : null;
+    case "question.asked": {
+      const options = Array.isArray(p.options)
+        ? p.options.filter((o) => typeof o === "string")
+        : [];
+      return options.length > 0 ? `options: ${options.join(", ")}` : null;
+    }
+    case "question.answered": {
+      const questionId = typeof p.question_id === "string" ? p.question_id : null;
+      const question = questionId ? questionsById.get(questionId) : undefined;
+      const questionText =
+        question && typeof question.payload.text === "string" ? question.payload.text : null;
+      return questionText ? `re: “${questionText}”` : null;
+    }
     default:
       return null;
   }
@@ -82,14 +103,31 @@ export function ActorKindLegend() {
   );
 }
 
+/** G4: the question/answer text itself (`payload.text` for both
+ * `question.asked` and `question.answered`) — given the SAME prominent
+ * quote-box treatment `event.progress_note` already gets, so a question
+ * or its answer reads as clearly as a progress note, not buried in the
+ * small monospace `detail` line. */
+function questionOrAnswerText(event: EventDTO): string | null {
+  if (event.verb !== "question.asked" && event.verb !== "question.answered") return null;
+  return typeof event.payload.text === "string" ? event.payload.text : null;
+}
+
 export function AuditSpine({ events, now }: { events: EventDTO[]; now: number }) {
   if (events.length === 0) {
     return <p className="text-sm text-muted-foreground">No events yet.</p>;
   }
+  // G4: every question.asked event, keyed by its own id — what a
+  // question.answered event's `payload.question_id` references — so
+  // eventDetail can pair an answer with the question text it closes.
+  const questionsById = new Map(
+    events.filter((e) => e.verb === "question.asked").map((e) => [e.id, e] as const),
+  );
   return (
     <ol className="flex flex-col">
       {events.map((event) => {
-        const detail = eventDetail(event);
+        const detail = eventDetail(event, questionsById);
+        const quoteText = event.progress_note ?? questionOrAnswerText(event);
         return (
           <li
             key={event.id}
@@ -113,14 +151,16 @@ export function AuditSpine({ events, now }: { events: EventDTO[]; now: number })
                   {formatRelative(event.at, now)}
                 </time>
               </div>
-              {event.progress_note && (
+              {quoteText && (
                 <p className="mt-1 rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-sm">
-                  “{event.progress_note}”
+                  “{quoteText}”
                 </p>
               )}
-              {!event.progress_note && detail && (
-                <p className="mt-0.5 font-mono text-xs text-muted-foreground">{detail}</p>
-              )}
+              {/* `detail` is always null for a plain progress-note event
+                  (ticket.updated falls through eventDetail's default
+                  case), so this only ever renders alongside `quoteText`
+                  for the G4 question verbs (options / "re: <question>"). */}
+              {detail && <p className="mt-0.5 font-mono text-xs text-muted-foreground">{detail}</p>}
               {event.session && (
                 <CopyableId
                   value={event.session}

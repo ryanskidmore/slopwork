@@ -29,9 +29,18 @@
  *  - {@link buildReverseEdgeIndex} — the reverse-edge derivation (edges
  *    are stored only on their source ticket; "who blocks me" is always
  *    derived by scanning outgoing edges and inverting).
+ *  - {@link computeAwaitingInputOverlay} / {@link computeAwaitingInputByTicket}
+ *    — G4 (t-jggg9): the `awaiting_input` overlay, exactly as derived,
+ *    never stored, as every other overlay here — a ticket has it iff it
+ *    has >=1 unanswered `question.asked` event (`src/tickets/questions.ts`'s
+ *    `deriveQuestions` fold). Consumed by BOTH `src/repo/db-index.ts`'s
+ *    index build (CLI: `status`/`list`/`ready`/`show`) and the web
+ *    explorer (`src/web/overlays.ts` re-exports these for `src/web/api/*`),
+ *    same one-implementation discipline as every other derivation above.
  */
 import type { Event, Ticket, TicketId, TicketState } from "../core/index.js";
 import { isTicketId, outgoingEdges } from "../core/index.js";
+import { deriveQuestions, unansweredQuestions } from "./questions.js";
 
 /** {@link deriveEffectiveOverlay}'s result — the two fields that are
  * derived (event-folded), not stored-verbatim. */
@@ -227,4 +236,66 @@ export function buildReverseEdgeIndex(tickets: readonly Ticket[]): ReverseEdgeIn
     }
   }
   return { blockedBy, relatedFrom, discovered };
+}
+
+/**
+ * G4 (t-jggg9): the `awaiting_input` overlay's summary shape — a ticket
+ * has it iff `openQuestionCount > 0`; `oldestOpenQuestionAt` is the oldest
+ * still-unanswered question's `askedAt` (the CLI's "Awaiting input"
+ * section/`slop list`'s badge and the web ticket-detail badge both use it
+ * for "how long has this been waiting").
+ */
+export interface AwaitingInputOverlay {
+  awaitingInput: boolean;
+  openQuestionCount: number;
+  oldestOpenQuestionAt: string | null;
+}
+
+const NOT_AWAITING_INPUT: AwaitingInputOverlay = {
+  awaitingInput: false,
+  openQuestionCount: 0,
+  oldestOpenQuestionAt: null,
+};
+
+/**
+ * design.md/G4's `awaiting_input` derived overlay for ONE ticket: `events`
+ * MUST already be scoped to that ticket (same precondition
+ * `deriveEffectiveOverlay` documents above) — `db-index.ts`'s `buildIndex`
+ * and `src/cli/commands/show.ts` both call this over a single ticket's own
+ * events. Never stored — recomputed fresh from the event log every time,
+ * exactly like `blocked`/`ready`/`stale` (D5).
+ */
+export function computeAwaitingInputOverlay(events: readonly Event[]): AwaitingInputOverlay {
+  const open = unansweredQuestions(deriveQuestions(events));
+  if (open.length === 0) return NOT_AWAITING_INPUT;
+  // `deriveQuestions` already returns oldest-first (ascending by the
+  // question's own id, which is chronological — core/ids.ts) and
+  // `unansweredQuestions` preserves that order, so `open[0]` is the oldest
+  // still-open question without needing to re-sort here.
+  return {
+    awaitingInput: true,
+    openQuestionCount: open.length,
+    oldestOpenQuestionAt: open[0]?.askedAt ?? null,
+  };
+}
+
+/**
+ * {@link computeAwaitingInputOverlay} across every ticket that has at
+ * least one question-verb event, in one pass — the web explorer's
+ * `/api/tickets`/`/api/review`/`/api/stale` routes need this (a whole-db
+ * `dataSource.listEvents()` read, not per-ticket), mirroring
+ * {@link computeBlockedCounts}'s "compute once over the full set" shape.
+ * A ticket id absent from the returned map has no question-verb events at
+ * all — callers should default to "not awaiting input" for any ticket not
+ * present (see {@link AwaitingInputOverlay}'s all-false zero value above).
+ */
+export function computeAwaitingInputByTicket(
+  events: readonly Event[],
+): Map<TicketId, AwaitingInputOverlay> {
+  const eventsByTicket = groupEventsByTicket(events);
+  const out = new Map<TicketId, AwaitingInputOverlay>();
+  for (const [ticketId, ticketEvents] of eventsByTicket) {
+    out.set(ticketId, computeAwaitingInputOverlay(ticketEvents));
+  }
+  return out;
 }

@@ -8,6 +8,7 @@
  */
 import type {
   ConfigDTO,
+  QuestionsResponseDTO,
   ReviewResponseDTO,
   StaleResponseDTO,
   TicketDetailDTO,
@@ -75,4 +76,8 @@ export function fetchReview(): Promise<ReviewResponseDTO> {
 
 export function fetchStale(): Promise<StaleResponseDTO> {
   return getJson("/api/stale");
+}
+
+export function fetchQuestions(): Promise<QuestionsResponseDTO> {
+  return getJson("/api/questions");
 }
