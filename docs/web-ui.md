@@ -90,7 +90,10 @@ controls expand or collapse the whole hierarchy, and the choice persists in
 the browser across reloads. An external parent (`jira:PROJ-123`) renders as a
 **badge linking out to the Jira URL** built from `remotes.jira` in `config.yaml`
 — external parents terminate the local tree (they're a leaf-upward badge,
-never a traversable node), matching [Concepts → Edge](concepts.md#edge).
+never a traversable node), matching [Concepts → Edge](concepts.md#edge). A
+repository large or deep enough to hit the API's node/depth budget (see
+below) shows a banner reporting how much of the tree isn't shown, and a
+`+more` badge on any node whose own children were cut off.
 
 ## Failure handling
 
@@ -108,14 +111,15 @@ Everything about one ticket, across four tabs:
   `question.asked`/`question.answered` events (G4, t-jggg9): a question's
   detail shows its multiple-choice options (if any), and an answer's own
   entry visually pairs with the question it closes (a `re: "<question
-  text>"` line under the answer).
+  text>"` line under the answer). **Load more**-bounded past the first
+  page, same as the panels below.
 - **Spec** — `summary`, `details_md` rendered as markdown, `acceptance[]`,
   `context[]`, `meta`, and the long-form `--outcome` resolution writeup
   (also markdown), when set.
 - **Sessions** — one card per session, oldest-first (a session history
   reads as a narrative): actor, harness kind, git branch/commit,
   start/end times, every plan version with its checked steps, and the end
-  summary.
+  summary. Also **Load more**-bounded, independently of the timeline tab.
 - **Relationships** — outgoing `blocks`/`relates_to`/`discovered_from`,
   and the reverse (who blocks this ticket, what relates back to it, what
   was discovered from it) — the reverse direction is derived, never
@@ -132,7 +136,9 @@ link and review-staleness.
 
 Every ticket currently in `review`, with its MR link and how long it's
 been waiting — sorted **longest-awaiting-first**, the order a human
-triaging reviews actually wants.
+triaging reviews actually wants. A queue past the first page shows a
+**Load more** control (with the same abortable/retry-on-failure posture as
+the initial fetch) rather than downloading the whole queue up front.
 
 ### Questions panel (`/questions`)
 
@@ -141,13 +147,15 @@ grouped by ticket (the ticket whose oldest open question has waited
 longest sorts first), same "who's waited longest" ordering the review
 panel uses. Each question shows its text, who asked it and when, and its
 multiple-choice options (if any) — the web counterpart of `slop questions`.
+Also **Load more**-bounded, same as the review panel.
 
 ### Stale panel (`/stale`)
 
 In-progress or review tickets with no activity past the configured
 threshold (`defaults.stale_after` / `defaults.review_stale_after` in
 `config.yaml` — see
-[Configuration](configuration.md#staleness-thresholds)).
+[Configuration](configuration.md#staleness-thresholds)). Also
+**Load more**-bounded, same as the review and questions panels.
 
 ## The JSON API
 
@@ -159,11 +167,11 @@ also call directly (still strictly read-only — GET/HEAD only, same
 |---|---|
 | `GET /api/config` | project name, remotes, staleness thresholds, and a `warning` when `config.yaml` couldn't be read/parsed/validated |
 | `GET /api/tickets` | bounded ticket list; accepts `state`/`label`/`priority`/`owner`/`q` plus 1-based `page` and `limit` (default 50, maximum 100) |
-| `GET /api/tree` | the parent/child hierarchy, nested, with external-parent badges resolved |
-| `GET /api/tickets/:ref` | one ticket: spec (markdown pre-rendered to sanitized HTML), relationships, overlays, events, sessions |
-| `GET /api/review` | tickets in review, longest-awaiting-first |
-| `GET /api/questions` | unanswered questions across the project, oldest first, grouped by ticket (G4) |
-| `GET /api/stale` | stale tickets, longest-idle-first |
+| `GET /api/tree` | the parent/child hierarchy, nested, with external-parent badges resolved; bounded by a node budget (`limit`, default 500, maximum 1,000) and a per-branch depth budget (`depth`, default 6, maximum 12) rather than page/limit |
+| `GET /api/tickets/:ref` | one ticket: spec (markdown pre-rendered to sanitized HTML), relationships, overlays, events, sessions; `events`/`sessions` are each bounded by their own `events_page`/`events_limit` and `sessions_page`/`sessions_limit` (defaults 50/20, maxima 100/50) |
+| `GET /api/review` | tickets in review, longest-awaiting-first; bounded by 1-based `page`/`limit` (default 50, maximum 100) |
+| `GET /api/questions` | unanswered questions across the project, oldest first, grouped by ticket (G4); bounded by `page`/`limit` over the flat question list, before grouping |
+| `GET /api/stale` | stale tickets, longest-idle-first; bounded by `page`/`limit` (default 50, maximum 100) |
 
 `:ref` accepts the same forms as everywhere else in the CLI: a full
 ticket id, an exact slug, or an unambiguous short id-prefix. Markdown
@@ -183,6 +191,25 @@ the number matching the active filters, with `total_pages`, `previous_page`,
 and `next_page` describing traversal. Omitting `page`/`limit` is supported,
 but `tickets` is now deliberately capped at the first 50 rows rather than
 returning an unbounded array.
+
+The review/stale/questions panels and a ticket's events/sessions timelines
+share that same `page`/`limit` envelope shape — `pagination.total` (there is
+no separate filter axis on these, so no `filtered_total` split),
+`total_pages`, `previous_page`, `next_page` — under a `pagination` field on
+each response (`event_pagination`/`session_pagination` on ticket detail,
+since it bounds two collections at once). An out-of-range `page` request
+degrades to an empty page with `next_page: null`, same as `/api/tickets`; a
+non-positive-integer `page`/`limit`, or a `limit` over the endpoint's
+maximum, is a `400 { error }`, not a silently-clamped value.
+
+`GET /api/tree` has no page/limit of its own — a nested hierarchy is not a
+flat list — so it bounds the walk instead: `limit` caps the total number of
+nodes returned (walked breadth-first across roots), `depth` caps how many
+levels deep any one branch is followed. The response's `returned`/`total`
+and `truncated` describe the whole walk; each node's `has_children` /
+`children_truncated` describe just that node, so a client can tell a
+genuinely childless ticket from one whose children were cut off by the
+budget.
 
 ## Staying in sync with the CLI
 
