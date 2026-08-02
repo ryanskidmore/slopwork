@@ -174,7 +174,7 @@ slop init --project myproj --jira "" --yes
 
 Safe to re-run: never touches `config.yaml` or `db/` on an already
 -initialized repo, only regenerates `AGENTS.md`/the skill file/the
-gitignore section.
+gitignore and gitattributes sections.
 
 ### `instructions`
 

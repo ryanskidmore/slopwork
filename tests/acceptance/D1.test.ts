@@ -210,11 +210,92 @@ describe("D1: init + agent onboarding", () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Gitattributes entries (t-mgx82): GitHub/GitLab generated markers + LF
+  // enforcement for the tracker db, managed the same way .gitignore is.
+  // ---------------------------------------------------------------------------
+
+  describe("gitattributes entries (t-mgx82)", () => {
+    it("a fresh repo gets a .gitattributes with the managed markers", async () => {
+      const dir = await makeScratchRepo("slop-d1-gitattributes-fresh-");
+      const result = runSlop(["init", "--yes"], dir);
+      expect(result.status, result.stderr).toBe(0);
+
+      const gitattributes = readFileSync(join(dir, ".gitattributes"), "utf8");
+      expect(gitattributes).toContain(".slop/db/** linguist-generated gitlab-generated");
+      expect(gitattributes).toContain(".slop/db/**/*.jsonc text eol=lf");
+      expect(gitattributes).toContain("# --- slopwork (managed by `slop init`) ---");
+    });
+
+    it("an existing .gitattributes with unrelated content gets the managed section appended, content preserved", async () => {
+      const dir = await makeScratchRepo("slop-d1-gitattributes-append-");
+      const userContent = "*.png binary\n*.psd -text -diff\n";
+      writeFileSync(join(dir, ".gitattributes"), userContent);
+
+      const result = runSlop(["init", "--yes"], dir);
+      expect(result.status, result.stderr).toBe(0);
+
+      const gitattributes = readFileSync(join(dir, ".gitattributes"), "utf8");
+      expect(gitattributes).toContain("*.png binary");
+      expect(gitattributes).toContain("*.psd -text -diff");
+      expect(gitattributes).toContain(".slop/db/** linguist-generated gitlab-generated");
+      expect(gitattributes.startsWith(userContent.trimEnd())).toBe(true);
+    });
+
+    it("re-running `init` is byte-identical for .gitattributes — no churn", async () => {
+      const dir = await makeScratchRepo("slop-d1-gitattributes-idempotent-");
+      const first = runSlop(["init", "--yes"], dir);
+      expect(first.status, first.stderr).toBe(0);
+      const firstText = readFileSync(join(dir, ".gitattributes"), "utf8");
+
+      const second = runSlop(["init", "--yes"], dir);
+      expect(second.status, second.stderr).toBe(0);
+      const secondText = readFileSync(join(dir, ".gitattributes"), "utf8");
+
+      expect(secondText).toBe(firstText);
+      expect(secondText.match(/linguist-generated/g)).toHaveLength(1);
+      expect(secondText.match(/eol=lf/g)).toHaveLength(1);
+
+      // A third run is equally byte-identical.
+      const third = runSlop(["init", "--yes"], dir);
+      expect(third.status, third.stderr).toBe(0);
+      expect(readFileSync(join(dir, ".gitattributes"), "utf8")).toBe(firstText);
+    });
+
+    it("tolerates a hand-written generated-markers rule that predates managed-section support (this repo's own root .gitattributes, before this feature) — appends alongside it rather than rewriting it", async () => {
+      const dir = await makeScratchRepo("slop-d1-gitattributes-handwritten-");
+      const handWritten =
+        "# .slop/db/*.jsonc files are written with LF line endings by src/core/jsonc.ts\n" +
+        "*.jsonc text eol=lf\n\n" +
+        "# Tracker database — machine-written by slop. Mark as generated.\n" +
+        ".slop/db/** linguist-generated gitlab-generated\n";
+      writeFileSync(join(dir, ".gitattributes"), handWritten);
+
+      const result = runSlop(["init", "--yes"], dir);
+      expect(result.status, result.stderr).toBe(0);
+
+      const gitattributes = readFileSync(join(dir, ".gitattributes"), "utf8");
+      // The hand-written lines survive byte-for-byte, untouched/undeduped.
+      expect(gitattributes).toContain(
+        "# .slop/db/*.jsonc files are written with LF line endings by src/core/jsonc.ts\n",
+      );
+      expect(gitattributes.startsWith(handWritten.replace(/\n+$/, ""))).toBe(true);
+      // ...and init's own managed section is appended alongside it.
+      expect(gitattributes).toContain("# --- slopwork (managed by `slop init`) ---");
+      expect(gitattributes).toContain(".slop/db/**/*.jsonc text eol=lf");
+
+      // Re-running is still idempotent even with the hand-written lines present.
+      const second = runSlop(["init", "--yes"], dir);
+      expect(second.status, second.stderr).toBe(0);
+      expect(readFileSync(join(dir, ".gitattributes"), "utf8")).toBe(gitattributes);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Idempotency / safety
   // ---------------------------------------------------------------------------
 
   describe("re-running `init` is idempotent and destroys nothing", () => {
-    it("survives a hand-created ticket file and does not duplicate gitignore lines", async () => {
+    it("survives a hand-created ticket file and does not duplicate gitignore/gitattributes lines", async () => {
       const dir = await makeScratchRepo("slop-d1-idempotent-");
       const first = runSlop(["init", "--yes"], dir);
       expect(first.status, first.stderr).toBe(0);
@@ -242,6 +323,13 @@ describe("D1: init + agent onboarding", () => {
       const gitignore = readFileSync(join(dir, ".gitignore"), "utf8");
       const indexLines = gitignore.split("\n").filter((l) => l.includes("index.jsonc"));
       expect(indexLines).toHaveLength(1);
+
+      // gitattributes has no duplicated lines either.
+      const gitattributes = readFileSync(join(dir, ".gitattributes"), "utf8");
+      const linguistLines = gitattributes
+        .split("\n")
+        .filter((l) => l.includes("linguist-generated"));
+      expect(linguistLines).toHaveLength(1);
 
       // Running a third time is equally harmless.
       const third = runSlop(["init", "--yes"], dir);

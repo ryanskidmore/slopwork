@@ -7,7 +7,13 @@
  * that section in place, so the gitignore entries always stay current
  * without ever duplicating lines or touching anything the repo owner put
  * in the file themselves.
+ *
+ * The actual upsert mechanics (CRLF-tolerant marker matching, trailing-
+ * blank-line trimming) live in managed-section.ts, shared with
+ * gitattributes.ts's identical `.gitattributes` handling.
  */
+import { upsertManagedSection } from "./managed-section.js";
+
 const SECTION_START = "# --- slopwork (managed by `slop init`) ---";
 const SECTION_END = "# --- end slopwork ---";
 
@@ -55,37 +61,8 @@ export function upsertGitignoreSection(
   existingText: string,
   lines: string[],
 ): { text: string; changed: boolean } {
-  const before = existingText;
-  // A CRLF `.gitignore` (Windows, or `core.autocrlf=true` on any platform) split
-  // on a bare `"\n"` would leave a trailing `"\r"` on every line, so
-  // neither marker line would ever match `SECTION_START`/`SECTION_END`
-  // below — re-running `init` against such a file would never find its
-  // own prior managed section and would duplicate it instead. Splitting
-  // on `/\r?\n/` strips the `\r` either way, so LF and CRLF input both
-  // produce identical, marker-matchable line arrays. Output is always
-  // rejoined with plain `"\n"` (unchanged), normalizing CRLF input to LF.
-  const sourceLines = existingText.length > 0 ? existingText.split(/\r?\n/) : [];
-
-  const startIdx = sourceLines.indexOf(SECTION_START);
-  const endIdx = sourceLines.indexOf(SECTION_END);
-
-  let kept: string[];
-  if (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx) {
-    kept = [...sourceLines.slice(0, startIdx), ...sourceLines.slice(endIdx + 1)];
-  } else {
-    kept = sourceLines;
-  }
-
-  // Trim trailing blank lines from what's kept, so re-running init never
-  // accumulates blank-line padding between unrelated content and the
-  // managed block.
-  while (kept.length > 0 && kept[kept.length - 1]?.trim() === "") {
-    kept.pop();
-  }
-
-  const block = [SECTION_START, ...lines, SECTION_END];
-  const rebuilt = kept.length > 0 ? [...kept, "", ...block] : block;
-
-  const text = `${rebuilt.join("\n")}\n`;
-  return { text, changed: text !== before };
+  return upsertManagedSection(existingText, lines, {
+    start: SECTION_START,
+    end: SECTION_END,
+  });
 }
