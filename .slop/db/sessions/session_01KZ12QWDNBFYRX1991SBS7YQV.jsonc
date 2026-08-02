@@ -1,0 +1,47 @@
+{
+  "id": "session_01KZ12QWDNBFYRX1991SBS7YQV",
+  "ticket": "ticket_01KZ12QP04YSS8860GKR661F5P",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "human"
+  },
+  "harness": {
+    "kind": "other",
+    "session_id": null
+  },
+  "git": {
+    "branch": "fix/audit-mutation-recovery",
+    "commit_at_start": "0c50f3f8541261b22ae1b2c5b66878e8cd9a3e46"
+  },
+  "started_at": "2026-08-02T11:11:27.669Z",
+  "ended_at": null,
+  "plan": [
+    {
+      "version": 1,
+      "steps": [
+        {
+          "text": "Define and validate the durable mutation-intent format and idempotent replay state machine",
+          "checked": true
+        },
+        {
+          "text": "Integrate journal creation with ticket/session mutation preparation and recovery with storage boundaries",
+          "checked": true
+        },
+        {
+          "text": "Add deterministic fault, conflict, duplicate-replay, and SIGKILL recovery tests",
+          "checked": true
+        },
+        {
+          "text": "Document compatibility/failure behavior and run quality and coverage gates",
+          "checked": true
+        },
+        {
+          "text": "Open the pull request and move the tracker ticket to review",
+          "checked": false
+        }
+      ],
+      "created_at": "2026-08-02T11:11:27.827Z"
+    }
+  ],
+  "end_summary": null
+}

@@ -50,6 +50,7 @@ const SECTION_END = "# --- end slopwork ---";
 export function computeGitignoreLines(): string[] {
   return [
     ".slop/db/index.jsonc",
+    ".slop/db/mutation-journal/",
     ".slop/db/.lock",
     ".slop/db/.lock.stale-*",
     ".slop/db/.lock.released-*",

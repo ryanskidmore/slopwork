@@ -47,13 +47,15 @@
  * multi-write units and read-modify-write races, exactly like the lock it
  * wraps (docs/concurrency-and-merging.md).
  *
- * Crash semantics are the flatfile lock's (and the wire contract adopts
- * them): mutual exclusion between concurrent transactions, NOT
- * cross-entity rollback — a transaction that dies partway leaves the
- * entities it already wrote written. Every derived value (blocked/ready/
- * index) is recomputed from truth, so a partial transaction can strand at
- * most bookkeeping (e.g. an unemitted `ticket.ready` event), never a torn
- * derived state.
+ * Crash semantics do not include cross-entity rollback: a transaction
+ * that dies partway leaves earlier logical mutations committed and later
+ * ones unstarted. The flatfile driver does guarantee that each individual
+ * ticket/session mutation and its audit event roll forward together via
+ * `.slop/db/mutation-journal/`; pending intents recover on storage open
+ * and transaction entry. Every derived value (blocked/ready/index) is
+ * recomputed from truth, so partial larger transactions do not leave torn
+ * derived state. A remote backend must provide its own equivalent for
+ * each create/update endpoint; the lease only supplies exclusivity.
  */
 import type { Clock } from "../core/clock.js";
 import type {

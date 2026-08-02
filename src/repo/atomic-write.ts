@@ -126,6 +126,24 @@ async function fsyncDir(dir: string): Promise<void> {
 }
 
 /**
+ * Remove a file and fsync its containing directory so the deletion is
+ * durable. `missing: "ignore"` makes replay cleanup idempotent; the
+ * default preserves ordinary delete semantics and surfaces ENOENT.
+ */
+export async function durableRemoveFile(
+  path: string,
+  options: { missing?: "error" | "ignore" } = {},
+): Promise<void> {
+  try {
+    await rm(path);
+  } catch (err) {
+    if (options.missing === "ignore" && isEnoent(err)) return;
+    throw err;
+  }
+  await fsyncDir(dirname(path));
+}
+
+/**
  * Durability follow-up to Fix 4's self-heal (module doc above): `mkdir(dir,
  * {recursive: true})` resolves to the path of the FIRST (topmost)
  * directory it actually had to create, or `undefined` if `dir` already

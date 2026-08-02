@@ -237,8 +237,8 @@ src/
     exit-codes.ts         the exit-code table above
     index.ts               module re-exports; entity types/schemas/ULIDs/JSONC live here
   repo/                 the flatfile DRIVER's internals: atomic writes (tmp+rename),
-                        `.slop/db/.lock`, ref resolution, the derived index, the event writer
-                        (month-sharded, docs/storage-backends.md). Not imported outside
+                        `.slop/db/.lock`, crash-recovery mutation journal, ref resolution, the
+                        derived index, and month-sharded event writer. Not imported outside
                         src/storage/ — commands and src/web/ go through the interface below.
     index.ts               re-exports the repo layer (atomic-write, db-index, events, refs,
                             sessions, tickets, ...); ticket/session CRUD is built on this

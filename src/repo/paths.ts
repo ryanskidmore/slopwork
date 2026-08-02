@@ -5,6 +5,7 @@
  * <root>/.slop/db/tickets/ticket_<ulid>.jsonc
  * <root>/.slop/db/sessions/session_<ulid>.jsonc
  * <root>/.slop/db/events/event_<ulid>.jsonc
+ * <root>/.slop/db/mutation-journal/event_<ulid>.jsonc (pending, gitignored)
  * <root>/.slop/db/index.jsonc   (derived, gitignored — see db-index.ts)
  * <root>/.slop/db/.lock          (multi-file transactions — see lock.ts)
  * ```
@@ -29,6 +30,8 @@ export interface RepoPaths {
   ticketsDir: string;
   sessionsDir: string;
   eventsDir: string;
+  /** Pending entity/event intents, always local and gitignored. */
+  mutationJournalDir: string;
   /** Derived, gitignored (D14) — see db-index.ts. */
   indexFile: string;
   /** Multi-file transaction lock (design.md §3) — see lock.ts. */
@@ -46,6 +49,7 @@ export function repoPaths(root: string): RepoPaths {
     ticketsDir: join(dbDir, "tickets"),
     sessionsDir: join(dbDir, "sessions"),
     eventsDir: join(dbDir, "events"),
+    mutationJournalDir: join(dbDir, "mutation-journal"),
     indexFile: join(dbDir, "index.jsonc"),
     lockFile: join(dbDir, ".lock"),
   };
@@ -92,7 +96,8 @@ export function requireRepoRoot(startDir: string): string {
 
 /**
  * The directory-creation primitive D1's `init` command calls. Creates the
- * bare `tickets/`, `sessions/`, `events/` skeleton under `<root>/.slop/db`
+ * bare `tickets/`, `sessions/`, `events/`, and local mutation-journal
+ * skeleton under `<root>/.slop/db`
  * (idempotent — safe to call against an already-initialized repo).
  * Does *not* write `config.yaml`, `AGENTS.md`, or gitignore entries — that
  * ceremony belongs to D1, not A3.
@@ -102,5 +107,6 @@ export async function ensureDbDirs(root: string): Promise<RepoPaths> {
   await mkdir(paths.ticketsDir, { recursive: true });
   await mkdir(paths.sessionsDir, { recursive: true });
   await mkdir(paths.eventsDir, { recursive: true });
+  await mkdir(paths.mutationJournalDir, { recursive: true });
   return paths;
 }

@@ -36,7 +36,7 @@ function formatZodIssues(error: z.ZodError): string[] {
  * (no path, no actionable guidance, and not a `SlopError` at all) escape
  * to the CLI's generic top-level handler uncaught.
  */
-async function readEntityText(path: string): Promise<string> {
+export async function readEntityText(path: string): Promise<string> {
   try {
     return await readFile(path, "utf8");
   } catch (err) {
@@ -101,9 +101,26 @@ export async function updateEntityFile<T>(
   patch: JsoncPatchEntry[],
   expectedAfter: T,
 ): Promise<void> {
-  const existingText = await readEntityText(path);
-  const newText = writeUpdate(existingText, patch, expectedAfter);
-  await atomicWriteFile(path, newText);
+  const prepared = await prepareEntityFileUpdate(path, patch, expectedAfter);
+  await atomicWriteFile(path, prepared.afterText);
+}
+
+export interface PreparedEntityUpdate {
+  beforeText: string;
+  afterText: string;
+}
+
+/**
+ * Compute the exact comment-preserving entity rewrite without applying
+ * it. Mutation journaling persists both strings before the write.
+ */
+export async function prepareEntityFileUpdate<T>(
+  path: string,
+  patch: JsoncPatchEntry[],
+  expectedAfter: T,
+): Promise<PreparedEntityUpdate> {
+  const beforeText = await readEntityText(path);
+  return { beforeText, afterText: writeUpdate(beforeText, patch, expectedAfter) };
 }
 
 /** Delete an entity file. Throws NOT_FOUND if it doesn't exist. */

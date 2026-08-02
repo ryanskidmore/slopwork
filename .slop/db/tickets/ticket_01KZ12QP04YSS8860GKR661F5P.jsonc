@@ -1,0 +1,46 @@
+{
+  "id": "ticket_01KZ12QP04YSS8860GKR661F5P",
+  "name": "Recover entity mutations missing audit events",
+  "slug": "fix/audit-mutation-recovery",
+  "spec": {
+    "summary": "Add a durable flatfile mutation journal so committed entity writes recover exactly one audit event after failure or crash.",
+    "details_md": "Pre-mint event identity and persist an idempotent create/update/delete intent before changing an entity. Replay under the repository lock on storage open and transaction entry; complete from the recorded before state, accept the recorded after state, reject third-state conflicts, verify an existing event matches, and retire completed intents durably.",
+    "acceptance": [
+      "A committed ticket or session create/update is eventually paired with exactly one stable event after event-write failure or SIGKILL.",
+      "Replaying a completed intent is harmless and never duplicates or overwrites a conflicting event.",
+      "Create, update, and delete journal states have explicit before/after recovery behavior.",
+      "Corrupt journals and entity/event conflicts fail loudly without modifying entity or event data.",
+      "Storage open and transaction entry recover pending intents while holding the repository lock."
+    ],
+    "context": [
+      "src/repo/events.ts",
+      "src/repo/mutation-journal.ts",
+      "src/storage/flatfile.ts",
+      "src/storage/open.ts"
+    ],
+    "meta": {},
+    "v": 1
+  },
+  "state": "in_progress",
+  "priority": 0,
+  "labels": [],
+  "adhoc": false,
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ12QP04YSS8860GKR661F5P",
+  "path": [],
+  "active_session": "session_01KZ12QWDNBFYRX1991SBS7YQV",
+  "last_activity_at": "2026-08-02T11:11:27.672Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "Ryan Skidmore",
+      "kind": "human"
+    }
+  },
+  "created_at": "2026-08-02T11:11:21.144Z",
+  "updated_at": "2026-08-02T11:11:27.672Z"
+}

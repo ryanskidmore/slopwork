@@ -1056,3 +1056,45 @@ it), and closing it properly needs verify-before-relocate (e.g. the
 claim-inside-the-live-directory shape from the rejected redesign above),
 which is exactly the bigger change this ticket deliberately did not take
 on. Flagged here rather than silently left undocumented.
+
+## Audit hardening — durable roll-forward journal for entity/event pairs (t-f762o)
+
+The audit found a stronger failure than the accepted orphan-session window
+above: every normal ticket/session mutation wrote the entity first and its
+audit event second. An I/O error or `SIGKILL` between those writes left an
+authoritative entity change with no durable evidence that it happened.
+Unlike an orphaned new session, `reindex --heal` could neither detect nor
+reconstruct the missing actor, verb, payload, or timestamp.
+
+**Decision: journal each entity/event pair and recover by roll-forward.**
+Before changing an entity, `withMutationEvent` pre-mints the complete event
+and atomically writes one versioned JSONC intent under the gitignored
+`.slop/db/mutation-journal/`. The intent stores a validated entity identity,
+an operation (`create`/`update`/`delete`), exact before/after entity text,
+and the event. The entity and event are then written atomically as separate
+files, and the intent is durably removed only after both exist.
+
+Recovery runs under `.lock` when the flatfile backend opens and at every
+transaction entry. Its compare-and-apply state machine accepts only the
+recorded before state (apply after) or exact after state (continue), and
+accepts an existing event id only when its parsed content exactly equals
+the journal event. Any third entity state, event-id collision, malformed
+journal, or filename/content mismatch fails loudly without overwriting the
+evidence. The stable pre-minted event id makes replay idempotent and exactly
+once from the event log's perspective.
+
+This does **not** reverse the earlier decision about `slop start`'s
+new-session orphan window. The journal makes the session creation and its
+own `session.started` event indivisible across restart; it does not make the
+entire later session-create + ticket-update command one rollback-capable
+database transaction. A crash after the first pair completes but before the
+second begins can still leave the detectable orphan described above. This
+scope is intentional: close unrecoverable audit holes without pretending a
+flat set of files provides cross-entity rollback.
+
+The acceptance evidence includes deterministic injected event-write
+failures, before-state and after-state replay, duplicate replay, JSONC
+comment preservation, delete semantics, corrupt/divergent conflict cases,
+and a real child process held inside the entity→event window, killed with
+`SIGKILL`, then recovered by `openStorage` through the dead holder's stale
+lock.

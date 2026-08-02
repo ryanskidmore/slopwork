@@ -1,0 +1,17 @@
+{
+  "id": "event_01KZ1479VRV9EGJNEMHA92EHK9",
+  "actor": {
+    "name": "Ryan Skidmore",
+    "kind": "human"
+  },
+  "session": null,
+  "verb": "ticket.updated",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ12QP04YSS8860GKR661F5P"
+  },
+  "payload": {
+    "progress": "Docs and gates complete: lint/format/typecheck/build pass; focused recovery surface is 110/110; canonical full Vitest suite passed 1,959/1,959 before the final preparation-order regression test. Coverage executed with all tests passing but repository-wide thresholds remain below configured floors (pre-existing uninstrumented/new surfaces); mutation-journal itself measured 86.58% statements / 89.33% lines before the last added case."
+  },
+  "at": "2026-08-02T11:37:21.529Z"
+}

@@ -2,10 +2,11 @@
 
 Slopwork's target scenario is one engineer (or a small team) running two
 or three agents on parallel branches against the *same* `.slop/db/`. This
-doc explains the four mechanisms that make that safe: why the git merge
-story works, the write-path lock that serializes every mutating command,
-the lock-free path for progress notes, and how `slop start`/`--takeover`
-handle two agents wanting the same ticket.
+doc explains the mechanisms that make that safe: why the git merge story
+works, how entity/event pairs recover after a crash, the write-path lock
+that serializes every mutating command, the lock-free path for progress
+notes, and how `slop start`/`--takeover` handle two agents wanting the
+same ticket.
 
 ## Why `.slop/db/` merges cleanly
 
@@ -14,6 +15,7 @@ handle two agents wanting the same ticket.
   tickets/ticket_<ulid>.jsonc
   sessions/session_<ulid>.jsonc
   events/event_<ulid>.jsonc
+  mutation-journal/event_<ulid>.jsonc  # pending only, GITIGNORED
   index.jsonc      # derived, GITIGNORED
   .lock            # never committed
 ```
@@ -53,6 +55,46 @@ Atomic writes (temp file + rename, `src/repo/atomic-write.ts`) mean a
 process crash mid-write never leaves a half-written entity file on disk
 either — a reader always sees the old content or the new content, never a
 torn write.
+
+## Crash recovery for entity + event pairs
+
+Atomic rename protects one file, but a normal ticket or session mutation
+changes an entity file **and** appends the audit event that describes it.
+Those two renames cannot be one filesystem operation. The flatfile driver
+therefore uses a small write-ahead journal under
+`.slop/db/mutation-journal/` for every `createTicket`, `updateTicket`,
+`createSession`, and `updateSession` call:
+
+1. Pre-mint the event id and durably write one ignored journal file. It
+   records the validated entity identity, operation (`create`, `update`,
+   or `delete`), the exact before/after entity text, and the complete
+   event.
+2. Atomically apply the entity's after state.
+3. Atomically write that same pre-minted event.
+4. Durably remove the journal only after both files are present.
+
+If the process dies between any two steps, opening the flatfile backend
+or entering the next write transaction replays pending journals under the
+normal db lock. Replay is compare-and-apply: an entity matching the
+recorded before state is advanced; one already matching the after state
+is accepted; the event is created only if absent and accepted only if its
+content exactly matches. Replaying the same intent repeatedly therefore
+does not duplicate or replace the event.
+
+Recovery deliberately fails closed. A corrupt journal, a target matching
+neither recorded state, or an existing event id with different content
+stops the open/transaction with an actionable error and leaves the
+journal and conflicting data untouched. Back up the repo and inspect all
+three files before resolving such a conflict; deleting the journal alone
+can discard the only durable evidence of an incomplete audit write.
+
+The journal is local coordination state, like `.lock` and `index.jsonc`,
+so `slop init` always gitignores it. It guarantees roll-forward of each
+entity/event pair, **not rollback of an entire multi-entity command**. A
+crash halfway through a cascade can still leave earlier logical mutations
+committed and later ones unstarted; every pair that did start is either
+complete already or recoverable. Pure `update --progress` writes only an
+event and consequently needs no paired journal.
 
 ## Self-healing after a merge
 

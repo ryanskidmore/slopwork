@@ -31,6 +31,15 @@ where breaking changes land.
   Playwright Chromium suite exercises real desktop/mobile flows, keyboard
   controls, accessible navigation names, layout bounds, and visual snapshots.
   Both CI and release workflows enforce the new gates.
+- **Crash-recoverable entity/event writes.** Flatfile ticket and session
+  creates/updates now persist a gitignored write-ahead intent before the
+  entity changes and retire it only after the matching pre-minted event is
+  durable. Pending intents replay automatically under the db lock on
+  storage open or the next transaction; replay is idempotent and refuses
+  to overwrite divergent entity state or a different event with the same
+  id. This closes the crash window where a committed entity mutation could
+  permanently lose its audit event. See
+  [Concurrency & merging → Crash recovery](docs/concurrency-and-merging.md#crash-recovery-for-entity--event-pairs).
 - **Elicitations: structured questions, `awaiting_input`, questions inbox**
   (G4, t-jggg9). The only agent→human escalation channel used to be a
   string convention (`update --progress "QUESTION: …"`) with no state, no

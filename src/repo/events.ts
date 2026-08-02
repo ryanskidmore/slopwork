@@ -78,6 +78,18 @@ import {
 import { createEntityFileCanonical, listEntityIds, readEntityFile } from "./entity-file.js";
 import { isEnoent, readDirSafe } from "./fs-utils.js";
 import type { RepoPaths } from "./paths.js";
+import {
+  type MutationEntity,
+  type MutationPreparation,
+  commitMutationWithEvent,
+  recoverMutationJournals,
+} from "./mutation-journal.js";
+
+export type {
+  MutationDescriptor,
+  MutationEntity,
+  MutationPreparation,
+} from "./mutation-journal.js";
 
 /**
  * The FLAT path for `id` — `events/<id>.jsonc`, ignoring sharding
@@ -394,8 +406,7 @@ export interface MutationEventSpec {
 
 /**
  * Mint and write exactly one event — no accompanying entity write, no
- * lock. The lock-free counterpart to {@link withMutationEvent} below, and
- * what it now delegates to once its own `write()` has landed.
+ * lock. The lock-free counterpart to {@link withMutationEvent} below.
  *
  * ticket_01KY9RWFM80BKNE2CDX85QMKGS: a pure `slop update --progress`
  * call (no other field) is the one mutation-adjacent action that emits an
@@ -415,7 +426,18 @@ export async function appendEvent(
   spec: MutationEventSpec,
   clock: Clock = systemClock,
 ): Promise<Event> {
-  const event: Event = {
+  const event = buildEvent(ctx, entity, spec, clock);
+  await createEvent(paths, event);
+  return event;
+}
+
+function buildEvent(
+  ctx: EventContext,
+  entity: EventEntity,
+  spec: MutationEventSpec,
+  clock: Clock,
+): Event {
+  return {
     id: newEventId(),
     actor: ctx.actor,
     session: ctx.session,
@@ -424,13 +446,11 @@ export async function appendEvent(
     payload: spec.payload ?? {},
     at: clock.now().toISOString(),
   };
-  await createEvent(paths, event);
-  return event;
 }
 
 /**
- * The emit-on-mutation hook itself (A4). Runs `write` — the actual entity
- * file mutation — and then emits exactly one event describing it. This is
+ * The emit-on-mutation hook itself. It pre-mints the event, durably writes
+ * a mutation journal, then drives the journal's idempotent replay. This is
  * the mechanism the acceptance criterion ("every repo mutation in tests
  * produces exactly one ordered event") depends on: tickets.ts's
  * `createTicket`/`updateTicket` and sessions.ts's `createSession`/
@@ -439,45 +459,31 @@ export async function appendEvent(
  * caller has to remember to uphold — the same reasoning that put A3's
  * index auto-heal inside `loadIndex` rather than at every read call site.
  *
- * Ordering is deliberate:
- *   1. `write()` runs first. If it throws, no event is emitted — nothing
- *      happened, so there is nothing to record, and the caller sees the
- *      original error (e.g. `updateTicket` against a nonexistent ticket
- *      throws NOT_FOUND and no event file is ever written).
- *   2. Only once the entity write has genuinely landed on disk (atomic
- *      tmp+rename, per atomic-write.ts) does this mint and write the
- *      event, via {@link appendEvent} (itself just {@link createEvent}
- *      plus minting the event).
- *
- * What this does NOT provide: cross-file atomicity between the entity
- * write and its event. design.md §3 only promises atomicity *within* a
- * single file (tmp+rename); nothing in this design makes "write the
- * ticket" and "write its event" one indivisible unit. If the process is
- * killed — or the event write itself fails (disk full, etc.) — in the
- * narrow window after step 1 completes but before step 2's `createEvent`
- * call finishes, the entity mutation stands and its event is missing.
- * This is the same trade-off multi-mutation transactions under `.lock`
- * (lock.ts) already accept: `withLock` guarantees mutual exclusion between
- * concurrent transactions, not crash atomicity across the files one
- * transaction touches. Calling this repeatedly inside one `withLock` body
- * (B4's done-cascade) composes correctly for the normal case — N calls
- * produce N durable, immutable events — and on a *thrown* error partway
- * through, every mutation that already completed keeps both its entity
- * write and its event; nothing is rolled back (events are immutable by
- * design, so there is nothing TO roll back) and the transaction's
- * remaining mutations simply never happen. See tests/acceptance/A4.test.ts
- * for both properties exercised directly.
+ * `preparation` produces the exact before/after text after older pending
+ * intents have recovered, so a new update never snapshots stale state. A
+ * failed preparation creates no journal or event. A failed entity or event
+ * write leaves the durable intent for the next storage-open/transaction
+ * recovery pass; an already-applied entity or event is accepted only when
+ * it exactly matches the intent.
  */
 export async function withMutationEvent(
   paths: RepoPaths,
   ctx: EventContext,
-  entity: EventEntity,
+  entity: MutationEntity,
   spec: MutationEventSpec,
-  write: () => Promise<void>,
+  preparation: MutationPreparation,
   clock: Clock = systemClock,
 ): Promise<Event> {
-  await write();
-  return appendEvent(paths, ctx, entity, spec, clock);
+  const event = buildEvent(ctx, entity, spec, clock);
+  return commitMutationWithEvent(paths, event, entity, preparation, {
+    readEvent,
+    createEvent,
+  });
+}
+
+/** Recover pending mutation journals using this module's event I/O. */
+export function recoverMutationEvents(paths: RepoPaths): Promise<Event[]> {
+  return recoverMutationJournals(paths, { readEvent, createEvent });
 }
 
 // --- A4: ULID cursor query -------------------------------------------------

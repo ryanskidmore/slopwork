@@ -77,9 +77,11 @@ import {
   migrateFlatEventsToShards,
   queryEvents,
   readEvent,
+  recoverMutationEvents,
 } from "../repo/events.js";
 import type { EventContext, EventQuery, MutationEventSpec } from "../repo/events.js";
 import { DEFAULT_TIMEOUT_MS, withLock } from "../repo/lock.js";
+import { hasPendingMutationJournals } from "../repo/mutation-journal.js";
 import { sweepStaleTempFiles } from "../repo/atomic-write.js";
 import type { RepoPaths } from "../repo/paths.js";
 import { resolveTicketRef, resolveTicketRefs } from "../repo/refs.js";
@@ -320,7 +322,25 @@ export class FlatfileBackend implements StorageBackend {
     // served from a pre-transaction cache.
     this.invalidateCaches();
     try {
-      return await withLock(this.paths.lockFile, () => fn(TX_SCOPE), {
+      return await withLock(
+        this.paths.lockFile,
+        async () => {
+          await recoverMutationEvents(this.paths);
+          return fn(TX_SCOPE);
+        },
+        { timeoutMs: this.lockTimeoutMs },
+      );
+    } finally {
+      this.invalidateCaches();
+    }
+  }
+
+  /** Recover local pending intents, taking the write lock only when needed. */
+  async recoverPendingMutations(): Promise<Event[]> {
+    if (!(await hasPendingMutationJournals(this.paths))) return [];
+    this.invalidateCaches();
+    try {
+      return await withLock(this.paths.lockFile, () => recoverMutationEvents(this.paths), {
         timeoutMs: this.lockTimeoutMs,
       });
     } finally {
@@ -337,6 +357,7 @@ export class FlatfileBackend implements StorageBackend {
       this.paths.ticketsDir,
       this.paths.sessionsDir,
       this.paths.eventsDir,
+      this.paths.mutationJournalDir,
       ...shardDirs,
     ]);
   }

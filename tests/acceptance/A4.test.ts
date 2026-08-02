@@ -16,7 +16,7 @@ import {
 import { rebuildIndex } from "../../src/repo/db-index.js";
 import type { EventContext, MutationEventSpec } from "../../src/repo/events.js";
 import * as eventsModule from "../../src/repo/events.js";
-import { listEvents, queryEvents, withMutationEvent } from "../../src/repo/events.js";
+import { appendEvent, listEvents, queryEvents } from "../../src/repo/events.js";
 import { acquireLock, releaseLock, withLock } from "../../src/repo/lock.js";
 import { ensureDbDirs } from "../../src/repo/paths.js";
 import type { RepoPaths } from "../../src/repo/paths.js";
@@ -252,12 +252,11 @@ describe("A4: Event writer", () => {
     it("a same-millisecond batch of mutations is strictly ordered with no duplicate ids", async () => {
       const COUNT = 250;
       for (let i = 0; i < COUNT; i++) {
-        await withMutationEvent(
+        await appendEvent(
           paths,
           ctx,
           { kind: "ticket", id: newTicketId() },
           { verb: "ticket.updated", payload: { i } },
-          async () => {},
         );
       }
 
@@ -275,12 +274,11 @@ describe("A4: Event writer", () => {
 
     it("is stable under repeated reads (listEvents and queryEvents alike)", async () => {
       for (let i = 0; i < 12; i++) {
-        await withMutationEvent(
+        await appendEvent(
           paths,
           ctx,
           { kind: "ticket", id: newTicketId() },
           { verb: "ticket.updated" },
-          async () => {},
         );
       }
       const listFirst = await listEvents(paths);
@@ -339,14 +337,13 @@ describe("A4: Event writer", () => {
       expect("deleteEvent" in repoModule).toBe(false);
     });
 
-    it("the only way to make an event file appear on disk is createEvent/withMutationEvent — writing one twice for the same id is a plain overwrite, never exposed through the mutation surface", async () => {
+    it("the only way to make an event file appear on disk is createEvent/appendEvent — writing one twice for the same id is a plain overwrite, never exposed through the mutation surface", async () => {
       const ctx: EventContext = { actor: { name: "ryan", kind: "human" }, session: null };
-      const event = await withMutationEvent(
+      const event = await appendEvent(
         paths,
         ctx,
         { kind: "ticket", id: newTicketId() },
         { verb: "ticket.created" },
-        async () => {},
       );
       const read1 = await listEvents(paths);
       expect(read1).toEqual([event]);

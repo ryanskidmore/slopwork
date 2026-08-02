@@ -75,9 +75,14 @@ describe("findRepoRoot / requireRepoRoot", () => {
 });
 
 describe("ensureDbDirs", () => {
-  it("creates tickets/, sessions/, events/ (the D1 directory-creation primitive)", async () => {
+  it("creates entity directories and the local mutation journal", async () => {
     const paths = await ensureDbDirs(scratch);
-    for (const dir of [paths.ticketsDir, paths.sessionsDir, paths.eventsDir]) {
+    for (const dir of [
+      paths.ticketsDir,
+      paths.sessionsDir,
+      paths.eventsDir,
+      paths.mutationJournalDir,
+    ]) {
       const st = await stat(dir);
       expect(st.isDirectory()).toBe(true);
     }
