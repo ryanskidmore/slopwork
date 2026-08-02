@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom"
 import { AppShell } from "./components/app-shell.js";
 import { TooltipProvider } from "./components/ui/tooltip.js";
 import { NotFoundPage } from "./pages/not-found-page.js";
+import { QuestionsPage } from "./pages/questions-page.js";
 import { ReviewPage } from "./pages/review-page.js";
 import { StalePage } from "./pages/stale-page.js";
 import { TicketDetailPage } from "./pages/ticket-detail-page.js";
@@ -17,6 +18,7 @@ const router = createBrowserRouter([
       { path: "tickets/:ref", element: <TicketDetailPage /> },
       { path: "tree", element: <TreePage /> },
       { path: "review", element: <ReviewPage /> },
+      { path: "questions", element: <QuestionsPage /> },
       { path: "stale", element: <StalePage /> },
       { path: "*", element: <NotFoundPage /> },
     ],

@@ -25,6 +25,7 @@ import { type Clock, systemClock } from "../core/index.js";
 import appCss from "./generated/app.css" with { type: "text" };
 import appJs from "./generated/app.js" with { type: "text" };
 import { handleConfig } from "./api/config.js";
+import { handleQuestionsPanel } from "./api/questions.js";
 import { handleReviewPanel } from "./api/review.js";
 import { handleStalePanel } from "./api/stale.js";
 import { handleTicketDetail } from "./api/ticket-detail.js";
@@ -244,6 +245,9 @@ export function createWebServer(
       },
       "/api/stale": {
         ...readMethods((req) => handleStalePanel(req, dataSource, now())),
+      },
+      "/api/questions": {
+        ...readMethods((req) => handleQuestionsPanel(req, dataSource)),
       },
       "/api/tickets/:ref": {
         ...readMethods((req) => handleTicketDetail(req, dataSource, now())),

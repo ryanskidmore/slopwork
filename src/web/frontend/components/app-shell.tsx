@@ -1,4 +1,11 @@
-import { GitBranch, GitPullRequestArrow, ListTree, Search, TimerReset } from "lucide-react";
+import {
+  GitBranch,
+  GitPullRequestArrow,
+  HelpCircle,
+  ListTree,
+  Search,
+  TimerReset,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { fetchConfig } from "../lib/api.js";
@@ -11,6 +18,7 @@ const NAV_ITEMS = [
   { to: "/tickets", label: "Tickets", icon: ListTree },
   { to: "/tree", label: "Tree", icon: GitBranch },
   { to: "/review", label: "Review", icon: GitPullRequestArrow },
+  { to: "/questions", label: "Questions", icon: HelpCircle },
   { to: "/stale", label: "Stale", icon: TimerReset },
 ];
 

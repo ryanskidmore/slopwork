@@ -10,6 +10,7 @@ import type { BunRequest } from "bun";
 import type { Ticket, TicketId } from "../../core/index.js";
 import type { WebDataSource } from "../data-source.js";
 import {
+  computeAwaitingInputByTicket,
   computeStaleReason,
   deriveEffectiveTickets,
   isTicketStale,
@@ -31,6 +32,9 @@ export async function handleStalePanel(
   const tickets = deriveEffectiveTickets(rawTickets, events);
   const byId = new Map<TicketId, Ticket>(tickets.map((t) => [t.id, t]));
   const thresholds = staleThresholdsFromConfig(config);
+  // G4 (t-jggg9): reuses the SAME whole-db event read already fetched
+  // above for deriveEffectiveTickets — no second listEvents() call.
+  const awaitingInputByTicket = computeAwaitingInputByTicket(events);
 
   const stale = tickets
     .filter((t) => isTicketStale(t, thresholds, now))
@@ -43,7 +47,15 @@ export async function handleStalePanel(
   const body: StaleResponseDTO = {
     config: configDto(config, warning),
     rows: stale.map(({ ticket, since }) => ({
-      ticket: ticketSummaryDto(ticket, tickets, byId, thresholds, config, now),
+      ticket: ticketSummaryDto(
+        ticket,
+        tickets,
+        byId,
+        thresholds,
+        config,
+        now,
+        awaitingInputByTicket,
+      ),
       since,
     })),
   };
