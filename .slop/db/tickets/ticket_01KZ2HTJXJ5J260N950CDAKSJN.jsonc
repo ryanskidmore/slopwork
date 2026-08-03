@@ -1,0 +1,36 @@
+{
+  "id": "ticket_01KZ2HTJXJ5J260N950CDAKSJN",
+  "name": "Cut v0.3.0; fix GitHub Releases integration",
+  "slug": "cut-v0-3-0-fix",
+  "spec": {
+    "summary": "Releases page shows only v0.1.1: release.yml publishes to npm but never creates a GitHub Release. Backfill v0.2.0 from its tag + changelog section, add a gh-release step to release.yml (after successful publish, notes from the changelog), then cut v0.3.0 per RELEASE.md (378 lines of Unreleased incl. breaking changes; pre-1.0 policy = minor bump).",
+    "details_md": "",
+    "acceptance": [],
+    "context": [],
+    "meta": {},
+    "v": 1
+  },
+  "state": "in_progress",
+  "priority": 1,
+  "labels": [
+    "source:release"
+  ],
+  "blocks": [],
+  "relates_to": [],
+  "discovered_from": [],
+  "root_id": "ticket_01KZ2HTJXJ5J260N950CDAKSJN",
+  "path": [],
+  "active_session": "session_01KZ2HTK5XTHDW7RAC552X1PA9",
+  "last_activity_at": "2026-08-03T00:54:19.638Z",
+  "latest_note": null,
+  "owner": null,
+  "provenance": {
+    "method": "new",
+    "created_by": {
+      "name": "coordinator",
+      "kind": "agent"
+    }
+  },
+  "created_at": "2026-08-03T00:54:19.314Z",
+  "updated_at": "2026-08-03T00:54:19.638Z"
+}

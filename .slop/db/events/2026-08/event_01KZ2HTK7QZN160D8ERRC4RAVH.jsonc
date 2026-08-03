@@ -1,0 +1,18 @@
+{
+  "id": "event_01KZ2HTK7QZN160D8ERRC4RAVH",
+  "actor": {
+    "name": "coordinator",
+    "kind": "agent"
+  },
+  "session": "session_01KZ2HTK5XTHDW7RAC552X1PA9",
+  "verb": "ticket.state_changed",
+  "entity": {
+    "kind": "ticket",
+    "id": "ticket_01KZ2HTJXJ5J260N950CDAKSJN"
+  },
+  "payload": {
+    "from": "open",
+    "to": "in_progress"
+  },
+  "at": "2026-08-03T00:54:19.639Z"
+}

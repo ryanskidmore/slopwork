@@ -9,6 +9,10 @@ where breaking changes land.
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.3.0 — 2026-08-03
+
 ### Added
 
 - **Auto-compact events into a per-ticket archive on terminal transitions**

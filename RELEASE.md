@@ -20,7 +20,12 @@ How to cut a release of `slopwork` and publish it to npm.
 
 ## Cutting a release
 
-1. **Bump the version.** On `main`, with a clean working tree:
+1. **Cut the changelog.** Move `CHANGELOG.md`'s `## Unreleased` content under a new
+   `## X.Y.Z — YYYY-MM-DD` heading and leave a fresh empty `Unreleased` section. The release
+   workflow extracts this exact section as the GitHub Release notes and **fails the release if the
+   section is missing**, so this step must land before the tag.
+
+2. **Bump the version.** On `main`, with a clean working tree:
 
    ```sh
    npm version patch   # or: minor / major / 1.2.3
@@ -29,7 +34,7 @@ How to cut a release of `slopwork` and publish it to npm.
    This updates `package.json`'s `version` field, commits it (`vX.Y.Z`), and creates a matching
    annotated git tag — do not hand-edit the `version` field.
 
-2. **Push the commit and the tag:**
+3. **Push the commit and the tag:**
 
    ```sh
    git push origin main
@@ -38,16 +43,18 @@ How to cut a release of `slopwork` and publish it to npm.
 
    Pushing the `vX.Y.Z` tag is what triggers `.github/workflows/release.yml`.
 
-3. **Watch the release run** (Actions tab → Release). It runs the same `bun run check:required`
+4. **Watch the release run** (Actions tab → Release). It runs the same `bun run check:required`
    gate as CI (lint, format check, typecheck, coverage thresholds, frontend component tests, build,
    browser smoke tests, compiled-binary smoke, and installed-tarball verification), confirms the
    pushed tag matches `package.json`'s version, then runs `npm publish --access public`,
    authenticating via OIDC trusted publishing (no token secret involved). Provenance attestation
    is generated automatically as part of trusted publishing. Any gate failure aborts the release
-   before anything is published.
+   before anything is published. After a successful publish it creates the matching **GitHub
+   Release**, with notes extracted verbatim from the version's `CHANGELOG.md` section.
 
-4. **Verify** on [npmjs.com/package/slopwork](https://www.npmjs.com/package/slopwork) that the
-   new version, and its provenance attestation, are live.
+5. **Verify** on [npmjs.com/package/slopwork](https://www.npmjs.com/package/slopwork) that the
+   new version, and its provenance attestation, are live, and that the GitHub Releases page shows
+   the new tag with its changelog notes.
 
 ### Manual / dry-run publish
 
