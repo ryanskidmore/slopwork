@@ -196,13 +196,25 @@ function isDefined<T>(value: T | undefined): value is T {
  * convention), so the membership check below needs a plain-string set to
  * compare against. Returns `[]` without touching disk when there are no
  * candidates at all (a closure that unblocks nothing costs nothing here).
+ *
+ * t-7eq5s: reads `listLooseEvents()`, NOT the (now archive-inclusive)
+ * `listEvents()` — every candidate here is, by construction, a currently
+ * -OPEN ticket (filtered in {@link cascadeOnClose} below), and a live
+ * ticket's events are never compacted into an archive (only `done`/
+ * `dropped` tickets ever are). Reading the loose-only surface keeps this
+ * hot, lock-held, every-single-close read from ever scaling with the db's
+ * total closed/archived-ticket history — exactly the cost this function's
+ * own doc above already fixed once (O(candidates × total events) → O(total
+ * events), read ONCE); using the archive-inclusive surface here would
+ * silently reintroduce an analogous regression, just one call deep instead
+ * of N.
  */
 async function priorReadyEventsFor(
   backend: StorageBackend,
   candidateIds: ReadonlySet<string>,
 ): Promise<Event[]> {
   if (candidateIds.size === 0) return [];
-  const allEvents = await backend.listEvents();
+  const allEvents = await backend.listLooseEvents();
   return allEvents.filter(
     (event) =>
       event.verb === "ticket.ready" &&

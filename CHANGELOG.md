@@ -11,6 +11,33 @@ where breaking changes land.
 
 ### Added
 
+- **Auto-compact events into a per-ticket archive on terminal transitions**
+  (t-7eq5s). `slop done`/`slop drop` now fold a closing ticket's full event
+  history — every `ticket.*`/`session.*`/`plan.*`/... event it or its
+  sessions ever produced, full records, never summaries — into
+  `events/archive/<ticket_id>.jsonc`, deleting the now-redundant loose
+  originals, inside the same write transaction as the terminal-state write.
+  One-file-per-event is unchanged for LIVE tickets (still load-bearing for
+  conflict-free parallel appends and lock-free `--progress`); this only
+  ever touches a ticket once it's `done`/`dropped`. Reads are unaffected:
+  `slop show`, `slop events` (`--since`/`--poll`/`--ticket`), and the web
+  audit spine all merge archived and loose events transparently — same
+  ids, same order, byte-identical output before and after compaction — and
+  a merge-safe poll cursor taken before a close resumes correctly after.
+  Design choice: one archive file per TICKET (not embedded on the ticket
+  entity), so a ticket's own metadata reads — the hottest path in this
+  codebase — never pay to parse its full historical event count; a
+  cross-clone double-close (illegal within one db, but possible across
+  unsynced clones) produces an ordinary, human-resolvable small-file
+  conflict on the archive, no different in kind from the ticket file's own
+  existing `state`/`updated_at` conflict in that scenario, and every read
+  path dedupes by event id so a "keep both" resolution loses nothing. New
+  `slop reindex --compact` retroactively (and idempotently) runs the same
+  compaction for every already-closed ticket in a db — the migration path
+  for a repo whose closed tickets predate this feature — and, like
+  `--shard-events`, never runs implicitly. See [Concurrency & merging →
+  Event-archive
+  compaction](docs/concurrency-and-merging.md#event-archive-compaction-t-7eq5s).
 - **Bounded the remaining unbounded web API collections** (t-m1j8y): the
   review/stale/questions panels and a ticket's events/sessions timeline now
   take the same validated, capped `page`/`limit` query params `GET

@@ -15,6 +15,7 @@ import {
   listSessions,
   listTickets,
   loadIndex,
+  queryEvents,
   readTicket,
   repoPaths,
 } from "../../src/repo/index.js";
@@ -523,11 +524,15 @@ describe("E2: Concurrency + merge hardening", () => {
         expect(readyEvents).toHaveLength(1);
 
         // Every worker's own done-session/done/review events are present
-        // — no mutation was silently dropped under contention.
+        // — no mutation was silently dropped under contention. Each
+        // worker closed (t-7eq5s: `done` compacts a closed ticket's
+        // events into its own per-ticket archive as part of the same
+        // transaction), so this reads via `queryEvents({ticket})` — which
+        // transparently merges loose + archived — rather than the plain
+        // repo-layer `listEvents` used for the still-open `dependent`
+        // ticket's `ticket.ready` check above.
         for (const w of workers) {
-          const workerEvents = events.filter(
-            (e) => e.entity.kind === "ticket" && e.entity.id === w.id,
-          );
+          const workerEvents = await queryEvents(paths, { ticket: w.id });
           expect(
             workerEvents.some((e) => e.verb === "ticket.done"),
             w.slug,

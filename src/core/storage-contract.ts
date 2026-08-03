@@ -126,6 +126,24 @@ export interface EventShardMigrationResult {
   shards: string[];
 }
 
+/**
+ * `compactTicketEvents`'s result (t-7eq5s) — one ticket's worth of
+ * event-archive compaction, whether triggered by `done`/`drop`'s own
+ * terminal transition or `slop reindex --compact`'s retroactive sweep.
+ */
+export interface EventCompactionResult {
+  ticket: TicketId;
+  /** Loose events newly folded into the archive by THIS call — `0` when
+   * there was nothing left to compact. */
+  archived: number;
+  /** The archive's total event count after this call. */
+  archiveTotal: number;
+  /** `events/YYYY-MM` shard directories removed because they were left
+   * with zero remaining loose files — a flatfile-only concept; a remote
+   * backend has nothing analogous to report here and should return `[]`. */
+  shardsRemoved: string[];
+}
+
 export interface StorageBackend {
   readonly kind: "flatfile" | "remote";
 
@@ -173,9 +191,31 @@ export interface StorageBackend {
     clock?: Clock,
   ): Promise<Event>;
   queryEvents(query?: EventQuery): Promise<Event[]>;
+  /** Every event in the db — full historical fidelity, archived or not
+   * (t-7eq5s). Search/elicitations-inbox/web-bulk-overlay reads, and
+   * `slop reindex --strict`, want this. */
   listEvents(): Promise<Event[]>;
-  /** Every readable event plus structured diagnostics for every skipped file. */
+  /** Every readable event plus structured diagnostics for every skipped
+   * file — archive-inclusive, same as {@link listEvents}. */
   listEventsTolerant(): Promise<ListEventsTolerantResult>;
+  /**
+   * Every event currently sitting LOOSE (flat or sharded) — excludes
+   * anything already folded into a per-ticket archive (t-7eq5s). Cheap,
+   * and never scales with closed/archived-ticket history: the ONE read the
+   * done-cascade's `ticket.ready` dedup check (`src/tickets/cascade.ts`)
+   * needs, since its candidates are always currently-open tickets whose
+   * events are, by construction, never archived. A remote backend with no
+   * loose/archived distinction of its own may simply alias this to
+   * {@link listEvents}.
+   */
+  listLooseEvents(): Promise<Event[]>;
+  /** Fold every currently-loose event belonging to `id` into its per
+   * -ticket archive and remove the now-redundant loose files (t-7eq5s).
+   * Idempotent — safe to call on an already-fully-compacted ticket (a
+   * no-op, `archived: 0`) or repeatedly to fold in residual cross-clone
+   * events. Callers must only ever invoke this for an already-closed
+   * (`done`/`dropped`) ticket. */
+  compactTicketEvents(id: TicketId): Promise<EventCompactionResult>;
   /** Create a constant-size opaque handle backed by an empty exact seen-id set. */
   createEventPollCursor(): Promise<EventPollCursor>;
   /** Read and validate the durable state behind an opaque polling cursor. */

@@ -25,6 +25,7 @@ import { SlopError } from "../errors.js";
 import {
   assertMaxLength,
   type BulkOutcome,
+  compactClosedTicketEvents,
   printWarning,
   readStdin,
   resolveBulkRefs,
@@ -87,6 +88,10 @@ interface DoneOneResult {
   cascade: CascadeOnCloseResult;
   skippedReview: boolean;
   ownershipWarning: string | null;
+  /** t-7eq5s: non-null iff compacting this ticket's events into its
+   * archive failed — see this file's module doc, "compaction is
+   * best-effort". */
+  compactionWarning: string | null;
 }
 
 async function doneOneRef(
@@ -176,12 +181,24 @@ async function doneOneRef(
     // `ticket.ready` for any dependent this ticket was blocking.
     const cascade = await cascadeOnClose(backend, tx, current.id, { actor, session: session.id });
 
+    // t-7eq5s: fold this ticket's events into its per-ticket archive, in
+    // the SAME transaction as the terminal-state write above — see this
+    // module's doc, "compaction is best-effort", for why a failure here
+    // warns rather than fails the whole `done` call: the ticket has
+    // already durably transitioned by this point (this same transaction,
+    // above), and an un-compacted-but-correctly-closed ticket is always
+    // safely retriable later via `slop reindex --compact` — it is never a
+    // reason to make `done` itself report failure for a transition that
+    // genuinely succeeded.
+    const compactionWarning = await compactClosedTicketEvents(backend, current.id);
+
     return {
       session: finalSession,
       ticket: doneTicket,
       cascade,
       skippedReview,
       ownershipWarning,
+      compactionWarning,
     };
   });
 }
@@ -207,11 +224,13 @@ function doneJsonBody(result: DoneOneResult): {
 }
 
 /** Printed AFTER the transaction commits — a skipped review, a
- * session-ownership mismatch, or a corrupt-elsewhere-in-the-db problem is
- * a warning, never a reason `done` itself could fail (same convention as
- * `stop.ts`; see `sessionOwnershipWarning`'s own doc). Shared by both the
- * single-ref and bulk (t-mmngo) rendering paths. */
+ * session-ownership mismatch, a corrupt-elsewhere-in-the-db problem, or a
+ * failed event-archive compaction (t-7eq5s) is a warning, never a reason
+ * `done` itself could fail (same convention as `stop.ts`; see
+ * `sessionOwnershipWarning`'s own doc). Shared by both the single-ref and
+ * bulk (t-mmngo) rendering paths. */
 function printDoneWarnings(result: DoneOneResult): void {
+  if (result.compactionWarning !== null) printWarning(result.compactionWarning);
   if (result.skippedReview) {
     printWarning(
       `${result.ticket.id} (${result.ticket.slug}) done without a review/MR — if this had a code ` +

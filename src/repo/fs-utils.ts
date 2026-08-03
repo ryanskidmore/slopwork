@@ -27,6 +27,14 @@ export function isEexist(err: unknown): boolean {
   return errorCode(err) === "EEXIST";
 }
 
+/** Directory non-empty — used by a best-effort `rmdir` (t-7eq5s's shard
+ * -directory cleanup after compaction) to tell "someone else already
+ * removed it or landed a new file in it, harmless race" apart from a real
+ * failure. */
+export function isEnotempty(err: unknown): boolean {
+  return errorCode(err) === "ENOTEMPTY";
+}
+
 /** `readdir`, but a missing directory reads as empty rather than throwing. */
 export async function readDirSafe(dir: string): Promise<string[]> {
   try {

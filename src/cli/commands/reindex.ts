@@ -17,6 +17,7 @@ interface ReindexOptions {
   strict?: boolean;
   heal?: boolean;
   shardEvents?: boolean;
+  compact?: boolean;
 }
 
 /**
@@ -63,6 +64,16 @@ interface ReindexOptions {
  * each rename persisted as its own `ticket.updated` event under the write
  * transaction. The index is rebuilt a second time after healing so the
  * final report (and every subsequent read) reflects the repaired slugs.
+ *
+ * t-7eq5s: `--compact` retroactively runs the SAME per-ticket event
+ * -archive compaction `done`/`drop` already trigger automatically on every
+ * fresh terminal transition, for every ticket this rebuild finds already
+ * `done`/`dropped` — the migration path for a repo whose closed tickets
+ * predate this feature (or that had a `done`/`drop` compaction fail and
+ * warn, per those commands' own doc). Idempotent, and — like
+ * `--shard-events` — NEVER runs implicitly: compacting rewrites
+ * git-tracked files (deletes loose event files, writes a new archive), so
+ * it should always land as a deliberate, visible commit.
  */
 export async function runReindex(options: ReindexOptions): Promise<void> {
   const root = requireRepoRoot(process.cwd());
@@ -230,8 +241,49 @@ export async function runReindex(options: ReindexOptions): Promise<void> {
       : `; ${sessionScan.orphans.length} orphaned active session(s) found (run \`slop reindex --heal\` to close them out)`;
   }
 
+  // t-7eq5s: `--compact` retroactively runs the SAME per-ticket
+  // compaction `done`/`drop` already trigger on every fresh terminal
+  // transition — for every ticket THIS rebuild found already `done`/
+  // `dropped`. Deliberately its own explicit flag, never folded into
+  // `--heal` or run implicitly: compaction rewrites git-tracked files
+  // (deletes loose event files, writes/rewrites an archive), so a repo
+  // owner should see that change land as a deliberate, visible commit —
+  // not a side effect of a routine `reindex` or `--heal` run. Idempotent:
+  // a ticket with nothing left loose (already fully compacted) reports
+  // `archived: 0` and is simply skipped, so a repeat `--compact` run (or
+  // one against a repo where every closed ticket already compacted itself
+  // via done/drop) costs nothing extra to report.
+  let compactNote = "";
+  if (options.compact) {
+    const closedRows = index.tickets.filter(
+      (row) => row.state === "done" || row.state === "dropped",
+    );
+    let compactedTickets = 0;
+    let archivedEvents = 0;
+    const shardsRemoved = new Set<string>();
+    await backend.transact(async () => {
+      // Same "re-checked between each write" contract as the slug-heal
+      // and orphaned-session-heal loops above — one lock acquisition for
+      // the whole retroactive sweep, not one per ticket.
+      for (const row of closedRows) {
+        const result = await backend.compactTicketEvents(row.id);
+        if (result.archived > 0) {
+          compactedTickets++;
+          archivedEvents += result.archived;
+        }
+        for (const month of result.shardsRemoved) shardsRemoved.add(month);
+      }
+    });
+    compactNote =
+      archivedEvents > 0
+        ? `; compacted ${archivedEvents} event(s) across ${compactedTickets} closed ticket(s)` +
+          (shardsRemoved.size > 0 ? ` (removed ${shardsRemoved.size} now-empty shard dir(s))` : "")
+        : `; nothing to compact (${closedRows.length} closed ticket(s) already fully compacted)`;
+  }
+
   process.stdout.write(
-    `reindexed: ${index.tickets.length} ticket(s), ${slugCount} slug(s)${sweptNote}${orphanNote}${shardNote}${slugHealNote}\n`,
+    `reindexed: ${index.tickets.length} ticket(s), ${slugCount} slug(s)${sweptNote}${orphanNote}` +
+      `${shardNote}${slugHealNote}${compactNote}\n`,
   );
 }
 
@@ -257,6 +309,11 @@ export function registerReindexCommand(program: Command): void {
       "--shard-events",
       "migrate flat-layout events/event_*.jsonc files into events/YYYY-MM/ shards (idempotent; " +
         "never runs implicitly — see docs/concepts.md)",
+    )
+    .option(
+      "--compact",
+      "retroactively compact every already-closed (done/dropped) ticket's events into its " +
+        "per-ticket archive (idempotent; never runs implicitly — see docs/concepts.md)",
     )
     .action(runReindex);
 }

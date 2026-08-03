@@ -202,6 +202,7 @@ slop reindex
 slop reindex --strict         # fail on the first unreadable file instead of skipping it
 slop reindex --heal           # also close out any orphaned active sessions found
 slop reindex --shard-events   # migrate flat-layout events/ into events/YYYY-MM/ shards
+slop reindex --compact        # retroactively compact every closed ticket's events into its archive
 ```
 
 `--strict` restores pre-fault-tolerance, all-or-nothing behavior. Without
@@ -252,6 +253,22 @@ git-style — the same collision rule `slop new` already uses), each
 rename recorded as its own `ticket.updated` event. The index is rebuilt a
 second time after healing so the summary line (and every subsequent
 read) reflects the repaired slugs.
+
+**`--compact` (t-7eq5s)** retroactively runs the SAME per-ticket
+event-archive compaction `slop done`/`slop drop` already run automatically
+on every fresh terminal transition, for every ticket THIS rebuild finds
+already `done`/`dropped` — the migration path for a db whose closed
+tickets predate this feature, or whose `done`/`drop` compaction attempt
+failed and only warned (see [Concurrency & merging → Event-archive
+compaction](concurrency-and-merging.md#event-archive-compaction-t-7eq5s)
+for the full design and cross-clone merge story). Idempotent: a ticket
+with nothing left loose to fold in (already fully compacted) costs nothing
+extra to report; a repeat `--compact` run over an already-fully-compacted
+db reports "nothing to compact". **Never runs implicitly** — same
+reasoning as `--shard-events`: compaction rewrites git-tracked files
+(deletes loose event files, writes/rewrites an archive), so it should
+always land as a deliberate, visible commit, never a side effect of a
+routine `reindex` or `--heal` run.
 
 ---
 
@@ -688,8 +705,16 @@ echo -e "a\nb\nc" | slop done - --note "batch closed"
 
 Completes one or more refs — legal from `review` **or** directly from
 `in_progress` (review is optional). Finalizes each session (end summary),
-then runs the done-cascade exactly once per ref, reporting any ticket
-that ref was blocking that just became unblocked.
+runs the done-cascade exactly once per ref (reporting any ticket that ref
+was blocking that just became unblocked), then — t-7eq5s — compacts that
+ref's events into its own archive (`events/archive/<ticket_id>.jsonc`),
+all inside the same write transaction. Nothing about `slop show`/`slop
+events`/a poll cursor changes because of this; see [Concurrency & merging
+→ Event-archive
+compaction](concurrency-and-merging.md#event-archive-compaction-t-7eq5s).
+A compaction failure (rare — e.g. disk full) never fails `done` itself:
+the ref has already durably closed by that point, so it's reported as a
+warning instead, retriable later via `slop reindex --compact`.
 
 | Flag | Meaning |
 |---|---|
@@ -730,8 +755,10 @@ slop drop a b c --reason "superseded by the rewrite"
 
 Marks one or more refs `dropped` (wontdo) from any non-terminal state.
 `--reason` is **required** and applies to every ref. Finalizes an active
-session if one exists, and runs the same done-cascade `done` does — a
-dropped ticket also stops blocking its dependents.
+session if one exists, runs the same done-cascade `done` does — a dropped
+ticket also stops blocking its dependents — and compacts that ref's events
+into its own archive exactly like `done` does (t-7eq5s; see that
+command's own note above).
 
 Given exactly ONE ref, `--json` returns the same shape as before t-mmngo:
 `{id, slug, handle, name, state, reason, session, unblocked, problems}`
@@ -907,6 +934,13 @@ returned and therefore still discovers an older-clock event that arrives
 after a Git merge. Omit the cursor on the first call, persist the returned
 `poll_cursor`, and reuse it on every later call. Empty results do not
 retire or advance the token.
+
+A closed ticket's events may live in its own compacted archive
+(`events/archive/<ticket_id>.jsonc`, t-7eq5s) rather than as loose files —
+every mode here (`--since`, `--poll`, `--ticket`) reads across both
+transparently, same ids and order either way; see [Concurrency & merging →
+Event-archive
+compaction](concurrency-and-merging.md#event-archive-compaction-t-7eq5s).
 
 | Flag | Meaning |
 |---|---|

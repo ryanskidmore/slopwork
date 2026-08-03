@@ -138,6 +138,8 @@ Events are immutable and append-only (`src/repo/events.ts`'s module doc)
 | `GET /v1/events?since=<id>&ticket=<id>&limit=<n>` | `queryEvents({since, ticket, limit})` — all three query params optional | `Event[]`, cursor (ascending id) order |
 | `GET /v1/events?mode=all` | `listEvents()` (strict) | `Event[]` |
 | `GET /v1/events?mode=tolerant` | `listEventsTolerant()` | `{ events: Event[], problems: EventReadProblem[] }` (readable records survive; every skipped/duplicate/misplaced record is reported with `kind`, `id`, `path`, and `message`) |
+| `GET /v1/events?mode=loose` | `listLooseEvents()` | `Event[]` — see "Event-archive compaction" below |
+| `POST /v1/tickets/:id/compact-events` | `compactTicketEvents(id)` | `EventCompactionResult` (`{ ticket, archived, archive_total, shards_removed }`) — see "Event-archive compaction" below |
 | `POST /v1/event-cursors` | `createEventPollCursor()` | `{ "cursor": "cursor_v1_<32 lowercase hex>" }` and an empty versioned seen-ID set |
 | `GET /v1/event-cursors/:cursor` | `readEventPollCursor(cursor)` | `{ "version": 1, "cursor": EventPollCursor, "seen": EventId[] }` (404 if absent) |
 | `POST /v1/event-cursors/:cursor/advance` | `advanceEventPollCursor(cursor, returned)` — body `{ "returned": EventId[] }` | The updated state after atomically unioning returned IDs |
@@ -149,6 +151,47 @@ purely a local storage-layout concern) — nothing about this wire contract
 exposes shard layout, since `EventShardMigrationResult` below is the
 flatfile driver's own maintenance operation, not a generic one every
 backend need implement meaningfully (see "Maintenance").
+
+#### Event-archive compaction (t-7eq5s)
+
+The flatfile driver folds a CLOSED ticket's events into a per-ticket
+archive file on its terminal transition (see [Concurrency & merging →
+Event-archive
+compaction](concurrency-and-merging.md#event-archive-compaction-t-7eq5s)
+for the full design) — a purely local storage-layout concern, exactly like
+event sharding above. It changes two things about this interface:
+
+- **`listEvents()`/`listEventsTolerant()` are archive-inclusive.** They
+  return the complete event log — archived or still loose — full
+  historical fidelity for callers that want "everything" (search's
+  note-history scan, the elicitations inbox, the web explorer's bulk
+  overlay reads). A backend with no loose/archived distinction of its own
+  (a real database has no reason to have one) simply has nothing to
+  distinguish here — every event it holds already satisfies both methods
+  identically.
+- **`listLooseEvents()` is a NEW, narrower method**: every event NOT yet
+  folded into an archive. This exists for exactly one caller —
+  `src/tickets/cascade.ts`'s done-cascade dedup check — whose candidates
+  are always currently-open tickets, so restricting to "loose" costs
+  nothing there and keeps that hot, lock-held read from ever scaling with
+  a db's total closed-ticket history. **A backend with no loose/archived
+  distinction may simply alias this to `listEvents()`** — there is nothing
+  for it to narrow.
+- **`compactTicketEvents(id)` is a NEW method**, called by `done`/`drop`
+  right after a ticket's terminal-state write (same transaction/lease) and
+  by `slop reindex --compact`'s retroactive sweep. **A backend with no
+  local loose/archived file distinction to consolidate may treat this as a
+  no-op**, returning `{ ticket: id, archived: 0, archive_total: 0,
+  shards_removed: [] }` — same "flatfile-specific concept, safe no-op
+  elsewhere" posture `sweepTempFiles`/`migrateEventShards` already have
+  (see "Maintenance" below). `slop done`/`slop drop`/`slop reindex
+  --compact` must all still complete successfully against such a backend,
+  just reporting nothing to compact.
+
+Nothing about `queryEvents`/`readEvent`'s wire shape changes: they already
+return complete `Event` records regardless of storage layout, and a real
+remote implementation was never expected to expose "is this one archived"
+as part of its response.
 
 The scalar `since` query is ordered static-snapshot pagination, not a durable
 polling checkpoint. Merge-safe consumers use the cursor endpoints and filter

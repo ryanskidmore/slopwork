@@ -124,6 +124,26 @@ merge-safe incremental consumption; `--since` only pages a current ordered
 snapshot and can miss older IDs merged later. See
 [CLI reference → `events`](cli-reference.md#events).
 
+**Auto-compaction on terminal transitions (t-7eq5s).** One-file-per-event
+stays exactly as described above for LIVE tickets — it's what makes
+conflict-free parallel appends and lock-free `--progress` work at all (see
+[Concurrency & merging](concurrency-and-merging.md)). The instant a ticket
+reaches `done` or `dropped`, `slop done`/`slop drop` fold every event that
+belongs to it (its own `ticket.*` events, plus every `session.*`/`plan.*`/
+etc. event for any session it ever ran) into one archive file,
+`events/archive/<ticket_id>.jsonc` — full event records, not summaries —
+and delete the now-redundant loose originals, all inside the same write
+transaction as the terminal-state write itself. Nothing about reading is
+different: `slop show`/`slop events`/the web audit spine/a merge-safe poll
+cursor all treat an archived event identically to a loose one — same id,
+same ordering, same content — they just don't need to keep it as its own
+tiny file forever. See
+[Concurrency & merging → Event-archive compaction](concurrency-and-merging.md#event-archive-compaction-t-7eq5s)
+for the cross-clone merge story, and
+[CLI reference → `reindex`](cli-reference.md#reindex) for `--compact`, the
+explicit, never-implicit retroactive sweep for tickets that closed before
+this feature existed.
+
 ### Actor
 
 Not a stored entity with its own file — a small `{name, kind: human|agent}`
@@ -235,6 +255,7 @@ the current clock.
     sessions/session_<ulid>.jsonc      # plan embedded, versioned
     events/event_<ulid>.jsonc          # immutable — flat layout (pre-sharding, or never migrated)
     events/2026-08/event_<ulid>.jsonc  # immutable — sharded layout (G2), one dir per UTC month
+    events/archive/ticket_<ulid>.jsonc # compacted, one file per CLOSED ticket (t-7eq5s)
     mutation-journal/event_<ulid>.jsonc # pending entity/event intent — GITIGNORED
     event-cursors/cursor_v1_<hex>.jsonc # exact polling checkpoint — GITIGNORED
     index.jsonc                        # derived — GITIGNORED, auto-healed
