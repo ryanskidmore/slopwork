@@ -1,0 +1,204 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ15K9Z7QSNR003PSSDJ2M25",
+  "events": [
+    {
+      "id": "event_01KZ15KA11TEMN55C4TDFG14N3",
+      "actor": {
+        "name": "codex-dependency-boundaries",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ15K9Z7QSNR003PSSDJ2M25"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T12:01:23.489Z"
+    },
+    {
+      "id": "event_01KZ15KN52JSXBMK0892BEC3XS",
+      "actor": {
+        "name": "codex-dependency-boundaries",
+        "kind": "agent"
+      },
+      "session": "session_01KZ15KN503KPSNDBMK51074TF",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ15KN503KPSNDBMK51074TF"
+      },
+      "payload": {
+        "harness": "codex",
+        "takeover": false
+      },
+      "at": "2026-08-02T12:01:34.882Z"
+    },
+    {
+      "id": "event_01KZ15KN56ZYQ1KPMW4DQ7NQXJ",
+      "actor": {
+        "name": "codex-dependency-boundaries",
+        "kind": "agent"
+      },
+      "session": "session_01KZ15KN503KPSNDBMK51074TF",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ15K9Z7QSNR003PSSDJ2M25"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T12:01:34.886Z"
+    },
+    {
+      "id": "event_01KZ15KY2FHQAY0M07ER24JE95",
+      "actor": {
+        "name": "codex-dependency-boundaries",
+        "kind": "human"
+      },
+      "session": "session_01KZ15KN503KPSNDBMK51074TF",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ15KN503KPSNDBMK51074TF"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 6
+      },
+      "at": "2026-08-02T12:01:44.016Z"
+    },
+    {
+      "id": "event_01KZ167NXVZX4J2PWB6NVQNJ4E",
+      "actor": {
+        "name": "codex-dependency-boundaries",
+        "kind": "human"
+      },
+      "session": "session_01KZ15KN503KPSNDBMK51074TF",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ15KN503KPSNDBMK51074TF"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-02T12:12:31.035Z"
+    },
+    {
+      "id": "event_01KZ167S6830PW24XCRYAHNMRJ",
+      "actor": {
+        "name": "codex-dependency-boundaries",
+        "kind": "human"
+      },
+      "session": "session_01KZ15KN503KPSNDBMK51074TF",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ15KN503KPSNDBMK51074TF"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T12:12:34.376Z"
+    },
+    {
+      "id": "event_01KZ1680R0GYTERJ6ZD5T6HGW1",
+      "actor": {
+        "name": "codex-dependency-boundaries",
+        "kind": "human"
+      },
+      "session": "session_01KZ15KN503KPSNDBMK51074TF",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ15KN503KPSNDBMK51074TF"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-02T12:12:42.112Z"
+    },
+    {
+      "id": "event_01KZ1686NEBBPBRJ2PSJA85EMB",
+      "actor": {
+        "name": "codex-dependency-boundaries",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ15K9Z7QSNR003PSSDJ2M25"
+      },
+      "payload": {
+        "progress": "Mapped the recursive production graph and replaced outward ownership with neutral core ports: SlopError moved to core/errors; index schemas/DTOs/formatters to core/db-index; StorageBackend plus event/query/tolerant-read DTOs to core/storage-contract. Compatibility re-exports preserve repo/storage/CLI surfaces. Ticket/session domain no longer imports repo, storage, or CLI; typecheck passes and the recursive graph now has zero SCC cycles (previously repo/db-index and repo/tickets formed one)."
+      },
+      "at": "2026-08-02T12:12:48.174Z"
+    },
+    {
+      "id": "event_01KZ16KT1XSWE0Z1RNT74T73JZ",
+      "actor": {
+        "name": "codex-dependency-boundaries",
+        "kind": "human"
+      },
+      "session": "session_01KZ15KN503KPSNDBMK51074TF",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ15KN503KPSNDBMK51074TF"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-08-02T12:19:08.477Z"
+    },
+    {
+      "id": "event_01KZ2FV5SCMT5BZF32PZKDCQY4",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ15KN503KPSNDBMK51074TF",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ15KN503KPSNDBMK51074TF"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Ghost close: these are the dead session's own in-branch tickets for the three WIP salvages, merged into main still marked in_progress. The work shipped and was tracked to completion via the coordinator's wrapper tickets (PRs 20, 21, 22, all merged)."
+      },
+      "at": "2026-08-03T00:19:41.484Z"
+    },
+    {
+      "id": "event_01KZ2FV5TTE256ZH6HC4JNRGQB",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ15KN503KPSNDBMK51074TF",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ15K9Z7QSNR003PSSDJ2M25"
+      },
+      "payload": {
+        "from": "in_progress"
+      },
+      "at": "2026-08-03T00:19:41.530Z"
+    }
+  ]
+}

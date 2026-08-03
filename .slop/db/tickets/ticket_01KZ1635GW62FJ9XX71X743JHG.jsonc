@@ -19,10 +19,9 @@
     "meta": {},
     "v": 1
   },
-  "state": "in_progress",
+  "state": "done",
   "priority": 0,
   "labels": [],
-  "adhoc": false,
   "blocks": [],
   "relates_to": [],
   "discovered_from": [
@@ -30,9 +29,9 @@
   ],
   "root_id": "ticket_01KZ1635GW62FJ9XX71X743JHG",
   "path": [],
-  "active_session": "session_01KZ163B342TFSZVENZ7ZQXZS7",
-  "last_activity_at": "2026-08-02T12:10:08.874Z",
-  "latest_note": null,
+  "active_session": null,
+  "last_activity_at": "2026-08-03T00:19:41.381Z",
+  "latest_note": "Ghost close: these are the dead session's own in-branch tickets for the three WIP salvages, merged into main still marked in_progress. The work shipped and was tracked to completion via the coordinator's wrapper tickets (PRs 20, 21, 22, all merged).",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -42,5 +41,5 @@
     }
   },
   "created_at": "2026-08-02T12:10:03.170Z",
-  "updated_at": "2026-08-02T12:10:08.874Z"
+  "updated_at": "2026-08-03T00:19:41.381Z"
 }

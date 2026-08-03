@@ -14,7 +14,7 @@
     "commit_at_start": "75ca680b3e47a579aaca97b9c281bec516b69c54"
   },
   "started_at": "2026-08-02T12:01:34.880Z",
-  "ended_at": null,
+  "ended_at": "2026-08-03T00:19:41.484Z",
   "plan": [
     {
       "version": 1,
@@ -47,5 +47,5 @@
       "created_at": "2026-08-02T12:01:44.012Z"
     }
   ],
-  "end_summary": null
+  "end_summary": "Ghost close: these are the dead session's own in-branch tickets for the three WIP salvages, merged into main still marked in_progress. The work shipped and was tracked to completion via the coordinator's wrapper tickets (PRs 20, 21, 22, all merged)."
 }

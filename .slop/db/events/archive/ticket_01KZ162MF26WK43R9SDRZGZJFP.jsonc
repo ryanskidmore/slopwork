@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ162MF26WK43R9SDRZGZJFP",
+  "events": [
+    {
+      "id": "event_01KZ162MJWP5M006BEGSXZMM6C",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ162MF26WK43R9SDRZGZJFP"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T12:09:45.820Z"
+    },
+    {
+      "id": "event_01KZ162V9B86EQJAT9MEH8KQ1N",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ162V996RQF2ZY0DHHRBDJF",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ162V996RQF2ZY0DHHRBDJF"
+      },
+      "payload": {
+        "harness": "other",
+        "takeover": false
+      },
+      "at": "2026-08-02T12:09:52.683Z"
+    },
+    {
+      "id": "event_01KZ162V9FFC7ZYNRG2TM37DQA",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ162V996RQF2ZY0DHHRBDJF",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ162MF26WK43R9SDRZGZJFP"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T12:09:52.687Z"
+    },
+    {
+      "id": "event_01KZ162VEWXZZFM56ED2GGCB7K",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ162V996RQF2ZY0DHHRBDJF",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ162V996RQF2ZY0DHHRBDJF"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 7
+      },
+      "at": "2026-08-02T12:09:52.860Z"
+    },
+    {
+      "id": "event_01KZ169KAN1B71WQDEMCV2GX66",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ162V996RQF2ZY0DHHRBDJF",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ162V996RQF2ZY0DHHRBDJF"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-02T12:13:33.909Z"
+    },
+    {
+      "id": "event_01KZ169KFKEJH5XM0RHZB8669J",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ162MF26WK43R9SDRZGZJFP"
+      },
+      "payload": {
+        "progress": "Mapped remaining collection paths. Chosen design: endpoint-scoped keyset cursors for review/stale/questions and detail event/session/plan feeds; raw slicing before DTO construction; deterministic bounded tree with explicit node/depth truncation instead of risky lazy subtree state merging. Flatfile directory materialization remains the backend floor."
+      },
+      "at": "2026-08-02T12:13:34.067Z"
+    },
+    {
+      "id": "event_01KZ2FV5Y4H2XG03JBKZGGY64E",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ162V996RQF2ZY0DHHRBDJF",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ162V996RQF2ZY0DHHRBDJF"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Ghost close: these are the dead session's own in-branch tickets for the three WIP salvages, merged into main still marked in_progress. The work shipped and was tracked to completion via the coordinator's wrapper tickets (PRs 20, 21, 22, all merged)."
+      },
+      "at": "2026-08-03T00:19:41.636Z"
+    },
+    {
+      "id": "event_01KZ2FV5ZFG1WNXZ7453FH9MFD",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ162V996RQF2ZY0DHHRBDJF",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ162MF26WK43R9SDRZGZJFP"
+      },
+      "payload": {
+        "from": "in_progress"
+      },
+      "at": "2026-08-03T00:19:41.679Z"
+    }
+  ]
+}

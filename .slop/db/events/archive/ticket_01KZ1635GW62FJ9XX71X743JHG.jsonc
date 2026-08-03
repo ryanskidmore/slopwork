@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ1635GW62FJ9XX71X743JHG",
+  "events": [
+    {
+      "id": "event_01KZ1635H7VDYWMN4QA9ZPH6RQ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1635GW62FJ9XX71X743JHG"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T12:10:03.175Z"
+    },
+    {
+      "id": "event_01KZ163B35Q4S0ABMG2CW5RG3D",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KZ163B342TFSZVENZ7ZQXZS7",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ163B342TFSZVENZ7ZQXZS7"
+      },
+      "payload": {
+        "harness": "codex",
+        "takeover": false
+      },
+      "at": "2026-08-02T12:10:08.869Z"
+    },
+    {
+      "id": "event_01KZ163B3A537C9RJKG30BZ8RR",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KZ163B342TFSZVENZ7ZQXZS7",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1635GW62FJ9XX71X743JHG"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T12:10:08.874Z"
+    },
+    {
+      "id": "event_01KZ163BA3887Y51YM5WRQCYGD",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ163B342TFSZVENZ7ZQXZS7",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ163B342TFSZVENZ7ZQXZS7"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 6
+      },
+      "at": "2026-08-02T12:10:09.091Z"
+    },
+    {
+      "id": "event_01KZ2FV5MB0Y3E8Y7YAW49SAQT",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ163B342TFSZVENZ7ZQXZS7",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ163B342TFSZVENZ7ZQXZS7"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Ghost close: these are the dead session's own in-branch tickets for the three WIP salvages, merged into main still marked in_progress. The work shipped and was tracked to completion via the coordinator's wrapper tickets (PRs 20, 21, 22, all merged)."
+      },
+      "at": "2026-08-03T00:19:41.324Z"
+    },
+    {
+      "id": "event_01KZ2FV5P552F4CP1YYFXGTCCA",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ163B342TFSZVENZ7ZQXZS7",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1635GW62FJ9XX71X743JHG"
+      },
+      "payload": {
+        "from": "in_progress"
+      },
+      "at": "2026-08-03T00:19:41.381Z"
+    }
+  ]
+}
