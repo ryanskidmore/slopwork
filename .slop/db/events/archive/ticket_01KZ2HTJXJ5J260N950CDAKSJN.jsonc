@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ2HTJXJ5J260N950CDAKSJN",
+  "events": [
+    {
+      "id": "event_01KZ2HTJYKQ92QBCS34TC38BBE",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ2HTJXJ5J260N950CDAKSJN"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-03T00:54:19.347Z"
+    },
+    {
+      "id": "event_01KZ2HTK5YZ3XQAK0FYSJ6EEEY",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ2HTK5XTHDW7RAC552X1PA9",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ2HTK5XTHDW7RAC552X1PA9"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-08-03T00:54:19.582Z"
+    },
+    {
+      "id": "event_01KZ2HTK7QZN160D8ERRC4RAVH",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ2HTK5XTHDW7RAC552X1PA9",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ2HTJXJ5J260N950CDAKSJN"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-03T00:54:19.639Z"
+    },
+    {
+      "id": "event_01KZ2J9DTYY147NZBQDH175VKK",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ2HTK5XTHDW7RAC552X1PA9",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ2HTK5XTHDW7RAC552X1PA9"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "v0.3.0 released: npm publish green with provenance (run 30775641171), GitHub Release auto-created by the new release.yml step, v0.2.0 release backfilled. RELEASE.md now documents the changelog-cut-before-tag requirement."
+      },
+      "at": "2026-08-03T01:02:25.630Z"
+    },
+    {
+      "id": "event_01KZ2J9DXG0H6Z4FQ8Z6468RNH",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ2HTK5XTHDW7RAC552X1PA9",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ2HTJXJ5J260N950CDAKSJN"
+      },
+      "payload": {
+        "from": "in_progress"
+      },
+      "at": "2026-08-03T01:02:25.712Z"
+    }
+  ]
+}

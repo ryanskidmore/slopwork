@@ -10,7 +10,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "in_progress",
+  "state": "done",
   "priority": 1,
   "labels": [
     "source:release"
@@ -20,9 +20,9 @@
   "discovered_from": [],
   "root_id": "ticket_01KZ2HTJXJ5J260N950CDAKSJN",
   "path": [],
-  "active_session": "session_01KZ2HTK5XTHDW7RAC552X1PA9",
-  "last_activity_at": "2026-08-03T00:54:19.638Z",
-  "latest_note": null,
+  "active_session": null,
+  "last_activity_at": "2026-08-03T01:02:25.712Z",
+  "latest_note": "v0.3.0 released: npm publish green with provenance (run 30775641171), GitHub Release auto-created by the new release.yml step, v0.2.0 release backfilled. RELEASE.md now documents the changelog-cut-before-tag requirement.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -32,5 +32,5 @@
     }
   },
   "created_at": "2026-08-03T00:54:19.314Z",
-  "updated_at": "2026-08-03T00:54:19.638Z"
+  "updated_at": "2026-08-03T01:02:25.712Z"
 }

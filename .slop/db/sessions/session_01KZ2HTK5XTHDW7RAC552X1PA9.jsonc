@@ -14,7 +14,7 @@
     "commit_at_start": "fc7ff7f021df0d0581f2d12558e7dc89a75d888e"
   },
   "started_at": "2026-08-03T00:54:19.581Z",
-  "ended_at": null,
+  "ended_at": "2026-08-03T01:02:25.629Z",
   "plan": [],
-  "end_summary": null
+  "end_summary": "v0.3.0 released: npm publish green with provenance (run 30775641171), GitHub Release auto-created by the new release.yml step, v0.2.0 release backfilled. RELEASE.md now documents the changelog-cut-before-tag requirement."
 }
