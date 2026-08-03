@@ -1,0 +1,275 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ14E4SZ1QP6Q2XSWB4J1XB6",
+  "events": [
+    {
+      "id": "event_01KZ14E4V4NACK3B0GSM1ZHR29",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ14E4SZ1QP6Q2XSWB4J1XB6"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T11:41:05.764Z"
+    },
+    {
+      "id": "event_01KZ14EAYTCXGJCJT9503HD9C5",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KZ14EAYSAKR2ZK1S505MZH9C",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14EAYSAKR2ZK1S505MZH9C"
+      },
+      "payload": {
+        "harness": "codex",
+        "takeover": false
+      },
+      "at": "2026-08-02T11:41:12.026Z"
+    },
+    {
+      "id": "event_01KZ14EAYZEECHMPPDHCX2KN54",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KZ14EAYSAKR2ZK1S505MZH9C",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ14E4SZ1QP6Q2XSWB4J1XB6"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T11:41:12.031Z"
+    },
+    {
+      "id": "event_01KZ14EG7M9YN184PVPB6NJDN2",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14EAYSAKR2ZK1S505MZH9C",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14EAYSAKR2ZK1S505MZH9C"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 6
+      },
+      "at": "2026-08-02T11:41:17.428Z"
+    },
+    {
+      "id": "event_01KZ15VGZEXJEKT1A0MVXT2ARE",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14EAYSAKR2ZK1S505MZH9C",
+      "verb": "plan.revised",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14EAYSAKR2ZK1S505MZH9C"
+      },
+      "payload": {
+        "version": 2,
+        "step_count": 6
+      },
+      "at": "2026-08-02T12:05:52.750Z"
+    },
+    {
+      "id": "event_01KZ15VH3GZSJH66VPKAN65V9X",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14EAYSAKR2ZK1S505MZH9C",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14EAYSAKR2ZK1S505MZH9C"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-02T12:05:52.880Z"
+    },
+    {
+      "id": "event_01KZ15VH7M0K6C6EEBCD0TKBX7",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14EAYSAKR2ZK1S505MZH9C",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14EAYSAKR2ZK1S505MZH9C"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T12:05:53.047Z"
+    },
+    {
+      "id": "event_01KZ15VHDTTAXB39830BRTZSKF",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14EAYSAKR2ZK1S505MZH9C",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14EAYSAKR2ZK1S505MZH9C"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-02T12:05:53.210Z"
+    },
+    {
+      "id": "event_01KZ15VHJGCAZTVACT0RFXVTQ6",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14EAYSAKR2ZK1S505MZH9C",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14EAYSAKR2ZK1S505MZH9C"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-08-02T12:05:53.360Z"
+    },
+    {
+      "id": "event_01KZ15VHPB70X1RNZQ41W325DX",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14EAYSAKR2ZK1S505MZH9C",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14EAYSAKR2ZK1S505MZH9C"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-08-02T12:05:53.484Z"
+    },
+    {
+      "id": "event_01KZ15VHWBSEA00H9HR44GW350",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ14E4SZ1QP6Q2XSWB4J1XB6"
+      },
+      "payload": {
+        "progress": "Implemented structured event integrity across repo/storage/index/CLI/web, including no-cache and forced-reindex repair visibility. Full suite: 1,972/1,972 pass; typecheck/lint/format/build pass. Coverage test suite passes but repository thresholds remain red (79.28% statements, 74.46% functions, 80.27% lines vs 82/80/83), recorded as residual gate debt rather than hidden."
+      },
+      "at": "2026-08-02T12:05:53.675Z"
+    },
+    {
+      "id": "event_01KZ15X6DPX0AWEW95QKJ5DPWP",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14EAYSAKR2ZK1S505MZH9C",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14EAYSAKR2ZK1S505MZH9C"
+      },
+      "payload": {
+        "step": 6,
+        "checked": true
+      },
+      "at": "2026-08-02T12:06:47.478Z"
+    },
+    {
+      "id": "event_01KZ15X6JGPP8NG448J823K0VA",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14EAYSAKR2ZK1S505MZH9C",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ14E4SZ1QP6Q2XSWB4J1XB6"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/18"
+      },
+      "at": "2026-08-02T12:06:47.632Z"
+    },
+    {
+      "id": "event_01KZ23B4H8GGWP9MVJFWEQAT4Q",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ14EAYSAKR2ZK1S505MZH9C",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14EAYSAKR2ZK1S505MZH9C"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Audit-fix program fully merged: PRs 5,6,7,9,10,12,13,14,15,16,17,18,19 all on main (PR 11 closed as superseded). Batch-closed after final merges of 14/18 and 19."
+      },
+      "at": "2026-08-02T20:41:13.000Z"
+    },
+    {
+      "id": "event_01KZ23B4HWMF0CXTEGB6XDP95E",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ14EAYSAKR2ZK1S505MZH9C",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ14E4SZ1QP6Q2XSWB4J1XB6"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T20:41:13.020Z"
+    }
+  ]
+}

@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ1S96SQTM2EWDQ2P2DT6085",
+  "events": [
+    {
+      "id": "event_01KZ1S96W50H3Y360JRRP7JMF7",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1S96SQTM2EWDQ2P2DT6085"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T17:45:24.101Z"
+    },
+    {
+      "id": "event_01KZ1YQ19WWXH7X8Q7N1F4SCNH",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1YQ19M4NQPZ2AJW46YYE46",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ1YQ19M4NQPZ2AJW46YYE46"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-08-02T19:20:20.028Z"
+    },
+    {
+      "id": "event_01KZ1YQ1A93PDKZKKM82BXDWWC",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1YQ19M4NQPZ2AJW46YYE46",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1S96SQTM2EWDQ2P2DT6085"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T19:20:20.041Z"
+    },
+    {
+      "id": "event_01KZ1ZMT77EBH0CW4CT8YBGVKE",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1YQ19M4NQPZ2AJW46YYE46",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1S96SQTM2EWDQ2P2DT6085"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/19"
+      },
+      "at": "2026-08-02T19:36:35.815Z"
+    },
+    {
+      "id": "event_01KZ1ZMTBSRG28FKZ7RKQE94GJ",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1S96SQTM2EWDQ2P2DT6085"
+      },
+      "payload": {
+        "progress": "PR #19 open. Shared managed-section helper extracted so gitignore + gitattributes upsert logic can't drift; byte-idempotent across runs, hand-written lines preserved. Post-merge chore: run slop init here to adopt the managed section, then hand-trim the now-redundant hand-written .gitattributes lines."
+      },
+      "at": "2026-08-02T19:36:35.961Z"
+    },
+    {
+      "id": "event_01KZ23B5FCS1CQ42Z8HMQB8B03",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1YQ19M4NQPZ2AJW46YYE46",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ1YQ19M4NQPZ2AJW46YYE46"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Audit-fix program fully merged: PRs 5,6,7,9,10,12,13,14,15,16,17,18,19 all on main (PR 11 closed as superseded). Batch-closed after final merges of 14/18 and 19."
+      },
+      "at": "2026-08-02T20:41:13.964Z"
+    },
+    {
+      "id": "event_01KZ23B5G2K2YKFGZWX0J7NF7F",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1YQ19M4NQPZ2AJW46YYE46",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1S96SQTM2EWDQ2P2DT6085"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T20:41:13.986Z"
+    }
+  ]
+}

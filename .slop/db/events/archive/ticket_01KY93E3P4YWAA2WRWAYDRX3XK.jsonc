@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KY93E3P4YWAA2WRWAYDRX3XK",
+  "events": [
+    {
+      "id": "event_01KY93E3PGCNJN8M4VW2CP9M3R",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KY93E3P4YWAA2WRWAYDRX3XK"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-07-24T03:41:49.648Z"
+    },
+    {
+      "id": "event_01KYA40QB26TWHEZ90P0QNVE9V",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KYA40QAWTDT1HN99E2PXS70K",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYA40QAWTDT1HN99E2PXS70K"
+      },
+      "payload": {
+        "harness": "other",
+        "takeover": false
+      },
+      "at": "2026-07-24T13:11:14.018Z"
+    },
+    {
+      "id": "event_01KYA40QBNMMRTYKHXFBRQ3HT7",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KYA40QAWTDT1HN99E2PXS70K",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KY93E3P4YWAA2WRWAYDRX3XK"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-07-24T13:11:14.037Z"
+    },
+    {
+      "id": "event_01KYA40QEX2F24Y2ZCEYRZJE2W",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYA40QAWTDT1HN99E2PXS70K",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYA40QAWTDT1HN99E2PXS70K"
+      },
+      "payload": {
+        "reason": "done"
+      },
+      "at": "2026-07-24T13:11:14.141Z"
+    },
+    {
+      "id": "event_01KYA40QFGCD90JDFY54CWTNYF",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYA40QAWTDT1HN99E2PXS70K",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KY93E3P4YWAA2WRWAYDRX3XK"
+      },
+      "payload": {
+        "from": "in_progress"
+      },
+      "at": "2026-07-24T13:11:14.160Z"
+    }
+  ]
+}

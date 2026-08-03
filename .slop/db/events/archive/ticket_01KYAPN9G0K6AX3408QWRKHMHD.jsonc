@@ -1,0 +1,275 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYAPN9G0K6AX3408QWRKHMHD",
+  "events": [
+    {
+      "id": "event_01KYAPN9GC0AVPE7V28QD8PG5S",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPN9G0K6AX3408QWRKHMHD"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-07-24T18:37:02.348Z"
+    },
+    {
+      "id": "event_01KYAS2JRZVCT1M1Q0VQNKV9HJ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-07-24T19:19:14.975Z"
+    },
+    {
+      "id": "event_01KYAS2JSK5983EJS5SSPH6JFA",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPN9G0K6AX3408QWRKHMHD"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-07-24T19:19:14.995Z"
+    },
+    {
+      "id": "event_01KYAS2SJ2CJV32WGWZ2EPKV4D",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 6
+      },
+      "at": "2026-07-24T19:19:21.924Z"
+    },
+    {
+      "id": "event_01KYAS7T2P6PSH1CTQHADZQMS3",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-07-24T19:22:06.294Z"
+    },
+    {
+      "id": "event_01KYAS7T8NAJ0EVRSG7JS9CRF6",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-07-24T19:22:06.486Z"
+    },
+    {
+      "id": "event_01KYASDMAST2PWSC030JQJJZCQ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-07-24T19:25:17.017Z"
+    },
+    {
+      "id": "event_01KYAT0XT7F2NJESDNW2JABRAF",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-07-24T19:35:49.319Z"
+    },
+    {
+      "id": "event_01KYATGEBTJVKKWKPV0ZGYDXHV",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-07-24T19:44:17.786Z"
+    },
+    {
+      "id": "event_01KYATK394JTX3HSC59MT4V0YH",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ"
+      },
+      "payload": {
+        "step": 6,
+        "checked": true
+      },
+      "at": "2026-07-24T19:45:44.740Z"
+    },
+    {
+      "id": "event_01KYATK69GQVZ38D640V9WEC8N",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPN9G0K6AX3408QWRKHMHD"
+      },
+      "payload": {
+        "progress": "All 5 sub-items done: (1) gitignore .lock.stale-* in gitignore.ts, (2) bin/slop.mjs drops the bun --version pre-check, maps spawn ENOENT to friendly message (regression test: fake-bun spawn-count check in packaging.test.ts), (3) docs/configuration.md's Transcripts section corrected re: takeover/D15-re-entry not capturing a transcript; follow-up ticket sessions-capture-transcript-on-takeover filed for the actual fix, (4) END_SUMMARY_MAX_LENGTH(10k)/RESOLUTION_MAX_LENGTH(64k, was 20k) enforced via new shared.ts assertMaxLength -> USAGE_ERROR at the CLI layer in stop/drop/done, backed by schema-level max()s, (5) slop events defaults --limit to 100 (DEFAULT_EVENTS_LIMIT), and has_more is now only ever true alongside a next_cursor that genuinely differs from --since (fixed the stuck-cursor bug where budget-elide-everything reported has_more:true with next_cursor:null). Updated two pre-existing acceptance tests (D3, E1) that had encoded the old behavior. Full suite/lint/typecheck/format:check green (1768 tests)."
+      },
+      "at": "2026-07-24T19:45:47.824Z"
+    },
+    {
+      "id": "event_01KYATKAVVSGKR5YDMQ7EF498T",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ"
+      },
+      "payload": {
+        "transcript_ref": "transcripts/session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ.jsonl"
+      },
+      "at": "2026-07-24T19:45:52.507Z"
+    },
+    {
+      "id": "event_01KYATKAWG2TJCX4XKKC6B0JW2",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPN9G0K6AX3408QWRKHMHD"
+      },
+      "payload": {
+        "mr": null
+      },
+      "at": "2026-07-24T19:45:52.530Z"
+    },
+    {
+      "id": "event_01KYAV46HSB5MSJ33SZMQQPVKH",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Merged to main + full suite (1813 tests) green",
+        "transcript_ref": "transcripts/session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ.jsonl"
+      },
+      "at": "2026-07-24T19:55:05.145Z"
+    },
+    {
+      "id": "event_01KYAV46JGJ1ZZ1K49N7D86P7Z",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAS2JRQTMXSHNDPWZ9Y2ZXZ",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPN9G0K6AX3408QWRKHMHD"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-07-24T19:55:05.168Z"
+    }
+  ]
+}

@@ -1,0 +1,206 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYAPKSP6QQMGZ6Q6YDPE8NAV",
+  "events": [
+    {
+      "id": "event_01KYAPKSPHZS4NGBSP7WNRNB5R",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPKSP6QQMGZ6Q6YDPE8NAV"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-07-24T18:36:13.393Z"
+    },
+    {
+      "id": "event_01KYAT3H1TAZXV0ACD8WJJV8CR",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAT3H1KC5DRXA4ES9X0T8TY",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAT3H1KC5DRXA4ES9X0T8TY"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-07-24T19:37:14.554Z"
+    },
+    {
+      "id": "event_01KYAT3H2C5XZ53FXVSW9WSEWA",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAT3H1KC5DRXA4ES9X0T8TY",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPKSP6QQMGZ6Q6YDPE8NAV"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-07-24T19:37:14.572Z"
+    },
+    {
+      "id": "event_01KYAT55H5T8M59EE1SXCWRE65",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAT3H1KC5DRXA4ES9X0T8TY",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAT3H1KC5DRXA4ES9X0T8TY"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 5
+      },
+      "at": "2026-07-24T19:38:08.293Z"
+    },
+    {
+      "id": "event_01KYAT5A3KBWJYBNHZ2DBSETZF",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAT3H1KC5DRXA4ES9X0T8TY",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAT3H1KC5DRXA4ES9X0T8TY"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-07-24T19:38:12.979Z"
+    },
+    {
+      "id": "event_01KYAT7APJQQYFPDM14PH2Y8JM",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAT3H1KC5DRXA4ES9X0T8TY",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAT3H1KC5DRXA4ES9X0T8TY"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-07-24T19:39:19.122Z"
+    },
+    {
+      "id": "event_01KYAT7AXAXA2Z4M2S5R5394PF",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAT3H1KC5DRXA4ES9X0T8TY",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAT3H1KC5DRXA4ES9X0T8TY"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-07-24T19:39:19.338Z"
+    },
+    {
+      "id": "event_01KYAT7B3DFF4D6SPPTXF8XZBP",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAT3H1KC5DRXA4ES9X0T8TY",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAT3H1KC5DRXA4ES9X0T8TY"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-07-24T19:39:19.533Z"
+    },
+    {
+      "id": "event_01KYAT9T1M7SVHXN8VYE0KE8QD",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAT3H1KC5DRXA4ES9X0T8TY",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAT3H1KC5DRXA4ES9X0T8TY"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-07-24T19:40:40.372Z"
+    },
+    {
+      "id": "event_01KYATA0GE907VC79PY9JBGH6J",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAT3H1KC5DRXA4ES9X0T8TY",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAT3H1KC5DRXA4ES9X0T8TY"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Bun.serve now passed reusePort:false explicitly (server.ts) — Bun was binding SO_REUSEPORT-style on Linux despite its own docs claiming that default, reproduced live before the fix (two instances both bound port 4996/4997 silently, requests round-robined). Confirmed live after the fix: second instance exits 1 with 'port N is already in use...'. New tests/acceptance/web-port-in-use.test.ts spawns two real slop web processes and asserts the second fails fast while the first keeps serving. Full verification suite green.",
+        "transcript_ref": "transcripts/session_01KYAT3H1KC5DRXA4ES9X0T8TY.jsonl"
+      },
+      "at": "2026-07-24T19:40:46.990Z"
+    },
+    {
+      "id": "event_01KYATA0H2Q9PAXZ40TZAXMKJ6",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAT3H1KC5DRXA4ES9X0T8TY",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPKSP6QQMGZ6Q6YDPE8NAV"
+      },
+      "payload": {
+        "from": "in_progress"
+      },
+      "at": "2026-07-24T19:40:47.010Z"
+    }
+  ]
+}

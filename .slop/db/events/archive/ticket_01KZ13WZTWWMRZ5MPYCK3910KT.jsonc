@@ -1,0 +1,326 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ13WZTWWMRZ5MPYCK3910KT",
+  "events": [
+    {
+      "id": "event_01KZ13X01G3H1H48F7NC3E2ZQQ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ13WZTWWMRZ5MPYCK3910KT"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T11:31:43.792Z"
+    },
+    {
+      "id": "event_01KZ13X6DM0FKMBE9P5FCX5WNN",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ13X6D8T9VNY1S0ZJMH771J",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ13X6D8T9VNY1S0ZJMH771J"
+      },
+      "payload": {
+        "harness": "other",
+        "takeover": false
+      },
+      "at": "2026-08-02T11:31:50.324Z"
+    },
+    {
+      "id": "event_01KZ13X6EE14F3J8CFTK415TN4",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ13X6D8T9VNY1S0ZJMH771J",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ13WZTWWMRZ5MPYCK3910KT"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T11:31:50.350Z"
+    },
+    {
+      "id": "event_01KZ13X6QW2YDC44FDXJ6N9EAP",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ13X6D8T9VNY1S0ZJMH771J",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ13X6D8T9VNY1S0ZJMH771J"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 7
+      },
+      "at": "2026-08-02T11:31:50.652Z"
+    },
+    {
+      "id": "event_01KZ143KK7667MS7STX7HMXB3G",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ13X6D8T9VNY1S0ZJMH771J",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ13X6D8T9VNY1S0ZJMH771J"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-02T11:35:20.423Z"
+    },
+    {
+      "id": "event_01KZ143KPDFGBRYM731SWCHXRW",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ13X6D8T9VNY1S0ZJMH771J",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ13X6D8T9VNY1S0ZJMH771J"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T11:35:20.525Z"
+    },
+    {
+      "id": "event_01KZ143KRNH3EDDD73XJN08MS3",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ13WZTWWMRZ5MPYCK3910KT"
+      },
+      "payload": {
+        "progress": "Verified unbounded API/palette and per-keystroke non-abortable list search remain on stacked base. Designed 1-based page/limit contract (default 50, max 100), stable activity/id ordering, backward-compatible whole-repo total, filtered pagination metadata, and debounced abortable UI requests."
+      },
+      "at": "2026-08-02T11:35:20.597Z"
+    },
+    {
+      "id": "event_01KZ14GDR1EY4EWGR6WGR6C63J",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ13X6D8T9VNY1S0ZJMH771J",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ13X6D8T9VNY1S0ZJMH771J"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-02T11:42:20.417Z"
+    },
+    {
+      "id": "event_01KZ14GDW4F361E4S1BEWT6T79",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ13X6D8T9VNY1S0ZJMH771J",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ13X6D8T9VNY1S0ZJMH771J"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-08-02T11:42:20.548Z"
+    },
+    {
+      "id": "event_01KZ14GDYHEX6HTMCSRRQCAFD4",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ13X6D8T9VNY1S0ZJMH771J",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ13X6D8T9VNY1S0ZJMH771J"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-08-02T11:42:20.625Z"
+    },
+    {
+      "id": "event_01KZ14GE0W0B3FED2S38YH3PW1",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ13WZTWWMRZ5MPYCK3910KT"
+      },
+      "payload": {
+        "progress": "Implemented validated bounded API pagination with stable activity/id ordering and large-list no-duplicate tests. Added URL-backed page/page-size controls, debounced abortable ticket search with visible busy state, bounded debounced abortable palette search with explicit error/empty states, and accessible labels/mobile nav names. Focused 12 API tests and 49 D5 acceptance tests pass; both typechecks and build pass."
+      },
+      "at": "2026-08-02T11:42:20.700Z"
+    },
+    {
+      "id": "event_01KZ14NWZR2RJEFA6HKKZ3AWA2",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ13X6D8T9VNY1S0ZJMH771J",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ13X6D8T9VNY1S0ZJMH771J"
+      },
+      "payload": {
+        "step": 6,
+        "checked": true
+      },
+      "at": "2026-08-02T11:45:19.864Z"
+    },
+    {
+      "id": "event_01KZ14NX3DXGM61PZ4QG61SRDT",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ13WZTWWMRZ5MPYCK3910KT"
+      },
+      "payload": {
+        "progress": "Updated web/API documentation and adapted the benchmark to the bounded 100-row endpoint. Full suite passes: 134 files, 1,965 tests. Lint, format, focused API/D5 acceptance, both typechecks, and production build all pass. Browser interaction gate remains assigned to the follow-up as scoped."
+      },
+      "at": "2026-08-02T11:45:19.981Z"
+    },
+    {
+      "id": "event_01KZ14Q9824EZZQT6SJ4PFEZPB",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ13X6D8T9VNY1S0ZJMH771J",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ13X6D8T9VNY1S0ZJMH771J"
+      },
+      "payload": {
+        "step": 7,
+        "checked": true
+      },
+      "at": "2026-08-02T11:46:05.186Z"
+    },
+    {
+      "id": "event_01KZ14Q9AQQJ9YYPPH98VSAV8M",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ13WZTWWMRZ5MPYCK3910KT"
+      },
+      "payload": {
+        "progress": "Committed b882412, pushed fix/audit-web-pagination, and opened stacked PR #15 targeting fix/audit-read-performance. Retarget to main after #12 merges. Residual browser gate and unrelated tree/error/timeline findings remain assigned to follow-ups."
+      },
+      "at": "2026-08-02T11:46:05.271Z"
+    },
+    {
+      "id": "event_01KZ14Q9D08GDQYB15RXFYV47B",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ13X6D8T9VNY1S0ZJMH771J",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ13WZTWWMRZ5MPYCK3910KT"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/15"
+      },
+      "at": "2026-08-02T11:46:05.344Z"
+    },
+    {
+      "id": "event_01KZ23B559R4WYYJ6F89Y6TRDY",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ13X6D8T9VNY1S0ZJMH771J",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ13X6D8T9VNY1S0ZJMH771J"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Audit-fix program fully merged: PRs 5,6,7,9,10,12,13,14,15,16,17,18,19 all on main (PR 11 closed as superseded). Batch-closed after final merges of 14/18 and 19."
+      },
+      "at": "2026-08-02T20:41:13.641Z"
+    },
+    {
+      "id": "event_01KZ23B55Z5H3VPQJA2SNRKNZE",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ13X6D8T9VNY1S0ZJMH771J",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ13WZTWWMRZ5MPYCK3910KT"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T20:41:13.663Z"
+    }
+  ]
+}

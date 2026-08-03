@@ -1,0 +1,274 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ1467SS3N0PZ9EJ6XCCPJ66",
+  "events": [
+    {
+      "id": "event_01KZ1467VTNT8RCH8G7ZY9HB7S",
+      "actor": {
+        "name": "codex-web-resilience",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1467SS3N0PZ9EJ6XCCPJ66"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T11:36:46.714Z"
+    },
+    {
+      "id": "event_01KZ146J7KC7NBERZ99FYPT4CR",
+      "actor": {
+        "name": "codex-web-resilience",
+        "kind": "agent"
+      },
+      "session": "session_01KZ146J7GCEME06TYK1CBHHDM",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ146J7GCEME06TYK1CBHHDM"
+      },
+      "payload": {
+        "harness": "codex",
+        "takeover": false
+      },
+      "at": "2026-08-02T11:36:57.331Z"
+    },
+    {
+      "id": "event_01KZ146J7RC6KX09XSQ88FFSSX",
+      "actor": {
+        "name": "codex-web-resilience",
+        "kind": "agent"
+      },
+      "session": "session_01KZ146J7GCEME06TYK1CBHHDM",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1467SS3N0PZ9EJ6XCCPJ66"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T11:36:57.336Z"
+    },
+    {
+      "id": "event_01KZ146JASHGJTJ66J70B8PSHD",
+      "actor": {
+        "name": "codex-web-resilience",
+        "kind": "human"
+      },
+      "session": "session_01KZ146J7GCEME06TYK1CBHHDM",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ146J7GCEME06TYK1CBHHDM"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 6
+      },
+      "at": "2026-08-02T11:36:57.433Z"
+    },
+    {
+      "id": "event_01KZ14C97Y2M45NKPB11FKDZKS",
+      "actor": {
+        "name": "codex-web-resilience",
+        "kind": "human"
+      },
+      "session": "session_01KZ146J7GCEME06TYK1CBHHDM",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ146J7GCEME06TYK1CBHHDM"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-02T11:40:04.735Z"
+    },
+    {
+      "id": "event_01KZ14C9AZZMCQG125HJXJV7ZR",
+      "actor": {
+        "name": "codex-web-resilience",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1467SS3N0PZ9EJ6XCCPJ66"
+      },
+      "payload": {
+        "progress": "Mapped the failure and test surfaces: tree/review/stale/questions have uncaught non-abortable fetches, router has no errorElement, tree eagerly expands all nodes with cumulative indentation, mobile nav icon links lose names below sm, and CI has no DOM/browser gate. Chosen design: shared timeout+abort query hook, explicit retry state, persisted depth-1 tree expansion, separate jsdom Vitest config, and Chromium Playwright smoke against the committed web fixture."
+      },
+      "at": "2026-08-02T11:40:04.831Z"
+    },
+    {
+      "id": "event_01KZ15D3FW8B8FDWRK5VGZ6Y5R",
+      "actor": {
+        "name": "codex-web-resilience",
+        "kind": "human"
+      },
+      "session": "session_01KZ146J7GCEME06TYK1CBHHDM",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ146J7GCEME06TYK1CBHHDM"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T11:58:00.188Z"
+    },
+    {
+      "id": "event_01KZ15D7B9W8REM7P69Q115VD7",
+      "actor": {
+        "name": "codex-web-resilience",
+        "kind": "human"
+      },
+      "session": "session_01KZ146J7GCEME06TYK1CBHHDM",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ146J7GCEME06TYK1CBHHDM"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-02T11:58:04.137Z"
+    },
+    {
+      "id": "event_01KZ15DBA4DFJ6N8135WJ319KM",
+      "actor": {
+        "name": "codex-web-resilience",
+        "kind": "human"
+      },
+      "session": "session_01KZ146J7GCEME06TYK1CBHHDM",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ146J7GCEME06TYK1CBHHDM"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-08-02T11:58:08.196Z"
+    },
+    {
+      "id": "event_01KZ15DFQ0KCBGJ3GSDZ5R7FRP",
+      "actor": {
+        "name": "codex-web-resilience",
+        "kind": "human"
+      },
+      "session": "session_01KZ146J7GCEME06TYK1CBHHDM",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ146J7GCEME06TYK1CBHHDM"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-08-02T11:58:12.704Z"
+    },
+    {
+      "id": "event_01KZ15DQ3CBCR0EW7H4YPF4CQV",
+      "actor": {
+        "name": "codex-web-resilience",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1467SS3N0PZ9EJ6XCCPJ66"
+      },
+      "payload": {
+        "progress": "Implemented shared abort+timeout query lifecycle and retry states for config/tree/review/questions/stale; added a route error boundary; rebuilt the tree around persisted accessible branch controls with root-only default expansion and mobile wrapping; fixed compact nav names/layout; and added jsdom plus Chromium desktop/mobile gates in CI/release. Verified typecheck, lint, format, component tests (4), Playwright flows (3), build, and full suite (1,965 tests); inspected nonblank desktop/mobile captures with no horizontal overflow."
+      },
+      "at": "2026-08-02T11:58:20.268Z"
+    },
+    {
+      "id": "event_01KZ15F9WWYH2969QF6835BNCR",
+      "actor": {
+        "name": "codex-web-resilience",
+        "kind": "human"
+      },
+      "session": "session_01KZ146J7GCEME06TYK1CBHHDM",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ146J7GCEME06TYK1CBHHDM"
+      },
+      "payload": {
+        "step": 6,
+        "checked": true
+      },
+      "at": "2026-08-02T11:59:12.284Z"
+    },
+    {
+      "id": "event_01KZ15FFTH3M8RMBXQMEEH261X",
+      "actor": {
+        "name": "codex-web-resilience",
+        "kind": "human"
+      },
+      "session": "session_01KZ146J7GCEME06TYK1CBHHDM",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1467SS3N0PZ9EJ6XCCPJ66"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/16"
+      },
+      "at": "2026-08-02T11:59:18.353Z"
+    },
+    {
+      "id": "event_01KZ23B583DQQE7HTV8PETMTT1",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ146J7GCEME06TYK1CBHHDM",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ146J7GCEME06TYK1CBHHDM"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Audit-fix program fully merged: PRs 5,6,7,9,10,12,13,14,15,16,17,18,19 all on main (PR 11 closed as superseded). Batch-closed after final merges of 14/18 and 19."
+      },
+      "at": "2026-08-02T20:41:13.731Z"
+    },
+    {
+      "id": "event_01KZ23B59HGY1592Q15YKG97J6",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ146J7GCEME06TYK1CBHHDM",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1467SS3N0PZ9EJ6XCCPJ66"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T20:41:13.778Z"
+    }
+  ]
+}

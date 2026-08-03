@@ -1,0 +1,292 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYAY563XSEE9C0AEZ7MH23HG",
+  "events": [
+    {
+      "id": "event_01KYAY564Q62Y1F9KHAAQY0Z6Q",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAY563XSEE9C0AEZ7MH23HG"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-07-24T20:48:03.223Z"
+    },
+    {
+      "id": "event_01KYB1DRQM2R6EK8HDWVYW9P2Z",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1DRQDM5JPH288YE664ZYA",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB1DRQDM5JPH288YE664ZYA"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-07-24T21:45:10.132Z"
+    },
+    {
+      "id": "event_01KYB1DRR6XHQW24BT4T5DHA83",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1DRQDM5JPH288YE664ZYA",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAY563XSEE9C0AEZ7MH23HG"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-07-24T21:45:10.151Z"
+    },
+    {
+      "id": "event_01KYB1E2Z5RAGYVJ3B10CAY96M",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1DRQDM5JPH288YE664ZYA",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB1DRQDM5JPH288YE664ZYA"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 6
+      },
+      "at": "2026-07-24T21:45:20.613Z"
+    },
+    {
+      "id": "event_01KYB2R3E7335HH928QFCSCMNR",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1DRQDM5JPH288YE664ZYA",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB1DRQDM5JPH288YE664ZYA"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-07-24T22:08:17.351Z"
+    },
+    {
+      "id": "event_01KYB2R3NR1MN76Y4T0TK53P90",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1DRQDM5JPH288YE664ZYA",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB1DRQDM5JPH288YE664ZYA"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-07-24T22:08:17.592Z"
+    },
+    {
+      "id": "event_01KYB2R3WYTST9DC9TB5HMGNQT",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1DRQDM5JPH288YE664ZYA",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB1DRQDM5JPH288YE664ZYA"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-07-24T22:08:17.822Z"
+    },
+    {
+      "id": "event_01KYB2R43QYQZN07TQBS9X3MTA",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAY563XSEE9C0AEZ7MH23HG"
+      },
+      "payload": {
+        "progress": "Scaffolded React+Tailwind v4(bun-plugin-tailwind)+Radix/shadcn-style toolchain, JSON API (src/web/api/*) reusing overlays/markdown/url-safety, and the full SPA (app-shell, command palette, audit-spine ticket-detail centerpiece, tickets/tree/review/stale/transcript pages). bun run build/typecheck/build:web all green end-to-end; smoke-tested compiled dist/slop serves /api/* + SPA shell + assets. Next: rewrite the 5 web acceptance test suites against the JSON API, delete obsolete tests, docs, full gate."
+      },
+      "at": "2026-07-24T22:08:18.039Z"
+    },
+    {
+      "id": "event_01KYB3HP8ZHZNK1FQ768C55BCP",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1DRQDM5JPH288YE664ZYA",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB1DRQDM5JPH288YE664ZYA"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-07-24T22:22:15.839Z"
+    },
+    {
+      "id": "event_01KYB3HPFBJM7R2RAD6AEEDTN1",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1DRQDM5JPH288YE664ZYA",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB1DRQDM5JPH288YE664ZYA"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-07-24T22:22:16.043Z"
+    },
+    {
+      "id": "event_01KYB3HPN6ZS2NRMNBWJ508QG8",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAY563XSEE9C0AEZ7MH23HG"
+      },
+      "payload": {
+        "progress": "Full gate green: bun run build/test/lint/typecheck/format:check all pass (1913 tests). Rewrote 3 acceptance suites (D5.test.ts, web-real-repo.test.ts, web-config-fault-tolerance.test.ts, web-stale-panel-review-anchor.test.ts) plus src/cli/commands/web.test.ts against the new /api/* JSON contract, discovered and fixed a review.requested dual-event payload gotcha along the way. D5.test.ts's compiled-binary block now doubles as the build-artifact smoke test (checks SPA shell, JSON API, embedded CSS/JS, and no-CDN-reference offline posture from dist/slop). Next: docs/web-ui.md + README dev-loop docs, then slop review."
+      },
+      "at": "2026-07-24T22:22:16.230Z"
+    },
+    {
+      "id": "event_01KYB4NYEAB430NGBVCV1QG5T9",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1DRQDM5JPH288YE664ZYA",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB1DRQDM5JPH288YE664ZYA"
+      },
+      "payload": {
+        "step": 6,
+        "checked": true
+      },
+      "at": "2026-07-24T22:42:03.850Z"
+    },
+    {
+      "id": "event_01KYB4PBV4F624AZ5YY5SBC1VR",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1DRQDM5JPH288YE664ZYA",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB1DRQDM5JPH288YE664ZYA"
+      },
+      "payload": {
+        "transcript_ref": "transcripts/session_01KYB1DRQDM5JPH288YE664ZYA.jsonl"
+      },
+      "at": "2026-07-24T22:42:17.572Z"
+    },
+    {
+      "id": "event_01KYB4PBVP8WMPQAZQ07DGHNPJ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1DRQDM5JPH288YE664ZYA",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAY563XSEE9C0AEZ7MH23HG"
+      },
+      "payload": {
+        "mr": null
+      },
+      "at": "2026-07-24T22:42:17.591Z"
+    },
+    {
+      "id": "event_01KYB5315WN6EA0PN293H5N59Y",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1DRQDM5JPH288YE664ZYA",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB1DRQDM5JPH288YE664ZYA"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Merged to main. Verified independently: SPA served from the compiled binary, zero external fetches (font inlined as data URI), deep links 200, Host allowlist 403, API serving 84 tickets. Audit spine renders as briefed with shape-coded authorship; dark mode first-class. 1915 tests green.",
+        "transcript_ref": "transcripts/session_01KYB1DRQDM5JPH288YE664ZYA.jsonl"
+      },
+      "at": "2026-07-24T22:49:12.636Z"
+    },
+    {
+      "id": "event_01KYB5316D36XT5Z2EQY4AX5C1",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1DRQDM5JPH288YE664ZYA",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAY563XSEE9C0AEZ7MH23HG"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-07-24T22:49:12.653Z"
+    }
+  ]
+}

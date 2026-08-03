@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ1S8B22JSZ150JSK67840W6",
+  "events": [
+    {
+      "id": "event_01KZ1S8B70BN5GR5Y5CX0PFT72",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1S8B22JSZ150JSK67840W6"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T17:44:55.776Z"
+    },
+    {
+      "id": "event_01KZ1S96PG3A106TV00PKCHSK9",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1S96P9WHEEK54HZEZ28HZM",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ1S96P9WHEEK54HZEZ28HZM"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-08-02T17:45:23.920Z"
+    },
+    {
+      "id": "event_01KZ1S96PZGMGCFJ1FEC760RB2",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1S96P9WHEEK54HZEZ28HZM",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1S8B22JSZ150JSK67840W6"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T17:45:23.935Z"
+    },
+    {
+      "id": "event_01KZ1YQ12VEHE3E3RYTA34D1CV",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1S8B22JSZ150JSK67840W6"
+      },
+      "payload": {
+        "progress": "All six PRs rebased, gates green, MERGEABLE with CI passing. Two main-owned regressions found (managed-output import broken by 5+10 interaction; check:required ran coverage before build) — hotfixed on main, byte-aligned with the branches. First hotfix commit went out with a swallowed failing typecheck (stale node_modules); corrected in follow-up with real verification. CI watch running."
+      },
+      "at": "2026-08-02T19:20:19.803Z"
+    },
+    {
+      "id": "event_01KZ1Z0KMQQDSX2GNT5EDDVFMT",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1S96P9WHEEK54HZEZ28HZM",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ1S96P9WHEEK54HZEZ28HZM"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "All six PRs rebased and MERGEABLE with CI passing (merge order: 7/13/14/15 any order, 18 after 14, 16 after 15). .slop/db marked linguist-generated + gitlab-generated on main. Two merge-wave regressions hotfixed on main, byte-aligned with branches; main CI green (run 30763143561)."
+      },
+      "at": "2026-08-02T19:25:33.719Z"
+    },
+    {
+      "id": "event_01KZ1Z0KN407N75V0R09P4E45Q",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1S96P9WHEEK54HZEZ28HZM",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1S8B22JSZ150JSK67840W6"
+      },
+      "payload": {
+        "from": "in_progress"
+      },
+      "at": "2026-08-02T19:25:33.732Z"
+    }
+  ]
+}

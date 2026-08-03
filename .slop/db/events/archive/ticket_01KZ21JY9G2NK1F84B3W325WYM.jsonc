@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ21JY9G2NK1F84B3W325WYM",
+  "events": [
+    {
+      "id": "event_01KZ21JYAEXH7FDJVP6HWV7473",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ21JY9G2NK1F84B3W325WYM"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T20:10:31.630Z"
+    },
+    {
+      "id": "event_01KZ21KAC949NAFQ98TT44KR1J",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ21KAC04ZT1SKVEJAA4NDCA",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ21KAC04ZT1SKVEJAA4NDCA"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-08-02T20:10:43.977Z"
+    },
+    {
+      "id": "event_01KZ21KACRCQHSJ28K07W2F9T5",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ21KAC04ZT1SKVEJAA4NDCA",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ21JY9G2NK1F84B3W325WYM"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T20:10:43.992Z"
+    },
+    {
+      "id": "event_01KZ23B5PTNJ1Q5BBEPFT5EA8V",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ21KAC04ZT1SKVEJAA4NDCA",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ21KAC04ZT1SKVEJAA4NDCA"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "PRs 14 and 18 re-rebased through second merge wave, gates green, both now merged (18 merged by coordinator on Ryan's authorization)."
+      },
+      "at": "2026-08-02T20:41:14.202Z"
+    },
+    {
+      "id": "event_01KZ23B5QPRM2W0NVFMXW51GNM",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ21KAC04ZT1SKVEJAA4NDCA",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ21JY9G2NK1F84B3W325WYM"
+      },
+      "payload": {
+        "from": "in_progress"
+      },
+      "at": "2026-08-02T20:41:14.230Z"
+    }
+  ]
+}

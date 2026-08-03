@@ -1,0 +1,206 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYAPN8X68TEEA4NHXZ1PZD52",
+  "events": [
+    {
+      "id": "event_01KYAPN8XKKG36M8Z5HT9H9WZM",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPN8X68TEEA4NHXZ1PZD52"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-07-24T18:37:01.747Z"
+    },
+    {
+      "id": "event_01KYATN74R0QSQ17ZT39SSNSR1",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYATN74JC0BW0RE50NDGBSV8",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYATN74JC0BW0RE50NDGBSV8"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-07-24T19:46:54.235Z"
+    },
+    {
+      "id": "event_01KYATN75GE7QP37MRTNYS6MP7",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYATN74JC0BW0RE50NDGBSV8",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPN8X68TEEA4NHXZ1PZD52"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-07-24T19:46:54.256Z"
+    },
+    {
+      "id": "event_01KYATPKDTHVEEAZTR1JCY0T55",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYATN74JC0BW0RE50NDGBSV8",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYATN74JC0BW0RE50NDGBSV8"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 5
+      },
+      "at": "2026-07-24T19:47:39.578Z"
+    },
+    {
+      "id": "event_01KYATRRRAQ59AJEC3HW4RRX05",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYATN74JC0BW0RE50NDGBSV8",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYATN74JC0BW0RE50NDGBSV8"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-07-24T19:48:50.570Z"
+    },
+    {
+      "id": "event_01KYATRRYT39WX451AJ47Z90HM",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYATN74JC0BW0RE50NDGBSV8",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYATN74JC0BW0RE50NDGBSV8"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-07-24T19:48:50.778Z"
+    },
+    {
+      "id": "event_01KYATTFME4NV7Z494QBVWPB57",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYATN74JC0BW0RE50NDGBSV8",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYATN74JC0BW0RE50NDGBSV8"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-07-24T19:49:46.766Z"
+    },
+    {
+      "id": "event_01KYAV0ST31Z65F6EJY5S8RHSF",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYATN74JC0BW0RE50NDGBSV8",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYATN74JC0BW0RE50NDGBSV8"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-07-24T19:53:13.795Z"
+    },
+    {
+      "id": "event_01KYAV3M3GBMV0QJE3G3DWS7P9",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYATN74JC0BW0RE50NDGBSV8",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYATN74JC0BW0RE50NDGBSV8"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-07-24T19:54:46.256Z"
+    },
+    {
+      "id": "event_01KYAV3VYA1JV08BNGFSAKVV72",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYATN74JC0BW0RE50NDGBSV8",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYATN74JC0BW0RE50NDGBSV8"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "(1) server.ts: every route now registers HEAD alongside GET via a readMethods() helper (Bun's routes table doesn't fall HEAD back onto GET automatically — verified live: HEAD /tickets 404'd before, 200s with correct Content-Length and empty body after). (2) stale.ts: review rows now sort/label by review.requested_at via overlays.ts's computeStaleReason (same anchor isTicketStale already uses), not last_activity_at, so an unrelated update --progress note can no longer make a rotting MR look fresher. New tests: D5.test.ts HEAD-requests block + web-stale-panel-review-anchor.test.ts (built a real repo where requested_at/last_activity_at diverge, confirmed the test fails against the old code). Full verification suite green.",
+        "transcript_ref": "transcripts/session_01KYATN74JC0BW0RE50NDGBSV8.jsonl"
+      },
+      "at": "2026-07-24T19:54:54.282Z"
+    },
+    {
+      "id": "event_01KYAV3VZ3PBQR0FMP1V0SEYT1",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYATN74JC0BW0RE50NDGBSV8",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPN8X68TEEA4NHXZ1PZD52"
+      },
+      "payload": {
+        "from": "in_progress"
+      },
+      "at": "2026-07-24T19:54:54.307Z"
+    }
+  ]
+}

@@ -13,7 +13,7 @@
     "meta": {},
     "v": 1
   },
-  "state": "review",
+  "state": "done",
   "priority": 1,
   "labels": [
     "source:product"
@@ -23,9 +23,9 @@
   "discovered_from": [],
   "root_id": "ticket_01KZ21KA4B0ZW32HXR12H1RHQE",
   "path": [],
-  "active_session": "session_01KZ2AFMJS31KEEK7T0VAJ41YX",
-  "last_activity_at": "2026-08-02T23:55:18.539Z",
-  "latest_note": null,
+  "active_session": null,
+  "last_activity_at": "2026-08-03T00:18:54.620Z",
+  "latest_note": "PR #24 merged. Terminal-transition compaction live with per-ticket archives, cursor-safe reads, reindex --compact for retroactive sweeps.",
   "owner": null,
   "provenance": {
     "method": "new",
@@ -35,13 +35,5 @@
     }
   },
   "created_at": "2026-08-02T20:10:43.723Z",
-  "updated_at": "2026-08-02T23:55:18.539Z",
-  "review": {
-    "mr": "https://github.com/ryanskidmore/slopwork/pull/24",
-    "requested_at": "2026-08-02T23:55:18.539Z",
-    "by": {
-      "name": "coordinator",
-      "kind": "agent"
-    }
-  }
+  "updated_at": "2026-08-03T00:18:54.620Z"
 }

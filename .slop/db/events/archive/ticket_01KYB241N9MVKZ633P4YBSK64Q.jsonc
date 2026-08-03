@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYB241N9MVKZ633P4YBSK64Q",
+  "events": [
+    {
+      "id": "event_01KYB241PYXZR9T7NVDE73H6XR",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYB241N9MVKZ633P4YBSK64Q"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-07-24T21:57:20.222Z"
+    },
+    {
+      "id": "event_01KYB3DGTM6CRW52JV10SYKCJK",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB3DGTFHCPYXAKBM88XJQ5Y",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB3DGTFHCPYXAKBM88XJQ5Y"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-07-24T22:19:59.189Z"
+    },
+    {
+      "id": "event_01KYB3DGV6EKSSBFRKCRN7HZK4",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB3DGTFHCPYXAKBM88XJQ5Y",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYB241N9MVKZ633P4YBSK64Q"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-07-24T22:19:59.206Z"
+    },
+    {
+      "id": "event_01KYB3DH2H9T8EMPXETH4YBYVQ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB3DGTFHCPYXAKBM88XJQ5Y",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB3DGTFHCPYXAKBM88XJQ5Y"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "One documented rule (flat for ticket-only commands, nested ticket/session for session commands); shared ticketJson helper prevents drift; verified against the real binary; docs + CHANGELOG updated. 1952 tests green.",
+        "transcript_ref": "transcripts/session_01KYB3DGTFHCPYXAKBM88XJQ5Y.jsonl"
+      },
+      "at": "2026-07-24T22:19:59.441Z"
+    },
+    {
+      "id": "event_01KYB3DH31BBXVTBF3WPAR8530",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB3DGTFHCPYXAKBM88XJQ5Y",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYB241N9MVKZ633P4YBSK64Q"
+      },
+      "payload": {
+        "from": "in_progress"
+      },
+      "at": "2026-07-24T22:19:59.457Z"
+    }
+  ]
+}

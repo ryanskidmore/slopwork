@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ1P45ZSQZFTGHEWRB85J4QM",
+  "events": [
+    {
+      "id": "event_01KZ1P4622FCE8AHQ5WJJXP8QY",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1P45ZSQZFTGHEWRB85J4QM"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T16:50:13.698Z"
+    },
+    {
+      "id": "event_01KZ273KH8FANDNFJ753XNDBER",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ273KH7CSMPHB3S7JYNB7EV",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ273KH7CSMPHB3S7JYNB7EV"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-08-02T21:47:00.520Z"
+    },
+    {
+      "id": "event_01KZ273KHY5YEWG6KXJ19MSGQQ",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ273KH7CSMPHB3S7JYNB7EV",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1P45ZSQZFTGHEWRB85J4QM"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T21:47:00.543Z"
+    },
+    {
+      "id": "event_01KZ29N0Q8NHN62KK39FEKXEEY",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ273KH7CSMPHB3S7JYNB7EV",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1P45ZSQZFTGHEWRB85J4QM"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/22"
+      },
+      "at": "2026-08-02T22:31:28.232Z"
+    },
+    {
+      "id": "event_01KZ29N0WMTNSZJDJYQH3QQ5PT",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ273KH7CSMPHB3S7JYNB7EV",
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1P45ZSQZFTGHEWRB85J4QM"
+      },
+      "payload": {
+        "progress": "PR #22 open. Key reconciliation: replaced the dead session's invented cursor pagination with main's established page/limit envelope, dropped three out-of-scope sub-endpoints. Also fixed a real tree correctness gap (frontend inferred children from array length; now reads has_children/children_truncated). Follow-ups reported: detail load-more refetches whole payload; plan versions unbounded; tree limit/depth API unused by UI."
+      },
+      "at": "2026-08-02T22:31:28.404Z"
+    },
+    {
+      "id": "event_01KZ2B02Z78T9XB38FMR82HXZK",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ273KH7CSMPHB3S7JYNB7EV",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ273KH7CSMPHB3S7JYNB7EV"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "PRs 22 and 23 merged to main. Web collections bounded end to end; concurrent suite runs officially supported (perf-scale knob + ephemeral Playwright port, repro harness committed)."
+      },
+      "at": "2026-08-02T22:54:59.559Z"
+    },
+    {
+      "id": "event_01KZ2B0302JQX4NM845THADWWJ",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ273KH7CSMPHB3S7JYNB7EV",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1P45ZSQZFTGHEWRB85J4QM"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T22:54:59.586Z"
+    }
+  ]
+}

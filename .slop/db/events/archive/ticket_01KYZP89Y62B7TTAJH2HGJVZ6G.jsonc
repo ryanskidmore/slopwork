@@ -1,0 +1,185 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYZP89Y62B7TTAJH2HGJVZ6G",
+  "events": [
+    {
+      "id": "event_01KYZP8A0MXS1ZGNVXX6M3C4X1",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP89Y62B7TTAJH2HGJVZ6G"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-01T22:13:59.956Z"
+    },
+    {
+      "id": "event_01KZ0SKT6V8FMGF6HRQ1AFCEY2",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0SKT6NHR1ZAYXJNE2AHHZC",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0SKT6NHR1ZAYXJNE2AHHZC"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-08-02T08:31:57.147Z"
+    },
+    {
+      "id": "event_01KZ0SKT7FNMW1FE7DABYGTW18",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0SKT6NHR1ZAYXJNE2AHHZC",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP89Y62B7TTAJH2HGJVZ6G"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T08:31:57.167Z"
+    },
+    {
+      "id": "event_01KZ0SKTBM27HDE6K7561E6VVM",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0SKT6NHR1ZAYXJNE2AHHZC",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0SKT6NHR1ZAYXJNE2AHHZC"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 3
+      },
+      "at": "2026-08-02T08:31:57.300Z"
+    },
+    {
+      "id": "event_01KZ0WKFPF4S2FB2ZEMBW6K9ZY",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0SKT6NHR1ZAYXJNE2AHHZC",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0SKT6NHR1ZAYXJNE2AHHZC"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T09:24:12.111Z"
+    },
+    {
+      "id": "event_01KZ0WKFV0E3XW1CJA6TB7FDB9",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0SKT6NHR1ZAYXJNE2AHHZC",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0SKT6NHR1ZAYXJNE2AHHZC"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-02T09:24:12.256Z"
+    },
+    {
+      "id": "event_01KZ0WKFZ1HMS9JJJENDKAZJV7",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0SKT6NHR1ZAYXJNE2AHHZC",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP89Y62B7TTAJH2HGJVZ6G"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/4"
+      },
+      "at": "2026-08-02T09:24:12.385Z"
+    },
+    {
+      "id": "event_01KZ0WKG62D7QSNFCK0KD0XRFC",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP89Y62B7TTAJH2HGJVZ6G"
+      },
+      "payload": {
+        "progress": "PR #4 open (stacks on PR #3). Gate green: 1949 tests, 26 commands. ask/answer/questions shipped as events (question.asked/question.answered), awaiting_input derived in the shared overlay module, ready excludes awaiting by default (--include-awaiting), web /questions panel + spine pairing. Follow-up noted: answer's question-id resolution is a full event-log scan — revisit if profiling flags it."
+      },
+      "at": "2026-08-02T09:24:12.610Z"
+    },
+    {
+      "id": "event_01KZ10HHKC940ZJRH9EWBWX2VV",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0SKT6NHR1ZAYXJNE2AHHZC",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0SKT6NHR1ZAYXJNE2AHHZC"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "PRs #3/#4 merged; content landed on main via the stranded-stack merge (4811002). list/ready filters/bulk ops/graph editing/slug healing + full elicitations live. CI coverage gate tracked in t-mx6bq."
+      },
+      "at": "2026-08-02T10:33:02.828Z"
+    },
+    {
+      "id": "event_01KZ10HHKXJNXAFVXDTH3BASNK",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0SKT6NHR1ZAYXJNE2AHHZC",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP89Y62B7TTAJH2HGJVZ6G"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T10:33:02.845Z"
+    }
+  ]
+}

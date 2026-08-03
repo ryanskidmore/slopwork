@@ -1,0 +1,237 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYZP7VE2DKD0JTFB765P98GA",
+  "events": [
+    {
+      "id": "event_01KYZP7VF7CCPZ9PQE56DQ4R5Q",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP7VE2DKD0JTFB765P98GA"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-01T22:13:45.063Z"
+    },
+    {
+      "id": "event_01KYZPATV8ADPCRFARTSAJ420B",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KYZPATTZHQHRY3FY4VCCMYD6",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYZPATTZHQHRY3FY4VCCMYD6"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-08-01T22:15:22.729Z"
+    },
+    {
+      "id": "event_01KYZPATVXDHTEREHWRARTQQG4",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KYZPATTZHQHRY3FY4VCCMYD6",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP7VE2DKD0JTFB765P98GA"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-01T22:15:22.749Z"
+    },
+    {
+      "id": "event_01KYZPAV0VJ59KKF1H2XCS7YBY",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KYZPATTZHQHRY3FY4VCCMYD6",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYZPATTZHQHRY3FY4VCCMYD6"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 3
+      },
+      "at": "2026-08-01T22:15:22.907Z"
+    },
+    {
+      "id": "event_01KYZPDT2ZDWMJVHVQBR3RHB9Q",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KYZPATTZHQHRY3FY4VCCMYD6",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYZPATTZHQHRY3FY4VCCMYD6"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-01T22:17:00.255Z"
+    },
+    {
+      "id": "event_01KYZPDT78P79DPXDWVMZGS5FE",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP7VE2DKD0JTFB765P98GA"
+      },
+      "payload": {
+        "progress": "G1 subagent spawned in isolated worktree from main@64589c2; branch feat/g1-remove-transcripts; will open PR to main. Groups G2-G5 queued to stack sequentially."
+      },
+      "at": "2026-08-01T22:17:00.393Z"
+    },
+    {
+      "id": "event_01KYZRW1VEXJVASMG13SVF1MCA",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KYZPATTZHQHRY3FY4VCCMYD6",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYZPATTZHQHRY3FY4VCCMYD6"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-01T22:59:44.110Z"
+    },
+    {
+      "id": "event_01KYZRW200J0ZFTK3366VZ04AX",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KYZPATTZHQHRY3FY4VCCMYD6",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYZPATTZHQHRY3FY4VCCMYD6"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-01T22:59:44.256Z"
+    },
+    {
+      "id": "event_01KYZRW2505NK5K57XBYNFJ2AQ",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KYZPATTZHQHRY3FY4VCCMYD6",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYZPATTZHQHRY3FY4VCCMYD6"
+      },
+      "payload": {
+        "transcript_ref": "transcripts/session_01KYZPATTZHQHRY3FY4VCCMYD6.jsonl"
+      },
+      "at": "2026-08-01T22:59:44.416Z"
+    },
+    {
+      "id": "event_01KYZRW27YTBNZ2AR9ET5QR5SK",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KYZPATTZHQHRY3FY4VCCMYD6",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP7VE2DKD0JTFB765P98GA"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/1"
+      },
+      "at": "2026-08-01T22:59:44.510Z"
+    },
+    {
+      "id": "event_01KYZRW2BZPQZDMTY6B3REH503",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP7VE2DKD0JTFB765P98GA"
+      },
+      "payload": {
+        "progress": "PR #1 open (base main, +3036/-6258), full gate green: 1812 tests, lint/format/typecheck/build clean. Post-merge coordinator chores: hand-remove transcripts: from .slop/config.yaml (init won't touch existing config), re-run slop init for AGENTS.md + gitignore section, delete .slop/transcripts/. Note: review no longer writes the session (transcript_ref was its only session write); review.requested is now ticket-scoped only."
+      },
+      "at": "2026-08-01T22:59:44.639Z"
+    },
+    {
+      "id": "event_01KZ0NSV8YEHFF5E1V9D17AJ8Q",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KYZPATTZHQHRY3FY4VCCMYD6",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYZPATTZHQHRY3FY4VCCMYD6"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "PR #1 merged to main (77febc1). Transcripts removed end to end; gate was green (1812 tests). Post-merge chores done: config key dropped, AGENTS.md/gitignore regenerated, .slop/transcripts deleted."
+      },
+      "at": "2026-08-02T07:25:20.542Z"
+    },
+    {
+      "id": "event_01KZ0NSV9FGCPJ5CVFT5HTB20J",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KYZPATTZHQHRY3FY4VCCMYD6",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP7VE2DKD0JTFB765P98GA"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T07:25:20.559Z"
+    }
+  ]
+}

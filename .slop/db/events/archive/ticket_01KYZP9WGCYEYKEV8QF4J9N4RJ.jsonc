@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYZP9WGCYEYKEV8QF4J9N4RJ",
+  "events": [
+    {
+      "id": "event_01KYZP9WGVBM0A8F5EJZ5FVC69",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP9WGCYEYKEV8QF4J9N4RJ"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": "ticket_01KYZP8A340W5A8X70TYQ6XVT8"
+      },
+      "at": "2026-08-01T22:14:51.675Z"
+    },
+    {
+      "id": "event_01KZ12RTNMN8SCRB4HCWQTG8BF",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ12RTNE6MQQ3GGW9FGCK7MS",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12RTNE6MQQ3GGW9FGCK7MS"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-08-02T11:11:58.645Z"
+    },
+    {
+      "id": "event_01KZ12RTP460Z3P2RVR08098ZW",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ12RTNE6MQQ3GGW9FGCK7MS",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP9WGCYEYKEV8QF4J9N4RJ"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T11:11:58.660Z"
+    },
+    {
+      "id": "event_01KZ12RTV33Z81R7VZCJ7NPF36",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ12RTNE6MQQ3GGW9FGCK7MS",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP9WGCYEYKEV8QF4J9N4RJ"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/8"
+      },
+      "at": "2026-08-02T11:11:58.819Z"
+    },
+    {
+      "id": "event_01KZ1C71YJAKPNTQ5QR0K7T0MF",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ12RTNE6MQQ3GGW9FGCK7MS",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12RTNE6MQQ3GGW9FGCK7MS"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "PR #8 merged to main. Budget unification, honest benchmarks (9:1 ratio, 1M rung dropped), exit code 3 removed, SLOP_FAKE_NOW consolidation, adhoc folded into provenance, docs corrections, post-G3 polish — all live. Coverage gate work rode this PR."
+      },
+      "at": "2026-08-02T13:57:02.034Z"
+    },
+    {
+      "id": "event_01KZ1C71YZ13VJ0GWQTVE9HFRD",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ12RTNE6MQQ3GGW9FGCK7MS",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP9WGCYEYKEV8QF4J9N4RJ"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T13:57:02.047Z"
+    }
+  ]
+}

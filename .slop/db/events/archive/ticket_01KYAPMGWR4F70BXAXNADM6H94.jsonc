@@ -1,0 +1,260 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYAPMGWR4F70BXAXNADM6H94",
+  "events": [
+    {
+      "id": "event_01KYAPMGX54EZ9J5E4QWKVBDES",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPMGWR4F70BXAXNADM6H94"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-07-24T18:36:37.157Z"
+    },
+    {
+      "id": "event_01KYASJG9Y50SNNQFEB2FPR0E3",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASJG9RH00N4XTNB5229631",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYASJG9RH00N4XTNB5229631"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-07-24T19:27:56.734Z"
+    },
+    {
+      "id": "event_01KYASJGAME2T74P6ARYA6W3DN",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASJG9RH00N4XTNB5229631",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPMGWR4F70BXAXNADM6H94"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-07-24T19:27:56.756Z"
+    },
+    {
+      "id": "event_01KYASY6QQ6QE639CCD3Z4YJS7",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASJG9RH00N4XTNB5229631",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYASJG9RH00N4XTNB5229631"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 8
+      },
+      "at": "2026-07-24T19:34:20.151Z"
+    },
+    {
+      "id": "event_01KYASYH1M9K8XYCHH66FCA86S",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASJG9RH00N4XTNB5229631",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYASJG9RH00N4XTNB5229631"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-07-24T19:34:30.708Z"
+    },
+    {
+      "id": "event_01KYASYKJGY6TCRAFTC0FB6BQK",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASJG9RH00N4XTNB5229631",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYASJG9RH00N4XTNB5229631"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-07-24T19:34:33.296Z"
+    },
+    {
+      "id": "event_01KYASYPACXZ6FWVNGQK84BDDM",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASJG9RH00N4XTNB5229631",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYASJG9RH00N4XTNB5229631"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-07-24T19:34:36.108Z"
+    },
+    {
+      "id": "event_01KYASYRQY0X2FAS814PE0JYG4",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASJG9RH00N4XTNB5229631",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYASJG9RH00N4XTNB5229631"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-07-24T19:34:38.590Z"
+    },
+    {
+      "id": "event_01KYASYX68S7RSPEB9RP7TZAJF",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASJG9RH00N4XTNB5229631",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYASJG9RH00N4XTNB5229631"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-07-24T19:34:43.144Z"
+    },
+    {
+      "id": "event_01KYASYZ90PJBM4YHPZF1TNR37",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASJG9RH00N4XTNB5229631",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYASJG9RH00N4XTNB5229631"
+      },
+      "payload": {
+        "step": 6,
+        "checked": true
+      },
+      "at": "2026-07-24T19:34:45.280Z"
+    },
+    {
+      "id": "event_01KYASZ23T04DA3DVD7P15MWXN",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASJG9RH00N4XTNB5229631",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYASJG9RH00N4XTNB5229631"
+      },
+      "payload": {
+        "step": 7,
+        "checked": true
+      },
+      "at": "2026-07-24T19:34:48.187Z"
+    },
+    {
+      "id": "event_01KYASZ49943HN27QRHXTC7VF8",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASJG9RH00N4XTNB5229631",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYASJG9RH00N4XTNB5229631"
+      },
+      "payload": {
+        "step": 8,
+        "checked": true
+      },
+      "at": "2026-07-24T19:34:50.409Z"
+    },
+    {
+      "id": "event_01KYASZB01ZAQR59CX1V6MAZQQ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASJG9RH00N4XTNB5229631",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYASJG9RH00N4XTNB5229631"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Added a shared assertLabelHasNoLeadingSigil helper (src/tickets/labels.ts), used by both new's buildNewTicket (rejects any --label starting with +/-) and update's parseLabelOp (rejects a doubled sigil after its own op sigil is stripped, e.g. --label ++bug). Both now agree on what a valid label looks like, closing the grammar mismatch where new silently stored a literal '+bug'/'-weird' label that a later update --label could never correctly address. Updated the B1.test.ts test that had documented the old accept-silently behavior.",
+        "transcript_ref": "transcripts/session_01KYASJG9RH00N4XTNB5229631.jsonl"
+      },
+      "at": "2026-07-24T19:34:57.281Z"
+    },
+    {
+      "id": "event_01KYASZB0Q2C8FADNNTRJ1GCWJ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASJG9RH00N4XTNB5229631",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPMGWR4F70BXAXNADM6H94"
+      },
+      "payload": {
+        "from": "in_progress"
+      },
+      "at": "2026-07-24T19:34:57.303Z"
+    }
+  ]
+}

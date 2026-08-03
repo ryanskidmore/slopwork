@@ -1,0 +1,256 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ13ABCGGZKREQS5AWCVTJRN",
+  "events": [
+    {
+      "id": "event_01KZ13ABEPQMHF9NG03XG1RS2K",
+      "actor": {
+        "name": "codex-session-attribution",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ13ABCGGZKREQS5AWCVTJRN"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T11:21:32.886Z"
+    },
+    {
+      "id": "event_01KZ13AGQ5P4S5NZNABQWYQMHC",
+      "actor": {
+        "name": "codex-session-attribution",
+        "kind": "agent"
+      },
+      "session": "session_01KZ13AGQ34CVMZHPVYV77F9ZC",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ13AGQ34CVMZHPVYV77F9ZC"
+      },
+      "payload": {
+        "harness": "codex",
+        "takeover": false
+      },
+      "at": "2026-08-02T11:21:38.277Z"
+    },
+    {
+      "id": "event_01KZ13AGQ9YCXEJ4R809P62SGC",
+      "actor": {
+        "name": "codex-session-attribution",
+        "kind": "agent"
+      },
+      "session": "session_01KZ13AGQ34CVMZHPVYV77F9ZC",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ13ABCGGZKREQS5AWCVTJRN"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T11:21:38.281Z"
+    },
+    {
+      "id": "event_01KZ13AW30ZDTXQ9ZTTGX5014W",
+      "actor": {
+        "name": "codex-session-attribution",
+        "kind": "human"
+      },
+      "session": "session_01KZ13AGQ34CVMZHPVYV77F9ZC",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ13AGQ34CVMZHPVYV77F9ZC"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 5
+      },
+      "at": "2026-08-02T11:21:49.920Z"
+    },
+    {
+      "id": "event_01KZ13GCQACR7M3FJA9H8MJX2D",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ13ABCGGZKREQS5AWCVTJRN"
+      },
+      "payload": {
+        "progress": "Mapped every affected mutation path and added one ticketEventContext helper. Lock-free progress/ask use their resolved snapshot; update/edit/split/answer use transaction-fresh ticket state, with split child creation anchored to the active parent session."
+      },
+      "at": "2026-08-02T11:24:50.794Z"
+    },
+    {
+      "id": "event_01KZ13WGPTMV5K2N8SG528GYM6",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ13AGQ34CVMZHPVYV77F9ZC",
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ13ABCGGZKREQS5AWCVTJRN"
+      },
+      "payload": {
+        "progress": "Regression coverage now spans the shared helper, update active/open + bulk distinct sessions + reparent descendants, edit, split active/cold parent semantics, ask, answer after stop/restart, compiled CLI event JSON, and web ticket-detail DTO propagation. Focused 117 tests, compiled G5/D5 69 tests, typecheck/build/lint/format all pass."
+      },
+      "at": "2026-08-02T11:31:28.090Z"
+    },
+    {
+      "id": "event_01KZ141GZ5VRJK80E0CBJH6F0V",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ13AGQ34CVMZHPVYV77F9ZC",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ13AGQ34CVMZHPVYV77F9ZC"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-02T11:34:12.197Z"
+    },
+    {
+      "id": "event_01KZ141H1KATD342KT374866B3",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ13AGQ34CVMZHPVYV77F9ZC",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ13AGQ34CVMZHPVYV77F9ZC"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T11:34:12.276Z"
+    },
+    {
+      "id": "event_01KZ141H3YNJV5ZT994D7FH2GE",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ13AGQ34CVMZHPVYV77F9ZC",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ13AGQ34CVMZHPVYV77F9ZC"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-02T11:34:12.350Z"
+    },
+    {
+      "id": "event_01KZ141H8G31GKN1X29XG34DQ1",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ13AGQ34CVMZHPVYV77F9ZC",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ13AGQ34CVMZHPVYV77F9ZC"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-08-02T11:34:12.496Z"
+    },
+    {
+      "id": "event_01KZ142FFG1YP9Z3G5KM9TM012",
+      "actor": {
+        "name": "codex-session-attribution",
+        "kind": "human"
+      },
+      "session": "session_01KZ13AGQ34CVMZHPVYV77F9ZC",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ13AGQ34CVMZHPVYV77F9ZC"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-08-02T11:34:43.440Z"
+    },
+    {
+      "id": "event_01KZ142FHX3X58K91YF2QKB4XM",
+      "actor": {
+        "name": "codex-session-attribution",
+        "kind": "human"
+      },
+      "session": "session_01KZ13AGQ34CVMZHPVYV77F9ZC",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ13ABCGGZKREQS5AWCVTJRN"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/13"
+      },
+      "at": "2026-08-02T11:34:43.517Z"
+    },
+    {
+      "id": "event_01KZ23B52NQTZ5PTGDD3MK4AXH",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ13AGQ34CVMZHPVYV77F9ZC",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ13AGQ34CVMZHPVYV77F9ZC"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Audit-fix program fully merged: PRs 5,6,7,9,10,12,13,14,15,16,17,18,19 all on main (PR 11 closed as superseded). Batch-closed after final merges of 14/18 and 19."
+      },
+      "at": "2026-08-02T20:41:13.557Z"
+    },
+    {
+      "id": "event_01KZ23B53AGZQ6PWRAE56R9CB2",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ13AGQ34CVMZHPVYV77F9ZC",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ13ABCGGZKREQS5AWCVTJRN"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T20:41:13.578Z"
+    }
+  ]
+}

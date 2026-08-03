@@ -1,0 +1,188 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYAPKSGB85E971TVHYZE54AP",
+  "events": [
+    {
+      "id": "event_01KYAPKSGQPFF45A91TRPRHK9S",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPKSGB85E971TVHYZE54AP"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-07-24T18:36:13.207Z"
+    },
+    {
+      "id": "event_01KYASBSJ422QPQA5Q9JXAB8CD",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASBSHXV63KMM3MQP23TPZW",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYASBSHXV63KMM3MQP23TPZW"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-07-24T19:24:16.836Z"
+    },
+    {
+      "id": "event_01KYASBSJS695RM3WBVPPX4WME",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASBSHXV63KMM3MQP23TPZW",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPKSGB85E971TVHYZE54AP"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-07-24T19:24:16.857Z"
+    },
+    {
+      "id": "event_01KYASCN5GXN05D3R42CDV8MZS",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASBSHXV63KMM3MQP23TPZW",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYASBSHXV63KMM3MQP23TPZW"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 4
+      },
+      "at": "2026-07-24T19:24:45.104Z"
+    },
+    {
+      "id": "event_01KYASVMKYS76C1GKPYSSCZEDT",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASBSHXV63KMM3MQP23TPZW",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYASBSHXV63KMM3MQP23TPZW"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-07-24T19:32:56.062Z"
+    },
+    {
+      "id": "event_01KYASVMTCXBVSDYMTAJMP3N37",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASBSHXV63KMM3MQP23TPZW",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYASBSHXV63KMM3MQP23TPZW"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-07-24T19:32:56.268Z"
+    },
+    {
+      "id": "event_01KYASVN06TBK2GRRM5PXC7HQR",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASBSHXV63KMM3MQP23TPZW",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYASBSHXV63KMM3MQP23TPZW"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-07-24T19:32:56.454Z"
+    },
+    {
+      "id": "event_01KYAT1FMZ60BNF17CZZ0PQ6MW",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASBSHXV63KMM3MQP23TPZW",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYASBSHXV63KMM3MQP23TPZW"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-07-24T19:36:07.583Z"
+    },
+    {
+      "id": "event_01KYAT1SY0HN4GNT50A11M1J6C",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASBSHXV63KMM3MQP23TPZW",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYASBSHXV63KMM3MQP23TPZW"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "server.ts wraps every route (and the fetch fallback) in guardHost(): a request whose Host header isn't localhost/127.0.0.1/[::1] gets 403, blocking DNS rebinding against the loopback-bound server. New tests/acceptance/web-host-header-allowlist.test.ts uses node:http (fetch forbids overriding Host) to prove foreign hosts 403, the DNS-rebinding shape (foreign hostname + real port) 403s, and localhost/127.0.0.1/[::1] still work. Full verification suite green (one unrelated pre-existing flaky test filed as t-eqidx).",
+        "transcript_ref": "transcripts/session_01KYASBSHXV63KMM3MQP23TPZW.jsonl"
+      },
+      "at": "2026-07-24T19:36:18.112Z"
+    },
+    {
+      "id": "event_01KYAT1SYKS89R2KQSSAYHNVFW",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYASBSHXV63KMM3MQP23TPZW",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPKSGB85E971TVHYZE54AP"
+      },
+      "payload": {
+        "from": "in_progress"
+      },
+      "at": "2026-07-24T19:36:18.131Z"
+    }
+  ]
+}

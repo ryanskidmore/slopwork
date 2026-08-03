@@ -1,0 +1,291 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ11CPQKWZKJVMFF6BWTVNYQ",
+  "events": [
+    {
+      "id": "event_01KZ11CPSS3Y1DCXRPR4W0NZFW",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11CPQKWZKJVMFF6BWTVNYQ"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T10:47:52.889Z"
+    },
+    {
+      "id": "event_01KZ11CT8YQG008CTG5GFM54ZM",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KZ11CT8WGCWTHMV8ED948784",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11CT8WGCWTHMV8ED948784"
+      },
+      "payload": {
+        "harness": "codex",
+        "takeover": false
+      },
+      "at": "2026-08-02T10:47:56.446Z"
+    },
+    {
+      "id": "event_01KZ11CT9213E0R9Y83Y4GCWZW",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KZ11CT8WGCWTHMV8ED948784",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11CPQKWZKJVMFF6BWTVNYQ"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T10:47:56.450Z"
+    },
+    {
+      "id": "event_01KZ11CZBC25NVSTHVGS0K5FMH",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ11CT8WGCWTHMV8ED948784",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11CT8WGCWTHMV8ED948784"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 6
+      },
+      "at": "2026-08-02T10:48:01.644Z"
+    },
+    {
+      "id": "event_01KZ11GNK0YG6DWQAT99ZTB074",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ11CT8WGCWTHMV8ED948784",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11CT8WGCWTHMV8ED948784"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-02T10:50:02.720Z"
+    },
+    {
+      "id": "event_01KZ11GNQ1A5G8S1CMF5082A1G",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11CPQKWZKJVMFF6BWTVNYQ"
+      },
+      "payload": {
+        "progress": "Mapped every parser caller: CLI strict reads, repo/storage tolerant selection/defaults, init/instructions, and web tolerant config all converge on the same configSchema but currently use two YAML parsers. Canonical codec will live in src/core/config-yaml.ts using yaml 2.9's YAML 1.2 parser/stringifier; caller-specific error handling stays in place."
+      },
+      "at": "2026-08-02T10:50:02.849Z"
+    },
+    {
+      "id": "event_01KZ11WZEPTHVPC1TZ4A9V6WTF",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ11CT8WGCWTHMV8ED948784",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11CT8WGCWTHMV8ED948784"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T10:56:46.038Z"
+    },
+    {
+      "id": "event_01KZ11WZJNSF5SDEV9NC9F8NY8",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ11CT8WGCWTHMV8ED948784",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11CT8WGCWTHMV8ED948784"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-02T10:56:46.165Z"
+    },
+    {
+      "id": "event_01KZ11WZPQP0MX65XT3NEQN94H",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ11CT8WGCWTHMV8ED948784",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11CT8WGCWTHMV8ED948784"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-08-02T10:56:46.295Z"
+    },
+    {
+      "id": "event_01KZ11WZVP2NNPFWNJMGKV9GAD",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11CPQKWZKJVMFF6BWTVNYQ"
+      },
+      "payload": {
+        "progress": "Replaced the restricted hand parser and Bun.YAML split with yaml 2.9 in core/config-yaml.ts; routed init, strict CLI reads, tolerant repo/storage reads, and web config reads through it. Added a shared five-case YAML 1.2 matrix plus black-box CLI/storage/live HTTP acceptance coverage; focused typecheck and 21 relevant tests pass."
+      },
+      "at": "2026-08-02T10:56:46.454Z"
+    },
+    {
+      "id": "event_01KZ12200RYFSSR4EBG82BTG0Y",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ11CT8WGCWTHMV8ED948784",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11CT8WGCWTHMV8ED948784"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-08-02T10:59:30.456Z"
+    },
+    {
+      "id": "event_01KZ12205WN5YTHGKC8B82V7MK",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11CPQKWZKJVMFF6BWTVNYQ"
+      },
+      "payload": {
+        "progress": "Quality gates: format, lint, typecheck, focused suites, full 1,956-test run, build, and npm pack smoke all completed. Every test passed. Coverage generation completed but the command exits 1 because repository-wide configured thresholds exceed the measured baseline (79.43% statements, 80.38% lines, 74.04% functions); no test failed."
+      },
+      "at": "2026-08-02T10:59:30.620Z"
+    },
+    {
+      "id": "event_01KZ122TFD6DXVZGRRT2ZXYNZE",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ11CT8WGCWTHMV8ED948784",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11CPQKWZKJVMFF6BWTVNYQ"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/5"
+      },
+      "at": "2026-08-02T10:59:57.549Z"
+    },
+    {
+      "id": "event_01KZ122ZBXF6T31936HS84ECG0",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ11CT8WGCWTHMV8ED948784",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11CT8WGCWTHMV8ED948784"
+      },
+      "payload": {
+        "step": 6,
+        "checked": true
+      },
+      "at": "2026-08-02T11:00:02.557Z"
+    },
+    {
+      "id": "event_01KZ23B4KWMM6R03HYE9E0NWHV",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ11CT8WGCWTHMV8ED948784",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11CT8WGCWTHMV8ED948784"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Audit-fix program fully merged: PRs 5,6,7,9,10,12,13,14,15,16,17,18,19 all on main (PR 11 closed as superseded). Batch-closed after final merges of 14/18 and 19."
+      },
+      "at": "2026-08-02T20:41:13.084Z"
+    },
+    {
+      "id": "event_01KZ23B4MGN5STPMVGQ9J09HA9",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ11CT8WGCWTHMV8ED948784",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11CPQKWZKJVMFF6BWTVNYQ"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T20:41:13.104Z"
+    }
+  ]
+}

@@ -1,0 +1,239 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYAPMHVDARHGCDZPAADXM94R",
+  "events": [
+    {
+      "id": "event_01KYAPMHVR97JDB7748K2JB20B",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPMHVDARHGCDZPAADXM94R"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-07-24T18:36:38.136Z"
+    },
+    {
+      "id": "event_01KYAZ0ZDNW910Z130T7T1YWKN",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-07-24T21:03:13.845Z"
+    },
+    {
+      "id": "event_01KYAZ0ZE7MHXPBP1MFN5DPMCJ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPMHVDARHGCDZPAADXM94R"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-07-24T21:03:13.863Z"
+    },
+    {
+      "id": "event_01KYAZ8VC9FBWTMEAKJBGN45PY",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 4
+      },
+      "at": "2026-07-24T21:07:31.849Z"
+    },
+    {
+      "id": "event_01KYAZ8ZG8F6A9C53PXXJJY0TV",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-07-24T21:07:36.072Z"
+    },
+    {
+      "id": "event_01KYAZ93M9BCK0188T6VCTD11K",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-07-24T21:07:40.299Z"
+    },
+    {
+      "id": "event_01KYAZ97VHRF3KEDA4PQDY3KVW",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-07-24T21:07:44.625Z"
+    },
+    {
+      "id": "event_01KYAZ9DYR19G95WQKT6TEETR3",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-07-24T21:07:50.872Z"
+    },
+    {
+      "id": "event_01KYAZ9KHZDRNBEBW5E494PAS6",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPMHVDARHGCDZPAADXM94R"
+      },
+      "payload": {
+        "progress": "Confirmed NOT_IMPLEMENTED(3) has zero throw sites in src/ - marked reserved/unreachable in README.md, docs/cli-reference.md, and exit-codes.ts's own doc table (with explanation why it's kept, not removed). Dropped the unenforced 'roots require a human owner, D1' claim from new.ts's --owner help text (D1 is policy; enforcement is separate future work item F4, nothing in the schema enforces it today). Added regression tests. Full verification suite green."
+      },
+      "at": "2026-07-24T21:07:56.607Z"
+    },
+    {
+      "id": "event_01KYAZ9QBQ0VTKSRXKHRHS2D2G",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB"
+      },
+      "payload": {
+        "transcript_ref": "transcripts/session_01KYAZ0ZDD90QY58DJFMRQ0KGB.jsonl"
+      },
+      "at": "2026-07-24T21:08:00.503Z"
+    },
+    {
+      "id": "event_01KYAZ9QC976DHXYMRA97353YY",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPMHVDARHGCDZPAADXM94R"
+      },
+      "payload": {
+        "mr": null
+      },
+      "at": "2026-07-24T21:08:00.521Z"
+    },
+    {
+      "id": "event_01KYAZRVMERKTFY2V56ER08P94",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Merged to main + full suite (1907 tests) green",
+        "transcript_ref": "transcripts/session_01KYAZ0ZDD90QY58DJFMRQ0KGB.jsonl"
+      },
+      "at": "2026-07-24T21:16:16.398Z"
+    },
+    {
+      "id": "event_01KYAZRVN3VRAQCV3S731YWXDS",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZ0ZDD90QY58DJFMRQ0KGB",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPMHVDARHGCDZPAADXM94R"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-07-24T21:16:16.420Z"
+    }
+  ]
+}

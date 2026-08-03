@@ -1,0 +1,256 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ12QP04YSS8860GKR661F5P",
+  "events": [
+    {
+      "id": "event_01KZ12QP1YV837PTV2YQV9B9KH",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ12QP04YSS8860GKR661F5P"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T11:11:21.150Z"
+    },
+    {
+      "id": "event_01KZ12QWDQ5KBFKBG6NWYX0G28",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ12QWDNBFYRX1991SBS7YQV",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12QWDNBFYRX1991SBS7YQV"
+      },
+      "payload": {
+        "harness": "other",
+        "takeover": false
+      },
+      "at": "2026-08-02T11:11:27.671Z"
+    },
+    {
+      "id": "event_01KZ12QWDVGJPMZZK8ABESM2HK",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ12QWDNBFYRX1991SBS7YQV",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ12QP04YSS8860GKR661F5P"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T11:11:27.675Z"
+    },
+    {
+      "id": "event_01KZ12QWJP0QQ54AR0ZDW76ERV",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ12QWDNBFYRX1991SBS7YQV",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12QWDNBFYRX1991SBS7YQV"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 5
+      },
+      "at": "2026-08-02T11:11:27.831Z"
+    },
+    {
+      "id": "event_01KZ13V5YEPNY3T963VV177XVJ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ12QWDNBFYRX1991SBS7YQV",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12QWDNBFYRX1991SBS7YQV"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-02T11:30:44.302Z"
+    },
+    {
+      "id": "event_01KZ13V63BZ1G9P4JGF1FY41RJ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ12QWDNBFYRX1991SBS7YQV",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12QWDNBFYRX1991SBS7YQV"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T11:30:44.459Z"
+    },
+    {
+      "id": "event_01KZ13V69223GNNQQBRJ7W0QFG",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ12QWDNBFYRX1991SBS7YQV",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12QWDNBFYRX1991SBS7YQV"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-02T11:30:44.642Z"
+    },
+    {
+      "id": "event_01KZ13V6FRS8M5RJ1HFZFYDZPF",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ12QP04YSS8860GKR661F5P"
+      },
+      "payload": {
+        "progress": "Durable intent/replay state machine is integrated at storage open and transaction entry; deterministic fault, conflict, duplicate replay, update/delete, and real SIGKILL recovery tests pass."
+      },
+      "at": "2026-08-02T11:30:44.857Z"
+    },
+    {
+      "id": "event_01KZ1479PKNS7ZWQE1P0MYWWX0",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ12QWDNBFYRX1991SBS7YQV",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12QWDNBFYRX1991SBS7YQV"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-08-02T11:37:21.363Z"
+    },
+    {
+      "id": "event_01KZ1479VRV9EGJNEMHA92EHK9",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ12QP04YSS8860GKR661F5P"
+      },
+      "payload": {
+        "progress": "Docs and gates complete: lint/format/typecheck/build pass; focused recovery surface is 110/110; canonical full Vitest suite passed 1,959/1,959 before the final preparation-order regression test. Coverage executed with all tests passing but repository-wide thresholds remain below configured floors (pre-existing uninstrumented/new surfaces); mutation-journal itself measured 86.58% statements / 89.33% lines before the last added case."
+      },
+      "at": "2026-08-02T11:37:21.529Z"
+    },
+    {
+      "id": "event_01KZ14BB1NYS28AEMMF5FV9EMS",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ12QWDNBFYRX1991SBS7YQV",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ12QP04YSS8860GKR661F5P"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/14"
+      },
+      "at": "2026-08-02T11:39:33.814Z"
+    },
+    {
+      "id": "event_01KZ14BB7JK55V07CTPZHMP76G",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ12QWDNBFYRX1991SBS7YQV",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12QWDNBFYRX1991SBS7YQV"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-08-02T11:39:34.002Z"
+    },
+    {
+      "id": "event_01KZ23B4EKCZKBPC4BW2Z5S4M1",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ12QWDNBFYRX1991SBS7YQV",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12QWDNBFYRX1991SBS7YQV"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Audit-fix program fully merged: PRs 5,6,7,9,10,12,13,14,15,16,17,18,19 all on main (PR 11 closed as superseded). Batch-closed after final merges of 14/18 and 19."
+      },
+      "at": "2026-08-02T20:41:12.915Z"
+    },
+    {
+      "id": "event_01KZ23B4F9BAG7YVS8YRAEGXJV",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ12QWDNBFYRX1991SBS7YQV",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ12QP04YSS8860GKR661F5P"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T20:41:12.937Z"
+    }
+  ]
+}

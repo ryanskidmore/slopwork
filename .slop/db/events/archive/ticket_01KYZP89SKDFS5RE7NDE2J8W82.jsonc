@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYZP89SKDFS5RE7NDE2J8W82",
+  "events": [
+    {
+      "id": "event_01KYZP89VHB071A9KBVZ430W5V",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP89SKDFS5RE7NDE2J8W82"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-01T22:13:59.793Z"
+    },
+    {
+      "id": "event_01KZ0NT4H7GKSRH11C7KP9MRT6",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0NT4H0SE66GVWJCMKX5AD8",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0NT4H0SE66GVWJCMKX5AD8"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-08-02T07:25:30.023Z"
+    },
+    {
+      "id": "event_01KZ0NT4HTZ0FYS0C2ZFVJ646S",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0NT4H0SE66GVWJCMKX5AD8",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP89SKDFS5RE7NDE2J8W82"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T07:25:30.042Z"
+    },
+    {
+      "id": "event_01KZ0NT4PP7WZGNK83FDX6QACQ",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0NT4H0SE66GVWJCMKX5AD8",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0NT4H0SE66GVWJCMKX5AD8"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 3
+      },
+      "at": "2026-08-02T07:25:30.198Z"
+    },
+    {
+      "id": "event_01KZ0NVZ5YZM9V49PV9JA6DCSM",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0NT4H0SE66GVWJCMKX5AD8",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0NT4H0SE66GVWJCMKX5AD8"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-02T07:26:30.078Z"
+    },
+    {
+      "id": "event_01KZ0NVZ9QS6EFW8X51BJE517J",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP89SKDFS5RE7NDE2J8W82"
+      },
+      "payload": {
+        "progress": "G3 subagent (Sonnet) spawned in fresh worktree; branch feat/g3-cli-workbench stacked on origin/feat/g2-pluggable-storage; PR will base on the G2 branch. Covers t-km7mb, t-175oq, t-mmngo, t-9uvbr, t-trqk9."
+      },
+      "at": "2026-08-02T07:26:30.199Z"
+    },
+    {
+      "id": "event_01KZ0SKGKXXP5FRSX8PQAA17NK",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0NT4H0SE66GVWJCMKX5AD8",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0NT4H0SE66GVWJCMKX5AD8"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T08:31:47.325Z"
+    },
+    {
+      "id": "event_01KZ0SKGSVF4D15GA6VPBBE6K5",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0NT4H0SE66GVWJCMKX5AD8",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0NT4H0SE66GVWJCMKX5AD8"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-02T08:31:47.515Z"
+    },
+    {
+      "id": "event_01KZ0SKGY867WB4MFATG9KPT58",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0NT4H0SE66GVWJCMKX5AD8",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP89SKDFS5RE7NDE2J8W82"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/3"
+      },
+      "at": "2026-08-02T08:31:47.656Z"
+    },
+    {
+      "id": "event_01KZ0SKJRCM8Q3ZKGK83A0N0G7",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP89SKDFS5RE7NDE2J8W82"
+      },
+      "payload": {
+        "progress": "PR #3 open (base feat/g2-pluggable-storage, stacks on PR #2). Gate green: 1919 tests. list/ready filters/bulk ops/graph-editing flags/slug healing all shipped. Judgment calls: bulk exit = numerically greatest failing code; duplicate-slug warning is exit 0 (distinct from unreadable-file problems). Follow-ups reported: argv shim gap on --blocks/--relates-to, edit refusal messages, getting-started examples."
+      },
+      "at": "2026-08-02T08:31:49.516Z"
+    },
+    {
+      "id": "event_01KZ10HGWS7PSHHTNBKS8D34VA",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0NT4H0SE66GVWJCMKX5AD8",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0NT4H0SE66GVWJCMKX5AD8"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "PRs #3/#4 merged; content landed on main via the stranded-stack merge (4811002). list/ready filters/bulk ops/graph editing/slug healing + full elicitations live. CI coverage gate tracked in t-mx6bq."
+      },
+      "at": "2026-08-02T10:33:02.105Z"
+    },
+    {
+      "id": "event_01KZ10HGX7JFQY5RJMK5TMSHBW",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0NT4H0SE66GVWJCMKX5AD8",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP89SKDFS5RE7NDE2J8W82"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T10:33:02.119Z"
+    }
+  ]
+}

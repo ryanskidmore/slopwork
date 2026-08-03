@@ -1,0 +1,291 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ11E6CJYM9EQEJR3VAW9411",
+  "events": [
+    {
+      "id": "event_01KZ11E6EEBFS61KPWKSMWXYQ9",
+      "actor": {
+        "name": "codex-ready-audit",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11E6CJYM9EQEJR3VAW9411"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T10:48:41.678Z"
+    },
+    {
+      "id": "event_01KZ11E9K966FPADS6WBHHKX2W",
+      "actor": {
+        "name": "codex-ready-audit",
+        "kind": "agent"
+      },
+      "session": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM"
+      },
+      "payload": {
+        "harness": "codex",
+        "takeover": false
+      },
+      "at": "2026-08-02T10:48:44.905Z"
+    },
+    {
+      "id": "event_01KZ11E9KDRF7BQ3YSJ0P4BF2S",
+      "actor": {
+        "name": "codex-ready-audit",
+        "kind": "agent"
+      },
+      "session": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11E6CJYM9EQEJR3VAW9411"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T10:48:44.909Z"
+    },
+    {
+      "id": "event_01KZ11EJ3225JSJEQ0TS7QSE6D",
+      "actor": {
+        "name": "codex-ready-audit",
+        "kind": "human"
+      },
+      "session": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 5
+      },
+      "at": "2026-08-02T10:48:53.602Z"
+    },
+    {
+      "id": "event_01KZ11K1TKEA91C8P0JTS6XQQK",
+      "actor": {
+        "name": "codex-ready-audit",
+        "kind": "human"
+      },
+      "session": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-02T10:51:20.787Z"
+    },
+    {
+      "id": "event_01KZ11K5ZE62TRWJYC001RVK7C",
+      "actor": {
+        "name": "codex-ready-audit",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11E6CJYM9EQEJR3VAW9411"
+      },
+      "payload": {
+        "progress": "Mapped ready selection: IndexTicketRow.path contains full ancestry; current filters ignore descendants, so leaf eligibility can be derived once from all nonterminal rows before existing priority/age sort."
+      },
+      "at": "2026-08-02T10:51:25.038Z"
+    },
+    {
+      "id": "event_01KZ11Y8P1WG2659BRHG4GKYGS",
+      "actor": {
+        "name": "codex-ready-audit",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11E6CJYM9EQEJR3VAW9411"
+      },
+      "payload": {
+        "progress": "Implemented leaf-first strict and resumable selection from transitive IndexTicketRow.path ancestry; added pure, in-process command, compiled CLI acceptance, and onboarding regressions; documented terminal versus nonterminal descendant behavior."
+      },
+      "at": "2026-08-02T10:57:28.257Z"
+    },
+    {
+      "id": "event_01KZ11YVY8TXRV73RKXKYY8REP",
+      "actor": {
+        "name": "codex-ready-audit",
+        "kind": "human"
+      },
+      "session": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T10:57:47.977Z"
+    },
+    {
+      "id": "event_01KZ11YW6CMSPHFQ1KVEW2WWM9",
+      "actor": {
+        "name": "codex-ready-audit",
+        "kind": "human"
+      },
+      "session": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-08-02T10:57:48.236Z"
+    },
+    {
+      "id": "event_01KZ11YW83QKJ6WWDTES3Q184Z",
+      "actor": {
+        "name": "codex-ready-audit",
+        "kind": "human"
+      },
+      "session": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-02T10:57:48.292Z"
+    },
+    {
+      "id": "event_01KZ11Z2M12QYAHSKCCP1335D3",
+      "actor": {
+        "name": "codex-ready-audit",
+        "kind": "human"
+      },
+      "session": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T10:57:54.817Z"
+    },
+    {
+      "id": "event_01KZ124XJRCV4QWR8YK37EVFBX",
+      "actor": {
+        "name": "codex-ready-audit",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11E6CJYM9EQEJR3VAW9411"
+      },
+      "payload": {
+        "progress": "Verification green: 143 related tests; full suite 132 files/1,959 tests; typecheck, web typecheck, lint, format check, diff check, and compiled build all pass."
+      },
+      "at": "2026-08-02T11:01:06.264Z"
+    },
+    {
+      "id": "event_01KZ1260TDGG4MXWD6A9J3GB9Q",
+      "actor": {
+        "name": "codex-ready-audit",
+        "kind": "human"
+      },
+      "session": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-08-02T11:01:42.349Z"
+    },
+    {
+      "id": "event_01KZ1260ZEZSF9Y2CKAF0EGT7W",
+      "actor": {
+        "name": "codex-ready-audit",
+        "kind": "human"
+      },
+      "session": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11E6CJYM9EQEJR3VAW9411"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/6"
+      },
+      "at": "2026-08-02T11:01:42.510Z"
+    },
+    {
+      "id": "event_01KZ23B4RE58ARN92GQRB6ZWHC",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Audit-fix program fully merged: PRs 5,6,7,9,10,12,13,14,15,16,17,18,19 all on main (PR 11 closed as superseded). Batch-closed after final merges of 14/18 and 19."
+      },
+      "at": "2026-08-02T20:41:13.230Z"
+    },
+    {
+      "id": "event_01KZ23B4S17SEEZAVMBJK6N1NS",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ11E9K7MMCCJFPA8Y9Q7XQM",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11E6CJYM9EQEJR3VAW9411"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T20:41:13.249Z"
+    }
+  ]
+}

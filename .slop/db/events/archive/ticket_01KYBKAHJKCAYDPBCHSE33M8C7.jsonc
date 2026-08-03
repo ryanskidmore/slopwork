@@ -1,0 +1,239 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYBKAHJKCAYDPBCHSE33M8C7",
+  "events": [
+    {
+      "id": "event_01KYBKAHKFSGVEEC0SRVFFHPN1",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYBKAHJKCAYDPBCHSE33M8C7"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-07-25T02:57:58.895Z"
+    },
+    {
+      "id": "event_01KYBKARV8D1CESYRW948WGV7G",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYBKARV0YD00NDHPNDBZXY4J",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYBKARV0YD00NDHPNDBZXY4J"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-07-25T02:58:06.312Z"
+    },
+    {
+      "id": "event_01KYBKARVW722N2REVCQ0EE1M8",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYBKARV0YD00NDHPNDBZXY4J",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYBKAHJKCAYDPBCHSE33M8C7"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-07-25T02:58:06.332Z"
+    },
+    {
+      "id": "event_01KYBKAS23ETQG57S58JTRH36B",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYBKARV0YD00NDHPNDBZXY4J",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYBKARV0YD00NDHPNDBZXY4J"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 4
+      },
+      "at": "2026-07-25T02:58:06.531Z"
+    },
+    {
+      "id": "event_01KYBKBQV9ZB6SGZKPQHBCKJR1",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYBKARV0YD00NDHPNDBZXY4J",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYBKARV0YD00NDHPNDBZXY4J"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-07-25T02:58:38.057Z"
+    },
+    {
+      "id": "event_01KYBKBR14SYS6KADCSCAEZPSC",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYBKAHJKCAYDPBCHSE33M8C7"
+      },
+      "payload": {
+        "progress": "v0 guarantees enumerated: atomic tmp+rename writes, global lock w/ fencing tokens for multi-file txns, lock-free append-only events, derived auto-healing index. Dispatching 4 parallel doc-research agents."
+      },
+      "at": "2026-07-25T02:58:38.244Z"
+    },
+    {
+      "id": "event_01KYBKE8B3EPZPBT30VSN6X9PX",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYBKAHJKCAYDPBCHSE33M8C7"
+      },
+      "payload": {
+        "progress": "Capacity math from dogfood db: ticket ~1.9KB, event ~416B (~9/ticket), session ~1.1KB, transcript ~2.85MB. 10M tickets => ~70GB OLTP + TBs of transcripts. Sharding mandatory for any 10GB-class primitive; transcripts are R2 regardless. 4 research agents in flight."
+      },
+      "at": "2026-07-25T03:00:00.483Z"
+    },
+    {
+      "id": "event_01KYBKQGE9R579A1EB3Q2S3MSA",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYBKARV0YD00NDHPNDBZXY4J",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYBKARV0YD00NDHPNDBZXY4J"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-07-25T03:05:03.689Z"
+    },
+    {
+      "id": "event_01KYBKQGME3KG2RP9Z1CWK65C7",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYBKARV0YD00NDHPNDBZXY4J",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYBKARV0YD00NDHPNDBZXY4J"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-07-25T03:05:03.886Z"
+    },
+    {
+      "id": "event_01KYBKQGT4Q9WP43WWFG0KFNDF",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYBKAHJKCAYDPBCHSE33M8C7"
+      },
+      "payload": {
+        "progress": "All 4 doc agents reported, limits verified live. Verdicts: DO-SQLite per project = S (native serialization, 10GB/DO, fencing built-in); D1 fleet = A (static-binding routing gap, batch-only txns, replicas beta); Hyperdrive+PlanetScale = B; R2-CAS lift-and-shift = C; KV disqualified as primary. Supporting: R2 transcripts, Queues 5k/s events, Pipelines->Iceberg->R2 SQL history, Workflows GA cascades, FTS5/AI Search. Synthesizing tier list for Ryan."
+      },
+      "at": "2026-07-25T03:05:04.068Z"
+    },
+    {
+      "id": "event_01KYBKR3N34VDEXACW2Y85P0A2",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYBKARV0YD00NDHPNDBZXY4J",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYBKARV0YD00NDHPNDBZXY4J"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-07-25T03:05:23.363Z"
+    },
+    {
+      "id": "event_01KYBKR3VRCDXSECMQ6DM07BS0",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYBKARV0YD00NDHPNDBZXY4J",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYBKARV0YD00NDHPNDBZXY4J"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Tier-ranked list presented to Ryan with recommendation: S = DO-SQLite-per-project + thin global directory; A = D1 fleet; B = Hyperdrive+PlanetScale; C = R2 CAS lift-and-shift; KV cache-only. All limits verified against live docs 2026-07-24 (4 research agents; findings in progress notes + session transcript). Follow-up design work drafted as t-mp6hu, awaiting Ryan's direction choice.",
+        "transcript_ref": "transcripts/session_01KYBKARV0YD00NDHPNDBZXY4J.jsonl"
+      },
+      "at": "2026-07-25T03:05:23.576Z"
+    },
+    {
+      "id": "event_01KYBKR3W94VJZK8BMVKWBFW4V",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYBKARV0YD00NDHPNDBZXY4J",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYBKAHJKCAYDPBCHSE33M8C7"
+      },
+      "payload": {
+        "from": "in_progress"
+      },
+      "at": "2026-07-25T03:05:23.593Z"
+    }
+  ]
+}

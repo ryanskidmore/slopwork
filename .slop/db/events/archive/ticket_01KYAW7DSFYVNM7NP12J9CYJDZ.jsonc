@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYAW7DSFYVNM7NP12J9CYJDZ",
+  "events": [
+    {
+      "id": "event_01KYAW7DSWE4SS37FM59GCEKC6",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAW7DSFYVNM7NP12J9CYJDZ"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-07-24T20:14:19.454Z"
+    },
+    {
+      "id": "event_01KYAW80XVBFAH76WQZW5YCJ0C",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAW7DSFYVNM7NP12J9CYJDZ"
+      },
+      "payload": {
+        "spec": true
+      },
+      "at": "2026-07-24T20:14:39.025Z"
+    },
+    {
+      "id": "event_01KYB1YS6R24609G7V3FH1RV3W",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1YS6JJ7NXNNX7TPAYJSJ1",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB1YS6JJ7NXNNX7TPAYJSJ1"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-07-24T21:54:27.672Z"
+    },
+    {
+      "id": "event_01KYB1YS7D7VSH5D5YQANVQH54",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1YS6JJ7NXNNX7TPAYJSJ1",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAW7DSFYVNM7NP12J9CYJDZ"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-07-24T21:54:27.693Z"
+    },
+    {
+      "id": "event_01KYB1ZQY8EXQ9XMPPTGDKJWFJ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1YS6JJ7NXNNX7TPAYJSJ1",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB1YS6JJ7NXNNX7TPAYJSJ1"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Decision recorded in DECISIONS.md: detect+repair is sufficient; journal rejected on measured cost/benefit. Revisit conditions documented.",
+        "transcript_ref": "transcripts/session_01KYB1YS6JJ7NXNNX7TPAYJSJ1.jsonl"
+      },
+      "at": "2026-07-24T21:54:59.144Z"
+    },
+    {
+      "id": "event_01KYB1ZQYQ6RXR26TEQVMMSGRZ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1YS6JJ7NXNNX7TPAYJSJ1",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAW7DSFYVNM7NP12J9CYJDZ"
+      },
+      "payload": {
+        "from": "in_progress"
+      },
+      "at": "2026-07-24T21:54:59.159Z"
+    }
+  ]
+}

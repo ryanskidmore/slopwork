@@ -1,0 +1,203 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYZP8A340W5A8X70TYQ6XVT8",
+  "events": [
+    {
+      "id": "event_01KYZP8A6WN39VTNQCCQ8A5PGA",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP8A340W5A8X70TYQ6XVT8"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-01T22:14:00.156Z"
+    },
+    {
+      "id": "event_01KZ0WKGA0EXVVZQKCDF5W5TT9",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0WKG9TZN9TWC4KKNXM4G32",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0WKG9TZN9TWC4KKNXM4G32"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-08-02T09:24:12.736Z"
+    },
+    {
+      "id": "event_01KZ0WKGAK6HXY80BE7RD8HXT2",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0WKG9TZN9TWC4KKNXM4G32",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP8A340W5A8X70TYQ6XVT8"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T09:24:12.755Z"
+    },
+    {
+      "id": "event_01KZ0WKGEKR59SRTG0PHYQMP0E",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0WKG9TZN9TWC4KKNXM4G32",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0WKG9TZN9TWC4KKNXM4G32"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 3
+      },
+      "at": "2026-08-02T09:24:12.883Z"
+    },
+    {
+      "id": "event_01KZ0WN5Q73N8FX6T3WE7ZHFP8",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0WKG9TZN9TWC4KKNXM4G32",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0WKG9TZN9TWC4KKNXM4G32"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-02T09:25:07.431Z"
+    },
+    {
+      "id": "event_01KZ0WN5VFNQZA9KK2HB4G9KTE",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP8A340W5A8X70TYQ6XVT8"
+      },
+      "payload": {
+        "progress": "G5 subagent (Sonnet) spawned; branch feat/g5-simplification stacked on origin/feat/g4-elicitations. Covers t-5vj9o, t-ukxun, t-uy8vo, t-drz1d, t-z4ci3 plus small extras from earlier group reports (BOOTSTRAP_DEFAULTS, env-strip leftovers, stale command counts)."
+      },
+      "at": "2026-08-02T09:25:07.567Z"
+    },
+    {
+      "id": "event_01KZ12RSRX9N9AZ94MX9S45AWG",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0WKG9TZN9TWC4KKNXM4G32",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0WKG9TZN9TWC4KKNXM4G32"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T11:11:57.725Z"
+    },
+    {
+      "id": "event_01KZ12RSZY6KYW9EZEWDK5XDM4",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0WKG9TZN9TWC4KKNXM4G32",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0WKG9TZN9TWC4KKNXM4G32"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-02T11:11:57.950Z"
+    },
+    {
+      "id": "event_01KZ12RT50SR1W8X2BT98ET2PK",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0WKG9TZN9TWC4KKNXM4G32",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP8A340W5A8X70TYQ6XVT8"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/8"
+      },
+      "at": "2026-08-02T11:11:58.112Z"
+    },
+    {
+      "id": "event_01KZ1C71T0ARRDKGSZTEX9Y0HX",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0WKG9TZN9TWC4KKNXM4G32",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0WKG9TZN9TWC4KKNXM4G32"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "PR #8 merged to main. Budget unification, honest benchmarks (9:1 ratio, 1M rung dropped), exit code 3 removed, SLOP_FAKE_NOW consolidation, adhoc folded into provenance, docs corrections, post-G3 polish — all live. Coverage gate work rode this PR."
+      },
+      "at": "2026-08-02T13:57:01.888Z"
+    },
+    {
+      "id": "event_01KZ1C71TDCSAYZHS41S458EYM",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0WKG9TZN9TWC4KKNXM4G32",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP8A340W5A8X70TYQ6XVT8"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T13:57:01.901Z"
+    }
+  ]
+}

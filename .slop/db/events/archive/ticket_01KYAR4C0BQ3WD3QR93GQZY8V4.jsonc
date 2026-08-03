@@ -1,0 +1,223 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYAR4C0BQ3WD3QR93GQZY8V4",
+  "events": [
+    {
+      "id": "event_01KYAR4C1RCJ9MZ21ZEJSCEYYJ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAR4C0BQ3WD3QR93GQZY8V4"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-07-24T19:02:45.048Z"
+    },
+    {
+      "id": "event_01KYB18JSNH7R2KAB9W6GP6F5X",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB18JSEMZ6K8MD8BXNJB2W1",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB18JSEMZ6K8MD8BXNJB2W1"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-07-24T21:42:20.213Z"
+    },
+    {
+      "id": "event_01KYB18JTB4BAVJ66H8BPXNY5S",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB18JSEMZ6K8MD8BXNJB2W1",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAR4C0BQ3WD3QR93GQZY8V4"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-07-24T21:42:20.235Z"
+    },
+    {
+      "id": "event_01KYB18K0HRVJKK7NMBCHFVG8J",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB18JSEMZ6K8MD8BXNJB2W1",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB18JSEMZ6K8MD8BXNJB2W1"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 5
+      },
+      "at": "2026-07-24T21:42:20.433Z"
+    },
+    {
+      "id": "event_01KYB1G29GHY1JB6KW1034N7YJ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB18JSEMZ6K8MD8BXNJB2W1",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB18JSEMZ6K8MD8BXNJB2W1"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-07-24T21:46:25.456Z"
+    },
+    {
+      "id": "event_01KYB1G2F57ASBM8SKGX91WDXF",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAR4C0BQ3WD3QR93GQZY8V4"
+      },
+      "payload": {
+        "progress": "Harness built (bench/seed.ts + measure.ts + run.ts) and smoke-tested end-to-end at tiny scale; repo gate clean. Guards baked in: refuses to present tmpfs numbers as real (warns loudly), verifies seeded tickets against the real ticketSchema, separates in-process engine timings from end-to-end CLI latency. Smoke test already proved the start-race correctness property (1 winner, N-1 clean CONFLICT). Real runs pending a quiet machine (SPA agent currently using CPU)."
+      },
+      "at": "2026-07-24T21:46:25.637Z"
+    },
+    {
+      "id": "event_01KYB3218XPFDD409WEHTPQDBW",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB18JSEMZ6K8MD8BXNJB2W1",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB18JSEMZ6K8MD8BXNJB2W1"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-07-24T22:13:42.813Z"
+    },
+    {
+      "id": "event_01KYB321F8NE4EPDGHG4H92VQD",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB18JSEMZ6K8MD8BXNJB2W1",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB18JSEMZ6K8MD8BXNJB2W1"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-07-24T22:13:43.016Z"
+    },
+    {
+      "id": "event_01KYB321N5KPX45W2VB1D7KWXQ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB18JSEMZ6K8MD8BXNJB2W1",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB18JSEMZ6K8MD8BXNJB2W1"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-07-24T22:13:43.205Z"
+    },
+    {
+      "id": "event_01KYB321VGQCCRSEEKMX6QPZXS",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB18JSEMZ6K8MD8BXNJB2W1",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB18JSEMZ6K8MD8BXNJB2W1"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-07-24T22:13:43.408Z"
+    },
+    {
+      "id": "event_01KYB32341WMFZ7MEPG01MT1BM",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB18JSEMZ6K8MD8BXNJB2W1",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB18JSEMZ6K8MD8BXNJB2W1"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Ladder 1k/10k/100k/1M + concurrency measured on ext4; docs/benchmarks.md written with honest ceiling analysis and repro commands.",
+        "transcript_ref": "transcripts/session_01KYB18JSEMZ6K8MD8BXNJB2W1.jsonl"
+      },
+      "at": "2026-07-24T22:13:44.705Z"
+    },
+    {
+      "id": "event_01KYB3234HS1FDPMWHX53CA22T",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB18JSEMZ6K8MD8BXNJB2W1",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAR4C0BQ3WD3QR93GQZY8V4"
+      },
+      "payload": {
+        "from": "in_progress"
+      },
+      "at": "2026-07-24T22:13:44.721Z"
+    }
+  ]
+}

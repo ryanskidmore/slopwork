@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYB1H2WMF9DZ7JMSCQQPR0EA",
+  "events": [
+    {
+      "id": "event_01KYB1H2YC1MPZA2384RXXP2R7",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYB1H2WMF9DZ7JMSCQQPR0EA"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": true,
+        "parent": null
+      },
+      "at": "2026-07-24T21:46:58.892Z"
+    },
+    {
+      "id": "event_01KYB1HBYNZT653E43ARKTYW4P",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1HBYE54Y2GAB7671BTC10",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB1HBYE54Y2GAB7671BTC10"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-07-24T21:47:08.117Z"
+    },
+    {
+      "id": "event_01KYB1HBZ7EFXN3QPWCAH4DGVY",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1HBYE54Y2GAB7671BTC10",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYB1H2WMF9DZ7JMSCQQPR0EA"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-07-24T21:47:08.135Z"
+    },
+    {
+      "id": "event_01KYB1N5V3K724KGYRXEYF2KDQ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1HBYE54Y2GAB7671BTC10",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB1HBYE54Y2GAB7671BTC10"
+      },
+      "payload": {
+        "transcript_ref": "transcripts/session_01KYB1HBYE54Y2GAB7671BTC10.jsonl"
+      },
+      "at": "2026-07-24T21:49:12.931Z"
+    },
+    {
+      "id": "event_01KYB1N5VTVQ5CHMDN10QKA0FK",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1HBYE54Y2GAB7671BTC10",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYB1H2WMF9DZ7JMSCQQPR0EA"
+      },
+      "payload": {
+        "mr": null
+      },
+      "at": "2026-07-24T21:49:12.954Z"
+    },
+    {
+      "id": "event_01KYB1N637NWWFC0Z97V7QGC3W",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1HBYE54Y2GAB7671BTC10",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYB1HBYE54Y2GAB7671BTC10"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Metadata added, tarball halved (verified by real install+lifecycle), CHANGELOG written",
+        "transcript_ref": "transcripts/session_01KYB1HBYE54Y2GAB7671BTC10.jsonl"
+      },
+      "at": "2026-07-24T21:49:13.191Z"
+    },
+    {
+      "id": "event_01KYB1N6434EDQ5T26PZHN6BAM",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYB1HBYE54Y2GAB7671BTC10",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYB1H2WMF9DZ7JMSCQQPR0EA"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-07-24T21:49:13.219Z"
+    }
+  ]
+}

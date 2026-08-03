@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYZP97J5S0M4C4S7JAK7ET0R",
+  "events": [
+    {
+      "id": "event_01KYZP97JXRCEPTEZAQKXE11P0",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP97J5S0M4C4S7JAK7ET0R"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F"
+      },
+      "at": "2026-08-01T22:14:30.237Z"
+    },
+    {
+      "id": "event_01KZ0NT2HPMY7DKF4BBQTZYH7H",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0NT2HEQ4BP4XMAX34HGN49",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0NT2HEQ4BP4XMAX34HGN49"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-08-02T07:25:27.990Z"
+    },
+    {
+      "id": "event_01KZ0NT2JBSFFZB6RW7RCTP3J4",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0NT2HEQ4BP4XMAX34HGN49",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP97J5S0M4C4S7JAK7ET0R"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T07:25:28.012Z"
+    },
+    {
+      "id": "event_01KZ0NT2RQZZTWQTE0E8HSFMZ5",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0NT2HEQ4BP4XMAX34HGN49",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP97J5S0M4C4S7JAK7ET0R"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/2"
+      },
+      "at": "2026-08-02T07:25:28.215Z"
+    },
+    {
+      "id": "event_01KZ10HG7BWG9498TR7ZD26D5E",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0NT2HEQ4BP4XMAX34HGN49",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0NT2HEQ4BP4XMAX34HGN49"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "PR #2 merged; content landed on main via the stranded-stack merge (4811002). Storage interface + flatfile driver + remote stub + wire contract + event sharding + lock simplification + unified overlay fold all live. CI coverage gate tracked separately in t-mx6bq."
+      },
+      "at": "2026-08-02T10:33:01.421Z"
+    },
+    {
+      "id": "event_01KZ10HG7RNCDAD6JTPW2NS5F1",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0NT2HEQ4BP4XMAX34HGN49",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP97J5S0M4C4S7JAK7ET0R"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T10:33:01.432Z"
+    }
+  ]
+}

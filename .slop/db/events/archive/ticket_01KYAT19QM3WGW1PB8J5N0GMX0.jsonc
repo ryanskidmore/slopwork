@@ -1,0 +1,221 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYAT19QM3WGW1PB8J5N0GMX0",
+  "events": [
+    {
+      "id": "event_01KYAT19R1H0E0Y58JAHKPKY45",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAT19QM3WGW1PB8J5N0GMX0"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-07-24T19:36:01.537Z"
+    },
+    {
+      "id": "event_01KYAZAATBWVMYGBAYV2W2E0VK",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZAAT4P9ZZRW6JC966EXC7",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAZAAT4P9ZZRW6JC966EXC7"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-07-24T21:08:20.427Z"
+    },
+    {
+      "id": "event_01KYAZAAV1TBR0CTXP7Q5QDXD4",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZAAT4P9ZZRW6JC966EXC7",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAT19QM3WGW1PB8J5N0GMX0"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-07-24T21:08:20.449Z"
+    },
+    {
+      "id": "event_01KYAZGRF889V7MBPRTBWFKAVH",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZAAT4P9ZZRW6JC966EXC7",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAZAAT4P9ZZRW6JC966EXC7"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 3
+      },
+      "at": "2026-07-24T21:11:51.016Z"
+    },
+    {
+      "id": "event_01KYAZGWC1X3ATNPMC0R4832T3",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZAAT4P9ZZRW6JC966EXC7",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAZAAT4P9ZZRW6JC966EXC7"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-07-24T21:11:55.009Z"
+    },
+    {
+      "id": "event_01KYAZH090RBP1XTX2WYAKJV8M",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZAAT4P9ZZRW6JC966EXC7",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAZAAT4P9ZZRW6JC966EXC7"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-07-24T21:11:59.008Z"
+    },
+    {
+      "id": "event_01KYAZH4V07PHB46MJGRFDYMQ5",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZAAT4P9ZZRW6JC966EXC7",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAZAAT4P9ZZRW6JC966EXC7"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-07-24T21:12:03.680Z"
+    },
+    {
+      "id": "event_01KYAZHCKD3NWEE3Z5AY4S9A25",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAT19QM3WGW1PB8J5N0GMX0"
+      },
+      "payload": {
+        "progress": "Root cause confirmed: newTicketId() uses real (unseeded) randomness via ulid's monotonicFactory; drawing 500 real ids and checking shortTicketCode (sha256(id) mod 36^5) for zero collisions hits the birthday paradox at ~0.2% per run (n=500, N=60.5M: P~=n^2/2N). Fixed by seeding a LOCAL monotonicFactory(mulberry32(seed)) with explicit strictly-increasing seed-times (never Date.now()) for this one test, making id generation fully reproducible while shortTicketCode itself stays exercised unchanged. Verified deterministic via 5 repeated runs, plus full suite (1907 tests) green."
+      },
+      "at": "2026-07-24T21:12:11.630Z"
+    },
+    {
+      "id": "event_01KYAZHGD8W8SE5YQWXZZR390B",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZAAT4P9ZZRW6JC966EXC7",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAZAAT4P9ZZRW6JC966EXC7"
+      },
+      "payload": {
+        "transcript_ref": "transcripts/session_01KYAZAAT4P9ZZRW6JC966EXC7.jsonl"
+      },
+      "at": "2026-07-24T21:12:15.528Z"
+    },
+    {
+      "id": "event_01KYAZHGDV2BMDZASFDQJ0RCJH",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZAAT4P9ZZRW6JC966EXC7",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAT19QM3WGW1PB8J5N0GMX0"
+      },
+      "payload": {
+        "mr": null
+      },
+      "at": "2026-07-24T21:12:15.547Z"
+    },
+    {
+      "id": "event_01KYAZRVWAF0HW60HR52KBTSYX",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZAAT4P9ZZRW6JC966EXC7",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAZAAT4P9ZZRW6JC966EXC7"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Merged to main + full suite (1907 tests) green",
+        "transcript_ref": "transcripts/session_01KYAZAAT4P9ZZRW6JC966EXC7.jsonl"
+      },
+      "at": "2026-07-24T21:16:16.650Z"
+    },
+    {
+      "id": "event_01KYAZRVWWHCCZ3KJ00TF5PA4S",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAZAAT4P9ZZRW6JC966EXC7",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAT19QM3WGW1PB8J5N0GMX0"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-07-24T21:16:16.668Z"
+    }
+  ]
+}

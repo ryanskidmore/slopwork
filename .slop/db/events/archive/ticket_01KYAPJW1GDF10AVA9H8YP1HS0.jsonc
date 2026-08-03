@@ -1,0 +1,275 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYAPJW1GDF10AVA9H8YP1HS0",
+  "events": [
+    {
+      "id": "event_01KYAPJW1SEEKAX879H6W2PDEW",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPJW1GDF10AVA9H8YP1HS0"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-07-24T18:35:43.035Z"
+    },
+    {
+      "id": "event_01KYAXKM0XY8DG75RZPWCSBTGE",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAXKM0NX9DDC87GXJ5MWGVV",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAXKM0NX9DDC87GXJ5MWGVV"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-07-24T20:38:27.613Z"
+    },
+    {
+      "id": "event_01KYAXKM1JJCDKG6WKJZ79VGAT",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAXKM0NX9DDC87GXJ5MWGVV",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPJW1GDF10AVA9H8YP1HS0"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-07-24T20:38:27.634Z"
+    },
+    {
+      "id": "event_01KYAXP14M7J232B3G786MHXCX",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAXKM0NX9DDC87GXJ5MWGVV",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAXKM0NX9DDC87GXJ5MWGVV"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 7
+      },
+      "at": "2026-07-24T20:39:46.580Z"
+    },
+    {
+      "id": "event_01KYAY2Y9042F51628TXFXD6D9",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAXKM0NX9DDC87GXJ5MWGVV",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAXKM0NX9DDC87GXJ5MWGVV"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-07-24T20:46:49.632Z"
+    },
+    {
+      "id": "event_01KYAY32G3XSREE4RNDH9TZ05Q",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAXKM0NX9DDC87GXJ5MWGVV",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAXKM0NX9DDC87GXJ5MWGVV"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-07-24T20:46:53.955Z"
+    },
+    {
+      "id": "event_01KYAY3642CBB0FCCQTB4Y48FC",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAXKM0NX9DDC87GXJ5MWGVV",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAXKM0NX9DDC87GXJ5MWGVV"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-07-24T20:46:57.666Z"
+    },
+    {
+      "id": "event_01KYAY39TQWTCV8RSK8WDRGHJ2",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAXKM0NX9DDC87GXJ5MWGVV",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAXKM0NX9DDC87GXJ5MWGVV"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-07-24T20:47:01.463Z"
+    },
+    {
+      "id": "event_01KYAY3D2S8E0MFMSQ1YD2QBDK",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAXKM0NX9DDC87GXJ5MWGVV",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAXKM0NX9DDC87GXJ5MWGVV"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-07-24T20:47:04.793Z"
+    },
+    {
+      "id": "event_01KYAY3G8XE7AV8815CMY4YN0D",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAXKM0NX9DDC87GXJ5MWGVV",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAXKM0NX9DDC87GXJ5MWGVV"
+      },
+      "payload": {
+        "step": 6,
+        "checked": true
+      },
+      "at": "2026-07-24T20:47:08.061Z"
+    },
+    {
+      "id": "event_01KYAY3MMXQ4VFQXAJSVYB12ZN",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPJW1GDF10AVA9H8YP1HS0"
+      },
+      "payload": {
+        "progress": "Implemented: checkReviewEntry(from, hasMr) allows review->review only when --mr given; review.ts passes mr!==undefined at both check sites, reworded the nag, differentiated stdout headline (moved vs MR-updated). Updated docs (cli-reference.md, concepts.md) and C3.test.ts's independent oracle for the new review->review edge. All tests/lint/typecheck/format/build pass."
+      },
+      "at": "2026-07-24T20:47:12.541Z"
+    },
+    {
+      "id": "event_01KYAY3XJMDHTKBH3DRC2HKXZG",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAXKM0NX9DDC87GXJ5MWGVV",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAXKM0NX9DDC87GXJ5MWGVV"
+      },
+      "payload": {
+        "transcript_ref": "transcripts/session_01KYAXKM0NX9DDC87GXJ5MWGVV.jsonl"
+      },
+      "at": "2026-07-24T20:47:21.684Z"
+    },
+    {
+      "id": "event_01KYAY3XK8EPVWH87Z1F0JT88S",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAXKM0NX9DDC87GXJ5MWGVV",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPJW1GDF10AVA9H8YP1HS0"
+      },
+      "payload": {
+        "mr": null
+      },
+      "at": "2026-07-24T20:47:21.704Z"
+    },
+    {
+      "id": "event_01KYB0KHHEZ9P7NK3MG950MXDF",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAXKM0NX9DDC87GXJ5MWGVV",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAXKM0NX9DDC87GXJ5MWGVV"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Merged to main + full suite (1950 tests) green",
+        "transcript_ref": "transcripts/session_01KYAXKM0NX9DDC87GXJ5MWGVV.jsonl"
+      },
+      "at": "2026-07-24T21:30:50.798Z"
+    },
+    {
+      "id": "event_01KYB0KHJ2JC7KFAMSKTC6J74F",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAXKM0NX9DDC87GXJ5MWGVV",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPJW1GDF10AVA9H8YP1HS0"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-07-24T21:30:50.818Z"
+    }
+  ]
+}

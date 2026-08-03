@@ -14,7 +14,7 @@
     "commit_at_start": "b1c0b396ef0c478205504070500e4a57322e70cb"
   },
   "started_at": "2026-08-02T22:46:00.537Z",
-  "ended_at": null,
+  "ended_at": "2026-08-03T00:18:54.590Z",
   "plan": [],
-  "end_summary": null
+  "end_summary": "PR #24 merged. Terminal-transition compaction live with per-ticket archives, cursor-safe reads, reindex --compact for retroactive sweeps."
 }

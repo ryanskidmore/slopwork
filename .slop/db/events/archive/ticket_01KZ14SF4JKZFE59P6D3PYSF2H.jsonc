@@ -1,0 +1,343 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ14SF4JKZFE59P6D3PYSF2H",
+  "events": [
+    {
+      "id": "event_01KZ14SF7DW1HGWMQPESFEF775",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ14SF4JKZFE59P6D3PYSF2H"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T11:47:16.845Z"
+    },
+    {
+      "id": "event_01KZ14SQVY5FPTVN2504XT3BCB",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14SQVWRFJA20EPM3R10X36",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14SQVWRFJA20EPM3R10X36"
+      },
+      "payload": {
+        "harness": "other",
+        "takeover": false
+      },
+      "at": "2026-08-02T11:47:25.694Z"
+    },
+    {
+      "id": "event_01KZ14SQW4FNBN3XQCKET896VG",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14SQVWRFJA20EPM3R10X36",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ14SF4JKZFE59P6D3PYSF2H"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T11:47:25.700Z"
+    },
+    {
+      "id": "event_01KZ14SR2P13CHYDSBAFFSP7JZ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14SQVWRFJA20EPM3R10X36",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14SQVWRFJA20EPM3R10X36"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 7
+      },
+      "at": "2026-08-02T11:47:25.910Z"
+    },
+    {
+      "id": "event_01KZ151N1HKGJAVFHHQ9Y019KD",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14SQVWRFJA20EPM3R10X36",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14SQVWRFJA20EPM3R10X36"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-02T11:51:44.945Z"
+    },
+    {
+      "id": "event_01KZ151N5S1QDNQPCDHVE7V521",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ14SF4JKZFE59P6D3PYSF2H"
+      },
+      "payload": {
+        "progress": "Mapped new, split, update, and context-pack read paths. Reusing StorageBackend.resolveTicketRefs plus transaction-local ticket snapshots; no datastore API or cross-command cache."
+      },
+      "at": "2026-08-02T11:51:45.081Z"
+    },
+    {
+      "id": "event_01KZ158FSJDQ1DNFD3KAGH2EAY",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14SQVWRFJA20EPM3R10X36",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14SQVWRFJA20EPM3R10X36"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T11:55:28.946Z"
+    },
+    {
+      "id": "event_01KZ158FZDC9V1NFH6MBCW6NW2",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ14SF4JKZFE59P6D3PYSF2H"
+      },
+      "payload": {
+        "progress": "Implemented transaction-local snapshot design: one ordered ref batch for new/update, one mutable ticket snapshot for split, and reverse-edge derivation from context-pack's tolerant ticket snapshot. Existing focused behavior tests are green after generating normal web assets."
+      },
+      "at": "2026-08-02T11:55:29.133Z"
+    },
+    {
+      "id": "event_01KZ15F0SZP77SSJ57MDA1VAFN",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14SQVWRFJA20EPM3R10X36",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14SQVWRFJA20EPM3R10X36"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-02T11:59:02.975Z"
+    },
+    {
+      "id": "event_01KZ15F0YJTK8KWNSEB9AF7NPS",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14SQVWRFJA20EPM3R10X36",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14SQVWRFJA20EPM3R10X36"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-08-02T11:59:03.122Z"
+    },
+    {
+      "id": "event_01KZ15F12QTZBK7N95W040T285",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14SQVWRFJA20EPM3R10X36",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14SQVWRFJA20EPM3R10X36"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-08-02T11:59:03.255Z"
+    },
+    {
+      "id": "event_01KZ15F1927ET4WWNRH258CEXG",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ14SF4JKZFE59P6D3PYSF2H"
+      },
+      "payload": {
+        "progress": "Focused snapshot suite green: 109 tests. Regressions prove split uses one listTickets scan across three children with collision suffixing; update resolves mixed/duplicate edge plus local-parent refs in one ordered batch; new uses one ordered batch plus one ticket scan; context pack uses one tolerant ticket scan and no loadIndex."
+      },
+      "at": "2026-08-02T11:59:03.458Z"
+    },
+    {
+      "id": "event_01KZ15TYMFK2W0JXR89ZPEBW9R",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14SQVWRFJA20EPM3R10X36",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14SQVWRFJA20EPM3R10X36"
+      },
+      "payload": {
+        "step": 6,
+        "checked": true
+      },
+      "at": "2026-08-02T12:05:33.967Z"
+    },
+    {
+      "id": "event_01KZ15TYT8AKQC2CAEQW5NSWHV",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ14SF4JKZFE59P6D3PYSF2H"
+      },
+      "payload": {
+        "progress": "Verification green on final code: focused affected suites 109/109; full suite 139 files and 2,020 tests; oxlint, oxfmt check, TypeScript (CLI and web), and compiled bun build all pass. Full suite was prebuilt first to avoid its known parallel build-artifact race."
+      },
+      "at": "2026-08-02T12:05:34.152Z"
+    },
+    {
+      "id": "event_01KZ15W8SJXAD1GYB94AHNDNRN",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14SQVWRFJA20EPM3R10X36",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14SQVWRFJA20EPM3R10X36"
+      },
+      "payload": {
+        "step": 7,
+        "checked": true
+      },
+      "at": "2026-08-02T12:06:17.139Z"
+    },
+    {
+      "id": "event_01KZ15W8Z6KNT92TQHWSBJBAVE",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ14SF4JKZFE59P6D3PYSF2H"
+      },
+      "payload": {
+        "progress": "Implementation and evidence committed as dd12bb6, branch pushed, and stacked PR #17 opened against feat/g5-simplification. Retarget after #8 lands."
+      },
+      "at": "2026-08-02T12:06:17.318Z"
+    },
+    {
+      "id": "event_01KZ15W96K8WTBXA40N89J21VA",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ14SQVWRFJA20EPM3R10X36",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ14SF4JKZFE59P6D3PYSF2H"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/17"
+      },
+      "at": "2026-08-02T12:06:17.555Z"
+    },
+    {
+      "id": "event_01KZ23B5BXK8R20GCZ5GW4WMB4",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ14SQVWRFJA20EPM3R10X36",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ14SQVWRFJA20EPM3R10X36"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Audit-fix program fully merged: PRs 5,6,7,9,10,12,13,14,15,16,17,18,19 all on main (PR 11 closed as superseded). Batch-closed after final merges of 14/18 and 19."
+      },
+      "at": "2026-08-02T20:41:13.853Z"
+    },
+    {
+      "id": "event_01KZ23B5CJYKQM9W70B00KCC1N",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ14SQVWRFJA20EPM3R10X36",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ14SF4JKZFE59P6D3PYSF2H"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T20:41:13.874Z"
+    }
+  ]
+}

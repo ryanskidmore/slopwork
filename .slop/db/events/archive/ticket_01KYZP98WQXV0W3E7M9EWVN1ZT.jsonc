@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYZP98WQXV0W3E7M9EWVN1ZT",
+  "events": [
+    {
+      "id": "event_01KYZP98XPRK6YRSXHP04CMWES",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP98WQXV0W3E7M9EWVN1ZT"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": "ticket_01KYZP89SKDFS5RE7NDE2J8W82"
+      },
+      "at": "2026-08-01T22:14:31.606Z"
+    },
+    {
+      "id": "event_01KZ0SKJ38XQ21QX6B2817G0H8",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0SKJ32NK9R7SNKRQPYNE2T",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0SKJ32NK9R7SNKRQPYNE2T"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-08-02T08:31:48.840Z"
+    },
+    {
+      "id": "event_01KZ0SKJ3VY4JZR3G5YY9AXJ22",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0SKJ32NK9R7SNKRQPYNE2T",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP98WQXV0W3E7M9EWVN1ZT"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T08:31:48.859Z"
+    },
+    {
+      "id": "event_01KZ0SKJ7YVJZ9GJE5V39P9YCW",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0SKJ32NK9R7SNKRQPYNE2T",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP98WQXV0W3E7M9EWVN1ZT"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/3"
+      },
+      "at": "2026-08-02T08:31:48.990Z"
+    },
+    {
+      "id": "event_01KZ10HHB37JB308WGF2QJKX76",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0SKJ32NK9R7SNKRQPYNE2T",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ0SKJ32NK9R7SNKRQPYNE2T"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "PRs #3/#4 merged; content landed on main via the stranded-stack merge (4811002). list/ready filters/bulk ops/graph editing/slug healing + full elicitations live. CI coverage gate tracked in t-mx6bq."
+      },
+      "at": "2026-08-02T10:33:02.563Z"
+    },
+    {
+      "id": "event_01KZ10HHBHEX9GE6QMKYNCDAPV",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ0SKJ32NK9R7SNKRQPYNE2T",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP98WQXV0W3E7M9EWVN1ZT"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T10:33:02.577Z"
+    }
+  ]
+}

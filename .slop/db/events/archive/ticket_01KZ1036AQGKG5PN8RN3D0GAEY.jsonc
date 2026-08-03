@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ1036AQGKG5PN8RN3D0GAEY",
+  "events": [
+    {
+      "id": "event_01KZ1036DFJVBCWYVSMNB5EAS5",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1036AQGKG5PN8RN3D0GAEY"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T10:25:12.623Z"
+    },
+    {
+      "id": "event_01KZ103GQTYKESXR18JBH91YCZ",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ103GQMHXDGPN7HRQGT8H2V",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ103GQMHXDGPN7HRQGT8H2V"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-08-02T10:25:23.194Z"
+    },
+    {
+      "id": "event_01KZ103GRXCYVQZ35HRVZDB5K0",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ103GQMHXDGPN7HRQGT8H2V",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1036AQGKG5PN8RN3D0GAEY"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T10:25:23.229Z"
+    },
+    {
+      "id": "event_01KZ10F8B71NCYXCBDGAK7BTP4",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ103GQMHXDGPN7HRQGT8H2V",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ103GQMHXDGPN7HRQGT8H2V"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 3
+      },
+      "at": "2026-08-02T10:31:47.815Z"
+    },
+    {
+      "id": "event_01KZ10F8GSNYVZVNPBANBADMAC",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ103GQMHXDGPN7HRQGT8H2V",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ103GQMHXDGPN7HRQGT8H2V"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-02T10:31:47.993Z"
+    },
+    {
+      "id": "event_01KZ10F8NJQ6HGTXW6NMEP0T81",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ103GQMHXDGPN7HRQGT8H2V",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ103GQMHXDGPN7HRQGT8H2V"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T10:31:48.146Z"
+    },
+    {
+      "id": "event_01KZ10F8W5DRF16HR3T7XVADR8",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1036AQGKG5PN8RN3D0GAEY"
+      },
+      "payload": {
+        "progress": "Merged feat/g3-cli-workbench (G3+G4) into main locally. Local coverage run on merged state: global+repo thresholds now pass; remaining failures are src/cli/commands (new list/ask/answer/questions lack the repo's mandatory in-process tests) and 4 near-miss src/tickets thresholds. 43 local test failures were a stale dist/slop artifact, not real."
+      },
+      "at": "2026-08-02T10:31:48.357Z"
+    },
+    {
+      "id": "event_01KZ12RW1WRGFZMN7ANZFY7R51",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ103GQMHXDGPN7HRQGT8H2V",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ103GQMHXDGPN7HRQGT8H2V"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-02T11:12:00.060Z"
+    },
+    {
+      "id": "event_01KZ12RW8CX7XQAM1GCWJCWBNK",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ103GQMHXDGPN7HRQGT8H2V",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1036AQGKG5PN8RN3D0GAEY"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/8"
+      },
+      "at": "2026-08-02T11:12:00.268Z"
+    },
+    {
+      "id": "event_01KZ12RWCMNFNKCFH2CYWMDS4H",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1036AQGKG5PN8RN3D0GAEY"
+      },
+      "payload": {
+        "progress": "Coverage fix superseded: G5's PR #8 includes the missing in-process command tests and passes the full coverage gate (2016 tests). Redundant fix agent stopped pre-push, no stray branch. Merging PR #8 turns main green. Also discovered: PRs #5/#6/#7 (Ryan's fix/audit-* branches) open in parallel."
+      },
+      "at": "2026-08-02T11:12:00.404Z"
+    },
+    {
+      "id": "event_01KZ1CG507BR1B6AT5QVA1TKWF",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ103GQMHXDGPN7HRQGT8H2V",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ103GQMHXDGPN7HRQGT8H2V"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Main CI green (run 30751034628): stranded G3/G4 landed via 4811002, coverage gate closed by PR #8's in-process tests. Both acceptance criteria met."
+      },
+      "at": "2026-08-02T14:02:00.071Z"
+    },
+    {
+      "id": "event_01KZ1CG50NVT1NTXNCEV9XD750",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ103GQMHXDGPN7HRQGT8H2V",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1036AQGKG5PN8RN3D0GAEY"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T14:02:00.085Z"
+    }
+  ]
+}

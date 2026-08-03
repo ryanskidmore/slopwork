@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ1P45MRZHMN1ZBJ22YGYDYN",
+  "events": [
+    {
+      "id": "event_01KZ1P45PW7DNRA1WVFKZ3M5ZM",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1P45MRZHMN1ZBJ22YGYDYN"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T16:50:13.340Z"
+    },
+    {
+      "id": "event_01KZ23BDJVS0ERFJB7T6JS7JF7",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ23BDJT6BGDF53G5RTADNZZ",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ23BDJT6BGDF53G5RTADNZZ"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-08-02T20:41:22.267Z"
+    },
+    {
+      "id": "event_01KZ23BDKKS4MQPP19KJ9A3FA9",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ23BDJT6BGDF53G5RTADNZZ",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1P45MRZHMN1ZBJ22YGYDYN"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T20:41:22.291Z"
+    },
+    {
+      "id": "event_01KZ273K07MQGN6XDCA3Z0VGVX",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ23BDJT6BGDF53G5RTADNZZ",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1P45MRZHMN1ZBJ22YGYDYN"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/20"
+      },
+      "at": "2026-08-02T21:46:59.975Z"
+    },
+    {
+      "id": "event_01KZ27YK3H1N3TET653Z74EDKE",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ23BDJT6BGDF53G5RTADNZZ",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ23BDJT6BGDF53G5RTADNZZ"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "PRs 20 and 21 merged to main. Merge-safe poll cursors + enforceable dependency boundaries live; the recursive detector caught 3 real violations before merging."
+      },
+      "at": "2026-08-02T22:01:44.817Z"
+    },
+    {
+      "id": "event_01KZ27YK4BP3DPG8NJC90WDBSV",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ23BDJT6BGDF53G5RTADNZZ",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1P45MRZHMN1ZBJ22YGYDYN"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T22:01:44.843Z"
+    }
+  ]
+}

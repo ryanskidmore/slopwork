@@ -1,0 +1,237 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F",
+  "events": [
+    {
+      "id": "event_01KYZP89Q24KF794A88J8ES22M",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-01T22:13:59.650Z"
+    },
+    {
+      "id": "event_01KYZRW2G4MEXRPCZWKCYSXHAT",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KYZRW2FX6TB5FTA07S1EJ2DP",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYZRW2FX6TB5FTA07S1EJ2DP"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-08-01T22:59:44.772Z"
+    },
+    {
+      "id": "event_01KYZRW2GVWN3C6SYAK1FBD0P2",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KYZRW2FX6TB5FTA07S1EJ2DP",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-01T22:59:44.795Z"
+    },
+    {
+      "id": "event_01KYZRW2N2FEMVY9ES1TDE2TVT",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KYZRW2FX6TB5FTA07S1EJ2DP",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYZRW2FX6TB5FTA07S1EJ2DP"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 3
+      },
+      "at": "2026-08-01T22:59:44.930Z"
+    },
+    {
+      "id": "event_01KYZRXXMK6AHVTA82NZMAX5FK",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KYZRW2FX6TB5FTA07S1EJ2DP",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYZRW2FX6TB5FTA07S1EJ2DP"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-01T23:00:45.331Z"
+    },
+    {
+      "id": "event_01KYZRXXRFXBNZ2BY2M4YTW99X",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F"
+      },
+      "payload": {
+        "progress": "G2 subagent spawned; branch feat/g2-pluggable-storage stacked on origin/feat/g1-remove-transcripts; PR will base on the G1 branch. Covers children t-y2j03, t-an2d7, t-6tqw9, t-cloj2, t-k3krj; may also resolve 01KYAVM4 (web cache) as a side effect."
+      },
+      "at": "2026-08-01T23:00:45.455Z"
+    },
+    {
+      "id": "event_01KZ0H8Y77V0984DP0Y6NC5BX3",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F"
+      },
+      "payload": {
+        "progress": "First G2 agent killed mid-task by session limit. Salvage state: feat/g2-pluggable-storage has 2 clean commits (t-cloj2 lock simplification, t-k3krj overlay unification) + uncommitted WIP on src/storage/. Relaunching on Sonnet to resume in the same worktree."
+      },
+      "at": "2026-08-02T06:06:12.199Z"
+    },
+    {
+      "id": "event_01KZ0NSVDV7JW9TH2W99SVPP6T",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KYZRW2FX6TB5FTA07S1EJ2DP",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYZRW2FX6TB5FTA07S1EJ2DP"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T07:25:20.699Z"
+    },
+    {
+      "id": "event_01KZ0NSVHVW5AKF7TRK5A9X88J",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KYZRW2FX6TB5FTA07S1EJ2DP",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYZRW2FX6TB5FTA07S1EJ2DP"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-02T07:25:20.827Z"
+    },
+    {
+      "id": "event_01KZ0NSVNV923MEKBQECTSX2ZG",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KYZRW2FX6TB5FTA07S1EJ2DP",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/2"
+      },
+      "at": "2026-08-02T07:25:20.956Z"
+    },
+    {
+      "id": "event_01KZ0NSVV9E8QM2QZCP0KWXBR2",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F"
+      },
+      "payload": {
+        "progress": "PR #2 open, restacked onto main after PR #1 merged. Gate green: 1851 tests. StorageBackend interface (src/storage/backend.ts) + flatfile driver + remote stub + wire contract (docs/storage-backends.md) + monthly event sharding + simplified lock + unified overlay fold. Web cache ticket resolved as side effect. Follow-ups reported: init does not prompt for backend/lock_timeout; remote driver has no real HTTP client yet; remote-auth failures map to GENERIC_ERROR; strict listEvents path uncached."
+      },
+      "at": "2026-08-02T07:25:21.129Z"
+    },
+    {
+      "id": "event_01KZ10HG2R884JGFNNA2G5YNAM",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KYZRW2FX6TB5FTA07S1EJ2DP",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYZRW2FX6TB5FTA07S1EJ2DP"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "PR #2 merged; content landed on main via the stranded-stack merge (4811002). Storage interface + flatfile driver + remote stub + wire contract + event sharding + lock simplification + unified overlay fold all live. CI coverage gate tracked separately in t-mx6bq."
+      },
+      "at": "2026-08-02T10:33:01.272Z"
+    },
+    {
+      "id": "event_01KZ10HG3766DZGGBSWYHDTZFT",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KYZRW2FX6TB5FTA07S1EJ2DP",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYZP89PKQXZJXCH7YQ0JNK4F"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T10:33:01.287Z"
+    }
+  ]
+}

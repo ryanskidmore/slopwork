@@ -1,0 +1,308 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ12YSBTYHZS6TPKQC0MVZB0",
+  "events": [
+    {
+      "id": "event_01KZ12YSDJXGNXPZNADNNK8AGQ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ12YSBTYHZS6TPKQC0MVZB0"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T11:15:13.970Z"
+    },
+    {
+      "id": "event_01KZ12YZZ4DTP12A67TZZAWSXA",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z"
+      },
+      "payload": {
+        "harness": "codex",
+        "takeover": false
+      },
+      "at": "2026-08-02T11:15:20.676Z"
+    },
+    {
+      "id": "event_01KZ12YZZ77J391GSCVKFX4FET",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ12YSBTYHZS6TPKQC0MVZB0"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T11:15:20.679Z"
+    },
+    {
+      "id": "event_01KZ12Z05A3EZM31AN0BJRK0TC",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 6
+      },
+      "at": "2026-08-02T11:15:20.874Z"
+    },
+    {
+      "id": "event_01KZ1351XMTW8DCQKR0NVY2KQ3",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-02T11:18:39.284Z"
+    },
+    {
+      "id": "event_01KZ1351Y9F7YA8EQ27BTFARAF",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ12YSBTYHZS6TPKQC0MVZB0"
+      },
+      "payload": {
+        "progress": "Verified both findings remain on current origin/main. Mapped all web summary call sites and designed one request-scoped reverse-edge context; isolated the event-only portion of the existing content fingerprint contract."
+      },
+      "at": "2026-08-02T11:18:39.305Z"
+    },
+    {
+      "id": "event_01KZ13BK8ZW7PJQ2H0EPNJ1PJ4",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T11:22:13.663Z"
+    },
+    {
+      "id": "event_01KZ13BKCDBSFMSAC8ZDJJ7NH2",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-02T11:22:13.773Z"
+    },
+    {
+      "id": "event_01KZ13BKF6NKAYRHTKCTV6TTFM",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-08-02T11:22:13.862Z"
+    },
+    {
+      "id": "event_01KZ13BKHPB7AWSMVMH9GQ3Y6T",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ12YSBTYHZS6TPKQC0MVZB0"
+      },
+      "payload": {
+        "progress": "Implemented request-scoped summary context across tickets/tree/review/stale/detail and reused it for detail relationships. Extracted event-only fingerprint for FlatfileBackend while keeping computeContentFingerprint behavior intact. Focused tests pass (37)."
+      },
+      "at": "2026-08-02T11:22:13.942Z"
+    },
+    {
+      "id": "event_01KZ13M5ECYNCP4G4RD2JGZJWV",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-08-02T11:26:54.412Z"
+    },
+    {
+      "id": "event_01KZ13M5GK49PJNRJBSKADAWYJ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ12YSBTYHZS6TPKQC0MVZB0"
+      },
+      "payload": {
+        "progress": "Added deterministic 8,192-ticket operation-count coverage, zero unrelated readdir/stat assertions, flat/sharded invalidation tests, and StorageBackend/web-handler benchmark phases. Full suite passes: 133 files, 1,953 tests. Lint, format, both typechecks, and production build pass."
+      },
+      "at": "2026-08-02T11:26:54.483Z"
+    },
+    {
+      "id": "event_01KZ13Q9CJJD4DHE16NWGWA1Y6",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z"
+      },
+      "payload": {
+        "step": 6,
+        "checked": true
+      },
+      "at": "2026-08-02T11:28:36.754Z"
+    },
+    {
+      "id": "event_01KZ13Q9F3HQ3Z2N7GPECCCVV8",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ12YSBTYHZS6TPKQC0MVZB0"
+      },
+      "payload": {
+        "progress": "Committed 5b99636, pushed fix/audit-read-performance, and opened PR #12. Residual: response size remains linear but unpaginated; intentionally left to the separate product/API finding."
+      },
+      "at": "2026-08-02T11:28:36.835Z"
+    },
+    {
+      "id": "event_01KZ13Q9HMW2ENX6SSVASYF92A",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ12YSBTYHZS6TPKQC0MVZB0"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/12"
+      },
+      "at": "2026-08-02T11:28:36.917Z"
+    },
+    {
+      "id": "event_01KZ23B4ZTX6TEDZ980N6P4WND",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Audit-fix program fully merged: PRs 5,6,7,9,10,12,13,14,15,16,17,18,19 all on main (PR 11 closed as superseded). Batch-closed after final merges of 14/18 and 19."
+      },
+      "at": "2026-08-02T20:41:13.466Z"
+    },
+    {
+      "id": "event_01KZ23B50GP8WQM299B7BQNS8K",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ12YZZ2QQEVZSYX6W6VA37Z",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ12YSBTYHZS6TPKQC0MVZB0"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T20:41:13.488Z"
+    }
+  ]
+}

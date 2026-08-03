@@ -1,0 +1,362 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ1CM70EA5ZW0Y73BTFG2RSB",
+  "events": [
+    {
+      "id": "event_01KZ1CM73MV60QYX5FQS6T63T1",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1CM70EA5ZW0Y73BTFG2RSB"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T14:04:13.300Z"
+    },
+    {
+      "id": "event_01KZ1CMG3XYNQNV355Y0H31JY2",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1CMG3NR26DWQNXFHVS0601",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ1CMG3NR26DWQNXFHVS0601"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-08-02T14:04:22.525Z"
+    },
+    {
+      "id": "event_01KZ1CMG63ED70MAR3N5VEV4NQ",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1CMG3NR26DWQNXFHVS0601",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1CM70EA5ZW0Y73BTFG2RSB"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T14:04:22.595Z"
+    },
+    {
+      "id": "event_01KZ1CMGC2DBCDB7R0JW9EDM39",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1CMG3NR26DWQNXFHVS0601",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ1CMG3NR26DWQNXFHVS0601"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 3
+      },
+      "at": "2026-08-02T14:04:22.786Z"
+    },
+    {
+      "id": "event_01KZ1CMGHF395SE5W4FV68SEJF",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1CMG3NR26DWQNXFHVS0601",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ1CMG3NR26DWQNXFHVS0601"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-02T14:04:22.959Z"
+    },
+    {
+      "id": "event_01KZ1CWV0WD6NME5A6XWV9JEA5",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1CMG3NR26DWQNXFHVS0601",
+      "verb": "plan.revised",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ1CMG3NR26DWQNXFHVS0601"
+      },
+      "payload": {
+        "version": 2,
+        "step_count": 7
+      },
+      "at": "2026-08-02T14:08:55.836Z"
+    },
+    {
+      "id": "event_01KZ1CWV647Y9DD6ETN5P1X2E1",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1CMG3NR26DWQNXFHVS0601",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ1CMG3NR26DWQNXFHVS0601"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-02T14:08:56.004Z"
+    },
+    {
+      "id": "event_01KZ1CX81Z8P8JB4RX3FEPT6WR",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1CMG3NR26DWQNXFHVS0601",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ1CMG3NR26DWQNXFHVS0601"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-02T14:09:09.183Z"
+    },
+    {
+      "id": "event_01KZ1CX8837TZN5QNYZFN6Q995",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1CM70EA5ZW0Y73BTFG2RSB"
+      },
+      "payload": {
+        "progress": "Dogfood events sharded on main directly: 912 events -> 2026-07 + 2026-08 shards. chore/audit-dogfood-event-shards is superseded (recommend deleting that branch). Wave queue defined; batches A-D run sequentially after the PR 5-7 agent reports."
+      },
+      "at": "2026-08-02T14:09:09.379Z"
+    },
+    {
+      "id": "event_01KZ1FRJ2EGX1X7XAMYCEE5KW7",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1CMG3NR26DWQNXFHVS0601",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ1CMG3NR26DWQNXFHVS0601"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T14:59:01.326Z"
+    },
+    {
+      "id": "event_01KZ1FRJ7VZ8T34NYGVM3GHH12",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1CM70EA5ZW0Y73BTFG2RSB"
+      },
+      "payload": {
+        "progress": "Wave 1 verdicts: PR5 MERGE-READY (YAML parser misparses new backend: key — 4/5 conformance cases red on main); PR6 MERGE-READY (umbrella parents leaked into ready — 9/9 red on main, composes with new filters); PR7 MERGE-READY after substantial rework (kept only the minimal token-safe release fixing a proven releaseLock TOCTOU; dropped the mkdir/owner.json protocol rewrite and restored staleTimeoutMs; a rarer pre-existing three-party restore race documented in DECISIONS.md rather than fixed). All pushed. Launching Batch A (web trio)."
+      },
+      "at": "2026-08-02T14:59:01.499Z"
+    },
+    {
+      "id": "event_01KZ1HDP6VHGHB5QWM58MPRP19",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1CMG3NR26DWQNXFHVS0601",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ1CMG3NR26DWQNXFHVS0601"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-08-02T15:28:02.267Z"
+    },
+    {
+      "id": "event_01KZ1HDPBJP28JBBFNNHV55ADX",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1CM70EA5ZW0Y73BTFG2RSB"
+      },
+      "payload": {
+        "progress": "Batch A: all 3 survive. PR12 (read-performance, clean rebase), PR15 (web pagination, restored label.tsx the G5 sweep had rightly deleted-as-dead but these fixes re-liven), PR16 (web resilience, adds test:web + test:browser CI suites; fixed SLOP_WEB_FAKE_NOW rename break). Stacked 12->15->16; retargeted 15/16 to main to avoid the G3/G4 stranding trap — merge in order. Discovery: dying session opened PRs 9-18 in a final burst 11:13-12:06Z; closed PR11 (dogfood shards, superseded by on-main migration). PRs 13/17 sit on the stale merged g5 base — Batch C will retarget. Spawning Batch B (update existing PRs 14/18 in place)."
+      },
+      "at": "2026-08-02T15:28:02.419Z"
+    },
+    {
+      "id": "event_01KZ1KZX1S71KX0CW2SWED9439",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1CMG3NR26DWQNXFHVS0601",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ1CMG3NR26DWQNXFHVS0601"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-08-02T16:12:56.249Z"
+    },
+    {
+      "id": "event_01KZ1KZX5VAMRHTVQ881VQ2448",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1CM70EA5ZW0Y73BTFG2RSB"
+      },
+      "payload": {
+        "progress": "Batch B: both MERGE-READY (agent mislabeled them RECOMMEND-CLOSE despite proving load-bearing; coordinator corrected PR bodies). PR14 mutation-recovery: journal concept absent on main, SIGKILL mid-write unrecoverable without it; agent added coverage tests only. PR18 event-integrity: stacked on 14, retargeted to main, 13 assertions red without fix, index schema v6. Merge order: 14 then 18. Spawning Batch C (PRs 9/10/13/17; 13+17 need retarget off stale g5 base)."
+      },
+      "at": "2026-08-02T16:12:56.379Z"
+    },
+    {
+      "id": "event_01KZ1NM4H0HYVZ7YXZH9RZZKR5",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1CMG3NR26DWQNXFHVS0601",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ1CMG3NR26DWQNXFHVS0601"
+      },
+      "payload": {
+        "step": 6,
+        "checked": true
+      },
+      "at": "2026-08-02T16:41:27.841Z"
+    },
+    {
+      "id": "event_01KZ1NM4RFRQVE6YPQ84SYE1VH",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1CM70EA5ZW0Y73BTFG2RSB"
+      },
+      "payload": {
+        "progress": "Batch C: all 4 MERGE-READY. PR10 source-hygiene (caught real AGENTS.md drift — coordinator regenerated it now; NUL bytes + mojibake on main confirmed), PR9 release-guardrails (main's release.yml can npm publish an untagged ref today; release gate drifted from CI gate), PR17 command-snapshots (retargeted to main; redundant scans orthogonal to storage cache, compounds with bulk update), PR13 session-attribution (retargeted; 10 session:null call sites, correctly covers question verbs). Caution recorded: 17 and 13 touch the same two test files — merge one, re-rebase the other. Spawning Batch D (WIP salvage assessment)."
+      },
+      "at": "2026-08-02T16:41:28.079Z"
+    },
+    {
+      "id": "event_01KZ1P45J9ZVDHB2CHXJHKEB35",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1CMG3NR26DWQNXFHVS0601",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ1CMG3NR26DWQNXFHVS0601"
+      },
+      "payload": {
+        "step": 7,
+        "checked": true
+      },
+      "at": "2026-08-02T16:50:13.193Z"
+    },
+    {
+      "id": "event_01KZ1P466ABGDA66DF1BH9581F",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1CMG3NR26DWQNXFHVS0601",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ1CMG3NR26DWQNXFHVS0601"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Wrangling complete. 11 PRs vetted MERGE-READY with load-bearing evidence (5,6,7,9,10,12,13,14,15,16,17,18 minus closed 11 = 12 open... final: 5,6,7,9,10,12,13,14,15,16,17,18). PR11 closed as superseded. 3 WIP snapshots assessed: cursors+boundaries near-done (finish tickets filed), web-bounds parked on web chain. Merge-order guidance recorded in each PR body."
+      },
+      "at": "2026-08-02T16:50:13.834Z"
+    },
+    {
+      "id": "event_01KZ1P466RQAS187HFG717277K",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ1CMG3NR26DWQNXFHVS0601",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1CM70EA5ZW0Y73BTFG2RSB"
+      },
+      "payload": {
+        "from": "in_progress"
+      },
+      "at": "2026-08-02T16:50:13.848Z"
+    }
+  ]
+}

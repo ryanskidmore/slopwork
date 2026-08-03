@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ21KA4B0ZW32HXR12H1RHQE",
+  "events": [
+    {
+      "id": "event_01KZ21KA53SZDP2828RZ89N8VB",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ21KA4B0ZW32HXR12H1RHQE"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T20:10:43.747Z"
+    },
+    {
+      "id": "event_01KZ2AFMJS31KEEK7T0VAJ41YY",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ2AFMJS31KEEK7T0VAJ41YX",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ2AFMJS31KEEK7T0VAJ41YX"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-08-02T22:46:00.537Z"
+    },
+    {
+      "id": "event_01KZ2AFMKF54W9DAXZ4D4FNR4A",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ2AFMJS31KEEK7T0VAJ41YX",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ21KA4B0ZW32HXR12H1RHQE"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T22:46:00.559Z"
+    },
+    {
+      "id": "event_01KZ2EEH4C669P9QZNPZ9FMB70",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ2AFMJS31KEEK7T0VAJ41YX",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ21KA4B0ZW32HXR12H1RHQE"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/24"
+      },
+      "at": "2026-08-02T23:55:18.540Z"
+    },
+    {
+      "id": "event_01KZ2EEHAGSPGWT5GZECW5SNFN",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ2AFMJS31KEEK7T0VAJ41YX",
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ21KA4B0ZW32HXR12H1RHQE"
+      },
+      "payload": {
+        "progress": "PR #24 open. Design: per-ticket archive file (events/archive/<id>.jsonc) — ticket reads stay lean; index/cascade proven safe on loose-only reads; cross-clone close-vs-append merges conflict-free (verified with real git merge in tests); double-close conflicts match the existing ticket-file conflict class, dedupe-by-id makes either resolution lossless. reindex --compact for retroactive sweeps. Measured: 10x events file-count reduction, list ~15-30% faster. Post-merge coordinator chore: run reindex --compact on this repo's tracker."
+      },
+      "at": "2026-08-02T23:55:18.736Z"
+    },
+    {
+      "id": "event_01KZ2FSQZY3VAVR4SJC2WQMQT6",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ2AFMJS31KEEK7T0VAJ41YX",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ2AFMJS31KEEK7T0VAJ41YX"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "PR #24 merged. Terminal-transition compaction live with per-ticket archives, cursor-safe reads, reindex --compact for retroactive sweeps."
+      },
+      "at": "2026-08-03T00:18:54.590Z"
+    },
+    {
+      "id": "event_01KZ2FSR0XC2JQCSSMQH46FZTJ",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ2AFMJS31KEEK7T0VAJ41YX",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ21KA4B0ZW32HXR12H1RHQE"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-03T00:18:54.621Z"
+    }
+  ]
+}

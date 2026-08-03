@@ -1,0 +1,187 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYAPHFTMEFZ3QY5KC934F9PQ",
+  "events": [
+    {
+      "id": "event_01KYAPHFV3B1B6T8R8K4GX4Z41",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPHFTMEFZ3QY5KC934F9PQ"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-07-24T18:34:57.763Z"
+    },
+    {
+      "id": "event_01KYARA02HMDDC39DVARXFK772",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYARA0217HSTY1PHCGENGXRM",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYARA0217HSTY1PHCGENGXRM"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-07-24T19:05:49.394Z"
+    },
+    {
+      "id": "event_01KYARA03MY54GTJ3F92PG20K7",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYARA0217HSTY1PHCGENGXRM",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPHFTMEFZ3QY5KC934F9PQ"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-07-24T19:05:49.428Z"
+    },
+    {
+      "id": "event_01KYARA7MEVY452AEW6S5VNXJ8",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYARA0217HSTY1PHCGENGXRM",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYARA0217HSTY1PHCGENGXRM"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 3
+      },
+      "at": "2026-07-24T19:05:57.134Z"
+    },
+    {
+      "id": "event_01KYARCAXZWNAGX19581B8REM1",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYARA0217HSTY1PHCGENGXRM",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYARA0217HSTY1PHCGENGXRM"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-07-24T19:07:06.047Z"
+    },
+    {
+      "id": "event_01KYARCB452MNATJ59KAH9FW6B",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYARA0217HSTY1PHCGENGXRM",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYARA0217HSTY1PHCGENGXRM"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-07-24T19:07:06.245Z"
+    },
+    {
+      "id": "event_01KYARKZ0JGZMEA9FHHKVGJRD9",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYARA0217HSTY1PHCGENGXRM",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYARA0217HSTY1PHCGENGXRM"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-07-24T19:11:15.986Z"
+    },
+    {
+      "id": "event_01KYARM1BZ0R1V1Q1METFRQM2W",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPHFTMEFZ3QY5KC934F9PQ"
+      },
+      "payload": {
+        "progress": "Fixed: externalParentBadge (shared.ts) now routes config.remotes.jira through safeUrl before building the href; falls back to the existing inert-text badge on unsafe schemes. Added shared.test.ts with javascript:/data:/unconfigured regression cases. Full suite green: bun run test/lint/typecheck/format:check all pass."
+      },
+      "at": "2026-07-24T19:11:18.399Z"
+    },
+    {
+      "id": "event_01KYARNM2DAYWSR6DMSXB1MCTB",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYARA0217HSTY1PHCGENGXRM",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYARA0217HSTY1PHCGENGXRM"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "externalParentBadge now routes config.remotes.jira through safeUrl before building href; unsafe schemes fall back to the existing inert-text badge. Added shared.test.ts (javascript:/data:/unconfigured cases). bun run test/lint/typecheck/format:check all green.",
+        "transcript_ref": "transcripts/session_01KYARA0217HSTY1PHCGENGXRM.jsonl"
+      },
+      "at": "2026-07-24T19:12:10.317Z"
+    },
+    {
+      "id": "event_01KYARNM3194H75574M8KH53WJ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYARA0217HSTY1PHCGENGXRM",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPHFTMEFZ3QY5KC934F9PQ"
+      },
+      "payload": {
+        "from": "in_progress"
+      },
+      "at": "2026-07-24T19:12:10.337Z"
+    }
+  ]
+}

@@ -1,0 +1,291 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ124Q5PHPJC0891677MMBFQ",
+  "events": [
+    {
+      "id": "event_01KZ124Q7NJYJC6A7T52FDRNET",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ124Q5PHPJC0891677MMBFQ"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T11:00:59.765Z"
+    },
+    {
+      "id": "event_01KZ124ZB70N7CXWG79A44HP1C",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KZ124ZB5T27QRJYM76EPDEBZ",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ124ZB5T27QRJYM76EPDEBZ"
+      },
+      "payload": {
+        "harness": "codex",
+        "takeover": false
+      },
+      "at": "2026-08-02T11:01:08.071Z"
+    },
+    {
+      "id": "event_01KZ124ZBB187XTWJD571XSY8V",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KZ124ZB5T27QRJYM76EPDEBZ",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ124Q5PHPJC0891677MMBFQ"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T11:01:08.075Z"
+    },
+    {
+      "id": "event_01KZ124ZHYVNGZQ7XC91CX0HAX",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ124ZB5T27QRJYM76EPDEBZ",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ124ZB5T27QRJYM76EPDEBZ"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 6
+      },
+      "at": "2026-08-02T11:01:08.286Z"
+    },
+    {
+      "id": "event_01KZ129ZBCZ82WD64YGS3EQ6WQ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ124ZB5T27QRJYM76EPDEBZ",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ124ZB5T27QRJYM76EPDEBZ"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-02T11:03:51.916Z"
+    },
+    {
+      "id": "event_01KZ129ZH09AM3YJ6HZXS1DTRT",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ124Q5PHPJC0891677MMBFQ"
+      },
+      "payload": {
+        "progress": "Confirmed release workflow_dispatch defaults to a real publish path, release runs plain tests while CI uses coverage thresholds, and CI only inspects npm pack metadata. Designed one check:required package script for both workflows, dry-run-only manual dispatch, and a self-contained tarball pack/install/execute verifier."
+      },
+      "at": "2026-08-02T11:03:52.096Z"
+    },
+    {
+      "id": "event_01KZ12J5E657CTPWC59P7MH07A",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ124ZB5T27QRJYM76EPDEBZ",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ124ZB5T27QRJYM76EPDEBZ"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T11:08:20.294Z"
+    },
+    {
+      "id": "event_01KZ12J5K6HMMF82R1JYFMPBQR",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ124ZB5T27QRJYM76EPDEBZ",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ124ZB5T27QRJYM76EPDEBZ"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-02T11:08:20.454Z"
+    },
+    {
+      "id": "event_01KZ12J5QBS8HMTC39AG838HNF",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ124ZB5T27QRJYM76EPDEBZ",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ124ZB5T27QRJYM76EPDEBZ"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-08-02T11:08:20.588Z"
+    },
+    {
+      "id": "event_01KZ12J5VGMBFWNPKXSAKQ9T72",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ124Q5PHPJC0891677MMBFQ"
+      },
+      "payload": {
+        "progress": "Implemented one check:required gate used verbatim by CI and release, forced workflow_dispatch onto the dry-run publish step while real publish requires a v* tag push, and added a prepack-backed verifier that packs, installs, checks installed source/assets, and executes the installed launcher. Workflow/YAML contract tests, packaging tests, format, lint, typecheck, build, compiled smoke, and package smoke pass."
+      },
+      "at": "2026-08-02T11:08:20.720Z"
+    },
+    {
+      "id": "event_01KZ12TD06ER7DERDPF6YTGT61",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ124ZB5T27QRJYM76EPDEBZ",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ124ZB5T27QRJYM76EPDEBZ"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-08-02T11:12:50.182Z"
+    },
+    {
+      "id": "event_01KZ12TD4J3BFJDSSFHK5MWDYN",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ124Q5PHPJC0891677MMBFQ"
+      },
+      "payload": {
+        "progress": "Final validation: YAML parses, 17 focused workflow/package tests pass, all 1,957 full-suite assertions pass, format/lint/typecheck/build/compiled smoke/real tgz install smoke pass. The inherited coverage command remains threshold-red at 79.56% statements, 80.56% lines, 74.18% functions; release now correctly shares that gate and depends on the parallel coverage repair. Documented GHSA-qwww-vcr4-c8h2 as non-applicable because Slopwork has no RSC mode or route actions."
+      },
+      "at": "2026-08-02T11:12:50.322Z"
+    },
+    {
+      "id": "event_01KZ12WDGMDAS085B9AEDQTMAX",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ124ZB5T27QRJYM76EPDEBZ",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ124Q5PHPJC0891677MMBFQ"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/9"
+      },
+      "at": "2026-08-02T11:13:56.244Z"
+    },
+    {
+      "id": "event_01KZ12WDN21JCHKZRMDV4R518T",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ124ZB5T27QRJYM76EPDEBZ",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ124ZB5T27QRJYM76EPDEBZ"
+      },
+      "payload": {
+        "step": 6,
+        "checked": true
+      },
+      "at": "2026-08-02T11:13:56.386Z"
+    },
+    {
+      "id": "event_01KZ23B4V0WSTYWQAR1J747D0M",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ124ZB5T27QRJYM76EPDEBZ",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ124ZB5T27QRJYM76EPDEBZ"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Audit-fix program fully merged: PRs 5,6,7,9,10,12,13,14,15,16,17,18,19 all on main (PR 11 closed as superseded). Batch-closed after final merges of 14/18 and 19."
+      },
+      "at": "2026-08-02T20:41:13.312Z"
+    },
+    {
+      "id": "event_01KZ23B4VJJZE856SHVK2XW4DK",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ124ZB5T27QRJYM76EPDEBZ",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ124Q5PHPJC0891677MMBFQ"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T20:41:13.330Z"
+    }
+  ]
+}

@@ -1,0 +1,273 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ1291TZ9J6FZT0W55X85P57",
+  "events": [
+    {
+      "id": "event_01KZ1291WQQQFK0GYXCR6KE7K4",
+      "actor": {
+        "name": "codex-source-hygiene",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1291TZ9J6FZT0W55X85P57"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T11:03:21.751Z"
+    },
+    {
+      "id": "event_01KZ12954HZG7FJWBV3EV6Z103",
+      "actor": {
+        "name": "codex-source-hygiene",
+        "kind": "agent"
+      },
+      "session": "session_01KZ12954G7FBBYVCXRXZ9V1WG",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12954G7FBBYVCXRXZ9V1WG"
+      },
+      "payload": {
+        "harness": "codex",
+        "takeover": false
+      },
+      "at": "2026-08-02T11:03:25.073Z"
+    },
+    {
+      "id": "event_01KZ12954NRFGR6EFMWGVZP64Z",
+      "actor": {
+        "name": "codex-source-hygiene",
+        "kind": "agent"
+      },
+      "session": "session_01KZ12954G7FBBYVCXRXZ9V1WG",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1291TZ9J6FZT0W55X85P57"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T11:03:25.077Z"
+    },
+    {
+      "id": "event_01KZ1299KVT41XN208VSQE46FV",
+      "actor": {
+        "name": "codex-source-hygiene",
+        "kind": "human"
+      },
+      "session": "session_01KZ12954G7FBBYVCXRXZ9V1WG",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12954G7FBBYVCXRXZ9V1WG"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 5
+      },
+      "at": "2026-08-02T11:03:29.659Z"
+    },
+    {
+      "id": "event_01KZ12EPY4YF4WAT10V39JBZ1M",
+      "actor": {
+        "name": "codex-source-hygiene",
+        "kind": "human"
+      },
+      "session": "session_01KZ12954G7FBBYVCXRXZ9V1WG",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12954G7FBBYVCXRXZ9V1WG"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-02T11:06:27.140Z"
+    },
+    {
+      "id": "event_01KZ12EQ923N8W902QHM9DCKET",
+      "actor": {
+        "name": "codex-source-hygiene",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1291TZ9J6FZT0W55X85P57"
+      },
+      "payload": {
+        "progress": "Verified on current main: two literal NUL bytes are runtime separators in fingerprintEntityDir; one corrupt comment sequence is in WebDataSource event docs; only .gitignore plus two benchmark configs are active stale transcript artifacts; .slop/AGENTS.md is behind canonical onboarding while SKILL.md is current; no drift/source-byte gate exists. Historical changelog/DECISIONS and G1 compatibility tests are intentional and remain."
+      },
+      "at": "2026-08-02T11:06:27.491Z"
+    },
+    {
+      "id": "event_01KZ12K498D4MV28J79ZDE19KJ",
+      "actor": {
+        "name": "codex-source-hygiene",
+        "kind": "human"
+      },
+      "session": "session_01KZ12954G7FBBYVCXRXZ9V1WG",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12954G7FBBYVCXRXZ9V1WG"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T11:08:51.880Z"
+    },
+    {
+      "id": "event_01KZ12K58Y80D1Q1PX2AEPYQVW",
+      "actor": {
+        "name": "codex-source-hygiene",
+        "kind": "human"
+      },
+      "session": "session_01KZ12954G7FBBYVCXRXZ9V1WG",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12954G7FBBYVCXRXZ9V1WG"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-02T11:08:52.894Z"
+    },
+    {
+      "id": "event_01KZ12K5XRECPCVFFJVHYMD5TJ",
+      "actor": {
+        "name": "codex-source-hygiene",
+        "kind": "human"
+      },
+      "session": "session_01KZ12954G7FBBYVCXRXZ9V1WG",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12954G7FBBYVCXRXZ9V1WG"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-08-02T11:08:53.560Z"
+    },
+    {
+      "id": "event_01KZ12K6JJNH6Y6THKZ0E3QYGN",
+      "actor": {
+        "name": "codex-source-hygiene",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1291TZ9J6FZT0W55X85P57"
+      },
+      "payload": {
+        "progress": "Repaired literal source NULs as escaped runtime delimiters, corrected WebDataSource mojibake, removed stale transcript settings only from .gitignore/bench configs, regenerated managed onboarding, and added digest/source-byte/mojibake/active-transcript/managed-drift regressions. Historical and migration compatibility references remain intact; event sharding untouched."
+      },
+      "at": "2026-08-02T11:08:54.227Z"
+    },
+    {
+      "id": "event_01KZ12XR2VN052YK5DY8CGVF4N",
+      "actor": {
+        "name": "codex-source-hygiene",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1291TZ9J6FZT0W55X85P57"
+      },
+      "payload": {
+        "progress": "Verification green: 114 focused tests; typecheck/web typecheck, lint, format, diff check, compiled build; deterministic full suite 134 files/1,955 tests with one worker. Default parallel full run exposed the pre-existing shared build:web/dist output race, so the serial result is authoritative for this PR."
+      },
+      "at": "2026-08-02T11:14:39.835Z"
+    },
+    {
+      "id": "event_01KZ12YZRJ52PJ2GFY5P9STFMV",
+      "actor": {
+        "name": "codex-source-hygiene",
+        "kind": "human"
+      },
+      "session": "session_01KZ12954G7FBBYVCXRXZ9V1WG",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12954G7FBBYVCXRXZ9V1WG"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-08-02T11:15:20.466Z"
+    },
+    {
+      "id": "event_01KZ12YZXSRMSRVTN4BCNPGBDY",
+      "actor": {
+        "name": "codex-source-hygiene",
+        "kind": "human"
+      },
+      "session": "session_01KZ12954G7FBBYVCXRXZ9V1WG",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1291TZ9J6FZT0W55X85P57"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/10"
+      },
+      "at": "2026-08-02T11:15:20.633Z"
+    },
+    {
+      "id": "event_01KZ23B4XDB0T31XPX987D5199",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ12954G7FBBYVCXRXZ9V1WG",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ12954G7FBBYVCXRXZ9V1WG"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Audit-fix program fully merged: PRs 5,6,7,9,10,12,13,14,15,16,17,18,19 all on main (PR 11 closed as superseded). Batch-closed after final merges of 14/18 and 19."
+      },
+      "at": "2026-08-02T20:41:13.389Z"
+    },
+    {
+      "id": "event_01KZ23B4Y0SA3KVQ4YXG3N237P",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ12954G7FBBYVCXRXZ9V1WG",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ1291TZ9J6FZT0W55X85P57"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T20:41:13.408Z"
+    }
+  ]
+}

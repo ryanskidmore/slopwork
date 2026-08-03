@@ -1,0 +1,239 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC",
+  "events": [
+    {
+      "id": "event_01KYAPKRYJ6E61VP287BJ9XPE2",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-07-24T18:36:12.626Z"
+    },
+    {
+      "id": "event_01KYAVAGVCKV2YHR06KWCFAWD3",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAVAGV52AEGJ57V54TQGYHZ",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAVAGV52AEGJ57V54TQGYHZ"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-07-24T19:58:32.300Z"
+    },
+    {
+      "id": "event_01KYAVAGW1WJTT48PGG0BZ7Q59",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAVAGV52AEGJ57V54TQGYHZ",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-07-24T19:58:32.321Z"
+    },
+    {
+      "id": "event_01KYAVASZ2MF9CGQK81SF464N3",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAVAGV52AEGJ57V54TQGYHZ",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAVAGV52AEGJ57V54TQGYHZ"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 4
+      },
+      "at": "2026-07-24T19:58:41.634Z"
+    },
+    {
+      "id": "event_01KYAVNF4AZFDPX26A3THQ029N",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAVAGV52AEGJ57V54TQGYHZ",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAVAGV52AEGJ57V54TQGYHZ"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-07-24T20:04:30.986Z"
+    },
+    {
+      "id": "event_01KYAVNFA3N52F2GGHXTH8KGHQ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAVAGV52AEGJ57V54TQGYHZ",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAVAGV52AEGJ57V54TQGYHZ"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-07-24T20:04:31.171Z"
+    },
+    {
+      "id": "event_01KYAVNFG3VKNBV0JRMC5KCVTQ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAVAGV52AEGJ57V54TQGYHZ",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAVAGV52AEGJ57V54TQGYHZ"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-07-24T20:04:31.363Z"
+    },
+    {
+      "id": "event_01KYAVNFQ70M8RWV951BX6GY5W",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAVAGV52AEGJ57V54TQGYHZ",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAVAGV52AEGJ57V54TQGYHZ"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-07-24T20:04:31.591Z"
+    },
+    {
+      "id": "event_01KYAVQR1M2AKGBGHNJ66C8WV2",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC"
+      },
+      "payload": {
+        "progress": "Fix A: SpeculativeTranscriptCapture gained baselineTranscriptRef (the session.transcript_ref observed at speculative-read time); resolveTranscriptCapture now requires BOTH session id AND that baseline to match the authoritative session before reusing the speculative result, else falls back to an in-lock capture (whose own Fix-2 preserve-existing behavior does the right thing). Fix B: stop.ts and review.ts now pre-validate state (assertStoppable / checkReviewEntry) against the unlocked initialTicket BEFORE speculativeTranscriptCapture runs, so a command that's clearly going to fail never mutates .slop/transcripts/. done.ts/drop.ts were checked and don't need this -- their state invariants mean checkDoneEntry/checkDropEntry can never fail while active_session is set. 3 new regression tests (transcript.test.ts race test, stop.test.ts + review.test.ts never-mutate-on-failed-validation tests). Full suite: 1753/1753 pass; typecheck/lint/format clean."
+      },
+      "at": "2026-07-24T20:05:45.652Z"
+    },
+    {
+      "id": "event_01KYAVQWRRT5JVJ67NWTGWMPXZ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAVAGV52AEGJ57V54TQGYHZ",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAVAGV52AEGJ57V54TQGYHZ"
+      },
+      "payload": {
+        "transcript_ref": "transcripts/session_01KYAVAGV52AEGJ57V54TQGYHZ.jsonl"
+      },
+      "at": "2026-07-24T20:05:50.488Z"
+    },
+    {
+      "id": "event_01KYAVQWSBN2EGNPKKACSXR935",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAVAGV52AEGJ57V54TQGYHZ",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC"
+      },
+      "payload": {
+        "mr": null
+      },
+      "at": "2026-07-24T20:05:50.507Z"
+    },
+    {
+      "id": "event_01KYAX72YA4SX05WSFHKJY725B",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAVAGV52AEGJ57V54TQGYHZ",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYAVAGV52AEGJ57V54TQGYHZ"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Merged to main + full suite (1892 tests) green",
+        "transcript_ref": "transcripts/session_01KYAVAGV52AEGJ57V54TQGYHZ.jsonl"
+      },
+      "at": "2026-07-24T20:31:36.906Z"
+    },
+    {
+      "id": "event_01KYAX72YTXJK5JDP4NZ1HTG38",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYAVAGV52AEGJ57V54TQGYHZ",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KYAPKRY7XZJ8D8E5V6X5M2QC"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-07-24T20:31:36.922Z"
+    }
+  ]
+}

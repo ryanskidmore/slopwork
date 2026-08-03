@@ -1,0 +1,362 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KY9RVF5PBVGEQG69H3AKDM6W",
+  "events": [
+    {
+      "id": "event_01KY9RVF6SVHV2NBTY1GZDAX03",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KY9RVF5PBVGEQG69H3AKDM6W"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-07-24T09:56:07.513Z"
+    },
+    {
+      "id": "event_01KYA2WN9FG8XX5MNA6FBRZNKK",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYA2WN98V782YAF2FZTSMYR4",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYA2WN98V782YAF2FZTSMYR4"
+      },
+      "payload": {
+        "harness": "claude-code",
+        "takeover": false
+      },
+      "at": "2026-07-24T12:51:32.271Z"
+    },
+    {
+      "id": "event_01KYA2WNAKR1TGJQ0QTQJE45ES",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYA2WN98V782YAF2FZTSMYR4",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KY9RVF5PBVGEQG69H3AKDM6W"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-07-24T12:51:32.307Z"
+    },
+    {
+      "id": "event_01KYA34E1R15AT3A66XSGTPTN0",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYA2WN98V782YAF2FZTSMYR4",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYA2WN98V782YAF2FZTSMYR4"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 6
+      },
+      "at": "2026-07-24T12:55:47.000Z"
+    },
+    {
+      "id": "event_01KYA34YNRDRQACTJ9DGYKAG05",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYA2WN98V782YAF2FZTSMYR4",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYA2WN98V782YAF2FZTSMYR4"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-07-24T12:56:04.024Z"
+    },
+    {
+      "id": "event_01KYA34YTB2HZ76J47FZPWC55D",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KY9RVF5PBVGEQG69H3AKDM6W"
+      },
+      "payload": {
+        "progress": "Version survey done: everything already at latest except @biomejs/biome 2.5.4->2.5.5 (patch). oxlint 1.75.0 (mature, v1.x). oxfmt 0.60.0 (pre-1.0, breaking config changes as recently as v0.33, still shipping experimental features like .svelte support in v0.49) - leaning defer."
+      },
+      "at": "2026-07-24T12:56:04.171Z"
+    },
+    {
+      "id": "event_01KYA3BXWRYS3FPSV79ZVH608N",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYA2WN98V782YAF2FZTSMYR4",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYA2WN98V782YAF2FZTSMYR4"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-07-24T12:59:52.600Z"
+    },
+    {
+      "id": "event_01KYA3BY15AY2FWTXNMAXEJX4J",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KY9RVF5PBVGEQG69H3AKDM6W"
+      },
+      "payload": {
+        "progress": "oxlint adopted as sole JS/TS linter (replaces biome lint; biome.json linter.enabled=false, biome keeps formatting+JSON support). Config .oxlintrc.json: default correctness/typescript/unicorn/oxc plugins + import plugin (0 extra findings, negligible cost). Fixed 6 real findings (new Array(n).fill() ambiguous-length idiom x4, useless spread before .sort() x2). Evaluated --vitest-plugin: 373 warnings, mostly false positives against this codebase's deliberate expect(actual, message) custom-failure-message pattern -> NOT enabled, documented as curated-out noise."
+      },
+      "at": "2026-07-24T12:59:52.741Z"
+    },
+    {
+      "id": "event_01KYA3EM9506X34VQ7DC5AH3P2",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYA2WN98V782YAF2FZTSMYR4",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYA2WN98V782YAF2FZTSMYR4"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-07-24T13:01:21.061Z"
+    },
+    {
+      "id": "event_01KYA3EMDJ7C4M743D5W5NTWNX",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KY9RVF5PBVGEQG69H3AKDM6W"
+      },
+      "payload": {
+        "progress": "oxfmt DEFERRED, Biome kept for format/format:check. Evidence: oxfmt is 0.60.0 (pre-1.0 by the project's own semver; latest resolvable under the 3-day release-age gate is 0.59.0), changelog shows a breaking config change as recently as v0.33 and new *experimental* .svelte support in v0.49 (~2.5mo before this pass) -- still actively evolving. Concretely tested (bunx oxfmt@0.59.0 --check, non-destructive) against this repo's own src/**/tests/**: 11/238 files differ from Biome's current output, and the diffs are NOT cosmetic -- e.g. src/web/views/tree.ts gets a materially different reflow of tagged-template HTML (html`...`) content, indentation and line-wrapping change throughout. That fails the bar of 'a clean, reviewable result' -- adopting now would churn real files unpredictably for marginal benefit. oxfmt DOES format JSON/JSONC fine (not a blocker on its own)."
+      },
+      "at": "2026-07-24T13:01:21.202Z"
+    },
+    {
+      "id": "event_01KYA3GE61B6B0B60Q6GF3MPK7",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYA2WN98V782YAF2FZTSMYR4",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYA2WN98V782YAF2FZTSMYR4"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-07-24T13:02:20.353Z"
+    },
+    {
+      "id": "event_01KYA3GEAK1SJ43QRYZ504F2JG",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KY9RVF5PBVGEQG69H3AKDM6W"
+      },
+      "payload": {
+        "progress": "Dep bumps: only @biomejs/biome 2.5.4->2.5.5 (patch) was available/safe; verified format:check/lint/typecheck green after. Everything else (typescript 7.0.2, zod 4.4.3, commander 15.0.0, jsonc-parser 3.3.1, ulid 3.0.2, fast-check 4.9.0, vitest+@vitest/coverage-v8 4.1.10, @types/bun 1.3.14) was already at npm latest -- no bump available. jsonc-parser stays at 3.3.1 (still latest); the known inline-array-delete corruption bug and jsonc.ts's defensive hybrid-write/reparse-validate safety net are UNCHANGED (no newer release exists to fix it; not touched)."
+      },
+      "at": "2026-07-24T13:02:20.499Z"
+    },
+    {
+      "id": "event_01KYA3J2RXBRA9FHPJPC5RVJDV",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYA2WN98V782YAF2FZTSMYR4",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYA2WN98V782YAF2FZTSMYR4"
+      },
+      "payload": {
+        "step": 5,
+        "checked": true
+      },
+      "at": "2026-07-24T13:03:14.205Z"
+    },
+    {
+      "id": "event_01KYA3RTWRN9S39VKPWD74V8ST",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYA2WN98V782YAF2FZTSMYR4",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYA2WN98V782YAF2FZTSMYR4"
+      },
+      "payload": {
+        "step": 6,
+        "checked": true
+      },
+      "at": "2026-07-24T13:06:55.512Z"
+    },
+    {
+      "id": "event_01KYA3SR3ZBZNRBSKVNNTA2KVM",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYA2WN98V782YAF2FZTSMYR4",
+      "verb": "session.stopped",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYA2WN98V782YAF2FZTSMYR4"
+      },
+      "payload": {
+        "note": "Modern-tooling pass complete, full gate green (typecheck/lint/format:check/test 116 files 1570 tests/test:coverage/build/smoke ./dist/slop --help), NOT committed (house rules: no git commands). oxlint adopted as sole JS/TS linter (.oxlintrc.json; replaces biome lint; biome.json linter.enabled=false; biome keeps format+JSON); 6 real findings fixed (new Array(n).fill ambiguity x4, useless spread-before-sort x2). oxfmt DEFERRED (pre-1.0, recent breaking changes, and a concrete non-cosmetic 11/238-file diff vs Biome verified via bunx --check) -- Biome stays the formatter, documented in DECISIONS.md. Deps: only @biomejs/biome 2.5.4->2.5.5 bumped; everything else (typescript/zod/commander/jsonc-parser/ulid/fast-check/vitest/coverage-v8/@types/bun) already at npm latest. jsonc-parser stays 3.3.1 (latest); jsonc.ts defensive hybrid-write logic untouched. Files touched: package.json, bun.lock, biome.json, .oxlintrc.json (new), README.md, DECISIONS.md, src/sessions/plan.ts, src/sessions/plan-diff.ts, src/repo/events.test.ts, tests/acceptance/B3.test.ts. tests/support/**, coverage thresholds, and the sandbox guard were NOT touched. Next step for whoever has git access: commit, open MR, then slop review --mr <url> && slop done.",
+        "transcript_ref": "transcripts/session_01KYA2WN98V782YAF2FZTSMYR4.jsonl"
+      },
+      "at": "2026-07-24T13:07:25.439Z"
+    },
+    {
+      "id": "event_01KYA3SR4JFSWFCXPESHZJJTS5",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYA2WN98V782YAF2FZTSMYR4",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KY9RVF5PBVGEQG69H3AKDM6W"
+      },
+      "payload": {
+        "from": "in_progress",
+        "to": "open"
+      },
+      "at": "2026-07-24T13:07:25.458Z"
+    },
+    {
+      "id": "event_01KYA40SQAAQD1XG9SWB0DK0JG",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KYA40SQ4EQ9G39DPP5PN84F9",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYA40SQ4EQ9G39DPP5PN84F9"
+      },
+      "payload": {
+        "harness": "other",
+        "takeover": false
+      },
+      "at": "2026-07-24T13:11:16.458Z"
+    },
+    {
+      "id": "event_01KYA40SQWCYQAH65JXZRRWPM8",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KYA40SQ4EQ9G39DPP5PN84F9",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KY9RVF5PBVGEQG69H3AKDM6W"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-07-24T13:11:16.476Z"
+    },
+    {
+      "id": "event_01KYA40SVFC06G91564FP155Q6",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYA40SQ4EQ9G39DPP5PN84F9",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KYA40SQ4EQ9G39DPP5PN84F9"
+      },
+      "payload": {
+        "reason": "done"
+      },
+      "at": "2026-07-24T13:11:16.591Z"
+    },
+    {
+      "id": "event_01KYA40SW2JWSKXP33026VM8CC",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "agent"
+      },
+      "session": "session_01KYA40SQ4EQ9G39DPP5PN84F9",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KY9RVF5PBVGEQG69H3AKDM6W"
+      },
+      "payload": {
+        "from": "in_progress"
+      },
+      "at": "2026-07-24T13:11:16.610Z"
+    }
+  ]
+}

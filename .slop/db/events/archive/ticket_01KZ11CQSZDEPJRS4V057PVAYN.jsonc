@@ -1,0 +1,238 @@
+{
+  "version": 1,
+  "ticket": "ticket_01KZ11CQSZDEPJRS4V057PVAYN",
+  "events": [
+    {
+      "id": "event_01KZ11CQVV0KR5PEGECVBV4ACA",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.created",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11CQSZDEPJRS4V057PVAYN"
+      },
+      "payload": {
+        "method": "new",
+        "state": "open",
+        "adhoc": false,
+        "parent": null
+      },
+      "at": "2026-08-02T10:47:53.979Z"
+    },
+    {
+      "id": "event_01KZ11CXFJX98RT0G66T5RQ1B8",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0",
+      "verb": "session.started",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0"
+      },
+      "payload": {
+        "harness": "other",
+        "takeover": false
+      },
+      "at": "2026-08-02T10:47:59.730Z"
+    },
+    {
+      "id": "event_01KZ11CXFPJNKE6AHRDS0F89D4",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0",
+      "verb": "ticket.state_changed",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11CQSZDEPJRS4V057PVAYN"
+      },
+      "payload": {
+        "from": "open",
+        "to": "in_progress"
+      },
+      "at": "2026-08-02T10:47:59.734Z"
+    },
+    {
+      "id": "event_01KZ11CXN4VEYZR5NA7Z4NM4NN",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0",
+      "verb": "plan.set",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0"
+      },
+      "payload": {
+        "version": 1,
+        "step_count": 4
+      },
+      "at": "2026-08-02T10:47:59.908Z"
+    },
+    {
+      "id": "event_01KZ11YCW6XBWSTS5XY5243QWJ",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0"
+      },
+      "payload": {
+        "step": 1,
+        "checked": true
+      },
+      "at": "2026-08-02T10:57:32.551Z"
+    },
+    {
+      "id": "event_01KZ11YD2ZK6H7H68SDRG3PEEF",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0"
+      },
+      "payload": {
+        "step": 2,
+        "checked": true
+      },
+      "at": "2026-08-02T10:57:32.767Z"
+    },
+    {
+      "id": "event_01KZ11YD7HAY1EHYZ2VV34FA2H",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11CQSZDEPJRS4V057PVAYN"
+      },
+      "payload": {
+        "progress": "Implemented claimed-directory locking with unique tokens, same-host dead-pid-only recovery, and deterministic three-party/release/same-pid race regressions; focused 56-test suite, typecheck, lint, and format checks pass."
+      },
+      "at": "2026-08-02T10:57:32.914Z"
+    },
+    {
+      "id": "event_01KZ12CAJ21GANEE31D50X8P3X",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0"
+      },
+      "payload": {
+        "step": 3,
+        "checked": true
+      },
+      "at": "2026-08-02T11:05:08.930Z"
+    },
+    {
+      "id": "event_01KZ12CAPSW7EP1CJ4ZPA1CBAR",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": null,
+      "verb": "ticket.updated",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11CQSZDEPJRS4V057PVAYN"
+      },
+      "payload": {
+        "progress": "Documentation now records the claimed-directory protocol and manual-recovery tradeoff. Focused lock/config/A4/G2 suite: 67 passed; full Vitest suite: 1,948 passed; lock coverage: 91.15% statements, 87.5% branches, 100% functions, 95.45% lines; build/typecheck/lint/format pass. Repository-wide coverage still exits nonzero on pre-existing G3/G4 global/CLI thresholds being repaired separately."
+      },
+      "at": "2026-08-02T11:05:09.081Z"
+    },
+    {
+      "id": "event_01KZ12DP1EZ2X4ANT09RDRPA12",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0",
+      "verb": "plan.step_checked",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0"
+      },
+      "payload": {
+        "step": 4,
+        "checked": true
+      },
+      "at": "2026-08-02T11:05:53.455Z"
+    },
+    {
+      "id": "event_01KZ12DP6C7FJ6EGH5GJ73253C",
+      "actor": {
+        "name": "Ryan Skidmore",
+        "kind": "human"
+      },
+      "session": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0",
+      "verb": "review.requested",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11CQSZDEPJRS4V057PVAYN"
+      },
+      "payload": {
+        "mr": "https://github.com/ryanskidmore/slopwork/pull/7"
+      },
+      "at": "2026-08-02T11:05:53.612Z"
+    },
+    {
+      "id": "event_01KZ23B4BHC47JV3XFPGMNF5Y0",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0",
+      "verb": "session.ended",
+      "entity": {
+        "kind": "session",
+        "id": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0"
+      },
+      "payload": {
+        "reason": "done",
+        "note": "Audit-fix program fully merged: PRs 5,6,7,9,10,12,13,14,15,16,17,18,19 all on main (PR 11 closed as superseded). Batch-closed after final merges of 14/18 and 19."
+      },
+      "at": "2026-08-02T20:41:12.817Z"
+    },
+    {
+      "id": "event_01KZ23B4CDC8P64BP88CES7KXK",
+      "actor": {
+        "name": "coordinator",
+        "kind": "agent"
+      },
+      "session": "session_01KZ11CXFGNVXVJ4F9G6SQKCS0",
+      "verb": "ticket.done",
+      "entity": {
+        "kind": "ticket",
+        "id": "ticket_01KZ11CQSZDEPJRS4V057PVAYN"
+      },
+      "payload": {
+        "from": "review"
+      },
+      "at": "2026-08-02T20:41:12.845Z"
+    }
+  ]
+}
